@@ -20,6 +20,7 @@ import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 class ConsultasCard extends ConsumerStatefulWidget {
   const ConsultasCard({super.key, required this.profile});
@@ -65,9 +66,11 @@ class _ConsultasCardState extends ConsumerState<ConsultasCard> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _valor = anterior);
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTreinoToast(
+        context,
         // Mismo copy que el resto del Coach Hub cuando falla un guardado.
-        const SnackBar(content: Text('No se pudo guardar. Probá de nuevo.')),
+        'No se pudo guardar. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _guardando = false);

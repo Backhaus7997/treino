@@ -38,6 +38,7 @@ import 'widgets/esta_semana_card.dart';
 import 'widgets/home_cta_button.dart';
 import 'widgets/home_header.dart';
 import '../coach/presentation/widgets/invite_gate.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Role-aware home screen.
 ///
@@ -579,10 +580,10 @@ Widget _resumeModal(
           Navigator.of(dialogCtx, rootNavigator: true).pop();
         }
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppL10n.of(context).workoutDiscardError),
-            ),
+          showTreinoToast(
+            context,
+            AppL10n.of(context).workoutDiscardError,
+            type: TreinoToastType.error,
           );
         }
         return;

@@ -79,6 +79,8 @@ class AgendaWebCalendar extends ConsumerWidget {
       firstDay: DateTime.utc(2026, 1, 1),
       lastDay: DateTime.utc(2027, 12, 31),
       focusedDay: focusedDay,
+      // Semana lunes→domingo, como el resto de la app (#1491).
+      startingDayOfWeek: StartingDayOfWeek.monday,
       selectedDayPredicate: (d) =>
           selectedDay != null && isSameDay(selectedDay, d),
       onDaySelected: onDaySelected,

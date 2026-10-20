@@ -89,7 +89,7 @@ class TrainerHomePreview extends StatelessWidget {
                   _Stat(
                     value: '1',
                     label: 'CANCELADAS',
-                    color: palette.danger,
+                    color: palette.dangerText,
                   ),
                 ],
               ),
@@ -579,8 +579,8 @@ class TrainerFeedPreview extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(TreinoIcon.bell, size: 20, color: palette.textPrimary),
-            const SizedBox(width: 12),
+            // Mensajes, búsqueda y "+": las tres acciones reales del header del
+            // Feed. La campana vive en Inicio (`NotificationBell`), no acá.
             Icon(TreinoIcon.chat, size: 20, color: palette.textPrimary),
             const SizedBox(width: 12),
             Icon(TreinoIcon.search, size: 20, color: palette.textPrimary),
@@ -672,21 +672,9 @@ class TrainerFeedPreview extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(AppDecorativeRadii.previewPhoto),
-                child: const SizedBox(
-                  height: 180,
-                  width: double.infinity,
-                  // Bundled, not fetched: a preview has to render offline and
-                  // identically on every run.
-                  child: Image(
-                    image: AssetImage('assets/onboarding/feed-post-photo.png'),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
+              // Post manual, sólo texto: "Nuevo post" no adjunta fotos. La
+              // foto sólo existe en el compartir post-entreno, que además lleva
+              // las métricas del entreno (como el post de arriba).
               Text(
                 'Última serie de la semana. Bloque 2 cerrado, gracias coach.',
                 style: GoogleFonts.barlow(
@@ -775,14 +763,15 @@ class _PostStats extends StatelessWidget {
 class _Reactions extends StatelessWidget {
   const _Reactions({required this.counts});
 
-  /// Heart, flame, comment — in the handoff's order. A two-item list drops the
-  /// comment icon, which is what the photo post shows.
+  /// Las tres reacciones reales de un post (`ReactionType`: like, fire, clap),
+  /// en ese orden. El Feed no tiene comentarios, así que no hay ícono de chat
+  /// con contador. Una lista más corta deja afuera las últimas.
   final List<int> counts;
 
   static const _icons = [
     TreinoIcon.reactionLike,
     TreinoIcon.reactionFire,
-    TreinoIcon.chat,
+    TreinoIcon.reactionClap,
   ];
 
   @override
@@ -1151,7 +1140,7 @@ class TrainerProfilePreview extends StatelessWidget {
         _Tile(
           icon: TreinoIcon.trash,
           label: 'Eliminar cuenta',
-          color: palette.danger,
+          color: palette.dangerText,
         ),
       ],
     );

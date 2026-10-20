@@ -419,3 +419,32 @@ final trainerByIdProvider =
     return repo.getById(uid);
   },
 );
+
+/// El perfil público de [uid] EN VIVO: sigue al documento, no lo lee una vez.
+///
+/// Para la vista previa del propio PF (#1498). [trainerByIdProvider] no sirve
+/// ahí por dos razones, las dos medidas en QA (2026-10-19):
+///
+///  1. Es una lectura puntual: tras guardar los años de experiencia, la vista
+///     previa seguía mostrando «—» y el aviso de que faltaban.
+///  2. Lo comparte `TrainerProfileView` (la pantalla de abajo en el stack), que
+///     lo mantiene vivo: al abrir un preview nuevo, el provider ya tenía el
+///     valor viejo en memoria y no volvía a leer — salir y volver a entrar no
+///     arreglaba nada.
+///
+/// `autoDispose` y por separado de [trainerByIdProvider] a propósito: cada
+/// preview abre su propio listener, así que nunca hereda lo que otra pantalla
+/// dejó cacheado. El alumno sigue con [trainerByIdProvider]: ve un perfil ajeno
+/// que no cambia mientras lo mira, y su lectura puntual es más barata que un
+/// listener por cada perfil que hojea.
+///
+/// Construye el repositorio concreto y no pasa por
+/// [TrainerPublicProfileRepositoryInterface]: esa interfaz es la superficie de
+/// los listados de discovery (y la implementan fakes de varios tests); un
+/// método más ahí rompería a todos por algo que sólo usa esta pantalla.
+final trainerLiveByIdProvider =
+    StreamProvider.autoDispose.family<TrainerPublicProfile?, String>(
+  (ref, uid) => TrainerPublicProfileRepository(
+    firestore: ref.watch(firestoreProvider),
+  ).watchById(uid),
+);

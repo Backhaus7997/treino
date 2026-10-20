@@ -209,14 +209,15 @@ void main() {
       await tester.pump(); // trigger build, provider still loading
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       // No stats while loading
-      expect(find.text('DÍAS'), findsNothing);
+      expect(find.text('SEMANAS'), findsNothing);
       // Complete the future so the widget can clean up.
       completer.complete(null);
       await tester.pump();
     });
 
     // SCENARIO-306: Data state renders streak + day strip + SEMANA + MES
-    testWidgets('SCENARIO-306: data state renders streak, DÍAS, SEMANA, MES', (
+    testWidgets('SCENARIO-306: data state renders streak, SEMANAS, SEMANA, MES',
+        (
       tester,
     ) async {
       final insights = _makeInsights(
@@ -235,9 +236,73 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.text('5'), findsAtLeastNWidgets(1));
-      expect(find.text('DÍAS'), findsOneWidget);
+      expect(find.text('SEMANAS'), findsOneWidget);
       expect(find.text('SEMANA'), findsOneWidget);
       expect(find.text('MES'), findsOneWidget);
+    });
+
+    // #1507: la racha cuenta SEMANAS consecutivas (computeWeeklyStreak,
+    // ADR-WRS-08), no días. El label tiene que decir lo que cuenta, y en
+    // singular cuando es 1.
+    testWidgets('#1507: la unidad de la racha son semanas, nunca días', (
+      tester,
+    ) async {
+      final insights = _makeInsights(streak: 3);
+      await tester.pumpWidget(
+        _wrapCard(
+          overrides: [
+            weeklyInsightsProvider.overrideWith((_) async => insights),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('SEMANAS'), findsOneWidget);
+      expect(find.text('DÍAS'), findsNothing);
+      expect(find.text('DÍA'), findsNothing);
+    });
+
+    testWidgets('#1507: racha de 1 → unidad en singular', (tester) async {
+      final insights = _makeInsights(streak: 1);
+      await tester.pumpWidget(
+        _wrapCard(
+          overrides: [
+            weeklyInsightsProvider.overrideWith((_) async => insights),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('SEMANAS'), findsNothing);
+      // 'SEMANA' aparece dos veces: la unidad de la racha y el tile SEMANA.
+      expect(find.text('SEMANA'), findsNWidgets(2));
+    });
+
+    // #1508: el mapa pinta los sets de la SEMANA (no lo que toca hoy) y antes
+    // no lo decía en ningún lado.
+    testWidgets('#1508: el mapa muscular tiene título y leyenda', (
+      tester,
+    ) async {
+      final insights = _makeInsights();
+      await tester.pumpWidget(
+        _wrapCard(
+          overrides: [
+            weeklyInsightsProvider.overrideWith((_) async => insights),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('MÚSCULOS DE LA SEMANA'), findsOneWidget);
+      expect(
+        find.text(
+          'Más color = más cerca de las series que pide tu rutina esta semana.',
+        ),
+        findsOneWidget,
+      );
     });
 
     // SCENARIO-307: trained today → shows trained-today copy

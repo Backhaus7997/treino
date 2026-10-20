@@ -46,6 +46,15 @@ const _elevenLabels = [
 
 void main() {
   group('TreinoSegmentedPill', () {
+    // #1514: el label salía en Barlow regular (el `labelLarge` del tema).
+    testWidgets('#1514: el label va en Barlow Condensed 700', (tester) async {
+      await tester
+          .pumpWidget(_wrap(const TreinoSegmentedPill(labels: _labels)));
+      final bar = tester.widget<TabBar>(find.byType(TabBar));
+      expect(bar.labelStyle?.fontFamily, 'Barlow Condensed');
+      expect(bar.labelStyle?.fontWeight, FontWeight.w700);
+    });
+
     testWidgets('renderiza un TabBar con una celda por etiqueta',
         (tester) async {
       await tester.pumpWidget(

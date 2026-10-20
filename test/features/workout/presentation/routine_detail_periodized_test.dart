@@ -15,7 +15,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
@@ -123,9 +126,12 @@ Widget _wrap(
   Widget w, {
   required Routine routine,
   List<Session> sessions = const [],
+  ThemeData? theme,
+  List<Override> extra = const [],
 }) {
   return ProviderScope(
     overrides: [
+      ...extra,
       routineByIdStreamProvider(routine.id)
           .overrideWith((ref) => Stream.value(routine)),
       routineByIdProvider(routine.id).overrideWith((ref) async => routine),
@@ -135,7 +141,7 @@ Widget _wrap(
       sessionsByUidProvider(_uid).overrideWith((ref) async => sessions),
     ],
     child: MaterialApp(
-      theme: AppTheme.dark(),
+      theme: theme ?? AppTheme.dark(),
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
       locale: const Locale('es', 'AR'),
@@ -373,14 +379,18 @@ void main() {
 
       // Plan-complete banner is in the CTA area below the fold.
       expect(find.text('PLAN COMPLETADO', skipOffstage: false), findsOneWidget);
-      // AD-2: the banner is a signal, never a lock — REPETIR must still be
-      // there and enabled. This is the true device repro path: before this
+      // AD-2: the banner is a signal, never a lock — the action must still
+      // be there and enabled. This is the true device repro path: before this
       // change, the widget early-returned the banner with no button at all.
+      //
+      // #1509: con el plan completo, Inicio vuelve a empezar el ciclo y
+      // recomienda semana 1 · día 1 — que es justo lo que el detalle muestra
+      // por defecto. Ese día ofrece EMPEZAR, como Inicio, y no REPETIR.
       expect(
-        find.text('REPETIR', skipOffstage: false),
+        find.text('EMPEZAR', skipOffstage: false),
         findsOneWidget,
-        reason: 'A complete plan must still offer an action (AD-2) — the '
-            'device repro this change fixes.',
+        reason: 'A complete plan must still offer an action (AD-2), and the '
+            'day Inicio recommends reads like Inicio (#1509).',
       );
       // AD-1: banner XOR chip. Exact match on 'COMPLETADO' does not collide
       // with 'PLAN COMPLETADO' (find.text is an exact match, not substring).
@@ -392,11 +402,55 @@ void main() {
       );
       final btn = tester.widget<ElevatedButton>(find
           .ancestor(
-            of: find.text('REPETIR', skipOffstage: false),
+            of: find.text('EMPEZAR', skipOffstage: false),
             matching: find.byType(ElevatedButton, skipOffstage: false),
           )
           .first);
       expect(btn.onPressed, isNotNull);
+    });
+
+    // #1509: Inicio ofrecía EMPEZAR y el detalle del mismo día decía REPETIR.
+    // Inicio es cíclico (última sesión + 1); el «hecho» del detalle es de todo
+    // el historial. El día que toca dice EMPEZAR; los demás hechos, REPETIR.
+    testWidgets(
+        '#1509: el día que recomienda Inicio dice EMPEZAR, los otros '
+        'hechos REPETIR', (tester) async {
+      final routine = _multiWeekRoutine(numWeeks: 2, days: [_day(1), _day(2)]);
+      // Ciclo completo y la semana 1 otra vez: la última es semana 1 · día 2
+      // (índice 0), así que Inicio recomienda semana 2 · día 1 (índice 1).
+      final sessions = [
+        _doneSession(routineId: routine.id, week: 0, day: 1),
+        _doneSession(routineId: routine.id, week: 0, day: 2),
+        _doneSession(routineId: routine.id, week: 1, day: 1),
+        _doneSession(routineId: routine.id, week: 1, day: 2),
+        _doneSession(routineId: routine.id, week: 0, day: 1, seq: 1)
+            .copyWith(startedAt: DateTime.utc(2026, 2, 1)),
+        _doneSession(routineId: routine.id, week: 0, day: 2, seq: 1)
+            .copyWith(startedAt: DateTime.utc(2026, 2, 2)),
+      ];
+
+      Future<void> abrir(int week, int day) async {
+        await tester.pumpWidget(_wrap(
+          RoutineDetailScreen(
+            key: ValueKey('$week-$day'),
+            routineId: routine.id,
+            initialWeekIndex: week,
+            initialDayNumber: day,
+          ),
+          routine: routine,
+          sessions: sessions,
+        ));
+        await _settle(tester);
+      }
+
+      await abrir(1, 1);
+      expect(find.text('EMPEZAR', skipOffstage: false), findsOneWidget,
+          reason: 'semana 2 · día 1 es lo que Inicio ofrece');
+      expect(find.text('REPETIR', skipOffstage: false), findsNothing);
+
+      await abrir(0, 1);
+      expect(find.text('REPETIR', skipOffstage: false), findsOneWidget,
+          reason: 'un día hecho que NO es el que toca sigue siendo REPETIR');
     });
 
     testWidgets(
@@ -499,10 +553,12 @@ void main() {
         sessions: sessions,
       ));
       await _settle(tester);
+      // #1509: tras el ciclo completo, semana 1 · día 1 es lo que toca (como
+      // en Inicio) → la acción dice EMPEZAR. Lo que se fija acá es que esté.
 
       final btn = tester.widget<ElevatedButton>(find
           .ancestor(
-            of: find.text('REPETIR', skipOffstage: false),
+            of: find.text('EMPEZAR', skipOffstage: false),
             matching: find.byType(ElevatedButton, skipOffstage: false),
           )
           .first);
@@ -865,6 +921,81 @@ void main() {
       await _settle(tester);
 
       expect(find.text('EMPEZAR', skipOffstage: false), findsOneWidget);
+    });
+  });
+
+  // ── #1509 (visual): detalle de un plan del PF en tema claro ──────────────
+  group('#1509 visual, tema claro', () {
+    Routine planDelPf() => _multiWeekRoutine(days: [_day(1), _day(2)])
+        .copyWith(source: RoutineSource.trainerAssigned, assignedBy: 'pf-1');
+
+    Future<AppPalette> abrir(WidgetTester tester, Routine routine) async {
+      final tema = AppTheme.light();
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+        theme: tema,
+        extra: [
+          userPublicProfileProvider('pf-1')
+              .overrideWith((ref) => Stream.value(null)),
+        ],
+      ));
+      await _settle(tester);
+      return tema.extension<AppPalette>()!;
+    }
+
+    // #1559: ya no hay disco. El círculo gris sólido era justo lo que #1509
+    // marcaba como fuera del lenguaje del resto: la flecha va suelta.
+    bool hayDiscoDetrasDelBotonAtras(WidgetTester tester) => find
+        .ancestor(
+          of: find.byTooltip('Volver'),
+          matching: find.byWidgetPredicate(
+              (w) => w is Material && w.shape is CircleBorder),
+        )
+        .evaluate()
+        .isNotEmpty;
+
+    Color colorDeLaFlecha(WidgetTester tester) => IconTheme.of(
+          tester.element(find.descendant(
+            of: find.byTooltip('Volver'),
+            matching: find.byType(Icon),
+          )),
+        ).color!;
+
+    testWidgets(
+        'sin foto, la flecha va suelta (sin disco) y del color del tema',
+        (tester) async {
+      final palette = await abrir(tester, planDelPf());
+      expect(hayDiscoDetrasDelBotonAtras(tester), isFalse);
+      expect(colorDeLaFlecha(tester), palette.textPrimary);
+    });
+
+    testWidgets('con foto, la flecha va suelta y blanca para leerse sobre ella',
+        (tester) async {
+      await abrir(
+          tester,
+          planDelPf().copyWith(
+              id: 'atletico-4dias-avanzado',
+              source: RoutineSource.system,
+              assignedBy: null));
+      // Llega con los datos: el color viaja con la animación de la barra.
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(hayDiscoDetrasDelBotonAtras(tester), isFalse);
+      expect(colorDeLaFlecha(tester), Colors.white);
+    });
+
+    testWidgets('«Asignado por» y el badge del día van en accentText',
+        (tester) async {
+      final palette = await abrir(tester, planDelPf());
+      final asignado = tester.widget<Text>(find.textContaining('signad'));
+      expect(asignado.style?.color, palette.accentText);
+    });
+
+    testWidgets('SEM/DÍA seleccionados: ink sobre mint, no blanco',
+        (tester) async {
+      await abrir(tester, planDelPf());
+      final sem1 = tester.widget<Text>(find.text('SEM 1'));
+      expect(sem1.style?.color, TreinoButtonTokens.ink);
     });
   });
 }

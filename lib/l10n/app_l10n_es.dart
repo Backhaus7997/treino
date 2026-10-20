@@ -64,8 +64,8 @@ class AppL10nEs extends AppL10n {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'DÍAS',
-      one: 'DÍA',
+      other: 'SEMANAS',
+      one: 'SEMANA',
     );
     return '$_temp0';
   }
@@ -93,6 +93,21 @@ class AppL10nEs extends AppL10n {
       one: 'entreno',
     );
     return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaMusclesTitle => 'MÚSCULOS DE LA SEMANA';
+
+  @override
+  String get homeEstaSemanaMusclesLegend =>
+      'Más color = más cerca de las series que pide tu rutina esta semana.';
+
+  @override
+  String get homeGreeting => '¡HOLA!';
+
+  @override
+  String homeGreetingNamed(String name) {
+    return '¡HOLA, $name!';
   }
 
   @override
@@ -151,6 +166,17 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get authWelcomeSignIn => 'Iniciar sesión';
+
+  @override
+  String get authWelcomeTrainerPrompt => '¿Eres entrenador?';
+
+  @override
+  String get authWelcomeBecomeTrainer => 'Quiero ser entrenador';
+
+  @override
+  String authWelcomeBecomeTrainerFallback(String email) {
+    return 'No pudimos abrir tu correo. Escríbenos a $email.';
+  }
 
   @override
   String get authLoginTitle => 'BIENVENIDO';
@@ -351,6 +377,17 @@ class AppL10nEs extends AppL10n {
       'No pudimos abrir la consulta. Inténtalo de nuevo.';
 
   @override
+  String get coachPreviewBannerTitle => 'VISTA PREVIA';
+
+  @override
+  String get coachPreviewBannerBody =>
+      'Así ve tu perfil un alumno. Los botones están desactivados en esta vista.';
+
+  @override
+  String get coachPreviewMissingExperience =>
+      'Todavía no has cargado tus años de experiencia: los alumnos ven «—». Toca para cargarlos.';
+
+  @override
   String get coachCtaProximamente => 'Próximamente — Etapa 3';
 
   @override
@@ -487,7 +524,7 @@ class AppL10nEs extends AppL10n {
   String get coachExercisePicker => 'Buscar ejercicio';
 
   @override
-  String get agendaButtonLabel => 'VER AGENDA DEL PF';
+  String get agendaButtonLabel => 'MI AGENDA';
 
   @override
   String get athleteNutritionPlanButtonLabel => 'MI PLAN NUTRICIONAL';
@@ -598,6 +635,28 @@ class AppL10nEs extends AppL10n {
       'No podés cancelar con menos de 24h de anticipación.';
 
   @override
+  String get agendaAthleteCancelCta => 'CANCELAR';
+
+  @override
+  String get agendaAthleteCancelConfirmBody =>
+      '¿Cancelar esta sesión? Le avisamos a tu entrenador.';
+
+  @override
+  String get agendaBookingCancelledByAthlete =>
+      'Reserva cancelada por el alumno.';
+
+  @override
+  String get agendaAthleteNotifyTrainerCta => 'AVISAR A MI ENTRENADOR';
+
+  @override
+  String get agendaAthleteNotifyHint =>
+      'Faltan menos de 24 h: si no puedes ir, avísale a tu entrenador.';
+
+  @override
+  String get agendaAthleteChatError =>
+      'No pudimos abrir el chat. Inténtalo de nuevo.';
+
+  @override
   String get agendaUpcomingAppointmentsHeading => 'TUS PRÓXIMAS RESERVAS';
 
   @override
@@ -634,8 +693,33 @@ class AppL10nEs extends AppL10n {
       'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.';
 
   @override
+  String agendaRuleOverlap(String day, String start, String end) {
+    return 'Ese horario se superpone con otro que ya cargaste: $day, $start – $end.';
+  }
+
+  @override
   String get agendaBookingCancelledByCoach =>
       'Reserva cancelada por el entrenador.';
+
+  @override
+  String get agendaAttendanceMarkAbsent => 'MARCAR AUSENTE';
+
+  @override
+  String get agendaAttendanceUndoAbsent => 'DESHACER AUSENTE';
+
+  @override
+  String get agendaAttendanceDefaultHint =>
+      'Si no marcas nada, la sesión cuenta como hecha.';
+
+  @override
+  String get agendaAttendanceAbsentHint => 'Marcaste que el alumno faltó.';
+
+  @override
+  String get agendaAttendanceAbsentStatus => 'Ausente';
+
+  @override
+  String get agendaAttendanceError =>
+      'No pudimos guardar la asistencia. Inténtalo de nuevo.';
 
   @override
   String get agendaBlockedDayTitle => 'Día bloqueado';
@@ -652,6 +736,59 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get agendaBlockedDayConfirm => 'Cargar igual';
+
+  @override
+  String get agendaConflictTitle => 'Revisa el horario';
+
+  @override
+  String agendaConflictOverlapLine(String name, String start, String end) {
+    return 'Se superpone con $name ($start – $end).';
+  }
+
+  @override
+  String agendaConflictOverlapMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Y $count sesiones más.',
+      one: 'Y 1 sesión más.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictSomeoneElse => 'otra sesión';
+
+  @override
+  String get agendaConflictOutsideAvailability =>
+      'Queda fuera de tu disponibilidad publicada.';
+
+  @override
+  String agendaConflictSeriesOverlap(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sesiones de la serie se superponen con otras ya agendadas.',
+      one: '1 sesión de la serie se superpone con otra ya agendada.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String agendaConflictSeriesOutside(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sesiones de la serie quedan fuera de tu disponibilidad publicada.',
+      one: '1 sesión de la serie queda fuera de tu disponibilidad publicada.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictQuestion => '¿Quieres agendarla igualmente?';
 
   @override
   String get agendaSlotFreeLabel => 'Disponible';
@@ -838,6 +975,12 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInFromToday => 'Ya lo contaste hoy en Inicio.';
+
+  @override
+  String get wellbeingCheckInUseForSession => 'USAR PARA ESTE ENTRENO';
 
   @override
   String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
@@ -1063,6 +1206,50 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
+
+  @override
+  String templatesFilterEmptyDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'No hay plantillas de $days días',
+      one: 'No hay plantillas de 1 día',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String templatesFilterEmptyMinutes(String minutes) {
+    return 'No hay plantillas de $minutes min o menos';
+  }
+
+  @override
+  String get templatesFilterEmptyCombination =>
+      'Ninguna plantilla cumple todo lo que elegiste a la vez';
+
+  @override
+  String get templatesFilterEmptyGoals =>
+      'Ninguna plantilla apunta a los objetivos que elegiste';
+
+  @override
+  String get templatesFilterEmptyZones =>
+      'Ninguna plantilla trabaja las zonas que elegiste';
+
+  @override
+  String get templatesFilterEmptyAction => 'Ver todas';
+
+  @override
+  String get templatesFilterBarClear => 'Borrar filtros';
+
+  @override
+  String get templatesFiltersCleared => 'Filtros borrados';
+
+  @override
+  String get templatesFiltersClearError =>
+      'No pudimos borrar los filtros. Inténtalo de nuevo.';
+
+  @override
+  String get templatesFiltersUndo => 'DESHACER';
 
   @override
   String get workoutExploreSearchHint =>
@@ -2455,7 +2642,11 @@ class AppL10nEs extends AppL10n {
   String get searchUsersClearA11y => 'Limpiar búsqueda';
 
   @override
-  String get publicProfileMessageDisabledA11y => 'Mensaje (próximamente)';
+  String get publicProfileMessageDisabledA11y =>
+      'Mensaje (no disponible: esta persona tiene que seguirte)';
+
+  @override
+  String get publicProfileStatWorkouts => 'ENTRENOS';
 
   @override
   String a11yAvatarLabel(String name) {
@@ -2592,6 +2783,9 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get commonCancel => 'Cancelar';
+
+  @override
+  String get commonDone => 'Listo';
 
   @override
   String get publicProfileLoadErrorA11y => 'No pudimos cargar este perfil.';
@@ -3163,6 +3357,51 @@ class AppL10nEs extends AppL10n {
   @override
   String get sessionFinishError =>
       'No pudimos finalizar la sesión. Inténtalo de nuevo.';
+
+  @override
+  String get sessionFinishNeedOneSet =>
+      'Haz al menos una serie para poder terminar. Si hoy no vas a entrenar, toca ABANDONAR.';
+
+  @override
+  String get sessionFinishEarlyTitle => '¿TERMINAR IGUAL?';
+
+  @override
+  String sessionFinishEarlyMissingHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Te faltan $count series:',
+      one: 'Te falta 1 serie:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'y $count ejercicios más',
+      one: 'y 1 ejercicio más',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyCounts(int percent) {
+    return 'Hiciste el $percent % de la sesión: cuenta como entreno para tu racha y tus rankings.';
+  }
+
+  @override
+  String sessionFinishEarlyNotCounts(int percent, int minPercent) {
+    return 'Hiciste el $percent % de la sesión. Se guarda, pero no cuenta como entreno para tu racha ni tus rankings: hace falta el $minPercent %.';
+  }
+
+  @override
+  String get sessionFinishEarlyConfirm => 'TERMINAR IGUAL';
+
+  @override
+  String get sessionFinishEarlyKeepGoing => 'SEGUIR ENTRENANDO';
 
   @override
   String get routineEditorMissingName => 'Ponle un nombre a la rutina.';
@@ -4209,7 +4448,7 @@ class AppL10nEs extends AppL10n {
   String get feedSegmentFollowing => 'SEGUIDORES';
 
   @override
-  String get feedEmptyFollowing => 'Aún no hay posts de a quienes seguís';
+  String get feedEmptyFollowing => 'Aún no hay posts de quienes seguís';
 
   @override
   String get chatBlockedComposerNotice =>
@@ -4412,7 +4651,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.';
+      'Todo lo que elijas filtra el catálogo: sólo vas a ver plantillas que cumplan con todo. Si no queda ninguna, podés ver todas.';
 
   @override
   String get templatesOnboardingStep2Title => '¿Cuánto dura tu sesión?';
@@ -4520,7 +4759,11 @@ class AppL10nEs extends AppL10n {
   String get templatesFilterBarSetUp => 'AJUSTAR MI BÚSQUEDA';
 
   @override
-  String get templatesFilterBarHint => 'Ordenado según lo que buscás';
+  String get templatesFilterBarHint =>
+      'Filtrado y ordenado según lo que buscás';
+
+  @override
+  String get templatesFilterBarHintSorted => 'Ordenado según lo que buscás';
 
   @override
   String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';
@@ -5344,6 +5587,70 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get timePickerHelpText => 'Elige una hora';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Entre $min y $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Máximo $max $unit';
+  }
+
+  @override
+  String get performanceLogTitleEdit => 'Editar evaluación';
+
+  @override
+  String get performanceLogUpdateCta => 'GUARDAR CAMBIOS';
+
+  @override
+  String get performanceLogUpdateSuccess => 'Evaluación actualizada';
+
+  @override
+  String get performanceHistoryEditTooltip => 'Editar evaluación';
+
+  @override
+  String get performanceHistoryDeleteTooltip => 'Eliminar evaluación';
+
+  @override
+  String get performanceHistoryOtherTrainerTag => 'Cargada por otro entrenador';
+
+  @override
+  String get performanceDeleteConfirmTitle => '¿Eliminar evaluación?';
+
+  @override
+  String performanceDeleteConfirmBody(String date) {
+    return 'Se eliminará la evaluación del $date. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get performanceDeleteSuccess => 'Evaluación eliminada';
+
+  @override
+  String get performanceDeleteError =>
+      'No pudimos eliminar la evaluación. Prueba de nuevo.';
+
+  @override
+  String get commonDelete => 'Eliminar';
+
+  @override
+  String get agendaRuleDeleteTitle => '¿Borrar este horario?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Las reservas existentes se mantienen.';
+
+  @override
+  String get agendaOverrideDeleteTitle => '¿Eliminar esta excepción?';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'AHORA NO';
+
+  @override
+  String get authSignOutConfirmTitle => '¿Cerrar sesión?';
+
+  @override
+  String get authSignOutConfirmAction => 'Salir';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -5406,8 +5713,8 @@ class AppL10nEsAr extends AppL10nEs {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'DÍAS',
-      one: 'DÍA',
+      other: 'SEMANAS',
+      one: 'SEMANA',
     );
     return '$_temp0';
   }
@@ -5435,6 +5742,21 @@ class AppL10nEsAr extends AppL10nEs {
       one: 'entreno',
     );
     return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaMusclesTitle => 'MÚSCULOS DE LA SEMANA';
+
+  @override
+  String get homeEstaSemanaMusclesLegend =>
+      'Más color = más cerca de las series que pide tu rutina esta semana.';
+
+  @override
+  String get homeGreeting => '¡HOLA!';
+
+  @override
+  String homeGreetingNamed(String name) {
+    return '¡HOLA, $name!';
   }
 
   @override
@@ -5493,6 +5815,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get authWelcomeSignIn => 'Iniciar sesión';
+
+  @override
+  String get authWelcomeTrainerPrompt => '¿Sos entrenador?';
+
+  @override
+  String get authWelcomeBecomeTrainer => 'Quiero ser entrenador';
+
+  @override
+  String authWelcomeBecomeTrainerFallback(String email) {
+    return 'No pudimos abrir tu correo. Escribinos a $email.';
+  }
 
   @override
   String get authLoginTitle => 'BIENVENIDO';
@@ -5693,6 +6026,17 @@ class AppL10nEsAr extends AppL10nEs {
       'No pudimos abrir la consulta. Probá de nuevo.';
 
   @override
+  String get coachPreviewBannerTitle => 'VISTA PREVIA';
+
+  @override
+  String get coachPreviewBannerBody =>
+      'Así ve tu perfil un alumno. Los botones están desactivados en esta vista.';
+
+  @override
+  String get coachPreviewMissingExperience =>
+      'Todavía no cargaste tus años de experiencia: los alumnos ven «—». Tocá para cargarlos.';
+
+  @override
   String get coachCtaProximamente => 'Próximamente — Etapa 3';
 
   @override
@@ -5829,7 +6173,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachExercisePicker => 'Buscar ejercicio';
 
   @override
-  String get agendaButtonLabel => 'VER AGENDA DEL PF';
+  String get agendaButtonLabel => 'MI AGENDA';
 
   @override
   String get athleteNutritionPlanButtonLabel => 'MI PLAN NUTRICIONAL';
@@ -5940,6 +6284,28 @@ class AppL10nEsAr extends AppL10nEs {
       'No podés cancelar con menos de 24h de anticipación.';
 
   @override
+  String get agendaAthleteCancelCta => 'CANCELAR';
+
+  @override
+  String get agendaAthleteCancelConfirmBody =>
+      '¿Cancelar esta sesión? Le avisamos a tu PF.';
+
+  @override
+  String get agendaBookingCancelledByAthlete =>
+      'Reserva cancelada por el alumno.';
+
+  @override
+  String get agendaAthleteNotifyTrainerCta => 'AVISAR A MI PF';
+
+  @override
+  String get agendaAthleteNotifyHint =>
+      'Faltan menos de 24 h: si no podés ir, avisale a tu PF.';
+
+  @override
+  String get agendaAthleteChatError =>
+      'No pudimos abrir el chat. Probá de nuevo.';
+
+  @override
   String get agendaUpcomingAppointmentsHeading => 'TUS PRÓXIMAS RESERVAS';
 
   @override
@@ -5976,8 +6342,33 @@ class AppL10nEsAr extends AppL10nEs {
       'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.';
 
   @override
+  String agendaRuleOverlap(String day, String start, String end) {
+    return 'Ese horario se superpone con otro que ya cargaste: $day, $start – $end.';
+  }
+
+  @override
   String get agendaBookingCancelledByCoach =>
       'Reserva cancelada por el entrenador.';
+
+  @override
+  String get agendaAttendanceMarkAbsent => 'MARCAR AUSENTE';
+
+  @override
+  String get agendaAttendanceUndoAbsent => 'DESHACER AUSENTE';
+
+  @override
+  String get agendaAttendanceDefaultHint =>
+      'Si no marcás nada, la sesión cuenta como hecha.';
+
+  @override
+  String get agendaAttendanceAbsentHint => 'Marcaste que el alumno faltó.';
+
+  @override
+  String get agendaAttendanceAbsentStatus => 'Ausente';
+
+  @override
+  String get agendaAttendanceError =>
+      'No pudimos guardar la asistencia. Probá de nuevo.';
 
   @override
   String get agendaBlockedDayTitle => 'Día bloqueado';
@@ -5994,6 +6385,59 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get agendaBlockedDayConfirm => 'Cargar igual';
+
+  @override
+  String get agendaConflictTitle => 'Revisá el horario';
+
+  @override
+  String agendaConflictOverlapLine(String name, String start, String end) {
+    return 'Se superpone con $name ($start – $end).';
+  }
+
+  @override
+  String agendaConflictOverlapMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Y $count sesiones más.',
+      one: 'Y 1 sesión más.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictSomeoneElse => 'otra sesión';
+
+  @override
+  String get agendaConflictOutsideAvailability =>
+      'Queda fuera de tu disponibilidad publicada.';
+
+  @override
+  String agendaConflictSeriesOverlap(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sesiones de la serie se superponen con otras ya agendadas.',
+      one: '1 sesión de la serie se superpone con otra ya agendada.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String agendaConflictSeriesOutside(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sesiones de la serie quedan fuera de tu disponibilidad publicada.',
+      one: '1 sesión de la serie queda fuera de tu disponibilidad publicada.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictQuestion => '¿Querés agendarla igual?';
 
   @override
   String get agendaSlotFreeLabel => 'Disponible';
@@ -6180,6 +6624,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInFromToday => 'Ya lo contaste hoy en Inicio.';
+
+  @override
+  String get wellbeingCheckInUseForSession => 'USAR PARA ESTE ENTRENO';
 
   @override
   String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
@@ -6405,6 +6855,50 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
+
+  @override
+  String templatesFilterEmptyDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'No hay plantillas de $days días',
+      one: 'No hay plantillas de 1 día',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String templatesFilterEmptyMinutes(String minutes) {
+    return 'No hay plantillas de $minutes min o menos';
+  }
+
+  @override
+  String get templatesFilterEmptyCombination =>
+      'Ninguna plantilla cumple todo lo que elegiste a la vez';
+
+  @override
+  String get templatesFilterEmptyGoals =>
+      'Ninguna plantilla apunta a los objetivos que elegiste';
+
+  @override
+  String get templatesFilterEmptyZones =>
+      'Ninguna plantilla trabaja las zonas que elegiste';
+
+  @override
+  String get templatesFilterEmptyAction => 'Ver todas';
+
+  @override
+  String get templatesFilterBarClear => 'Borrar filtros';
+
+  @override
+  String get templatesFiltersCleared => 'Filtros borrados';
+
+  @override
+  String get templatesFiltersClearError =>
+      'No pudimos borrar los filtros. Probá de nuevo.';
+
+  @override
+  String get templatesFiltersUndo => 'DESHACER';
 
   @override
   String get workoutExploreSearchHint =>
@@ -7799,7 +8293,11 @@ class AppL10nEsAr extends AppL10nEs {
   String get searchUsersClearA11y => 'Limpiar búsqueda';
 
   @override
-  String get publicProfileMessageDisabledA11y => 'Mensaje (próximamente)';
+  String get publicProfileMessageDisabledA11y =>
+      'Mensaje (no disponible: esta persona tiene que seguirte)';
+
+  @override
+  String get publicProfileStatWorkouts => 'ENTRENOS';
 
   @override
   String a11yAvatarLabel(String name) {
@@ -7936,6 +8434,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get commonCancel => 'Cancelar';
+
+  @override
+  String get commonDone => 'Listo';
 
   @override
   String get publicProfileLoadErrorA11y => 'No pudimos cargar este perfil.';
@@ -8504,6 +9005,51 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get sessionFinishError =>
       'No pudimos finalizar la sesión. Probá de nuevo.';
+
+  @override
+  String get sessionFinishNeedOneSet =>
+      'Hacé al menos una serie para poder terminar. Si hoy no vas a entrenar, tocá ABANDONAR.';
+
+  @override
+  String get sessionFinishEarlyTitle => '¿TERMINAR IGUAL?';
+
+  @override
+  String sessionFinishEarlyMissingHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Te faltan $count series:',
+      one: 'Te falta 1 serie:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'y $count ejercicios más',
+      one: 'y 1 ejercicio más',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyCounts(int percent) {
+    return 'Hiciste el $percent % de la sesión: cuenta como entreno para tu racha y tus rankings.';
+  }
+
+  @override
+  String sessionFinishEarlyNotCounts(int percent, int minPercent) {
+    return 'Hiciste el $percent % de la sesión. Se guarda, pero no cuenta como entreno para tu racha ni tus rankings: hace falta el $minPercent %.';
+  }
+
+  @override
+  String get sessionFinishEarlyConfirm => 'TERMINAR IGUAL';
+
+  @override
+  String get sessionFinishEarlyKeepGoing => 'SEGUIR ENTRENANDO';
 
   @override
   String get routineEditorMissingName => 'Poné un nombre a la rutina.';
@@ -9548,7 +10094,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get feedSegmentFollowing => 'SEGUIDORES';
 
   @override
-  String get feedEmptyFollowing => 'Todavía no hay posts de a quienes seguís';
+  String get feedEmptyFollowing => 'Todavía no hay posts de quienes seguís';
 
   @override
   String get chatBlockedComposerNotice =>
@@ -9751,7 +10297,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.';
+      'Todo lo que elijas filtra el catálogo: sólo vas a ver plantillas que cumplan con todo. Si no queda ninguna, podés ver todas.';
 
   @override
   String get templatesOnboardingStep2Title => '¿Cuánto dura tu sesión?';
@@ -9859,7 +10405,11 @@ class AppL10nEsAr extends AppL10nEs {
   String get templatesFilterBarSetUp => 'AJUSTAR MI BÚSQUEDA';
 
   @override
-  String get templatesFilterBarHint => 'Ordenado según lo que buscás';
+  String get templatesFilterBarHint =>
+      'Filtrado y ordenado según lo que buscás';
+
+  @override
+  String get templatesFilterBarHintSorted => 'Ordenado según lo que buscás';
 
   @override
   String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';
@@ -10683,4 +11233,68 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get timePickerHelpText => 'Elegí una hora';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Entre $min y $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Máximo $max $unit';
+  }
+
+  @override
+  String get performanceLogTitleEdit => 'Editar evaluación';
+
+  @override
+  String get performanceLogUpdateCta => 'GUARDAR CAMBIOS';
+
+  @override
+  String get performanceLogUpdateSuccess => 'Evaluación actualizada';
+
+  @override
+  String get performanceHistoryEditTooltip => 'Editar evaluación';
+
+  @override
+  String get performanceHistoryDeleteTooltip => 'Eliminar evaluación';
+
+  @override
+  String get performanceHistoryOtherTrainerTag => 'Cargada por otro entrenador';
+
+  @override
+  String get performanceDeleteConfirmTitle => '¿Eliminar evaluación?';
+
+  @override
+  String performanceDeleteConfirmBody(String date) {
+    return 'Se eliminará la evaluación del $date. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get performanceDeleteSuccess => 'Evaluación eliminada';
+
+  @override
+  String get performanceDeleteError =>
+      'No pudimos eliminar la evaluación. Probá de nuevo.';
+
+  @override
+  String get commonDelete => 'Eliminar';
+
+  @override
+  String get agendaRuleDeleteTitle => '¿Borrar este horario?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Las reservas existentes se mantienen.';
+
+  @override
+  String get agendaOverrideDeleteTitle => '¿Eliminar esta excepción?';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'AHORA NO';
+
+  @override
+  String get authSignOutConfirmTitle => '¿Cerrar sesión?';
+
+  @override
+  String get authSignOutConfirmAction => 'Salir';
 }

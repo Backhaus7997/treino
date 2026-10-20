@@ -21,6 +21,7 @@ import 'steps/step_4_experience_gender.dart';
 import 'steps/step_5_weight_height.dart';
 import 'widgets/profile_setup_footer.dart';
 import 'widgets/profile_setup_header.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Shell del flow ProfileSetup. Renderiza header + PageView con los 5 steps +
 /// footer con VOLVER + SIGUIENTE/EMPEZAR. El PageView se sincroniza con el
@@ -77,13 +78,10 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     // [termsConsentRequiredProvider].
     final needsTermsConsent = ref.read(termsConsentRequiredProvider) ?? true;
     if (needsTermsConsent && !state.termsAccepted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Aceptá los Términos y la Política de Privacidad para continuar',
-          ),
-          duration: Duration(seconds: 3),
-        ),
+      showTreinoToast(
+        context,
+        'Aceptá los Términos y la Política de Privacidad para continuar',
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -104,11 +102,10 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       // navegación; sin esto la foto elegida se pierde en silencio.
       if (!mounted) return;
       if (ref.read(profileSetupNotifierProvider).avatarUploadFailed) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No pudimos subir tu foto — reintentá desde Perfil.'),
-            duration: Duration(seconds: 4),
-          ),
+        showTreinoToast(
+          context,
+          'No pudimos subir tu foto — reintentá desde Perfil.',
+          type: TreinoToastType.error,
         );
       }
     } catch (e) {
@@ -121,12 +118,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       final copy = e is ModerationBlockedException
           ? AppL10n.of(context).moderationBlockedMessage
           : AppL10n.of(context).profileSetupSaveError;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(copy),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      showTreinoToast(context, copy, type: TreinoToastType.error);
     }
   }
 
@@ -185,11 +177,10 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       setState(() => _cancelando = false);
       // La cuenta sigue viva: los reintentos vuelven a correr.
       ref.read(altaCanceladaProvider.notifier).state = false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppL10n.of(context).profileSetupCancelAccountError),
-          duration: const Duration(seconds: 3),
-        ),
+      showTreinoToast(
+        context,
+        AppL10n.of(context).profileSetupCancelAccountError,
+        type: TreinoToastType.error,
       );
     }
   }

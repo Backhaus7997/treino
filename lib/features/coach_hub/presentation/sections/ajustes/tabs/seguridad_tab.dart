@@ -5,6 +5,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Acciones de seguridad que ya existen en Auth, sin crear un segundo flujo.
 class SeguridadTab extends ConsumerStatefulWidget {
@@ -23,18 +24,21 @@ class _SeguridadTabState extends ConsumerState<SeguridadTab> {
     setState(() => _sending = true);
     try {
       await ref.read(authServiceProvider).sendPasswordResetEmail(email: email);
-      _toast('Te mandamos un enlace a $email.');
+      _toast('Te mandamos un enlace a $email.', type: TreinoToastType.success);
     } catch (_) {
-      _toast('No pudimos enviar el enlace. Probá de nuevo.');
+      _toast('No pudimos enviar el enlace. Probá de nuevo.',
+          type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
-  void _toast(String message) {
+  void _toast(String message, {TreinoToastType type = TreinoToastType.info}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    showTreinoToast(
+      context,
+      message,
+      type: type,
     );
   }
 

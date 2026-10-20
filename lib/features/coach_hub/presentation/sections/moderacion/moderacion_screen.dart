@@ -10,6 +10,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 import 'package:treino/features/coach_hub/presentation/widgets/section_hero/section_hero.dart';
 import 'package:treino/features/moderation/application/moderation_queue_providers.dart';
 import 'package:treino/features/moderation/domain/pending_report.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// La cola de revisión de reportes.
 ///
@@ -150,7 +151,8 @@ class _Cifra extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final color = alerta ? palette.danger : palette.textPrimary;
+    // Sólo pinta el número (el borde tiene su propia expresión).
+    final color = alerta ? palette.dangerText : palette.textPrimary;
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -236,7 +238,7 @@ class _Cola extends ConsumerWidget {
                   : 'No hay reportes esperando.', // i18n: Fase W3
               textAlign: TextAlign.center,
               style: GoogleFonts.barlow(
-                color: cola.incompleta ? palette.danger : palette.textMuted,
+                color: cola.incompleta ? palette.dangerText : palette.textMuted,
                 fontSize: AppTextSize.body,
               ),
             ),
@@ -252,7 +254,7 @@ class _Cola extends ConsumerWidget {
                   'La lista está incompleta: el servidor dejó de buscar '
                   'antes de llegar al final.', // i18n: Fase W3
                   style: GoogleFonts.barlow(
-                    color: palette.danger,
+                    color: palette.dangerText,
                     fontSize: AppTextSize.caption,
                   ),
                 ),
@@ -339,7 +341,7 @@ class _FilaState extends ConsumerState<_Fila> {
                     ? '—'
                     : 'hace ${reporte.horasDesdeQueEntro} h', // i18n
                 style: GoogleFonts.barlow(
-                  color: tarde ? palette.danger : palette.textMuted,
+                  color: tarde ? palette.dangerText : palette.textMuted,
                   fontSize: AppTextSize.caption,
                   fontWeight: tarde ? FontWeight.w700 : FontWeight.w400,
                 ),
@@ -472,18 +474,16 @@ class _FilaState extends ConsumerState<_Fila> {
       // (contenido ya borrado, no aplica a un perfil, es otro moderador). El
       // mensaje del HttpsError ya viene en castellano desde el backend — el
       // genérico de abajo es sólo el resguardo para cuando no viene ninguno.
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            e.message ?? 'No pudimos cerrar el reporte.', // i18n: Fase W3
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        e.message ?? 'No pudimos cerrar el reporte.', // i18n: Fase W3
+        type: TreinoToastType.error,
       );
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos cerrar el reporte.'), // i18n: Fase W3
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos cerrar el reporte.', // i18n: Fase W3
+        type: TreinoToastType.error,
       );
     }
   }
@@ -703,13 +703,15 @@ class _Aviso extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(TreinoIcon.warning, size: AppTextSize.body, color: color),
+        Icon(TreinoIcon.warning,
+            size: AppTextSize.body,
+            color: AppPalette.of(context).textVariantOf(color)),
         const SizedBox(width: AppSpacing.hairline * 2),
         Expanded(
           child: Text(
             texto,
             style: GoogleFonts.barlow(
-              color: color,
+              color: AppPalette.of(context).textVariantOf(color),
               fontSize: AppTextSize.caption,
               fontWeight: FontWeight.w600,
               height: 1.4,

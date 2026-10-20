@@ -18,6 +18,7 @@ import '../../../core/utils/firestore_error.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/template_limit_gate.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
@@ -852,7 +853,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           key: const Key('invalid_week_hint'),
           style: GoogleFonts.barlow(
             fontSize: 11,
-            color: palette.danger,
+            color: palette.dangerText,
           ),
         ),
       ],
@@ -2126,7 +2127,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             SimpleDialogOption(
               onPressed: () => Navigator.of(ctx).pop(_DeleteScope.allWeeks),
               child: Text(l10n.routineEditorScopeAllWeeks,
-                  style: TextStyle(color: palette.danger)),
+                  style: TextStyle(color: palette.dangerText)),
             ),
           ],
         );
@@ -2225,11 +2226,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final isDuplicate = day.slots
         .any((s) => !identical(s, slot) && s.exercise?.id == newExercise.id);
     if (isDuplicate) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppL10n.of(context).routineEditorDuplicateExercise),
-        ),
-      );
+      showTreinoToast(
+          context, AppL10n.of(context).routineEditorDuplicateExercise);
       return;
     }
     _markDirty();
@@ -2276,10 +2274,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final nuevos = picked.where((e) => !presentes.contains(e.id)).toList();
     if (nuevos.isEmpty) {
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        // ignore: use_build_context_synchronously
-        SnackBar(content: Text(AppL10n.of(context).routineEditorAddNothingNew)),
-      );
+      showTreinoToast(context, AppL10n.of(context).routineEditorAddNothingNew);
       return;
     }
 
@@ -2549,9 +2544,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // Ninguno era nuevo: decirlo. Antes esto era un `return` mudo adentro del
     // setState y el botón parecía roto.
     if (nuevos.isEmpty) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorAddNothingNew)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorAddNothingNew,
+          type: TreinoToastType.info);
       return;
     }
 
@@ -2565,9 +2559,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // ejercicio adentro miente sobre lo que es.
     final esSuperserie = nuevos.length >= 2;
     if (!esSuperserie) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorSupersetNeedsTwo)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorSupersetNeedsTwo,
+          type: TreinoToastType.info);
     }
 
     setState(() {
@@ -2759,9 +2752,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
     final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
     if (nuevos.isEmpty) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorAddNothingNew)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorAddNothingNew,
+          type: TreinoToastType.info);
       return;
     }
 
@@ -2849,9 +2841,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final l10n = AppL10n.of(context);
       final error = _firstValidationError(l10n);
       if (error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
-        );
+        showTreinoToast(context, error.message, type: TreinoToastType.error);
         // Expand and scroll to the day the error points at (name errors carry
         // no day — nothing to scroll to).
         final day = error.day;
@@ -2942,9 +2932,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           _invalidateAssignedList(container,
               trainerId: uid, athleteId: athleteId);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachUpdatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case TrainerAssigning(:final athleteId, existingPlanId: null):
@@ -2978,9 +2967,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             weeksCount: _numWeeks,
           );
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachCreatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachCreatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case TrainerTemplating(existingTemplateId: final templateId?):
@@ -3001,9 +2989,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateTemplate(uid: uid, draft: draft);
           invalidateRoutineById(container, templateId);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachUpdatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case TrainerTemplating(existingTemplateId: null):
@@ -3039,9 +3026,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             weeksCount: _numWeeks,
           );
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachCreatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachCreatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         // Both athlete CREATE paths share one exit, and that is the whole
@@ -3075,9 +3061,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           }
           if (userRoutines.length >= kMaxOwnRoutines) {
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.workoutSelfEditorCapReached)),
-            );
+            showTreinoToast(context, l10n.workoutSelfEditorCapReached,
+                type: TreinoToastType.error);
             // No save happened — re-arm the unsaved-changes guard.
             _isDirty = true;
             setState(() => _submitting = false);
@@ -3152,9 +3137,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             }
           }
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.workoutSelfEditorSuccess)),
-          );
+          showTreinoToast(context, l10n.workoutSelfEditorSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case SelfCreating(existingRoutineId: final existingId?):
@@ -3180,9 +3164,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateUserOwned(uid: uid, draft: draft);
           invalidateRoutineById(container, existingId);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.workoutSelfEditorUpdateSuccess)),
-          );
+          showTreinoToast(context, l10n.workoutSelfEditorUpdateSuccess,
+              type: TreinoToastType.success);
           context.pop();
       }
     } catch (e) {
@@ -3225,9 +3208,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 : l10n.workoutSelfEditorError,
         };
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorText)),
-      );
+      showTreinoToast(context, errorText, type: TreinoToastType.error);
       // The save failed — the user stays on screen with unsaved changes, so
       // re-arm the guard cleared at the top of _submit.
       _isDirty = true;
@@ -3825,15 +3806,18 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 // tiene en pantalla.
                 final primerDia =
                     problemas.map((p) => p.dia).whereType<_EditableDay>();
-                return EditorFooterBar(
-                  summary: _resumenPie(l10n),
-                  problems: visibles,
-                  submitLabel: _submitLabelFor(widget.mode, l10n),
-                  submitting: _submitting,
-                  onSubmit: () => _submit(),
-                  onGoToProblem: primerDia.isEmpty
-                      ? null
-                      : () => _irAlDia(primerDia.first),
+                return _PieSinTeclado(
+                  builder: (acceptsTaps) => EditorFooterBar(
+                    summary: _resumenPie(l10n),
+                    problems: visibles,
+                    submitLabel: _submitLabelFor(widget.mode, l10n),
+                    submitting: _submitting,
+                    acceptsTaps: acceptsTaps,
+                    onSubmit: () => _submit(),
+                    onGoToProblem: primerDia.isEmpty
+                        ? null
+                        : () => _irAlDia(primerDia.first),
+                  ),
                 );
               }),
             ],
@@ -5741,10 +5725,13 @@ class _SlotEditorState extends State<_SlotEditor> {
       final values = sets.map((s) => s.distanceMeters).toList();
       final first = values.isEmpty ? null : values.first;
       final uniform = first != null && values.every((v) => v == first);
-      final target = uniform ? '${formatWeightKg(first)} m' : '—';
+      final target = uniform
+          ? '${formatWeightDisplay(first, AppL10n.of(context).localeName)} m'
+          : '—';
       return '${sets.length} × $target';
     }
     return resumenDePrescripcion(
+      localeName: AppL10n.of(context).localeName,
       modo: slot.exerciseMode,
       sets: [
         for (final set in sets)
@@ -5877,31 +5864,22 @@ class _SetTableState extends State<_SetTable> {
         relativeOffset.dx + 120,
         0,
       ),
-      color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
           value: ExerciseMode.reps,
           child: Text(
             l10n.routineEditorMeasureReps,
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
         PopupMenuItem(
           value: ExerciseMode.duration,
           child: Text(
             l10n.routineEditorMeasureTime,
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: ExerciseMode.distance,
-          child: Text(
-            'Distancia',
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
-          ),
+          child: Text('Distancia'),
         ),
       ],
     );
@@ -5945,9 +5923,8 @@ class _SetTableState extends State<_SetTable> {
       // El texto dice "este set" y no "el primer set": desde #867 la fuente es
       // la celda enfocada, y mandar al usuario a cargar la primera fila lo
       // dejaba corrigiendo un valor que no es el que se va a replicar.
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorFillColumnEmpty)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorFillColumnEmpty,
+          type: TreinoToastType.info);
       return;
     }
 
@@ -5957,24 +5934,17 @@ class _SetTableState extends State<_SetTable> {
     setState(() => _applyWeights(List<double?>.filled(sets.length, source)));
     widget.onChanged();
 
-    messenger.showSnackBar(
-      SnackBar(
-        // `persist: false` A MANO. `SnackBar` hace
-        // `persist = persist ?? action != null`: con acción es eterno por
-        // default, así que este cartel se quedaba hasta recargar. Es el
-        // gemelo del que el PF reportó en el editor web.
-        persist: false,
-        duration: const Duration(seconds: 6),
-        content: Text(l10n.routineEditorFillKgApplied),
-        action: SnackBarAction(
-          key: const Key('fill_kg_undo_action'),
-          label: l10n.routineEditorFillKgUndo,
-          onPressed: () {
-            if (!mounted) return;
-            setState(() => _applyWeights(previous));
-            widget.onChanged();
-          },
-        ),
+    showTreinoToastOn(
+      messenger,
+      l10n.routineEditorFillKgApplied,
+      type: TreinoToastType.success,
+      action: TreinoToastAction(
+        label: l10n.routineEditorFillKgUndo,
+        onPressed: () {
+          if (!mounted) return;
+          setState(() => _applyWeights(previous));
+          widget.onChanged();
+        },
       ),
     );
   }
@@ -6486,7 +6456,10 @@ class _SetRowState extends State<_SetRow> {
                 : l10n.routineEditorFieldReps,
       ),
       stepAmount: esKg ? kKgStepsKg.first : 1,
-      stepLabel: esKg ? formatWeightKg(kKgStepsKg.first) : '1',
+      stepLabel: esKg
+          ? formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName)
+          : '1',
       canDecrease: esKg
           ? (_currentKg ?? 0) > 0
           : esDistancia
@@ -6498,14 +6471,14 @@ class _SetRowState extends State<_SetRow> {
               ? _stepDistance(delta)
               : _stepReps(campo, delta),
       stepIncreaseLabel: esKg
-          ? l10n
-              .routineEditorKgStepIncreaseA11y(formatWeightKg(kKgStepsKg.first))
+          ? l10n.routineEditorKgStepIncreaseA11y(formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName))
           : esDistancia
               ? 'Aumentar distancia en 1 metro'
               : l10n.routineEditorRepsStepIncreaseA11y('1'),
       stepDecreaseLabel: esKg
-          ? l10n
-              .routineEditorKgStepDecreaseA11y(formatWeightKg(kKgStepsKg.first))
+          ? l10n.routineEditorKgStepDecreaseA11y(formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName))
           : esDistancia
               ? 'Reducir distancia en 1 metro'
               : l10n.routineEditorRepsStepDecreaseA11y('1'),
@@ -6532,7 +6505,6 @@ class _SetRowState extends State<_SetRow> {
         offset.dx + 160,
         0,
       ),
-      color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
             value: SetType.normal,
@@ -7317,5 +7289,80 @@ class _ShareOnProfileTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// El pie del editor (aviso + guardar) se esconde mientras el teclado está
+/// abierto, y cuando vuelve ignora los taps un momento (#1487).
+///
+/// Con el teclado arriba el pie subía pegado a él: tapaba las sugerencias de
+/// la entrada rápida y, al cerrarlo, ASIGNAR PLAN quedaba justo donde estaba
+/// el ✓ del teclado — un tap de más asignaba el plan sin querer.
+class _PieSinTeclado extends StatefulWidget {
+  const _PieSinTeclado({required this.builder});
+
+  /// Arma el pie; recibe si acepta taps todavía.
+  final Widget Function(bool acceptsTaps) builder;
+
+  @override
+  State<_PieSinTeclado> createState() => _PieSinTecladoState();
+}
+
+class _PieSinTecladoState extends State<_PieSinTeclado>
+    with WidgetsBindingObserver {
+  /// Cuánto tiempo el pie recién vuelto no acepta taps: lo que tarda un
+  /// segundo toque involuntario, no lo que tarda alguien en decidir guardar.
+  static const _resguardo = Duration(milliseconds: 500);
+
+  bool _hayTeclado = false;
+  bool _enResguardo = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _hayTeclado = _tecladoAbierto();
+  }
+
+  /// `View` y no `MediaQuery`: dentro del body de un Scaffold el inset del
+  /// teclado ya viene consumido (el Scaffold achica el body) y vale 0 siempre.
+  bool _tecladoAbierto() => View.of(context).viewInsets.bottom > 0;
+
+  /// El teclado cambia las métricas de la ventana, no las dependencias de este
+  /// widget: sin el observer nada lo reconstruye al abrirse o cerrarse.
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    final abierto = _tecladoAbierto();
+    if (abierto == _hayTeclado) return;
+    setState(() {
+      if (_hayTeclado && !abierto) {
+        _enResguardo = true;
+        _timer?.cancel();
+        _timer = Timer(_resguardo, () {
+          if (mounted) setState(() => _enResguardo = false);
+        });
+      }
+      _hayTeclado = abierto;
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hayTeclado) return const SizedBox.shrink();
+    return widget.builder(!_enResguardo);
   }
 }

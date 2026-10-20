@@ -48,6 +48,27 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
   const factory AuthFailure.subscriptionCancelFailed() =
       _SubscriptionCancelFailed;
 
+  /// Email o contraseña no coinciden, SIN decir cuál (#1505). Es lo único
+  /// que puede devolver el sign-in por credenciales: distinguir «no existe
+  /// la cuenta» de «la clave está mal» le confirma a quien prueba emails cuál
+  /// existe. Con la protección contra enumeración de Firebase, además, los dos
+  /// casos llegan como `invalid-credential` y no se pueden distinguir.
+  const factory AuthFailure.invalidCredentials() = _InvalidCredentials;
+
+  /// Mapeo para el SIGN-IN con email y contraseña: los tres códigos de
+  /// credenciales colapsan en [AuthFailure.invalidCredentials]; el resto,
+  /// igual que [AuthFailure.fromFirebase].
+  ///
+  /// No reemplaza a `fromFirebase`: el reset de contraseña necesita
+  /// `userNotFound` para tratarlo como éxito (REQ-AUTH-011).
+  factory AuthFailure.forSignIn(FirebaseAuthException e) => switch (e.code) {
+        'user-not-found' ||
+        'wrong-password' ||
+        'invalid-credential' =>
+          const AuthFailure.invalidCredentials(),
+        _ => AuthFailure.fromFirebase(e),
+      };
+
   factory AuthFailure.fromFirebase(FirebaseAuthException e) => switch (e.code) {
         'invalid-email' => const AuthFailure.invalidEmail(),
         'user-disabled' => const AuthFailure.userDisabled(),
@@ -72,6 +93,7 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         _UserDisabled() => 'Tu cuenta está deshabilitada. Contactá soporte',
         _UserNotFound() => 'No encontramos una cuenta con ese email',
         _WrongPassword() => 'La contraseña es incorrecta',
+        _InvalidCredentials() => 'Email o contraseña incorrectos',
         _EmailAlreadyInUse() => 'Ya existe una cuenta con ese email',
         _WeakPassword() => 'La contraseña es muy débil',
         _TooManyRequests() =>

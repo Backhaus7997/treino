@@ -11,6 +11,7 @@ import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/moderation/moderation_guard.dart';
 import '../../../core/image/avatar_cropper.dart';
+import '../../../core/widgets/form_scroll_to_error.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -23,6 +24,7 @@ import '../application/user_providers.dart';
 import '../domain/experience_level.dart';
 import '../domain/gender.dart';
 import '../domain/user_profile.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ---------------------------------------------------------------------------
 // Validators (inline per design §4.2 — NOT shared from auth)
@@ -236,7 +238,7 @@ class _ProfileEditPersonalScreenState
 
   Future<void> _save() async {
     if (_isBusy) return; // re-entrancy guard — a save is already in flight
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!validateAndRevealFirstError(_formKey)) return;
     // El gate de edad, ANTES de escribir. El campo de fecha no es un
     // `TextFormField` y por lo tanto NO cuelga del `_formKey`: se escapaba
     // entero del `validate()` de la línea de arriba, así que
@@ -258,13 +260,10 @@ class _ProfileEditPersonalScreenState
     if (uid == null) {
       _setSaveState(_SaveState.error);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppL10n.of(context).authGenericErrorFallback,
-              style: GoogleFonts.barlow(fontSize: 14),
-            ),
-          ),
+        showTreinoToast(
+          context,
+          AppL10n.of(context).authGenericErrorFallback,
+          type: TreinoToastType.error,
         );
       }
       return;
@@ -293,13 +292,10 @@ class _ProfileEditPersonalScreenState
         }
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'No pudimos subir tu foto. Probá de nuevo.', // i18n: Fase 6 Etapa 3
-                style: GoogleFonts.barlow(fontSize: 14),
-              ),
-            ),
+          showTreinoToast(
+            context,
+            'No pudimos subir tu foto. Probá de nuevo.', // i18n: Fase 6 Etapa 3
+            type: TreinoToastType.error,
           );
         }
         _setSaveState(_SaveState.idle);
@@ -365,13 +361,10 @@ class _ProfileEditPersonalScreenState
     try {
       await ref.read(userRepositoryProvider).update(uid, partial);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppL10n.of(context).profilePersonalSaveSuccess,
-              style: GoogleFonts.barlow(fontSize: 14),
-            ),
-          ),
+        showTreinoToast(
+          context,
+          AppL10n.of(context).profilePersonalSaveSuccess,
+          type: TreinoToastType.success,
         );
         context.pop();
       }
@@ -383,11 +376,7 @@ class _ProfileEditPersonalScreenState
         final copy = e is ModerationBlockedException
             ? AppL10n.of(context).moderationBlockedMessage
             : 'No pudimos guardar los cambios. Probá de nuevo.'; // i18n
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(copy, style: GoogleFonts.barlow(fontSize: 14)),
-          ),
-        );
+        showTreinoToast(context, copy, type: TreinoToastType.error);
       }
       _setSaveState(_SaveState.idle);
     }
@@ -461,7 +450,7 @@ class _ProfileEditPersonalScreenState
             child: Text(
               'DESCARTAR', // i18n: Fase 6 Etapa 3
               style: GoogleFonts.barlowCondensed(
-                color: palette.danger,
+                color: palette.dangerText,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
                 letterSpacing: 1.0,
@@ -557,6 +546,8 @@ class _ProfileEditPersonalScreenState
                 20, 8, 20, 20 + MediaQuery.paddingOf(context).bottom),
             child: Form(
               key: _formKey,
+              // El error se re-evalúa al editar el campo (#1500).
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -790,7 +781,7 @@ class _ProfileEditPersonalScreenState
         borderSide: BorderSide(color: palette.danger),
       ),
       errorStyle: GoogleFonts.barlow(
-        color: palette.danger,
+        color: palette.dangerText,
         fontSize: 12,
       ),
     );

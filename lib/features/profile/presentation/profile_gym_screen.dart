@@ -17,6 +17,7 @@ import '../../profile_setup/presentation/widgets/gym_search_box.dart';
 import '../application/user_providers.dart';
 import 'widgets/nearby_gyms_list.dart';
 import 'widgets/pinned_current_gym.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Allows the authenticated athlete to search and select a gym via Google
 /// Places Text Search (AD-12), then persist the selection to their profile.
@@ -87,27 +88,21 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
         await ref.read(userRepositoryProvider).update(uid, {'gymId': null});
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppL10n.of(context).profileGymSaveSuccess,
-              style: GoogleFonts.barlow(fontSize: 14),
-            ),
-          ),
+        showTreinoToast(
+          context,
+          AppL10n.of(context).profileGymSaveSuccess,
+          type: TreinoToastType.success,
         );
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e is ModerationBlockedException
-                  ? AppL10n.of(context).moderationBlockedMessage
-                  : AppL10n.of(context).profileGymSaveError,
-              style: GoogleFonts.barlow(fontSize: 14),
-            ),
-          ),
+        showTreinoToast(
+          context,
+          e is ModerationBlockedException
+              ? AppL10n.of(context).moderationBlockedMessage
+              : AppL10n.of(context).profileGymSaveError,
+          type: TreinoToastType.error,
         );
       }
     } finally {

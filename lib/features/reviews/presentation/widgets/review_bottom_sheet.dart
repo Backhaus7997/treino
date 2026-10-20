@@ -5,12 +5,12 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
-import '../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/moderation/moderation_guard.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/review_notifier.dart';
 import '../../domain/review.dart';
 import 'star_rating_input.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Which trigger opened this sheet — affects title copy.
 ///
@@ -109,32 +109,21 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
       // fallar siempre, y el usuario concluye que la app está rota en vez de
       // que su texto no pasa.
       final bloqueado = state.error is ModerationBlockedException;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            bloqueado
-                ? l10n.moderationBlockedMessage
-                : l10n.reviewSnackBarError,
-          ),
-        ),
+      // Con el sheet abierto: el helper lo dibuja ENCIMA (#1490).
+      showTreinoToast(
+        context,
+        bloqueado ? l10n.moderationBlockedMessage : l10n.reviewSnackBarError,
+        type: TreinoToastType.error,
       );
     } else {
+      // Messenger capturado ANTES del pop: cerrado el sheet, su context se
+      // desmonta y el aviso va a la pantalla de atrás, que ya queda visible.
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // El pop de la sheet ya pasó (línea de arriba) antes de armar
-              // este SnackBar, así que el check chico dibujándose acá no
-              // compite con ninguna navegación — solo acompaña el mensaje
-              // mientras el SnackBar hace su propia entrada.
-              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              const SizedBox(width: 10),
-              Flexible(child: Text(l10n.reviewSnackBarSuccess)),
-            ],
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.reviewSnackBarSuccess,
+        type: TreinoToastType.success,
       );
     }
   }

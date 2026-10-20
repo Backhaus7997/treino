@@ -8,6 +8,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/application/custom_exercise_quota_provider.dart';
 import '../../coach/presentation/custom_exercise_limit_gate.dart';
@@ -156,16 +157,14 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
       _selected = failed.isEmpty ? null : failed.toSet();
     });
 
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(
-      content: Text(
-        failed.isEmpty
-            ? (n == 1 ? 'Ejercicio borrado' : '$n ejercicios borrados') // i18n
-            : 'No pudimos borrar ${failed.length} de $n. Quedaron '
-                'seleccionados.', // i18n
-      ),
-    ));
+    showTreinoToast(
+      context,
+      failed.isEmpty
+          ? (n == 1 ? 'Ejercicio borrado' : '$n ejercicios borrados') // i18n
+          : 'No pudimos borrar ${failed.length} de $n. Quedaron '
+              'seleccionados.', // i18n
+      type: failed.isEmpty ? TreinoToastType.success : TreinoToastType.error,
+    );
   }
 
   Future<void> _onCreateNew() async {

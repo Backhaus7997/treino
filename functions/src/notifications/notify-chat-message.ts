@@ -7,7 +7,10 @@
  * Design:
  *   - ADR-PN-005: members ≠ senderId are recipients.
  *   - SenderName from userPublicProfiles/{senderId}.displayName ?? 'Alguien'.
- *   - Body: "${senderName}: ${displayText}" where displayText is:
+ *   - Title: the sender's name (#1464). It used to be a fixed "TREINO" with the
+ *     name buried in the body, so the lock screen said who sent it only after
+ *     the app name.
+ *   - Body: displayText, with NO name prefix (the title already carries it):
  *       · caption (truncated 100) if text non-empty
  *       · '📷 Foto' if mediaType === 'image'
  *       · '🎥 Video' if mediaType === 'video'
@@ -96,8 +99,7 @@ export async function notifyOnChatMessageHandler(
   //    message fall back to a placeholder so the push body is never empty.
   const mediaFallback =
     mediaType === "image" ? "📷 Foto" : mediaType === "video" ? "🎥 Video" : "";
-  const displayText = text.length > 0 ? truncate(text, 100) : mediaFallback;
-  const body = `${senderName}: ${displayText}`;
+  const body = text.length > 0 ? truncate(text, 100) : mediaFallback;
 
   // 4. Build deepLink.
   const deepLink = `/coach/chat/${chatId}?other=${senderId}`;
@@ -109,7 +111,9 @@ export async function notifyOnChatMessageHandler(
       uids: recipients,
       kind: "chat-message",
       notification: {
-        title: "TREINO", // i18n: Fase 6 Etapa 2
+        // El remitente va en el título y NO en el cuerpo (#1464): repetirlo en
+        // los dos lugares leería "Lautaro / Lautaro: hola".
+        title: senderName,
         body,
       },
       data: { deepLink, senderId },

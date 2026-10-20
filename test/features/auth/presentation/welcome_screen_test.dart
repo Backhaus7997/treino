@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/auth/presentation/welcome_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
@@ -25,8 +26,10 @@ GoRouter _makeRouter(Widget home) => GoRouter(
       ],
     );
 
-Widget _buildApp() {
-  const screen = WelcomeScreen();
+Future<bool> _noAbre(Uri _) async => false;
+
+Widget _buildApp({Future<bool> Function(Uri url) abrirUrl = _noAbre}) {
+  final screen = WelcomeScreen(abrirUrl: abrirUrl);
   final router = _makeRouter(screen);
   return ProviderScope(
     child: MaterialApp.router(
@@ -210,5 +213,75 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TermsNoticeText), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // «Quiero ser entrenador»: los PF no tienen alta self-service (los crea el
+  // equipo por Admin SDK), así que el acceso lleva al mismo contacto por mail
+  // que el Coach Hub, no a un registro.
+  // ---------------------------------------------------------------------------
+  testWidgets('muestra el acceso «Quiero ser entrenador»', (tester) async {
+    await tester.pumpWidget(_buildApp());
+    await tester.pumpAndSettle();
+
+    final cta = find.text('Quiero ser entrenador');
+    expect(cta, findsOneWidget);
+    expect(find.text('¿Sos entrenador?'), findsOneWidget);
+    expect(
+      find
+          .ancestor(of: cta, matching: find.byType(Semantics))
+          .evaluate()
+          .any((e) => (e.widget as Semantics).properties.button == true),
+      isTrue,
+      reason: 'el lector de pantalla tiene que anunciarlo como botón',
+    );
+  });
+
+  testWidgets('tocarlo abre el mail al equipo con el asunto del Coach Hub',
+      (tester) async {
+    final abiertas = <Uri>[];
+    await tester.pumpWidget(_buildApp(abrirUrl: (url) async {
+      abiertas.add(url);
+      return true;
+    }));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Quiero ser entrenador'));
+    await tester.tap(find.text('Quiero ser entrenador'));
+    await tester.pumpAndSettle();
+
+    expect(abiertas, hasLength(1));
+    final url = abiertas.single;
+    expect(url.scheme, 'mailto');
+    expect(url.path, kLegalContactEmail);
+    expect(url.query, 'subject=Quiero%20ser%20entrenador%20en%20TREINO');
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('sin cliente de mail avisa y deja la dirección a la vista',
+      (tester) async {
+    await tester.pumpWidget(_buildApp(abrirUrl: (_) async => false));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Quiero ser entrenador'));
+    await tester.tap(find.text('Quiero ser entrenador'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.textContaining(kLegalContactEmail), findsOneWidget);
+  });
+
+  testWidgets('si la plataforma lanza al abrir el mail, también avisa',
+      (tester) async {
+    await tester.pumpWidget(
+        _buildApp(abrirUrl: (_) async => throw Exception('sin handler')));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Quiero ser entrenador'));
+    await tester.tap(find.text('Quiero ser entrenador'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining(kLegalContactEmail), findsOneWidget);
   });
 }

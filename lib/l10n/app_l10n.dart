@@ -188,10 +188,10 @@ abstract class AppL10n {
   /// **'SEM {week} · {month}'**
   String homeEstaSemanaWeekMonth(int week, String month);
 
-  /// No description provided for @homeEstaSemanaStreakUnit.
+  /// Unit label next to the big streak number in the Home 'Esta Semana' card. The streak counts consecutive WEEKS in which the athlete met their routine's day target (computeWeeklyStreak, ADR-WRS-08), not days (#1507).
   ///
   /// In es_AR, this message translates to:
-  /// **'{count, plural, =1{DÍA} other{DÍAS}}'**
+  /// **'{count, plural, =1{SEMANA} other{SEMANAS}}'**
   String homeEstaSemanaStreakUnit(int count);
 
   /// Home 'Esta Semana' card streak subtext shown when the athlete already trained today.
@@ -223,6 +223,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{count, plural, =1{entreno} other{entrenos}}'**
   String homeEstaSemanaPeriodUnit(int count);
+
+  /// Title of the muscle map in the Home 'Esta Semana' card. The map paints the sets the athlete already logged THIS WEEK (finished sessions), not today's routine (#1508).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MÚSCULOS DE LA SEMANA'**
+  String get homeEstaSemanaMusclesTitle;
+
+  /// Legend under the Home muscle map: opacity = sets done this week / weekly target sets of the active routine.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Más color = más cerca de las series que pide tu rutina esta semana.'**
+  String get homeEstaSemanaMusclesLegend;
+
+  /// Home header greeting when the athlete has no display name yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡HOLA!'**
+  String get homeGreeting;
+
+  /// Home header greeting. [name] is the athlete's FIRST name, already uppercased (#1508).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡HOLA, {name}!'**
+  String homeGreetingNamed(String name);
 
   /// Home 'Esta Semana' card empty-state title for an athlete with zero sessions.
   ///
@@ -331,6 +355,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Iniciar sesión'**
   String get authWelcomeSignIn;
+
+  /// Welcome screen — lead-in before the «Quiero ser entrenador» link. Trainers are created by the team (no self-service), so the link opens the contact mail.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Sos entrenador?'**
+  String get authWelcomeTrainerPrompt;
+
+  /// Welcome screen — link that opens a mailto: to the TREINO team (same channel and subject as the Coach Hub not-allowed screen).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quiero ser entrenador'**
+  String get authWelcomeBecomeTrainer;
+
+  /// Welcome screen — SnackBar when no mail app handles the mailto:. Shows the address so it can be typed by hand.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir tu correo. Escribinos a {email}.'**
+  String authWelcomeBecomeTrainerFallback(String email);
 
   /// No description provided for @authLoginTitle.
   ///
@@ -710,6 +752,24 @@ abstract class AppL10n {
   /// **'No pudimos abrir la consulta. Probá de nuevo.'**
   String get coachInquiryCtaError;
 
+  /// Título de la marca que aparece arriba del perfil público cuando el que lo mira es el propio PF (VER PREVIEW, #1498).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VISTA PREVIA'**
+  String get coachPreviewBannerTitle;
+
+  /// Explica por qué CONSULTAR y PEDIR VÍNCULO no responden en la vista previa: nadie se consulta ni se pide vínculo a sí mismo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Así ve tu perfil un alumno. Los botones están desactivados en esta vista.'**
+  String get coachPreviewBannerBody;
+
+  /// Aviso en la vista previa del PF cuando trainerExperienceYears es null. Lleva a EDITAR (/profile/edit-trainer). RESEÑAS y ALUMNOS también pueden mostrar «—», pero esos los calcula el servidor; los años los carga el PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no cargaste tus años de experiencia: los alumnos ven «—». Tocá para cargarlos.'**
+  String get coachPreviewMissingExperience;
+
   /// No description provided for @coachCtaProximamente.
   ///
   /// In es_AR, this message translates to:
@@ -956,10 +1016,10 @@ abstract class AppL10n {
   /// **'Buscar ejercicio'**
   String get coachExercisePicker;
 
-  /// No description provided for @agendaButtonLabel.
+  /// Botón de la tab Coach que abre la agenda del alumno: sus propias sesiones con el PF, no la agenda del PF.
   ///
   /// In es_AR, this message translates to:
-  /// **'VER AGENDA DEL PF'**
+  /// **'MI AGENDA'**
   String get agendaButtonLabel;
 
   /// Botón de la tab Coach que abre el plan nutricional del alumno.
@@ -1154,6 +1214,42 @@ abstract class AppL10n {
   /// **'No podés cancelar con menos de 24h de anticipación.'**
   String get agendaCancellationTooLate;
 
+  /// Botón de una sesión en MI AGENDA del alumno, con más de 24 h de anticipación (#1515).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get agendaAthleteCancelCta;
+
+  /// Cuerpo del diálogo de confirmación cuando el alumno cancela una sesión.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cancelar esta sesión? Le avisamos a tu PF.'**
+  String get agendaAthleteCancelConfirmBody;
+
+  /// Motivo que queda en el registro de cancelación cuando cancela el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reserva cancelada por el alumno.'**
+  String get agendaBookingCancelledByAthlete;
+
+  /// Botón de una sesión con menos de 24 h en MI AGENDA: abre el chat con el PF (#1515).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AVISAR A MI PF'**
+  String get agendaAthleteNotifyTrainerCta;
+
+  /// Texto sobre el botón AVISAR A MI PF, que explica por qué no hay CANCELAR.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Faltan menos de 24 h: si no podés ir, avisale a tu PF.'**
+  String get agendaAthleteNotifyHint;
+
+  /// Snackbar cuando AVISAR A MI PF no puede abrir el chat.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir el chat. Probá de nuevo.'**
+  String get agendaAthleteChatError;
+
   /// No description provided for @agendaUpcomingAppointmentsHeading.
   ///
   /// In es_AR, this message translates to:
@@ -1220,11 +1316,53 @@ abstract class AppL10n {
   /// **'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.'**
   String get agendaRuleInvalidWindow;
 
+  /// Error inline del formulario Agregar/Editar horario cuando la franja se superpone con una regla semanal ya cargada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese horario se superpone con otro que ya cargaste: {day}, {start} – {end}.'**
+  String agendaRuleOverlap(String day, String start, String end);
+
   /// No description provided for @agendaBookingCancelledByCoach.
   ///
   /// In es_AR, this message translates to:
   /// **'Reserva cancelada por el entrenador.'**
   String get agendaBookingCancelledByCoach;
+
+  /// Botón del detalle de una sesión que ya empezó: el PF marca que el alumno faltó (#1492).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MARCAR AUSENTE'**
+  String get agendaAttendanceMarkAbsent;
+
+  /// Botón que vuelve a dejar como hecha una sesión marcada ausente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DESHACER AUSENTE'**
+  String get agendaAttendanceUndoAbsent;
+
+  /// Ayuda sobre el botón de asistencia: el default es que la sesión se dio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si no marcás nada, la sesión cuenta como hecha.'**
+  String get agendaAttendanceDefaultHint;
+
+  /// Ayuda sobre el botón de asistencia cuando la sesión ya está marcada ausente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Marcaste que el alumno faltó.'**
+  String get agendaAttendanceAbsentHint;
+
+  /// Valor de la fila ESTADO del detalle del turno cuando el alumno faltó.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ausente'**
+  String get agendaAttendanceAbsentStatus;
+
+  /// Snackbar cuando falla marcar o deshacer el ausente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar la asistencia. Probá de nuevo.'**
+  String get agendaAttendanceError;
 
   /// No description provided for @agendaBlockedDayTitle.
   ///
@@ -1249,6 +1387,54 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Cargar igual'**
   String get agendaBlockedDayConfirm;
+
+  /// No description provided for @agendaConflictTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Revisá el horario'**
+  String get agendaConflictTitle;
+
+  /// Línea del aviso de conflicto al agendar una sesión: la sesión nueva se superpone con una ya agendada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se superpone con {name} ({start} – {end}).'**
+  String agendaConflictOverlapLine(String name, String start, String end);
+
+  /// No description provided for @agendaConflictOverlapMore.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{Y 1 sesión más.} other{Y {count} sesiones más.}}'**
+  String agendaConflictOverlapMore(int count);
+
+  /// No description provided for @agendaConflictSomeoneElse.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'otra sesión'**
+  String get agendaConflictSomeoneElse;
+
+  /// No description provided for @agendaConflictOutsideAvailability.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Queda fuera de tu disponibilidad publicada.'**
+  String get agendaConflictOutsideAvailability;
+
+  /// No description provided for @agendaConflictSeriesOverlap.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 sesión de la serie se superpone con otra ya agendada.} other{{count} sesiones de la serie se superponen con otras ya agendadas.}}'**
+  String agendaConflictSeriesOverlap(int count);
+
+  /// No description provided for @agendaConflictSeriesOutside.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 sesión de la serie queda fuera de tu disponibilidad publicada.} other{{count} sesiones de la serie quedan fuera de tu disponibilidad publicada.}}'**
+  String agendaConflictSeriesOutside(int count);
+
+  /// No description provided for @agendaConflictQuestion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Querés agendarla igual?'**
+  String get agendaConflictQuestion;
 
   /// No description provided for @agendaSlotFreeLabel.
   ///
@@ -1573,6 +1759,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'¿CÓMO TE SENTISTE?'**
   String get wellbeingCheckInTitle;
+
+  /// #1513: resumen post-sesión cuando el ánimo ya se respondió en Inicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya lo contaste hoy en Inicio.'**
+  String get wellbeingCheckInFromToday;
+
+  /// #1513: resumen post-sesión cuando el ánimo ya se respondió en Inicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'USAR PARA ESTE ENTRENO'**
+  String get wellbeingCheckInUseForSession;
 
   /// Reassures that the check-in is skippable at no cost. The post-session moment is when the user wants to leave.
   ///
@@ -1993,6 +2191,66 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No hay rutinas para este nivel.'**
   String get workoutExploreEmptyLevel;
+
+  /// Estado vacío de EXPLORAR cuando el filtro duro de días (#1561) no deja ninguna plantilla. Va seguido del botón templatesFilterEmptyAction.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{days, plural, =1{No hay plantillas de 1 día} other{No hay plantillas de {days} días}}'**
+  String templatesFilterEmptyDays(int days);
+
+  /// Estado vacío de EXPLORAR cuando ninguna plantilla dura los minutos elegidos o menos ("tengo hasta X"). La opción "75 o más" no filtra, así que nunca llega acá.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay plantillas de {minutes} min o menos'**
+  String templatesFilterEmptyMinutes(String minutes);
+
+  /// Estado vacío de EXPLORAR cuando cada respuesta del cuestionario deja plantillas por separado pero ninguna cumple todas a la vez. Va seguido de templatesFilterEmptyAction.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ninguna plantilla cumple todo lo que elegiste a la vez'**
+  String get templatesFilterEmptyCombination;
+
+  /// Estado vacío de EXPLORAR cuando ninguna plantilla declara alguno de los objetivos elegidos. Va seguido de templatesFilterEmptyAction.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ninguna plantilla apunta a los objetivos que elegiste'**
+  String get templatesFilterEmptyGoals;
+
+  /// Estado vacío de EXPLORAR cuando ninguna plantilla dedica al menos el 10 % de sus ejercicios a alguna de las zonas elegidas. Va seguido de templatesFilterEmptyAction.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ninguna plantilla trabaja las zonas que elegiste'**
+  String get templatesFilterEmptyZones;
+
+  /// CTA del estado vacío de EXPLORAR: levanta todos los filtros del cuestionario (días, minutos, objetivo y zonas) en esa vista; el nivel y la búsqueda quedan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver todas'**
+  String get templatesFilterEmptyAction;
+
+  /// Botón de la barra de EXPLORAR que borra las respuestas guardadas del cuestionario (vuelve a mostrar el catálogo entero). Se usa como tooltip y etiqueta accesible.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Borrar filtros'**
+  String get templatesFilterBarClear;
+
+  /// Aviso después de borrar los filtros de EXPLORAR. Lleva la acción templatesFiltersUndo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Filtros borrados'**
+  String get templatesFiltersCleared;
+
+  /// Aviso cuando no se pudieron borrar los filtros de EXPLORAR (sin conexión o sin perfil cargado).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos borrar los filtros. Probá de nuevo.'**
+  String get templatesFiltersClearError;
+
+  /// Acción del aviso templatesFiltersCleared: vuelve a guardar las respuestas que había.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DESHACER'**
+  String get templatesFiltersUndo;
 
   /// Placeholder of the text search box above the EXPLORAR template grid (#1412). Tells the athlete what the box matches: template name, muscle group, exercise.
   ///
@@ -4412,11 +4670,17 @@ abstract class AppL10n {
   /// **'Limpiar búsqueda'**
   String get searchUsersClearA11y;
 
-  /// Semantics label for the disabled MENSAJE stub on the public profile screen, exposed via Semantics(button:true, enabled:false) (finding 16).
+  /// Semantics label for the disabled MENSAJE pill on the public profile screen, exposed via Semantics(button:true, enabled:false). Dice por qué está deshabilitado: el destinatario tiene que seguir a quien escribe y no hay chat ni vínculo previo.
   ///
   /// In es_AR, this message translates to:
-  /// **'Mensaje (próximamente)'**
+  /// **'Mensaje (no disponible: esta persona tiene que seguirte)'**
   String get publicProfileMessageDisabledA11y;
+
+  /// Etiqueta del contador de entrenos en la grilla de stats del perfil público (antes hardcodeada en inglés como WORKOUTS).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTRENOS'**
+  String get publicProfileStatWorkouts;
 
   /// Parametric Semantics label for user avatars (PostAvatar / HomeHeader avatar) wrapped at call sites so screen readers announce whose photo it is (findings 4,6,7,16,18,19). Fix agents must add the matching @a11yAvatarLabel placeholder metadata (name: String). When the name is null, use a11yAvatarLabelGeneric.
   ///
@@ -4633,6 +4897,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Cancelar'**
   String get commonCancel;
+
+  /// [#1500] Label of the accessory bar above the iOS numeric keyboard; tapping it dismisses the keyboard.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Listo'**
+  String get commonDone;
 
   /// Live-region accessibility label for the public profile load-error state (finding 16).
   ///
@@ -5635,6 +5905,54 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos finalizar la sesión. Probá de nuevo.'**
   String get sessionFinishError;
+
+  /// Caption under the disabled TERMINAR SESIÓN button while the athlete has logged zero sets (#1511). Explains why it is disabled and where the other exit is.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hacé al menos una serie para poder terminar. Si hoy no vas a entrenar, tocá ABANDONAR.'**
+  String get sessionFinishNeedOneSet;
+
+  /// Title of the confirm dialog shown when the athlete taps TERMINAR SESIÓN with sets still missing (#1511).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿TERMINAR IGUAL?'**
+  String get sessionFinishEarlyTitle;
+
+  /// Header of the list of missing sets in the finish-anyway dialog. [count] is the total of planned sets not done yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{Te falta 1 serie:} other{Te faltan {count} series:}}'**
+  String sessionFinishEarlyMissingHeader(int count);
+
+  /// Tail of the missing-sets list in the finish-anyway dialog when more exercises are missing sets than fit on screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{y 1 ejercicio más} other{y {count} ejercicios más}}'**
+  String sessionFinishEarlyMore(int count);
+
+  /// Finish-anyway dialog: the session reaches the minimum share of planned sets, so it counts as a workout (#1511).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hiciste el {percent} % de la sesión: cuenta como entreno para tu racha y tus rankings.'**
+  String sessionFinishEarlyCounts(int percent);
+
+  /// Finish-anyway dialog: the session is below the minimum share, so it is saved as incomplete and does not count as a workout (#1511).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hiciste el {percent} % de la sesión. Se guarda, pero no cuenta como entreno para tu racha ni tus rankings: hace falta el {minPercent} %.'**
+  String sessionFinishEarlyNotCounts(int percent, int minPercent);
+
+  /// Confirm button of the finish-anyway dialog.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TERMINAR IGUAL'**
+  String get sessionFinishEarlyConfirm;
+
+  /// Dismiss button of the finish-anyway dialog: back to the session.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEGUIR ENTRENANDO'**
+  String get sessionFinishEarlyKeepGoing;
 
   /// Inline validation hint when the routine name is empty and the save button is disabled (finding 19).
   ///
@@ -7329,7 +7647,7 @@ abstract class AppL10n {
   /// **'Ahora seguís a esta persona.'**
   String get feedFollowStartedSuccess;
 
-  /// Pill del segmento del feed que muestra posts de a quienes seguís.
+  /// Pill del segmento del feed que muestra posts de quienes seguís.
   ///
   /// In es_AR, this message translates to:
   /// **'SEGUIDORES'**
@@ -7338,7 +7656,7 @@ abstract class AppL10n {
   /// Estado vacío del feed SEGUIDORES.
   ///
   /// In es_AR, this message translates to:
-  /// **'Todavía no hay posts de a quienes seguís'**
+  /// **'Todavía no hay posts de quienes seguís'**
   String get feedEmptyFollowing;
 
   /// Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021).
@@ -7653,7 +7971,7 @@ abstract class AppL10n {
   /// **'¿Cuántos días podés entrenar?'**
   String get templatesOnboardingStep1Title;
 
-  /// Paso 1, bajada. NO promete que la grilla se ordene: en este PR las respuestas sólo se persisten, el ranking por afinidad llega con #635 PR#3. Cuando ese ranking exista, esta copy se actualiza junto con él.
+  /// Paso 1, bajada. La respuesta se guarda y se usa en EXPLORAR: días y minutos filtran la grilla (#1561) y todas las respuestas la ordenan por afinidad (#635). Qué filtra y qué ordena lo explica templatesOnboardingStep1Hint; esta bajada no lo repite.
   ///
   /// In es_AR, this message translates to:
   /// **'Elegí lo que vas a sostener. Guardamos tu respuesta para personalizar lo que te recomendamos.'**
@@ -7665,10 +7983,10 @@ abstract class AppL10n {
   /// **'Días por semana'**
   String get templatesOnboardingStep1Label;
 
-  /// Aclara que responder no vacía la grilla. Cierto hoy (nada consume las respuestas) y después del ranking (#635 PR#3), que ordena pero nunca esconde.
+  /// Aclara que TODAS las respuestas filtran la grilla: sólo se ven plantillas que cumplen todo, con salida "Ver todas" si queda vacía.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.'**
+  /// **'Todo lo que elijas filtra el catálogo: sólo vas a ver plantillas que cumplan con todo. Si no queda ninguna, podés ver todas.'**
   String get templatesOnboardingStep1Hint;
 
   /// Paso 2. Pregunta por duración de sesión.
@@ -7869,11 +8187,17 @@ abstract class AppL10n {
   /// **'AJUSTAR MI BÚSQUEDA'**
   String get templatesFilterBarSetUp;
 
-  /// Explica por qué la grilla está en ese orden. Dice ORDENADO, no filtrado: con 7 plantillas un filtro duro la vaciaría, así que nada se esconde.
+  /// Explica por qué la grilla se ve así (#1561) cuando el filtro de días/minutos ESTÁ en efecto: recorta y además ordena.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Filtrado y ordenado según lo que buscás'**
+  String get templatesFilterBarHint;
+
+  /// Misma barra cuando NO hay filtro en efecto: sólo se respondió objetivo/zonas, o el atleta tocó "Ver todas". Decir "Filtrado" ahí sería falso: no se esconde nada, sólo cambia el orden.
   ///
   /// In es_AR, this message translates to:
   /// **'Ordenado según lo que buscás'**
-  String get templatesFilterBarHint;
+  String get templatesFilterBarHintSorted;
 
   /// Acción en la card del ejercicio del player que abre el sheet de reporte al PF (#628).
   ///
@@ -9012,6 +9336,120 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Elegí una hora'**
   String get timePickerHelpText;
+
+  /// Error inline cuando un campo numérico de medición/evaluación queda fuera de su rango válido (#1483, #1485). unit puede venir vacío; el código recorta el espacio final.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entre {min} y {max} {unit}'**
+  String logFieldRange(String min, String max, String unit);
+
+  /// Aviso cuando una tecla se rechaza por pasarse del tope de la celda de peso/reps (#1510).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Máximo {max} {unit}'**
+  String inputMaxReached(String max, String unit);
+
+  /// Título del form de evaluación en modo edición (#1485).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar evaluación'**
+  String get performanceLogTitleEdit;
+
+  /// CTA del form de evaluación en modo edición.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR CAMBIOS'**
+  String get performanceLogUpdateCta;
+
+  /// SnackBar tras editar una evaluación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Evaluación actualizada'**
+  String get performanceLogUpdateSuccess;
+
+  /// Tooltip del lápiz en el historial de evaluaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar evaluación'**
+  String get performanceHistoryEditTooltip;
+
+  /// Tooltip del tacho en el historial de evaluaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar evaluación'**
+  String get performanceHistoryDeleteTooltip;
+
+  /// Fila del historial que cargó otro PF: las reglas sólo dejan editar/borrar al autor.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargada por otro entrenador'**
+  String get performanceHistoryOtherTrainerTag;
+
+  /// Título del diálogo de borrado de una evaluación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar evaluación?'**
+  String get performanceDeleteConfirmTitle;
+
+  /// Cuerpo del diálogo de borrado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se eliminará la evaluación del {date}. Esta acción no se puede deshacer.'**
+  String performanceDeleteConfirmBody(String date);
+
+  /// SnackBar tras borrar una evaluación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Evaluación eliminada'**
+  String get performanceDeleteSuccess;
+
+  /// SnackBar si falla el borrado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar la evaluación. Probá de nuevo.'**
+  String get performanceDeleteError;
+
+  /// Acción destructiva genérica de showTreinoConfirmDialog (#1496).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get commonDelete;
+
+  /// Título de la confirmación de borrado de una franja (#1496).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Borrar este horario?'**
+  String get agendaRuleDeleteTitle;
+
+  /// Cuerpo de la confirmación de borrado de una franja.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Las reservas existentes se mantienen.'**
+  String get agendaRuleDeleteBody;
+
+  /// Título de la confirmación de borrado de una excepción de agenda.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar esta excepción?'**
+  String get agendaOverrideDeleteTitle;
+
+  /// Salida neutra de la última slide del onboarding de ejercicios propios: cierra sin abrir el editor (#1489).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AHORA NO'**
+  String get onboardingCustomExerciseNotNow;
+
+  /// Título de la confirmación de Cerrar sesión (#1504).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cerrar sesión?'**
+  String get authSignOutConfirmTitle;
+
+  /// Acción que confirma cerrar sesión.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Salir'**
+  String get authSignOutConfirmAction;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 /// Tests for [AppTheme.light()].
 ///
@@ -102,5 +103,90 @@ void main() {
         ),
       );
     });
+  });
+
+  group('popupMenuTheme (#1558)', () {
+    for (final entry in {
+      'dark': (AppTheme.dark(), AppPalette.mintMagenta),
+      'light': (AppTheme.light(), AppPalette.mintMagentaLight),
+    }.entries) {
+      testWidgets('usa tokens del kit en ${entry.key}', (tester) async {
+        final (theme, palette) = entry.value;
+        final p = theme.popupMenuTheme;
+        expect(p.color, palette.bgCard);
+        expect(p.surfaceTintColor, Colors.transparent);
+        expect(p.elevation, greaterThan(0));
+        final shape = p.shape! as RoundedRectangleBorder;
+        expect(shape.borderRadius, BorderRadius.circular(AppRadius.md));
+        expect(shape.side.color, palette.border);
+        expect(p.textStyle!.fontFamily, contains('Barlow'));
+        expect(p.textStyle!.fontWeight, FontWeight.w600);
+        expect(p.textStyle!.color, palette.textPrimary);
+      });
+
+      // Con `useMaterial3: true`, `PopupMenuItem` NO lee `textStyle`: sólo
+      // `labelTextStyle`. Este test mide lo que el ítem renderiza de verdad.
+      testWidgets('el ítem renderiza Barlow 600 en ${entry.key}',
+          (tester) async {
+        final (theme, palette) = entry.value;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: PopupMenuButton<int>(
+                itemBuilder: (_) => const [
+                  PopupMenuItem<int>(value: 1, child: Text('EDITAR')),
+                  PopupMenuItem<int>(
+                    value: 2,
+                    enabled: false,
+                    child: Text('BLOQUEADO'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.byType(PopupMenuButton<int>));
+        await tester.pumpAndSettle();
+
+        final activo =
+            DefaultTextStyle.of(tester.element(find.text('EDITAR'))).style;
+        expect(activo.fontFamily, contains('Barlow'));
+        expect(activo.fontWeight, FontWeight.w600);
+        expect(activo.fontSize, AppTextSize.body);
+        expect(activo.color, palette.textPrimary);
+
+        final inactivo =
+            DefaultTextStyle.of(tester.element(find.text('BLOQUEADO'))).style;
+        expect(inactivo.fontWeight, FontWeight.w600);
+        expect(
+          inactivo.color,
+          palette.textPrimary.withValues(alpha: 0.38),
+        );
+      });
+    }
+
+    test('labelTextStyle tiene igualdad de valor (no rebuildea la app)', () {
+      expect(
+        AppTheme.dark().popupMenuTheme.labelTextStyle,
+        AppTheme.dark().popupMenuTheme.labelTextStyle,
+      );
+    });
+  });
+
+  // #1559: Material 3 tiñe el AppBar cuando hay contenido scrolleado debajo
+  // (scrolled-under). Sobre las pantallas con AppBar transparente eso dibuja
+  // una banda verdosa que corta lo que pasa por debajo (el avatar del perfil
+  // del entrenador).
+  group('appBarTheme sin tinte de scrolled-under (#1559)', () {
+    for (final (nombre, tema) in [
+      ('dark', AppTheme.dark()),
+      ('light', AppTheme.light()),
+    ]) {
+      test(nombre, () {
+        expect(tema.appBarTheme.scrolledUnderElevation, 0);
+        expect(tema.appBarTheme.surfaceTintColor, Colors.transparent);
+      });
+    }
   });
 }

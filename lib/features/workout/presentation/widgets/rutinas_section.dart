@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../coach/application/trainer_link_providers.dart';
 import '../../../coach/domain/trainer_link.dart';
@@ -75,7 +76,7 @@ class RutinasSection extends ConsumerWidget {
             children: [
               Text(
                 l10n.workoutMisRutinasSectionTitle,
-                style: theme.textTheme.titleMedium,
+                style: _heading(theme),
               ),
               if (headerAction != null) ...[
                 const SizedBox(height: 12),
@@ -89,7 +90,7 @@ class RutinasSection extends ConsumerWidget {
               Expanded(
                 child: Text(
                   l10n.workoutMisRutinasSectionTitle,
-                  style: theme.textTheme.titleMedium,
+                  style: _heading(theme),
                 ),
               ),
               if (headerAction != null) headerAction,
@@ -316,15 +317,13 @@ class _RoutineCard extends ConsumerWidget {
         'activeRoutineId': routine.id,
       });
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasMarkActiveSuccess)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasMarkActiveSuccess,
+            type: TreinoToastType.success);
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasActiveError)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasActiveError,
+            type: TreinoToastType.error);
       }
     }
   }
@@ -361,15 +360,13 @@ class _RoutineCard extends ConsumerWidget {
       // siendo arrancable hasta que se reinicie la app.
       invalidateRoutineById(container, routine.id);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasArchiveSuccess)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasArchiveSuccess,
+            type: TreinoToastType.success);
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasArchiveError)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasArchiveError,
+            type: TreinoToastType.error);
       }
     }
   }
@@ -592,3 +589,10 @@ class _FinalizadoChip extends StatelessWidget {
     );
   }
 }
+
+/// #1514: heading de sección en Barlow Condensed 700, como todo heading del
+/// sistema (AGENTS §2). `titleMedium` del tema es Barlow regular.
+TextStyle? _heading(ThemeData theme) => GoogleFonts.barlowCondensed(
+      textStyle: theme.textTheme.titleMedium,
+      fontWeight: FontWeight.w700,
+    );

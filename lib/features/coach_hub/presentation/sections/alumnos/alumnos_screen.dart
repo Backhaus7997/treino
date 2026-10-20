@@ -8,6 +8,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/core/widgets/treino_destructive_menu_item.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -35,6 +36,7 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Estado compuesto de un alumno en el roster (link + billing).
 ///
@@ -1049,7 +1051,9 @@ class _DotLabel extends StatelessWidget {
             child: Text(
               label,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: color, fontSize: 13),
+              style: TextStyle(
+                  color: AppPalette.of(context).textVariantOf(color),
+                  fontSize: 13),
             ),
           ),
         ],
@@ -1107,7 +1111,9 @@ class _TappableDotLabel extends StatelessWidget {
               child: Text(
                 label,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: color, fontSize: 13),
+                style: TextStyle(
+                    color: AppPalette.of(context).textVariantOf(color),
+                    fontSize: 13),
               ),
             ),
           ],
@@ -1190,8 +1196,10 @@ class _RowActionsState extends ConsumerState<_RowActions> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    showTreinoToast(
+      context,
+      message,
+      type: TreinoToastType.error,
     );
   }
 
@@ -1269,7 +1277,7 @@ class _RowActionsState extends ConsumerState<_RowActions> {
     }
     if (status == TrainerLinkStatus.active ||
         status == TrainerLinkStatus.paused) {
-      menuItems.add(PopupMenuItem(
+      menuItems.add(TreinoDestructiveMenuItem<VoidCallback>(
         value: () => _terminate(context, ref),
         child: Text(l10n.coachHubActionTerminate),
       ));

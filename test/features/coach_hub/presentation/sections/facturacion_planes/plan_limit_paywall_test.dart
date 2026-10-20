@@ -275,7 +275,7 @@ void main() {
       (tester) async {
     // Móvil: "VER ESTADO", no "REGULARIZAR" — un verbo de pago viola
     // 3.1.3(f) (decisión del dueño, 2026-09-29). El botón sigue mostrando el
-    // estado por SnackBar al tocarlo, ver los tests de abajo.
+    // estado por un toast al tocarlo, ver los tests de abajo.
     await openInactive(tester, SubscriptionTier.plan1);
 
     expect(find.text('VER ESTADO'), findsOneWidget);
@@ -319,7 +319,9 @@ void main() {
     await tester.tap(find.text('VER ESTADO'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(SnackBar), findsOneWidget);
+    // El aviso sale desde el modal: va por el Overlay raíz y no como
+    // SnackBar, que quedaba tapado por el modal (#1490).
+    expect(find.textContaining('Tu suscripción está'), findsOneWidget);
     expect(find.text('AJUSTES'), findsNothing);
   });
 
@@ -384,7 +386,7 @@ void main() {
       reason: 'la app movil llego a una vista de facturacion: es el camino por '
           'el que entra el cobro de reactivacion',
     );
-    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.textContaining('Tu suscripción está'), findsOneWidget);
   });
 
   testWidgets('reason por defecto es plan-limit — comportamiento intacto',

@@ -184,7 +184,7 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
               style: GoogleFonts.barlow(
                 fontSize: 13,
                 height: 1.3,
-                color: palette.danger,
+                color: palette.dangerText,
               ),
             ),
           ],

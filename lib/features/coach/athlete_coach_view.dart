@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
@@ -19,6 +20,7 @@ import '../reviews/domain/review.dart';
 import '../reviews/presentation/widgets/review_bottom_sheet.dart';
 import 'application/trainer_discovery_providers.dart' show trainerByIdProvider;
 import '../../l10n/app_l10n.dart';
+import 'application/nutrition_plan_providers.dart';
 import 'application/trainer_link_providers.dart';
 import 'domain/trainer_link.dart';
 import 'domain/trainer_link_status.dart';
@@ -199,6 +201,16 @@ class LinkStateCard extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.trainerId));
     final hasUnread = ref.watch(hasUnreadFromProvider(link.trainerId));
+    // Sólo con el vínculo activo: es el único estado que dibuja los accesos,
+    // y no hay por qué abrir el stream del plan para una solicitud pendiente.
+    // Mientras carga cuenta como "sin plan" — es el estado que no promete
+    // nada (#1517).
+    final tienePlan = link.status == TrainerLinkStatus.active &&
+        ref.watch(
+          nutritionPlanProvider(
+            (trainerId: link.trainerId, athleteId: link.athleteId),
+          ).select((plan) => plan.valueOrNull != null),
+        );
 
     return ListView(
       // + bottom inset: the floating bar overlays the body (extendBody),
@@ -246,20 +258,28 @@ class LinkStateCard extends ConsumerWidget {
                 // es lo que el alumno viene a buscar, así que va primero y es
                 // el más destacado de los tres.
                 //
-                // La agenda queda última a propósito: hoy su único dato propio
-                // son las reuniones del alumno; el calendario con los días
-                // ocupados del PF es contexto, no una acción.
+                // La agenda queda última a propósito: muestra sólo las
+                // sesiones del propio alumno, en modo lectura.
                 _AccesoDelAlumno(
-                  // Relleno por decisión de producto del maintainer, sobre la
-                  // alternativa que proponía el design system.
+                  // Relleno SÓLO si el PF ya cargó el plan (#1517).
                   //
-                  // El contrato de `TreinoButtonTokens` dice que el CTA
+                  // Con plan, el relleno es decisión de producto del
+                  // maintainer, sobre la alternativa que proponía el design
+                  // system. El contrato de `TreinoButtonTokens` dice que el CTA
                   // relleno es UNO por pantalla, y acá «MENSAJE» ya es otro:
                   // son dos verdes compitiendo. Se elige igual porque el plan
                   // nutricional es lo que el alumno viene a buscar y se lo
                   // quiere con ese peso. Queda escrito para que el próximo que
                   // lea la regla no crea que es un descuido.
-                  variante: TreinoButtonVariant.primary,
+                  //
+                  // Sin plan, ese peso mandaba al alumno a una pantalla vacía
+                  // («Tu PF todavía no cargó tu plan nutricional»): el CTA más
+                  // fuerte de la card era un callejón sin salida. Ahí baja a
+                  // delineado y «MENSAJE» queda como el único relleno, que es
+                  // lo que el alumno sí puede hacer: pedírselo.
+                  variante: tienePlan
+                      ? TreinoButtonVariant.primary
+                      : TreinoButtonVariant.secondaryAccent,
                   icono: TreinoIcon.sidebarNutricion,
                   etiqueta: l10n.athleteNutritionPlanButtonLabel,
                   onPressed: () => context.push(
@@ -276,7 +296,9 @@ class LinkStateCard extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _AccesoDelAlumno(
                   variante: TreinoButtonVariant.secondaryAccent,
-                  icono: TreinoIcon.tabWorkout,
+                  // Calendario, no mancuerna: la pantalla es la agenda del
+                  // ALUMNO, no la del PF ni un entrenamiento (#1515).
+                  icono: TreinoIcon.calendar,
                   etiqueta: l10n.agendaButtonLabel,
                   // El trainerId viaja por la ruta para que el host NO tenga
                   // que volver a preguntar lo que esta pantalla ya sabe: estos
@@ -646,10 +668,10 @@ class _ActionRow extends ConsumerWidget {
       context.push('/coach/chat/${chat.chatId}?other=${link.trainerId}');
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos abrir el chat. Probá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'No pudimos abrir el chat. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     }
   }
@@ -926,8 +948,10 @@ class _AliasRow extends StatelessWidget {
                 onTap: () async {
                   await Clipboard.setData(ClipboardData(text: alias!));
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Alias copiado.')),
+                    showTreinoToast(
+                      context,
+                      'Alias copiado.',
+                      type: TreinoToastType.success,
                     );
                   }
                 },

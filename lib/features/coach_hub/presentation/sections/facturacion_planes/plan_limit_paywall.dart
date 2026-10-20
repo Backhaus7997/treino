@@ -12,6 +12,7 @@ import '../../../../profile/application/user_providers.dart';
 import 'plan_checkout.dart';
 import 'plan_copy.dart';
 import 'plan_limit_shared.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Muestra el paywall de bloqueo cuando el PF intentó agregar un alumno que
 /// supera el límite de su plan (Fase 7, PR3 UI — el trigger real es el
@@ -603,8 +604,10 @@ class _PrimaryCta extends StatelessWidget {
               // $12.000-$39.000 por mes. Recuperarlo NO puede ser un cartel
               // acá: tiene que salir por fuera de la app (un mail), que es lo
               // unico que Apple no gobierna.
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(estado)),
+              showTreinoToast(
+                context,
+                estado,
+                type: TreinoToastType.info,
               );
             case PlanCheckoutAvailable():
               if (route == null) {
@@ -612,8 +615,10 @@ class _PrimaryCta extends StatelessWidget {
                 // Antes esto navegaba a '/ajustes' fijo y en movil moria contra
                 // una ruta inexistente: el modal decia lo correcto y el boton
                 // no hacia nada. Mejor decirlo que fingirlo.
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(estado)),
+                showTreinoToast(
+                  context,
+                  estado,
+                  type: TreinoToastType.info,
                 );
                 return;
               }
@@ -649,8 +654,10 @@ class _PrimaryCta extends StatelessWidget {
           context.push('/facturacion/planes');
         } else {
           // Plan 2 tope: aviso del plan a-medida (mock hasta canal de contacto).
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(muyPronto)),
+          showTreinoToast(
+            context,
+            muyPronto,
+            type: TreinoToastType.info,
           );
         }
       },

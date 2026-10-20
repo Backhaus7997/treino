@@ -407,8 +407,10 @@ void main() {
         });
       }
 
-      // Los SnackBars que disparan los botones del aviso de ALUMNOS también
-      // son texto que el PF lee dentro del binario móvil.
+      // Los toasts que disparan los botones del aviso de ALUMNOS también
+      // son texto que el PF lee dentro del binario móvil. El aviso es un
+      // modal, así que el toast sale por el Overlay raíz y NO como SnackBar
+      // (que quedaba tapado por el modal, #1490): se busca su texto.
       // `paused` y `cancelled` tienen SnackBars distintos
       // (`planLimitSuscripcionPausadaMovil` / `planLimitSuscripcionBajaMovil`).
       for (final status in [
@@ -428,8 +430,14 @@ void main() {
           await tester.tap(find.byType(PlanLimitAccentButton));
           await tester.pumpAndSettle();
 
-          expect(find.byType(SnackBar), findsOneWidget);
-          _verificar(tester, 'el SnackBar de VER ESTADO', locale);
+          final l10n = lookupAppL10n(locale);
+          expect(
+            find.text(status == SubscriptionStatus.paused
+                ? l10n.planLimitSuscripcionPausadaMovil
+                : l10n.planLimitSuscripcionBajaMovil),
+            findsOneWidget,
+          );
+          _verificar(tester, 'el toast de VER ESTADO', locale);
         });
       }
 
@@ -440,8 +448,11 @@ void main() {
         await tester.tap(find.byType(PlanLimitAccentButton));
         await tester.pumpAndSettle();
 
-        expect(find.byType(SnackBar), findsOneWidget);
-        _verificar(tester, 'el SnackBar de CONTACTANOS', locale);
+        expect(
+          find.text(lookupAppL10n(locale).planLimitAlumnosPlanAMedidaSnack),
+          findsOneWidget,
+        );
+        _verificar(tester, 'el toast de CONTACTANOS', locale);
       });
 
       // La bifurcación tiene que EXISTIR: si esto no encontrara "PASATE A" en

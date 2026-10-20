@@ -87,13 +87,16 @@ class _StubNotifier extends SessionNotifier {
 class _FinishTrackingNotifier extends SessionNotifier {
   _FinishTrackingNotifier(this._state, {required this.onFinish});
   final SessionState _state;
-  final void Function() onFinish;
+
+  /// Recibe el `allowIncomplete` con el que la UI llamó a `finishSession`.
+  final void Function(bool allowIncomplete) onFinish;
 
   @override
   Future<SessionState> build(SessionInit arg) async => _state;
 
   @override
-  Future<void> finishSession() async => onFinish();
+  Future<void> finishSession({bool allowIncomplete = false}) async =>
+      onFinish(allowIncomplete);
 }
 
 /// Stub que registra las llamadas a removeSet (live-set-editing PR2) sin
@@ -130,6 +133,32 @@ class _LoggingNotifier extends SessionNotifier {
     if (current == null) return;
     state = AsyncData(current.copyWith(setLogs: [...current.setLogs, setLog]));
   }
+}
+
+/// Monta el player con [stub] y una ruta stub del resumen: `_finishSession`
+/// navega a `/workout/session-summary/:id` al terminar.
+Widget _wrapWithSummaryRoute(SessionNotifier stub) {
+  final router = GoRouter(routes: [
+    GoRoute(
+      path: '/',
+      builder: (_, __) => const SessionPlayerScreen(init: _kInit),
+    ),
+    GoRoute(
+      path: '/workout/session-summary/:sessionId',
+      builder: (_, __) =>
+          const Scaffold(body: Center(child: Text('summary-stub'))),
+    ),
+  ]);
+  return ProviderScope(
+    overrides: [sessionNotifierProvider.overrideWith(() => stub)],
+    child: MaterialApp.router(
+      theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
+      routerConfig: router,
+    ),
+  );
 }
 
 // ── Factories de estado ───────────────────────────────────────────────────────
@@ -508,6 +537,43 @@ void main() {
   // llevan (su tap significa "adelantar el bloque" y ya tienen hint + play
   // propio) ni el resumen de superserie completa (no es tocable).
 
+  // #1510: la barra avanzaba sólo al cerrar un ejercicio entero, y el hint
+  // «Tocá para adelantar este bloque» iba lavado bajo un Opacity(0.75).
+  group('#1510', () {
+    testWidgets('la barra de progreso avanza por serie', (tester) async {
+      final state = _defaultState().copyWith(setLogs: [
+        makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+      ]);
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(state),
+      ));
+      await tester.pump();
+      final bar = tester.widget<LinearProgressIndicator>(
+          find.byType(LinearProgressIndicator).first);
+      expect(bar.value, closeTo(1 / 6, 1e-9),
+          reason: '1 serie de 6 planificadas (2 ejercicios × 3)');
+    });
+
+    testWidgets('el hint de adelantar no queda bajo un Opacity',
+        (tester) async {
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(_defaultState()),
+      ));
+      await tester.pump();
+      final hint = find.text('Tocá para adelantar este bloque');
+      await tester.scrollUntilVisible(hint, 200,
+          scrollable: find.byType(Scrollable).first);
+      expect(hint, findsWidgets);
+      final dims = tester
+          .widgetList<Opacity>(
+              find.ancestor(of: hint.first, matching: find.byType(Opacity)))
+          .where((o) => o.opacity < 1);
+      expect(dims, isEmpty);
+    });
+  });
+
   group('tap indicator (chevron junto al nombre)', () {
     testWidgets(
         'ejercicio activo lleva chevron junto al nombre; el preview future '
@@ -755,36 +821,175 @@ void main() {
     // SCENARIO-290: tap en botón habilitado llama al callback
     testWidgets('SCENARIO-290: tap en botón habilitado llama finishSession',
         (tester) async {
-      var finishCalled = false;
+      bool? allowIncompleteSeen;
       final stub = _FinishTrackingNotifier(
         completedState(),
-        onFinish: () => finishCalled = true,
+        onFinish: (allow) => allowIncompleteSeen = allow,
       );
-      // Necesita GoRouter porque _finishSession navega a /workout/session-summary/...
-      final router = GoRouter(routes: [
-        GoRoute(
-          path: '/',
-          builder: (_, __) => const SessionPlayerScreen(init: _kInit),
-        ),
-        GoRoute(
-          path: '/workout/session-summary/:sessionId',
-          builder: (_, __) =>
-              const Scaffold(body: Center(child: Text('summary-stub'))),
-        ),
-      ]);
-      await tester.pumpWidget(ProviderScope(
-        overrides: [sessionNotifierProvider.overrideWith(() => stub)],
-        child: MaterialApp.router(
-          theme: AppTheme.dark(),
-          localizationsDelegates: AppL10n.localizationsDelegates,
-          supportedLocales: AppL10n.supportedLocales,
-          routerConfig: router,
-        ),
-      ));
+      await tester.pumpWidget(_wrapWithSummaryRoute(stub));
       await tester.pump();
       await tester.tap(find.text('TERMINAR SESIÓN'));
       await tester.pumpAndSettle();
-      expect(finishCalled, isTrue);
+      // Sesión completa: cierra de una, sin aviso de "terminar igual".
+      expect(allowIncompleteSeen, isFalse);
+      expect(find.text('¿TERMINAR IGUAL?'), findsNothing);
+    });
+
+    // ── #1511 — TERMINAR IGUAL ──────────────────────────────────────────────
+
+    /// 4 series planificadas en total; [done] hechas del primer ejercicio.
+    SessionState partialState({required int done}) {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 2),
+        makeSlot(exerciseId: 'e2', exerciseName: 'Remo', targetSets: 2),
+      ];
+      return SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: slots),
+        setLogs: [
+          for (var n = 1; n <= done; n++)
+            makeSetLog(exerciseId: 'e1', setNumber: n, id: 'l$n'),
+        ],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+    }
+
+    testWidgets(
+        '#1511: sin ninguna serie hecha el botón sigue apagado y la leyenda '
+        'explica por qué', (tester) async {
+      final calls = <bool>[];
+      final stub = _FinishTrackingNotifier(
+        partialState(done: 0),
+        onFinish: calls.add,
+      );
+      await tester.pumpWidget(_wrapWithSummaryRoute(stub));
+      await tester.pump();
+
+      expect(
+          find.byKey(const Key('session_finish_need_one_set')), findsOneWidget);
+      expect(find.textContaining('tocá ABANDONAR'), findsOneWidget);
+
+      await tester.tap(find.text('TERMINAR SESIÓN'));
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+      expect(find.text('¿TERMINAR IGUAL?'), findsNothing);
+    });
+
+    testWidgets(
+        '#1511: con una serie hecha el botón se habilita y la leyenda se va',
+        (tester) async {
+      final stub = _FinishTrackingNotifier(
+        partialState(done: 1),
+        onFinish: (_) {},
+      );
+      await tester.pumpWidget(_wrapWithSummaryRoute(stub));
+      await tester.pump();
+
+      expect(
+          find.byKey(const Key('session_finish_need_one_set')), findsNothing);
+    });
+
+    testWidgets(
+        '#1511: tocar TERMINAR con series pendientes abre el aviso con lo que '
+        'falta, y no cierra nada todavía', (tester) async {
+      final calls = <bool>[];
+      final stub = _FinishTrackingNotifier(
+        partialState(done: 1), // 1 de 4 → 25 %
+        onFinish: calls.add,
+      );
+      await tester.pumpWidget(_wrapWithSummaryRoute(stub));
+      await tester.pump();
+
+      await tester.tap(find.text('TERMINAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿TERMINAR IGUAL?'), findsOneWidget);
+      expect(find.text('Te faltan 3 series:'), findsOneWidget);
+      expect(find.text('Press · 1/2'), findsOneWidget);
+      expect(find.text('Remo · 0/2'), findsOneWidget);
+      expect(calls, isEmpty);
+    });
+
+    testWidgets(
+        '#1511: por debajo del 50 % el aviso dice sin vueltas que NO cuenta',
+        (tester) async {
+      final stub = _FinishTrackingNotifier(
+        partialState(done: 1), // 25 %
+        onFinish: (_) {},
+      );
+      await tester.pumpWidget(_wrapWithSummaryRoute(stub));
+      await tester.pump();
+
+      await tester.tap(find.text('TERMINAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      final outcome = tester.widget<Text>(
+        find.byKey(const Key('session_finish_early_outcome')),
+      );
+      expect(outcome.data, contains('Hiciste el 25 % de la sesión'));
+      expect(outcome.data, contains('no cuenta como entreno'));
+      expect(outcome.data, contains('hace falta el 50 %'));
+    });
+
+    testWidgets('#1511: desde el 50 % el aviso dice que cuenta como entreno',
+        (tester) async {
+      final stub = _FinishTrackingNotifier(
+        partialState(done: 2), // 2 de 4 → 50 %
+        onFinish: (_) {},
+      );
+      await tester.pumpWidget(_wrapWithSummaryRoute(stub));
+      await tester.pump();
+
+      await tester.tap(find.text('TERMINAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      final outcome = tester.widget<Text>(
+        find.byKey(const Key('session_finish_early_outcome')),
+      );
+      expect(outcome.data, contains('Hiciste el 50 % de la sesión'));
+      expect(outcome.data, contains('cuenta como entreno'));
+      expect(outcome.data, isNot(contains('no cuenta')));
+    });
+
+    testWidgets('#1511: SEGUIR ENTRENANDO cierra el aviso sin terminar',
+        (tester) async {
+      final calls = <bool>[];
+      final stub = _FinishTrackingNotifier(
+        partialState(done: 1),
+        onFinish: calls.add,
+      );
+      await tester.pumpWidget(_wrapWithSummaryRoute(stub));
+      await tester.pump();
+
+      await tester.tap(find.text('TERMINAR SESIÓN'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SEGUIR ENTRENANDO'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿TERMINAR IGUAL?'), findsNothing);
+      expect(calls, isEmpty);
+      expect(find.text('summary-stub'), findsNothing);
+    });
+
+    testWidgets(
+        '#1511: TERMINAR IGUAL llama finishSession(allowIncomplete: true) y '
+        'va al resumen', (tester) async {
+      final calls = <bool>[];
+      final stub = _FinishTrackingNotifier(
+        partialState(done: 1),
+        onFinish: calls.add,
+      );
+      await tester.pumpWidget(_wrapWithSummaryRoute(stub));
+      await tester.pump();
+
+      await tester.tap(find.text('TERMINAR SESIÓN'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('TERMINAR IGUAL'));
+      await tester.pumpAndSettle();
+
+      expect(calls, [true]);
+      expect(find.text('summary-stub'), findsOneWidget);
     });
   });
 
@@ -900,7 +1105,8 @@ void main() {
       const spec = SetSpec(distanceMeters: 6);
 
       expect(plannedRepsForSpec(spec, ExerciseMode.distance), 0);
-      expect(repsDisplayText(spec, ExerciseMode.distance), '6 m');
+      expect(repsDisplayText(spec, ExerciseMode.distance, localeName: 'es_AR'),
+          '6 m');
     });
   });
 
@@ -1066,6 +1272,56 @@ void main() {
     });
   });
 
+  // #1510: el descanso configurado en la rutina sólo corría en el reloj. Al
+  // marcar la serie en el teléfono ahora arranca la cuenta, y SALTAR la saca.
+  group('#1510 descanso', () {
+    testWidgets('marcar una serie arranca el descanso del slot; SALTAR lo saca',
+        (tester) async {
+      final notifier = _LoggingNotifier(_defaultState());
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+      expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      expect(find.byKey(const Key('rest_timer_bar')), findsOneWidget);
+      expect(find.text('1:30'), findsOneWidget,
+          reason: 'el slot trae 90 s de descanso');
+
+      await tester.tap(find.text('SALTAR'));
+      await tester.pump();
+      expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+    });
+
+    testWidgets('sin descanso configurado no aparece nada', (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 4, slots: [
+          makeSlot(exerciseId: 'e1', targetSets: 3, restSeconds: 0),
+        ]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      final notifier = _LoggingNotifier(state);
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+    });
+  });
+
   // ── Block gating widget tests ─────────────────────────────────────────────
 
   group('block gating UI', () {
@@ -1199,13 +1455,13 @@ void main() {
         ),
       );
       await tester.pump();
-      // No future sets — only the disabled TERMINAR SESIÓN button adds Opacity(0.4).
+      // No future sets, and since #1511 TERMINAR SESIÓN is enabled as soon as
+      // one set is done — so nothing on screen is dimmed any more.
       final dimmed = tester
           .widgetList<Opacity>(find.byType(Opacity))
           .where((o) => o.opacity == 0.4)
           .length;
-      // Exactly one Opacity(0.4) for the disabled button; no future set rows.
-      expect(dimmed, equals(1));
+      expect(dimmed, equals(0));
     });
   });
 

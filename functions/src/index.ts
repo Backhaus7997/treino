@@ -319,6 +319,13 @@ export { getTrainerPricing } from "./subscriptions/trainer-pricing";
 // tambien a la cuenta vieja que nunca tuvo doc publico.
 export { ensureAthleteProfile } from "./profile/ensure-athlete-profile";
 
+// Busqueda de usuarios (#1478): el unico escritor de
+// `userPublicProfiles.searchPrefixes`, los prefijos plegados de cada palabra
+// del nombre con los que la app busca por `array-contains`. Se deploya DESPUES
+// de las reglas que conocen el campo. Ver el encabezado de
+// `profile/user-search-prefixes.ts`.
+export { userSearchPrefixesOnWrite } from "./profile/user-search-prefixes";
+
 // Paywall del entrenador — el reconciliador. Es lo que hace que pagar
 // SIGNIFIQUE algo: sin esto, `createPreapproval` abre un cobro y nadie se
 // entera. Corre a las 03:00 ART, una hora ANTES que `sweepEntitlements`, para

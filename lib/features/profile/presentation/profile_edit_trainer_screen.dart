@@ -10,6 +10,7 @@ import '../../../core/moderation/moderation_guard.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/geohash.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../core/widgets/form_scroll_to_error.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
@@ -23,6 +24,7 @@ import '../../gyms/domain/gym.dart';
 import '../application/trainer_location_consent_providers.dart';
 import '../application/user_providers.dart';
 import '../domain/user_profile.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ADR-TPO-005: view-only enum co-located with its single screen consumer.
 enum ProfileEditTrainerMode { edit, onboarding }
@@ -246,7 +248,9 @@ class _ProfileEditTrainerScreenState
 
   Future<void> _save(String uid) async {
     if (_saving) return;
-    if (!_formKey.currentState!.validate()) return;
+    // Scrollea hasta el primer campo inválido: con el error fuera de pantalla,
+    // GUARDAR parecía no hacer nada (#1499).
+    if (!validateAndRevealFirstError(_formKey)) return;
     if (_specialty == null) {
       setState(() =>
           _error = AppL10n.of(context).profileEditTrainerValidationSpecialty);
@@ -365,9 +369,10 @@ class _ProfileEditTrainerScreenState
             grantLocationConsent: otorgaConsentimiento,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(AppL10n.of(context).profileEditTrainerSaveSuccess)),
+      showTreinoToast(
+        context,
+        AppL10n.of(context).profileEditTrainerSaveSuccess,
+        type: TreinoToastType.success,
       );
       // ADR-TPO-006: post-save navigation branches on mode.
       if (widget.mode == ProfileEditTrainerMode.onboarding) {
@@ -417,6 +422,9 @@ class _ProfileEditTrainerScreenState
           20, 18, 20, 20 + MediaQuery.paddingOf(context).bottom),
       child: Form(
         key: _formKey,
+        // Una vez que el PF toca un campo, el error se re-evalúa al editar:
+        // sin esto "150 → 8" seguía en rojo hasta el próximo GUARDAR (#1500).
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -460,9 +468,12 @@ class _ProfileEditTrainerScreenState
               controller: _experienceController,
               keyboardType: TextInputType.number,
               style: TextStyle(color: palette.textPrimary),
+              // El detalle va en `helperText`: como hint de una línea se
+              // cortaba con puntos suspensivos (#1499).
               decoration: _inputDecoration(
                 palette,
-                hint: 'Ej: 5 (opcional — se muestra en tu perfil público)',
+                hint: 'Ej: 5',
+                helper: 'Opcional. Se muestra en tu perfil público.',
               ),
               validator: (v) {
                 final raw = v?.trim() ?? '';
@@ -498,7 +509,9 @@ class _ProfileEditTrainerScreenState
               style: TextStyle(color: palette.textPrimary),
               decoration: _inputDecoration(
                 palette,
-                hint: 'Alias, CBU, CVU o usuario de MercadoPago (opcional).',
+                hint: 'Alias, CBU o CVU',
+                helper: 'Opcional. También podés poner tu usuario de '
+                    'MercadoPago.',
               ),
             ),
             const SizedBox(height: 18),
@@ -529,25 +542,7 @@ class _ProfileEditTrainerScreenState
                     // mismo error, del otro lado.
                     loading: () => const SizedBox.shrink(),
                     error: (_, __) => const SizedBox.shrink(),
-                    data: (publicada) => Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            key: const Key(
-                              'profile_edit_trainer_publication_status',
-                            ),
-                            publicada
-                                ? l10n.profileEditTrainerPublished
-                                : l10n.profileEditTrainerNotPublished,
-                            style: TextStyle(
-                              color: publicada
-                                  ? palette.accent
-                                  : palette.textMuted,
-                              fontSize: AppTextSize.bodyDense,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+                    data: (publicada) => publicada
                         // P1-a. El sheet le promete al PF "Podés apagar esto
                         // cuando quieras desde tu perfil profesional", y hasta
                         // acá esa frase era falsa: `revokeTrainerLocationConsent`
@@ -561,24 +556,40 @@ class _ProfileEditTrainerScreenState
                         // Un consentimiento que no se puede retirar no es
                         // consentimiento: la Ley 25.326 y el RGPD lo piden
                         // revocable con la misma facilidad con que se otorgó.
-                        if (publicada)
-                          TextButton(
-                            key: const Key(
+                        //
+                        // #1499: era texto suelto + un TextButton "APAGAR LA
+                        // PUBLICACIÓN" a la derecha, y nada decía que fuera un
+                        // control. Ahora es un switch, igual que los otros dos
+                        // de la pantalla. Apagarlo revoca al instante (no
+                        // espera a GUARDAR), igual que el botón de antes.
+                        ? _ToggleCard(
+                            palette: palette,
+                            titleKey: const Key(
+                              'profile_edit_trainer_publication_status',
+                            ),
+                            switchKey: const Key(
                               'profile_edit_trainer_revoke_button',
                             ),
-                            onPressed: () =>
-                                _revokeLocationConsent(profile.uid),
-                            child: Text(
-                              l10n.trainerLocationConsentSheetRevoke,
-                              style: TextStyle(
-                                color: palette.textMuted,
-                                fontSize: AppTextSize.bodyDense,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            title: l10n.profileEditTrainerPublished,
+                            value: true,
+                            onChanged: (_) => _revokeLocationConsent(
+                              profile.uid,
+                            ),
+                          )
+                        // Sin publicar no hay nada que apagar, y publicar
+                        // pasa por GUARDAR (con su pedido de consentimiento):
+                        // un switch acá sería un control que no controla.
+                        : Text(
+                            key: const Key(
+                              'profile_edit_trainer_publication_status',
+                            ),
+                            l10n.profileEditTrainerNotPublished,
+                            style: TextStyle(
+                              color: palette.textMuted,
+                              fontSize: AppTextSize.bodyDense,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                      ],
-                    ),
                   ),
             ],
             const SizedBox(height: 18),
@@ -612,7 +623,7 @@ class _ProfileEditTrainerScreenState
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: palette.danger, fontSize: 13),
+                style: TextStyle(color: palette.dangerText, fontSize: 13),
               ),
             ],
             const SizedBox(height: 20),
@@ -696,10 +707,20 @@ class _ProfileEditTrainerScreenState
     );
   }
 
-  InputDecoration _inputDecoration(AppPalette palette, {required String hint}) {
+  InputDecoration _inputDecoration(
+    AppPalette palette, {
+    required String hint,
+    String? helper,
+  }) {
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(color: palette.textMuted),
+      helperText: helper,
+      helperMaxLines: 2,
+      helperStyle: TextStyle(
+        color: palette.textMuted,
+        fontSize: AppTextSize.caption,
+      ),
       filled: true,
       fillColor: palette.bgCard,
       enabledBorder: OutlineInputBorder(
@@ -843,7 +864,7 @@ class _GymsSection extends ConsumerWidget {
               children: [
                 Text(
                   l10n.profileLoadError,
-                  style: TextStyle(color: palette.danger, fontSize: 13),
+                  style: TextStyle(color: palette.dangerText, fontSize: 13),
                 ),
                 const SizedBox(height: 8),
                 Align(
@@ -1065,15 +1086,19 @@ class _ToggleCard extends StatelessWidget {
   const _ToggleCard({
     required this.palette,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     required this.value,
     required this.onChanged,
+    this.titleKey,
+    this.switchKey,
   });
   final AppPalette palette;
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
+  final Key? titleKey;
+  final Key? switchKey;
 
   @override
   Widget build(BuildContext context) {
@@ -1085,18 +1110,22 @@ class _ToggleCard extends StatelessWidget {
         border: Border.all(color: palette.border),
       ),
       child: SwitchListTile(
+        key: switchKey,
         contentPadding: EdgeInsets.zero,
         title: Text(
+          key: titleKey,
           title,
           style: TextStyle(
             color: palette.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(color: palette.textMuted, fontSize: 12),
-        ),
+        subtitle: subtitle == null
+            ? null
+            : Text(
+                subtitle!,
+                style: TextStyle(color: palette.textMuted, fontSize: 12),
+              ),
         value: value,
         onChanged: onChanged,
         activeThumbColor: palette.accent,
@@ -1466,7 +1495,7 @@ class _CustomLocationSheetState extends ConsumerState<_CustomLocationSheet> {
             Text(
               _error!,
               textAlign: TextAlign.center,
-              style: TextStyle(color: palette.danger, fontSize: 13),
+              style: TextStyle(color: palette.dangerText, fontSize: 13),
             ),
           ],
           const SizedBox(height: 16),
