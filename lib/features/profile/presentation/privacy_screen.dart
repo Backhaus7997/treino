@@ -16,6 +16,7 @@ import '../application/recordatorios_entrenamiento_providers.dart';
 import '../application/user_providers.dart';
 import '../data/user_repository.dart' show UserRepository;
 import '../domain/user_role.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Los controles de privacidad del usuario: la analítica (por dispositivo), los
 /// correos promocionales (por cuenta) y, sólo para el ATLETA, los recordatorios
@@ -92,11 +93,11 @@ class PrivacyScreen extends ConsumerWidget {
     try {
       await escribir(ref.read(userRepositoryProvider), uid);
     } catch (_) {
-      // Sin `action`: es un aviso que se va solo, así que el candado de
-      // `persist` (snackbar_persist_scan_test) no aplica.
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(mensajeDeError)));
+      showTreinoToastOn(
+        messenger,
+        mensajeDeError,
+        type: TreinoToastType.error,
+      );
     }
   }
 

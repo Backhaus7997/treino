@@ -10,10 +10,10 @@ import 'package:video_player/video_player.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/exercise_asset_image.dart';
+import '../../../core/widgets/treino_collapsing_top_bar.dart';
 import '../../../core/widgets/firebase_storage_video_player.dart'
     show VideoPlayOverlay;
 import '../../../core/widgets/motion/treino_shimmer.dart';
-import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../insights/domain/chart_period.dart';
 import '../application/exercise_progression_aggregator.dart';
@@ -103,74 +103,44 @@ class ExerciseDetailScreen extends ConsumerWidget {
     );
     final statsUid = athleteId ?? ref.watch(currentUidProvider) ?? '';
 
-    // Stack so the hero photo extends edge-to-edge from the top of the safe
-    // area while the back button floats over it. Non-data states still render
-    // the back button on top so the user can always escape.
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: exerciseAsync.when(
-            data: (exercise) => exercise == null
-                ? const _NotFoundState(label: 'Ejercicio no encontrado')
-                : _ExerciseDetailContent(
-                    exercise: exercise,
-                    statsUid: statsUid,
-                    // The SLOT's id, not the resolved [Exercise.id]: the
-                    // player logs `slot.exerciseId` into setLogs, so when the
-                    // slot id drifted from the catalogue and the provider
-                    // resolved by name-fallback, the athlete's history still
-                    // lives under the slot id.
-                    statsExerciseId: exerciseId,
-                  ),
-            loading: () => const _ExerciseLoadingSkeleton(),
-            error: (_, __) => _ErrorState(
-              message: 'No pudimos cargar el ejercicio.',
-              onRetry: () => ref.invalidate(
-                slotExerciseProvider((
-                  exerciseId: exerciseId,
-                  ownerId: ownerId,
-                  exerciseName: exerciseName,
-                )),
+    final exercise = exerciseAsync.valueOrNull;
+    final isCustom = exercise?.category.toLowerCase() == 'custom';
+
+    // La barra superior aparece al scrollear (#1559): en offset 0 sólo flota la
+    // flecha sobre la foto/video del hero (o sobre el fondo, en el encabezado
+    // compacto de los ejercicios del PF), sin círculo. Los estados sin datos
+    // también la llevan, para que el usuario nunca quede sin salida.
+    return TreinoCollapsingTopBar(
+      title: exercise?.name,
+      overHero: exercise != null && !isCustom,
+      // Hero: el título va al pie de los 320 px. Compacto: arranca bajo la
+      // barra y mide ~120.
+      collapseOffset: isCustom ? 120 : 240,
+      onBack: () =>
+          context.canPop() ? context.pop() : context.go(backFallbackRoute),
+      body: exerciseAsync.when(
+        data: (exercise) => exercise == null
+            ? const _NotFoundState(label: 'Ejercicio no encontrado')
+            : _ExerciseDetailContent(
+                exercise: exercise,
+                statsUid: statsUid,
+                // The SLOT's id, not the resolved [Exercise.id]: the
+                // player logs `slot.exerciseId` into setLogs, so when the
+                // slot id drifted from the catalogue and the provider
+                // resolved by name-fallback, the athlete's history still
+                // lives under the slot id.
+                statsExerciseId: exerciseId,
               ),
-            ),
+        loading: () => const _ExerciseLoadingSkeleton(),
+        error: (_, __) => _ErrorState(
+          message: 'No pudimos cargar el ejercicio.',
+          onRetry: () => ref.invalidate(
+            slotExerciseProvider((
+              exerciseId: exerciseId,
+              ownerId: ownerId,
+              exerciseName: exerciseName,
+            )),
           ),
-        ),
-        Positioned(
-          top: 0,
-          left: 0,
-          child: _BackBar(fallbackRoute: backFallbackRoute),
-        ),
-      ],
-    );
-  }
-}
-
-/// Persistent top-left back button. Always visible across loading / error /
-/// not-found / data states so the user can never dead-end on a deep-linked
-/// screen (REQ-RDT-020 strengthened). Floats over the hero photo with a
-/// translucent chip so it stays legible on bright images.
-class _BackBar extends StatelessWidget {
-  const _BackBar({required this.fallbackRoute});
-
-  /// Where to land when nothing can be popped — see
-  /// [ExerciseDetailScreen.backFallbackRoute].
-  final String fallbackRoute;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 8),
-      child: Material(
-        color: palette.scrimDark.withValues(alpha: 0.35),
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: IconButton(
-          tooltip: l10n.commonBack,
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go(fallbackRoute),
         ),
       ),
     );
@@ -647,7 +617,12 @@ class _CompactHeader extends StatelessWidget {
     final palette = AppPalette.of(context);
     return Container(
       color: palette.bg,
-      padding: const EdgeInsets.fromLTRB(20, 80, 20, 16),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        TreinoTopBarMetrics.reservedHeightOf(context) + 16,
+        20,
+        16,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

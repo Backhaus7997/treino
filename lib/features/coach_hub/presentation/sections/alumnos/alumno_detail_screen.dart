@@ -13,7 +13,6 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/date_labels.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
-import 'package:treino/core/widgets/motion/treino_success_check.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
@@ -30,6 +29,7 @@ import 'package:treino/features/coach/domain/athlete_file.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/follow_up_entry.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
+import 'package:treino/features/coach/domain/nutrition_plan_ids.dart';
 import 'package:treino/features/coach/domain/nutrition_plan_presets.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -88,6 +88,7 @@ import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Estado de un grupo de la ficha, para su marca en la barra.
 ///
@@ -1053,10 +1054,10 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
     try {
       await ref.read(measurementRepositoryProvider).delete(m.id);
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la medición.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos eliminar la medición.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     }
   }
@@ -1089,10 +1090,10 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
     try {
       await ref.read(performanceTestRepositoryProvider).delete(t.id);
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la prueba.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos eliminar la prueba.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     }
   }
@@ -3429,24 +3430,18 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
       // (appointment_detail_dialog.dart): mismo momento de éxito (guardado),
       // mismo feedback — antes solo el guardado de notas del TURNO tenía el
       // check y el de notas privadas del alumno quedaba en texto plano.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              const SizedBox(width: 10),
-              Flexible(child: Text(l10n.coachHubAlumnoDetailNotasSaveSuccess)),
-            ],
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToast(
+        context,
+        l10n.coachHubAlumnoDetailNotasSaveSuccess,
+        type: TreinoToastType.success,
       );
     } on FirebaseException catch (_) {
       if (!mounted) return;
       final l10n = AppL10n.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubAlumnoDetailNotasSaveError)),
+      showTreinoToast(
+        context,
+        l10n.coachHubAlumnoDetailNotasSaveError,
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) {
@@ -3805,25 +3800,24 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
             bytes: bytes,
           );
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosUploadSuccess),
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosUploadSuccess,
+        type: TreinoToastType.success,
       );
     } on AthleteFileTooLargeException {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosUploadTooLarge),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosUploadTooLarge,
+        type: TreinoToastType.error,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosUploadError),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosUploadError,
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -3859,10 +3853,10 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
       await ref.read(athleteFileRepositoryProvider).delete(file);
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosDeleteError),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosDeleteError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -4029,10 +4023,10 @@ class _ArchivoRow extends ConsumerWidget {
           .read(athleteFileRepositoryProvider)
           .setShared(file, !file.sharedWithAthlete);
     } catch (_) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosShareError),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosShareError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -4726,20 +4720,21 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_isEditing
-              ? 'Medición actualizada.' // i18n: Fase W2
-              : 'Medición guardada.'), // i18n: Fase W2
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        _isEditing
+            ? 'Medición actualizada.' // i18n: Fase W2
+            : 'Medición guardada.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar la medición.'), // i18n: Fase W2
-        ),
+      // Con context y no con el messenger: el diálogo sigue abierto y un
+      // SnackBar del Scaffold de atrás quedaría tapado (#1490).
+      showTreinoToast(
+        context,
+        'No pudimos guardar la medición.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -5541,20 +5536,21 @@ class _NuevoRendimientoDialogState
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_isEditing
-              ? 'Prueba actualizada.' // i18n: Fase W2
-              : 'Prueba guardada.'), // i18n: Fase W2
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        _isEditing
+            ? 'Prueba actualizada.' // i18n: Fase W2
+            : 'Prueba guardada.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar la prueba.'), // i18n: Fase W2
-        ),
+      // Con context y no con el messenger: el diálogo sigue abierto y un
+      // SnackBar del Scaffold de atrás quedaría tapado (#1490).
+      showTreinoToast(
+        context,
+        'No pudimos guardar la prueba.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -5852,10 +5848,10 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
     try {
       await ref.read(followUpEntryRepositoryProvider).delete(entry.id);
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la entrada.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos eliminar la entrada.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     }
   }
@@ -6140,20 +6136,21 @@ class _NuevaEntradaSeguimientoDialogState
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_isEditing
-              ? 'Entrada actualizada.' // i18n: Fase W2
-              : 'Entrada guardada.'), // i18n: Fase W2
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        _isEditing
+            ? 'Entrada actualizada.' // i18n: Fase W2
+            : 'Entrada guardada.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar la entrada.'), // i18n: Fase W2
-        ),
+      // Con context y no con el messenger: el diálogo sigue abierto y un
+      // SnackBar del Scaffold de atrás quedaría tapado (#1490).
+      showTreinoToast(
+        context,
+        'No pudimos guardar la entrada.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -6276,8 +6273,9 @@ class _NuevaEntradaSeguimientoDialogState
 /// vegetales…) y cada grupo con opciones que el alumno elige.
 ///
 /// Modelo: `NutritionPlan → Meal → FoodGroup → FoodOption`. Ver
-/// `nutrition_plan.dart` para detalle. En este MVP solo el PF arma el plan;
-/// el alumno NO lo ve todavía en mobile (feature scoped aparte).
+/// `nutrition_plan.dart` para detalle. El PF arma el plan (acá o, desde
+/// #1538, en la ficha del alumno mobile) y el alumno lo ve en su app, en MI
+/// PLAN NUTRICIONAL.
 ///
 /// Comportamiento:
 /// - Al abrir por primera vez muestra 6 comidas preset (desayuno, media
@@ -6286,6 +6284,11 @@ class _NuevaEntradaSeguimientoDialogState
 /// - Cambios locales viven en `_draft` — el stream de Firestore se lee al
 ///   entrar y cuando el PF guarda vuelve a persistir todo el doc.
 /// - Sin auto-save (evitamos writes innecesarios y forms rotos).
+/// - Si la lectura falla NO arranca de los presets: un GUARDAR PLAN sobre ese
+///   borrador pisaría el plan real que no se pudo leer (#1553).
+/// - Los ids salen del plan (`nextFreeId`) y no de un contador de sesión, y
+///   cada comida, grupo y opción lleva su id como `Key` (#1553): ver
+///   `nutrition_plan_ids.dart`.
 class _NutricionTab extends ConsumerStatefulWidget {
   const _NutricionTab({required this.athleteId});
 
@@ -6299,21 +6302,18 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
   NutritionPlan? _draft;
   bool _loadedOnce = false;
   bool _saving = false;
-  int _idCounter = 0;
 
-  String _newId(String prefix) {
-    _idCounter++;
-    // Sin Date.now() porque en tests / hot reload no queremos ids
-    // dependientes de tiempo real. El id solo tiene que ser único en la
-    // sesión — Firestore acepta cualquier string.
-    return '$prefix-$_idCounter';
-  }
+  /// Un id que no usa ningún ítem del borrador. Antes era un contador que
+  /// arrancaba en 0 en cada sesión: sobre un plan con `meal-1` guardado, la
+  /// comida nueva salía con el mismo id y editarla editaba también la otra.
+  String _newId(String prefix) => _draft!.nextFreeId(prefix);
 
   void _seedIfNeeded(NutritionPlan? persisted, String trainerUid) {
     if (_loadedOnce) return;
     _loadedOnce = true;
     if (persisted != null) {
-      _draft = persisted;
+      // Un plan guardado con el contador viejo puede traer ids repetidos.
+      _draft = persisted.withUniqueIds();
     } else {
       _draft = NutritionPlan(
         id: '${trainerUid}_${widget.athleteId}',
@@ -6333,7 +6333,6 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     if (oldWidget.athleteId != widget.athleteId) {
       _draft = null;
       _loadedOnce = false;
-      _idCounter = 0;
     }
   }
 
@@ -6343,12 +6342,10 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     final messenger = ScaffoldMessenger.of(context);
     final clean = draft.sanitizeForSave();
     if (clean.meals.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'El plan está vacío. Agregá al menos una comida con nombre.', // i18n: Fase W2
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        'El plan está vacío. Agregá al menos una comida con nombre.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -6356,18 +6353,17 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     try {
       await ref.read(nutritionPlanRepositoryProvider).save(clean);
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Plan guardado.'), // i18n: Fase W2
-          duration: Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        'Plan guardado.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar el plan.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos guardar el plan.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -6419,19 +6415,36 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     final palette = AppPalette.of(context);
     final trainerUid = ref.watch(currentUidProvider);
     if (trainerUid == null) return const SizedBox.shrink();
-    final planAsync = ref.watch(
-      nutritionPlanProvider(
-        (trainerId: trainerUid, athleteId: widget.athleteId),
-      ),
+    final provider = nutritionPlanProvider(
+      (trainerId: trainerUid, athleteId: widget.athleteId),
     );
+    final planAsync = ref.watch(provider);
 
     if (planAsync.hasValue) {
       _seedIfNeeded(planAsync.requireValue, trainerUid);
-    } else if (planAsync.hasError && !_loadedOnce) {
-      // Error al leer — dejamos que el PF arme el plan igual (arranca desde
-      // presets). El save intentará persistir; si sigue fallando el error
-      // se muestra en el snackbar.
-      _seedIfNeeded(null, trainerUid);
+    }
+
+    if (_draft == null && planAsync.hasError) {
+      // NO arrancamos de los presets: guardar ese borrador pisaría el plan
+      // real que no se pudo leer. Antes lo hacía (#1553).
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('error'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _muted(
+              palette,
+              'No pudimos cargar el plan nutricional.', // i18n: Fase W2
+            ),
+            TreinoButton(
+              label: 'Reintentar', // i18n: Fase W2
+              variant: TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.sm,
+              onPressed: () => ref.invalidate(provider),
+            ),
+          ],
+        ),
+      );
     }
 
     if (_draft == null) {
@@ -6464,7 +6477,9 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Armá el plan por comidas, grupos y opciones. Solo vos lo ves.', // i18n: Fase W2
+                        // Decía «Solo vos lo ves»: falso desde que el
+                        // alumno lo ve en mobile (#1553, AGENTS.md §11.1).
+                        'Armá el plan por comidas, grupos y opciones. Tu alumno lo ve en su app.', // i18n: Fase W2
                         style:
                             TextStyle(color: palette.textMuted, fontSize: 13),
                       ),
@@ -6512,8 +6527,14 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                       onChanged: _updateTitle,
                     ),
                     const SizedBox(height: 16),
+                    // La `Key` por id mantiene cada campo pegado a SU comida:
+                    // sin ella, al borrar la primera Flutter reusaba por
+                    // posición el estado del `TextFormField` (que lee
+                    // `initialValue` sólo al montar) y la card de arriba
+                    // mostraba el nombre de la borrada (#1553).
                     for (final meal in _draft!.meals)
                       Padding(
+                        key: ValueKey(meal.id),
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _MealEditor(
                           meal: meal,
@@ -6670,6 +6691,7 @@ class _MealEditor extends StatelessWidget {
           children: [
             for (final group in meal.groups)
               Padding(
+                key: ValueKey(group.id),
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _GroupEditor(
                   group: group,
@@ -6786,6 +6808,7 @@ class _GroupEditor extends StatelessWidget {
           const SizedBox(height: 6),
           for (final option in group.options)
             Padding(
+              key: ValueKey(option.id),
               padding: const EdgeInsets.only(top: 4),
               child: _OptionRow(
                 option: option,

@@ -3043,7 +3043,7 @@ estaba anotado como fuera de alcance.
   fuera de cota queda imborrable.
 - **libre** — el camino lo escribe sin ninguna cota.
 
-### La matriz 15 × 3
+### La matriz 16 × 3
 
 | # | Campo | `create` | Path 1 — cancelación (miembro) | Path 2 — edición del PF |
 |---|---|---|---|---|
@@ -3062,6 +3062,27 @@ estaba anotado como fuera de alcance.
 | 13 | `recurringId` | acotado — `<= 128` | **pineado** | **pineado** |
 | 14 | `paymentId` | acotado — **`== null`** | **pineado** | acotado — **set-once** |
 | 15 | `reason` ⭐ | acotado — **`== null`** | **pineado** | **pineado** |
+| 16 | `attendance` 🆕 | acotado — **`== null`** | **pineado** | acotado — pin **o** `null` **o** `== 'absent'`, y sólo si el turno está `confirmed` |
+
+🆕 **La fila 16 es de [#1492](https://github.com/Backhaus7997/treino/issues/1492)**: la asistencia
+que el PF marca sobre una sesión que ya empezó (`null` = se dio, `'absent'` = el
+alumno faltó). **No es un `status` nuevo** a propósito: las tres queries de
+`appointment_repository.dart` y el cobro exigen `status == 'confirmed'`, así que
+un `no_show` sacaba la sesión de la agenda de las dos partes y la volvía
+incobrable. `Appointment.toJson()` la **omite** cuando es `null`
+(`includeIfNull: false`), para que la app nueva siga creando turnos contra las
+reglas de antes de #1492, que no tienen la clave en `hasOnly()`. Sus tres
+celdas tienen escritura hostil y ancla en el bloque `#1492` de
+`appointments-shape-rules.test.ts`, y cada gate nuevo se midió con su mutación
+—reemplazado de a uno—: los cinco ponen al menos un rojo (el detalle, en el
+PR de #1492).
+
+**#1492 también cambió el gate del Path 1**: las 24 h son sólo del **atleta**.
+El PF cancela su turno en cualquier momento (`request.auth.uid ==
+resource.data.trainerId` como primer disyunto del gate). Las celdas de la
+matriz no cambian —el gate no es de ningún campo—, pero el negativo
+«DENIEGA al PF cancelar a menos de 24 h» pasó a ser un positivo, y el del
+atleta es el que sigue custodiando el gate.
 
 ⭐ **La fila 15 es nueva de [#846](https://github.com/Backhaus7997/treino/issues/846)**, y es la única del
 documento que **ningún camino de cliente escribe**. `reason` no sale de
@@ -3100,6 +3121,7 @@ falta para poder dejarlas abiertas: si una no se puede justificar, se pinea.
 | `noteBefore` / `noteAfter` · P2 | Son el **propósito** del camino |
 | `paymentId` · P2 | Set-once (`null` → string no vacío, o re-afirmar el MISMO valor). Money-critical. **Su premisa —que el valor nace en `null`— la sostiene el `create`, no este camino**: por eso la columna que faltaba era la que importaba |
 | `reason` · los tres caminos | **Ninguno**, y es el punto: es la única fila cerrada en las tres columnas. Ver ⭐ arriba |
+| `attendance` · P2 | Es la asistencia de una sesión del propio PF: él es el único que sabe si el alumno vino. Acotada a `null`/`'absent'` (igualdad contra el literal, así que fija el tipo: una lista `['absent']` da DENY) y a turnos `confirmed` — un «faltó» sobre una sesión cancelada no lo vería nadie para corregirlo. Que sea **después** de que empezó lo pone el cliente: `startsAt` es wall-clock y la regla no conoce la zona del PF. En el **Path 1** se pinea: el actor puede ser el atleta, que se borraría el «faltó» de paso al cancelar |
 | todo el `create` | Un turno nuevo nace `confirmed`, sin cancelación, sin log y **sin cobro**. Los tres `== null` (`cancelledAt`, `cancelledBy`, `paymentId`) y el `is list` + `size() == 0` del log son el mismo invariante escrito sobre cuatro campos. ⚠️ El `== null` fija el tipo de paso; el `size() == 0` **no** — ver la sexta pasada |
 
 **Las celdas que estaban abiertas y nadie había decidido.** Medidas contra el

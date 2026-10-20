@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
@@ -31,10 +32,19 @@ import '../../../workout/application/session_providers.dart'
 /// porque este widget sólo vive en el perfil público de un PF, pero el `catch`
 /// cubre que lo haya despublicado mientras el atleta miraba la pantalla.
 class TrainerInquiryCta extends ConsumerStatefulWidget {
-  const TrainerInquiryCta({super.key, required this.trainerId});
+  const TrainerInquiryCta({
+    super.key,
+    required this.trainerId,
+    this.preview = false,
+  });
 
   /// uid del PF a consultar.
   final String trainerId;
+
+  /// Vista previa del propio PF (#1498): el botón se ve pero no actúa.
+  /// Consultarse a uno mismo no tiene sentido (y `_onPressed` ya lo corta en
+  /// silencio, que es justo el «botón activo que no hace nada» del reporte).
+  final bool preview;
 
   @override
   ConsumerState<TrainerInquiryCta> createState() => _TrainerInquiryCtaState();
@@ -85,9 +95,11 @@ class _TrainerInquiryCtaState extends ConsumerState<TrainerInquiryCta> {
       }
       router.push('/coach/chat/${chat.chatId}?other=${widget.trainerId}');
     } catch (_) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(errorText)));
+      showTreinoToastOn(
+        messenger,
+        errorText,
+        type: TreinoToastType.error,
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -104,11 +116,11 @@ class _TrainerInquiryCtaState extends ConsumerState<TrainerInquiryCta> {
       children: [
         Semantics(
           button: true,
-          enabled: !_busy,
+          enabled: !_busy && !widget.preview,
           label: l10n.coachInquiryCtaLabel,
           child: ExcludeSemantics(
             child: FilledButton(
-              onPressed: _busy ? null : _onPressed,
+              onPressed: _busy || widget.preview ? null : _onPressed,
               style: FilledButton.styleFrom(
                 // AGENTS.md §2: sobre el acento va el ink invariante de
                 // TreinoButtonTokens, NUNCA `palette.bg` — el mint es idéntico

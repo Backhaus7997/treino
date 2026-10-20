@@ -32,6 +32,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Pendientes de HOY — solicitudes pendientes REAL. REQ-HOY-06.
 ///
@@ -240,8 +241,10 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
           .read(analyticsServiceProvider)
           .logLinkAccepted(linkId: widget.link.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardAcceptSuccess)),
+      showTreinoToast(
+        context,
+        l10n.coachHubDashboardAcceptSuccess,
+        type: TreinoToastType.success,
       );
     } on LinkPromotionFailure$PlanLimitReached catch (failure) {
       if (!mounted) return;
@@ -263,8 +266,10 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
     } on LinkPromotionFailure$PromotionPrecondition {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardAcceptPrecondition)),
+      showTreinoToast(
+        context,
+        l10n.coachHubDashboardAcceptPrecondition,
+        type: TreinoToastType.error,
       );
     } catch (_) {
       // Catch-all a proposito, NO acotado a LinkPromotionFailure (QA H5): lo
@@ -272,8 +277,10 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
       // _busy y avisar, o el boton queda muerto sin explicacion.
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardAcceptUnavailable)),
+      showTreinoToast(
+        context,
+        l10n.coachHubDashboardAcceptUnavailable,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -286,14 +293,18 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
     try {
       await repo.decline(widget.link.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardRejectSuccess)),
+      showTreinoToast(
+        context,
+        l10n.coachHubDashboardRejectSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardRejectError)),
+      showTreinoToast(
+        context,
+        l10n.coachHubDashboardRejectError,
+        type: TreinoToastType.error,
       );
     }
   }

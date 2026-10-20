@@ -18,6 +18,7 @@ import '../../../core/utils/firestore_error.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/template_limit_gate.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
@@ -2225,11 +2226,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final isDuplicate = day.slots
         .any((s) => !identical(s, slot) && s.exercise?.id == newExercise.id);
     if (isDuplicate) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppL10n.of(context).routineEditorDuplicateExercise),
-        ),
-      );
+      showTreinoToast(
+          context, AppL10n.of(context).routineEditorDuplicateExercise);
       return;
     }
     _markDirty();
@@ -2276,10 +2274,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final nuevos = picked.where((e) => !presentes.contains(e.id)).toList();
     if (nuevos.isEmpty) {
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        // ignore: use_build_context_synchronously
-        SnackBar(content: Text(AppL10n.of(context).routineEditorAddNothingNew)),
-      );
+      showTreinoToast(context, AppL10n.of(context).routineEditorAddNothingNew);
       return;
     }
 
@@ -2549,9 +2544,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // Ninguno era nuevo: decirlo. Antes esto era un `return` mudo adentro del
     // setState y el botón parecía roto.
     if (nuevos.isEmpty) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorAddNothingNew)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorAddNothingNew,
+          type: TreinoToastType.info);
       return;
     }
 
@@ -2565,9 +2559,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // ejercicio adentro miente sobre lo que es.
     final esSuperserie = nuevos.length >= 2;
     if (!esSuperserie) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorSupersetNeedsTwo)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorSupersetNeedsTwo,
+          type: TreinoToastType.info);
     }
 
     setState(() {
@@ -2759,9 +2752,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
     final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
     if (nuevos.isEmpty) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorAddNothingNew)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorAddNothingNew,
+          type: TreinoToastType.info);
       return;
     }
 
@@ -2849,9 +2841,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final l10n = AppL10n.of(context);
       final error = _firstValidationError(l10n);
       if (error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
-        );
+        showTreinoToast(context, error.message, type: TreinoToastType.error);
         // Expand and scroll to the day the error points at (name errors carry
         // no day — nothing to scroll to).
         final day = error.day;
@@ -2942,9 +2932,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           _invalidateAssignedList(container,
               trainerId: uid, athleteId: athleteId);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachUpdatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case TrainerAssigning(:final athleteId, existingPlanId: null):
@@ -2978,9 +2967,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             weeksCount: _numWeeks,
           );
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachCreatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachCreatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case TrainerTemplating(existingTemplateId: final templateId?):
@@ -3001,9 +2989,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateTemplate(uid: uid, draft: draft);
           invalidateRoutineById(container, templateId);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachUpdatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case TrainerTemplating(existingTemplateId: null):
@@ -3039,9 +3026,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             weeksCount: _numWeeks,
           );
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachCreatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachCreatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         // Both athlete CREATE paths share one exit, and that is the whole
@@ -3075,9 +3061,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           }
           if (userRoutines.length >= kMaxOwnRoutines) {
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.workoutSelfEditorCapReached)),
-            );
+            showTreinoToast(context, l10n.workoutSelfEditorCapReached,
+                type: TreinoToastType.error);
             // No save happened — re-arm the unsaved-changes guard.
             _isDirty = true;
             setState(() => _submitting = false);
@@ -3152,9 +3137,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             }
           }
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.workoutSelfEditorSuccess)),
-          );
+          showTreinoToast(context, l10n.workoutSelfEditorSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case SelfCreating(existingRoutineId: final existingId?):
@@ -3180,9 +3164,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateUserOwned(uid: uid, draft: draft);
           invalidateRoutineById(container, existingId);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.workoutSelfEditorUpdateSuccess)),
-          );
+          showTreinoToast(context, l10n.workoutSelfEditorUpdateSuccess,
+              type: TreinoToastType.success);
           context.pop();
       }
     } catch (e) {
@@ -3225,9 +3208,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 : l10n.workoutSelfEditorError,
         };
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorText)),
-      );
+      showTreinoToast(context, errorText, type: TreinoToastType.error);
       // The save failed — the user stays on screen with unsaved changes, so
       // re-arm the guard cleared at the top of _submit.
       _isDirty = true;
@@ -5883,31 +5864,22 @@ class _SetTableState extends State<_SetTable> {
         relativeOffset.dx + 120,
         0,
       ),
-      color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
           value: ExerciseMode.reps,
           child: Text(
             l10n.routineEditorMeasureReps,
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
         PopupMenuItem(
           value: ExerciseMode.duration,
           child: Text(
             l10n.routineEditorMeasureTime,
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: ExerciseMode.distance,
-          child: Text(
-            'Distancia',
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
-          ),
+          child: Text('Distancia'),
         ),
       ],
     );
@@ -5951,9 +5923,8 @@ class _SetTableState extends State<_SetTable> {
       // El texto dice "este set" y no "el primer set": desde #867 la fuente es
       // la celda enfocada, y mandar al usuario a cargar la primera fila lo
       // dejaba corrigiendo un valor que no es el que se va a replicar.
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorFillColumnEmpty)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorFillColumnEmpty,
+          type: TreinoToastType.info);
       return;
     }
 
@@ -5963,24 +5934,17 @@ class _SetTableState extends State<_SetTable> {
     setState(() => _applyWeights(List<double?>.filled(sets.length, source)));
     widget.onChanged();
 
-    messenger.showSnackBar(
-      SnackBar(
-        // `persist: false` A MANO. `SnackBar` hace
-        // `persist = persist ?? action != null`: con acción es eterno por
-        // default, así que este cartel se quedaba hasta recargar. Es el
-        // gemelo del que el PF reportó en el editor web.
-        persist: false,
-        duration: const Duration(seconds: 6),
-        content: Text(l10n.routineEditorFillKgApplied),
-        action: SnackBarAction(
-          key: const Key('fill_kg_undo_action'),
-          label: l10n.routineEditorFillKgUndo,
-          onPressed: () {
-            if (!mounted) return;
-            setState(() => _applyWeights(previous));
-            widget.onChanged();
-          },
-        ),
+    showTreinoToastOn(
+      messenger,
+      l10n.routineEditorFillKgApplied,
+      type: TreinoToastType.success,
+      action: TreinoToastAction(
+        label: l10n.routineEditorFillKgUndo,
+        onPressed: () {
+          if (!mounted) return;
+          setState(() => _applyWeights(previous));
+          widget.onChanged();
+        },
       ),
     );
   }
@@ -6541,7 +6505,6 @@ class _SetRowState extends State<_SetRow> {
         offset.dx + 160,
         0,
       ),
-      color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
             value: SetType.normal,

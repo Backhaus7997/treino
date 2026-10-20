@@ -13,6 +13,7 @@ import '../application/moderation_providers.dart';
 import '../domain/report_target_kind.dart';
 import 'widgets/block_confirmation_sheet.dart';
 import 'widgets/report_reason_sheet.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Único punto de orquestación de las acciones de moderación (reportar,
 /// bloquear), compartido por los cuatro call sites de la feature: `PostCard`,
@@ -141,13 +142,17 @@ Future<void> reportContent(
           reason: submission.reason,
           detail: submission.detail,
         );
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(l10n.moderationReportSuccess)));
+    showTreinoToastOn(
+      messenger,
+      l10n.moderationReportSuccess,
+      type: TreinoToastType.success,
+    );
   } catch (_) {
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(l10n.moderationReportError)));
+    showTreinoToastOn(
+      messenger,
+      l10n.moderationReportError,
+      type: TreinoToastType.error,
+    );
   }
 }
 
@@ -177,19 +182,17 @@ Future<void> blockUser(
       onConfirm: () async {
         try {
           await ref.read(blockRepositoryProvider).block(blockerUid, targetUid);
-          messenger
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(
-                content: Text(l10n.moderationBlockSuccess(targetDisplayName)),
-              ),
-            );
+          showTreinoToastOn(
+            messenger,
+            l10n.moderationBlockSuccess(targetDisplayName),
+            type: TreinoToastType.success,
+          );
         } catch (_) {
-          messenger
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(content: Text(l10n.moderationBlockError)),
-            );
+          showTreinoToastOn(
+            messenger,
+            l10n.moderationBlockError,
+            type: TreinoToastType.error,
+          );
         }
       },
     ),

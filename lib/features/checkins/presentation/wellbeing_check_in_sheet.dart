@@ -11,6 +11,7 @@ import '../../workout/domain/muscle_group.dart';
 import '../application/check_in_providers.dart';
 import '../domain/check_in.dart';
 import 'widgets/wellbeing_mood_row.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Abre el paso de check-in de bienestar.
 ///
@@ -115,8 +116,11 @@ class _WellbeingCheckInSheetState extends ConsumerState<WellbeingCheckInSheet> {
       // El sheet queda abierto: lo que el usuario escribió no se pierde y
       // puede reintentar. Avisar el fallo es obligatorio — dar por guardado un
       // registro que no se guardó es peor que no ofrecer el registro.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppL10n.of(context).wellbeingSaveError)),
+      // Desde el sheet: el helper lo dibuja ENCIMA (#1490), no tapado atrás.
+      showTreinoToast(
+        context,
+        AppL10n.of(context).wellbeingSaveError,
+        type: TreinoToastType.error,
       );
     }
   }

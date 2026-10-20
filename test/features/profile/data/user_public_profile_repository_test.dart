@@ -206,6 +206,92 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
+  // #1478: por cualquier palabra del nombre, sin tildes (`searchPrefixes`, que
+  // escribe la Cloud Function), y la consulta vieja en paralelo hasta el
+  // backfill.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('#1478 searchByDisplayName por searchPrefixes', () {
+    // Lo que la CF guardaría para cada nombre (ver
+    // test/fixtures/search/user_search_terms.json).
+    const martinLopez = [
+      'ma', 'mar', 'mart', 'marti', 'martin', //
+      'lo', 'lop', 'lope', 'lopez',
+    ];
+    const martinGomez = [
+      'ma', 'mar', 'mart', 'marti', 'martin', //
+      'go', 'gom', 'gome', 'gomez',
+    ];
+
+    Future<void> seed(
+      String uid,
+      String name, {
+      List<String>? prefixes,
+    }) =>
+        firestore.collection('userPublicProfiles').doc(uid).set({
+          'uid': uid,
+          'displayName': name,
+          'displayNameLowercase': name.toLowerCase(),
+          if (prefixes != null) 'searchPrefixes': prefixes,
+        });
+
+    Future<List<String>> uidsFor(String query) async =>
+        (await repo.searchByDisplayName(query)).map((p) => p.uid).toList();
+
+    test('"martin" encuentra a "Martín López" (la vieja no: tiene tilde)',
+        () async {
+      await seed('ml', 'Martín López', prefixes: martinLopez);
+      expect(await uidsFor('martin'), ['ml']);
+    });
+
+    test('"lopez" y "LÓPEZ" encuentran por el apellido', () async {
+      await seed('ml', 'Martín López', prefixes: martinLopez);
+      expect(await uidsFor('lopez'), ['ml']);
+      expect(await uidsFor('LÓPEZ'), ['ml']);
+      expect(await uidsFor('  lóp '), ['ml']);
+    });
+
+    test('varias palabras: todas tienen que estar, en cualquier orden',
+        () async {
+      await seed('ml', 'Martín López', prefixes: martinLopez);
+      await seed('mg', 'Martín Gómez', prefixes: martinGomez);
+      expect(await uidsFor('martin lo'), ['ml']);
+      expect(await uidsFor('lopez martin'), ['ml']);
+      expect((await uidsFor('martin')).toSet(), {'ml', 'mg'});
+      expect(await uidsFor('martin pe'), isEmpty);
+    });
+
+    test('un perfil que todavía no tiene el campo sale por la consulta vieja',
+        () async {
+      await seed('viejo', 'martin_88');
+      expect(await uidsFor('martin'), ['viejo']);
+    });
+
+    test(
+        'si lo encuentran las dos consultas, sale una sola vez y primero '
+        'en el orden de la vieja', () async {
+      await seed('ml', 'Martín López', prefixes: martinLopez);
+      await seed('viejo', 'martin_88');
+      await seed('mt', 'martina', prefixes: const [
+        'ma', 'mar', 'mart', 'marti', 'martin', 'martina', //
+      ]);
+      expect(await uidsFor('martin'), ['viejo', 'mt', 'ml']);
+    });
+
+    test('cada consulta trae hasta 20: juntas no se recortan a 20', () async {
+      for (var i = 0; i < 25; i++) {
+        await seed('handle$i', 'martin_$i');
+      }
+      for (var i = 0; i < 25; i++) {
+        await seed('real$i', 'Martín López', prefixes: martinLopez);
+      }
+      final uids = await uidsFor('martin');
+      expect(uids, hasLength(40));
+      // Lo que vino a arreglar el #1478 no queda afuera por los handles.
+      expect(uids.where((u) => u.startsWith('real')), hasLength(20));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
   // getByIds batch lookup — backs the RESEÑAS section's single-read author
   // resolution (replaces the per-tile N+1 listen pattern).
   // ──────────────────────────────────────────────────────────────────────────

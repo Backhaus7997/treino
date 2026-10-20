@@ -61,6 +61,7 @@ import '../../widgets/create_custom_exercise_dialog.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import '../../widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
 /// mobile's `RoutineEditorScreen(TrainerAssigning)`). Soporta, por ejercicio:
@@ -868,23 +869,19 @@ class _RoutineEditorWebScreenState
           visibility: nextVisibility,
         );
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isPublished
-                ? 'Tu plantilla salió del catálogo público.' // i18n
-                : '¡Tu plantilla ya está en el catálogo público!', // i18n
-          ),
-        ),
+      showTreinoToast(
+        context,
+        isPublished
+            ? 'Tu plantilla salió del catálogo público.' // i18n
+            : '¡Tu plantilla ya está en el catálogo público!', // i18n
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No pudimos actualizar la publicación.', // i18n
-          ),
-        ),
+      showTreinoToast(
+        context,
+        'No pudimos actualizar la publicación.', // i18n
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _publishing = false);
@@ -1454,53 +1451,37 @@ class _RoutineEditorWebScreenState
     Set<int> maskAnterior,
   ) {
     final nombre = slot.exercise?.name;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        // NO PERSISTENTE, Y ESTO HAY QUE PONERLO A MANO. `SnackBar` hace
-        // `persist = persist ?? action != null`: cualquier cartel CON acción
-        // es eterno por default, y `ScaffoldMessenger` ni siquiera le agenda
-        // el timer de cierre. Como éste trae «Deshacer», se quedaba en
-        // pantalla hasta recargar la página — el PF lo reportó así, y se
-        // paseaba con él a otras secciones porque el `ScaffoldMessenger` vive
-        // en la app, no en la ruta.
-        //
-        // Seis segundos y no los cuatro de default: son los que hay para leer
-        // el nombre del ejercicio, entender qué pasó y decidir si deshacer.
-        persist: false,
-        duration: const Duration(seconds: 6),
-        // FLOTANTE Y LEVANTADO. El editor tiene un pie FIJO con «Guardar»
-        // abajo de todo, y un SnackBar normal se sienta justo encima: el PF
-        // acaba de sacar un ejercicio y el aviso le tapa el boton para
-        // guardarlo. Lo cazo un test que dejo de poder tocar submit despues
-        // de borrar.
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(
-          AppSpacing.s20,
-          0,
-          AppSpacing.s20,
-          _kAltoDelPieFijo + AppSpacing.s12,
-        ),
-        content: Text(
-          nombre == null
-              ? 'Sacado de la Semana ${semana + 1}. Podés volver a agregarlo '
-                  'desde «Agregar ejercicio».' // i18n
-              : '«$nombre» sale de la Semana ${semana + 1}. Podés volver a '
-                  'agregarlo desde «Agregar ejercicio».', // i18n
-        ),
-        action: SnackBarAction(
-          label: 'Deshacer', // i18n
-          onPressed: () {
-            if (!mounted) return;
-            _markDirty();
-            // Se restaura la máscara ENTERA que había antes, no un `add` de la
-            // semana: la anterior podía estar vacía —que significa «en todas»—
-            // y agregarle una la convertiría en una máscara explícita de una
-            // sola semana, sacando el ejercicio de las otras.
-            setState(() => slot.activeWeeks = maskAnterior);
-          },
-        ),
-      ));
+    showTreinoToast(
+      context,
+      nombre == null
+          ? 'Sacado de la Semana ${semana + 1}. Podés volver a agregarlo '
+              'desde «Agregar ejercicio».' // i18n
+          : '«$nombre» sale de la Semana ${semana + 1}. Podés volver a '
+              'agregarlo desde «Agregar ejercicio».', // i18n
+      // Seis segundos y no los cuatro de default: son los que hay para leer
+      // el nombre del ejercicio, entender qué pasó y decidir si deshacer. El
+      // helper ya lo deja NO persistente aunque traiga acción —con
+      // `persist ?? action != null` de Material se quedaba en pantalla hasta
+      // recargar y se paseaba a otras secciones—.
+      duration: const Duration(seconds: 6),
+      // LEVANTADO. El editor tiene un pie FIJO con «Guardar» abajo de todo,
+      // dentro del body: el Scaffold no lo conoce y el aviso le tapaba el
+      // botón para guardar. Lo cazó un test que dejó de poder tocar submit
+      // después de borrar.
+      bottomOffset: _kAltoDelPieFijo,
+      action: TreinoToastAction(
+        label: 'Deshacer', // i18n
+        onPressed: () {
+          if (!mounted) return;
+          _markDirty();
+          // Se restaura la máscara ENTERA que había antes, no un `add` de la
+          // semana: la anterior podía estar vacía —que significa «en todas»—
+          // y agregarle una la convertiría en una máscara explícita de una
+          // sola semana, sacando el ejercicio de las otras.
+          setState(() => slot.activeWeeks = maskAnterior);
+        },
+      ),
+    );
   }
 
   // ── Copiar prescripción entre ejercicios (#655) ──────────────────────────
@@ -2650,15 +2631,12 @@ class _RoutineEditorWebScreenState
   /// sobrevive al `pop` y se lee en la pantalla de atrás — que es justo donde
   /// el PF va a buscar la copia.
   void _avisarCopiaGuardada(String nombre) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(
-          // i18n
-          'Se guardó «$nombre» en tus plantillas. La original quedó como '
-          'estaba.',
-        ),
-      ));
+    showTreinoToast(
+      context,
+      'Se guardó «$nombre» en tus plantillas. La original quedó como '
+      'estaba.', // i18n
+      type: TreinoToastType.success,
+    );
   }
 
   // ── Discard guard ────────────────────────────────────────────────────────
@@ -4647,10 +4625,7 @@ class _SetTypeChip extends StatelessWidget {
         for (final (value, text) in _options)
           PopupMenuItem<SetType>(
             value: value,
-            child: Text(
-              text,
-              style: GoogleFonts.barlow(color: palette.textPrimary),
-            ),
+            child: Text(text),
           ),
       ],
       child: Container(

@@ -52,6 +52,10 @@ class _GatedChatRepository extends ChatRepository {
 
   final Completer<void> gate;
 
+  /// Cuántas veces se llamó a `sendMessage`: un envío en vuelo no puede dejar
+  /// pasar un segundo.
+  int calls = 0;
+
   @override
   Future<void> sendMessage({
     required String chatId,
@@ -59,8 +63,10 @@ class _GatedChatRepository extends ChatRepository {
     String text = '',
     String? mediaUrl,
     MediaType? mediaType,
-  }) =>
-      gate.future;
+  }) {
+    calls++;
+    return gate.future;
+  }
 }
 
 Message _msg({
@@ -314,6 +320,168 @@ void main() {
       // El mensaje salió igual, así que el evento corresponde: lo único que
       // no debe pasar es que se toque la UI ya muerta.
       expect(analytics.events, contains('chat_message_sent'));
+    });
+
+    group('composer — teclado y borde (#1466)', () {
+      /// Chat con permiso de escribir y un repo cuyo `sendMessage` queda
+      /// colgado hasta que el test abre [gate].
+      Future<_GatedChatRepository> pumpGated(
+        WidgetTester tester,
+        Completer<void> gate, {
+        ThemeData? theme,
+      }) async {
+        final firestore = FakeFirebaseFirestore();
+        await firestore.collection('chats').doc('aaa_bbb').set({
+          'chatId': 'aaa_bbb',
+          'members': ['aaa', 'bbb'],
+          'createdAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20)),
+        });
+        await _seedIncomingFollow(firestore);
+        final repo = _GatedChatRepository(firestore: firestore, gate: gate);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              firestoreProvider.overrideWithValue(firestore),
+              chatRepositoryProvider.overrideWithValue(repo),
+              currentUidProvider.overrideWith((_) => 'aaa'),
+              messagesProvider('aaa_bbb').overrideWith(
+                (_) => Stream.value(const <Message>[]),
+              ),
+              userPublicProfileProvider('bbb').overrideWith(
+                (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+              ),
+              analyticsServiceProvider
+                  .overrideWithValue(FakeAnalyticsService()),
+            ],
+            child: MaterialApp(
+              theme: theme ?? AppTheme.dark(),
+              locale: const Locale('es', 'AR'),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              home: const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        return repo;
+      }
+
+      FocusNode focoDelCampo(WidgetTester tester) =>
+          tester.widget<EditableText>(find.byType(EditableText)).focusNode;
+
+      testWidgets(
+          'con el envío en vuelo el campo conserva el foco y el teclado: sólo '
+          'se bloquea el botón', (tester) async {
+        final gate = Completer<void>();
+        final repo = await pumpGated(tester, gate);
+
+        await tester.enterText(find.byType(TextField), 'hola');
+        expect(focoDelCampo(tester).hasFocus, isTrue);
+        await tester.tap(find.byTooltip('Enviar'));
+        await tester.pump();
+
+        expect(repo.calls, 1);
+        expect(tester.widget<TextField>(find.byType(TextField)).enabled, isTrue,
+            reason: 'un TextField deshabilitado pierde el foco');
+        expect(focoDelCampo(tester).hasFocus, isTrue);
+        expect(tester.testTextInput.isVisible, isTrue,
+            reason: 'el teclado no se cierra al enviar');
+
+        // El botón quedó bloqueado: un segundo tap no manda otro mensaje.
+        final boton = tester.widget<IconButton>(
+          find.ancestor(
+            of: find.byType(CircularProgressIndicator),
+            matching: find.byType(IconButton),
+          ),
+        );
+        expect(boton.onPressed, isNull);
+
+        gate.complete();
+        await tester.pumpAndSettle();
+
+        expect(repo.calls, 1);
+        expect(focoDelCampo(tester).hasFocus, isTrue);
+        expect(tester.testTextInput.isVisible, isTrue);
+      });
+
+      testWidgets(
+          'el campo se vacía al enviar: lo que se escribe durante el envío no '
+          'se pierde cuando termina', (tester) async {
+        final gate = Completer<void>();
+        await pumpGated(tester, gate);
+
+        await tester.enterText(find.byType(TextField), 'hola');
+        await tester.tap(find.byTooltip('Enviar'));
+        await tester.pump();
+        expect(
+            tester.widget<TextField>(find.byType(TextField)).controller!.text,
+            '');
+
+        await tester.enterText(find.byType(TextField), 'siguiente');
+        gate.complete();
+        await tester.pumpAndSettle();
+
+        expect(
+            tester.widget<TextField>(find.byType(TextField)).controller!.text,
+            'siguiente');
+      });
+
+      testWidgets(
+          'si el envío falla el texto vuelve al campo, antes de lo que se '
+          'escribió después', (tester) async {
+        final gate = Completer<void>();
+        await pumpGated(tester, gate);
+
+        await tester.enterText(find.byType(TextField), 'hola');
+        await tester.tap(find.byTooltip('Enviar'));
+        await tester.pump();
+        await tester.enterText(find.byType(TextField), 'otra');
+
+        gate.completeError(Exception('sin red'));
+        await tester.pumpAndSettle();
+
+        expect(
+            tester.widget<TextField>(find.byType(TextField)).controller!.text,
+            'hola\notra');
+        expect(find.text('No pudimos enviar el mensaje. Probá de nuevo.'),
+            findsOneWidget);
+      });
+
+      for (final (nombre, theme) in [
+        ('oscuro', AppTheme.dark()),
+        ('claro', AppTheme.light()),
+      ]) {
+        testWidgets(
+            'tema $nombre: el campo va sin borde ni relleno propios (una sola '
+            'caja, la del contenedor)', (tester) async {
+          await pumpGated(tester, Completer<void>(), theme: theme);
+
+          final d = tester
+              .widget<InputDecorator>(
+                find.descendant(
+                  of: find.byType(TextField),
+                  matching: find.byType(InputDecorator),
+                ),
+              )
+              .decoration;
+
+          // Los bordes que importan son los de cada ESTADO: el
+          // `InputDecorationTheme` de la app los define y mandan sobre
+          // `border`.
+          for (final borde in [
+            d.border,
+            d.enabledBorder,
+            d.focusedBorder,
+            d.disabledBorder,
+            d.errorBorder,
+            d.focusedErrorBorder,
+          ]) {
+            expect(borde?.borderSide, BorderSide.none);
+          }
+          expect(d.filled, isFalse);
+          expect(d.contentPadding, EdgeInsets.zero);
+        });
+      }
     });
 
     testWidgets('tap en send con texto vacío no crea ningún mensaje',

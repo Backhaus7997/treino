@@ -11,12 +11,14 @@ import '../../../../workout/domain/routine.dart';
 import '../../../../workout/domain/routine_source.dart';
 import '../../../../workout/domain/routine_status.dart';
 import '../../../../workout/domain/routine_visibility.dart';
+import '../../../../../core/widgets/treino_destructive_menu_item.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../widgets/coach_hub_widgets.dart';
 import 'routine_actions_provider.dart';
 import '../../widgets/athlete_picker_dialog.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Grilla de las rutinas del PF, en cards.
 ///
@@ -386,12 +388,9 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
             value: _AccionRutina.recuperar,
             child: Text('Recuperar'), // i18n
           ),
-        PopupMenuItem(
+        TreinoDestructiveMenuItem(
           value: _AccionRutina.eliminar,
-          child: Text(
-            'Eliminar', // i18n
-            style: TextStyle(color: palette.dangerText),
-          ),
+          child: const Text('Eliminar'), // i18n
         ),
       ],
     );
@@ -494,7 +493,8 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
     if (!mounted) return;
     setState(() => _ocupado = false);
     if (!ok) {
-      _avisar('No se pudo. Probá de nuevo.'); // i18n
+      _avisar('No se pudo. Probá de nuevo.',
+          type: TreinoToastType.error); // i18n
       return;
     }
     // El éxito se avisa sólo al sacarle una rutina a un alumno, y por una
@@ -503,12 +503,14 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
     // hace la acción más delicada del menú y la pantalla se ve casi igual.
     // Eliminar y archivar una plantilla sí se ven: la card se va o se apaga.
     if (archivar && asignada) {
-      _avisar(nombre == null
-          // i18n
-          ? 'Listo. Ya no la ve en su perfil, y te queda en Archivadas.'
-          // i18n
-          : 'Listo, $nombre ya no la ve. Te queda en Archivadas por si se la '
-              'querés devolver.');
+      _avisar(
+          nombre == null
+              // i18n
+              ? 'Listo. Ya no la ve en su perfil, y te queda en Archivadas.'
+              // i18n
+              : 'Listo, $nombre ya no la ve. Te queda en Archivadas por si se la '
+                  'querés devolver.',
+          type: TreinoToastType.success);
     }
   }
 
@@ -585,16 +587,19 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
     setState(() => _ocupado = false);
     switch (resultado) {
       case ResultadoDeRestaurar.ok:
-        _avisar(asignada
-            // i18n
-            ? '«${r.name}» vuelve a estar activa${nombre == null ? '' : ' para $nombre'}.'
-            : '«${r.name}» vuelve a tu biblioteca.'); // i18n
+        _avisar(
+            asignada
+                // i18n
+                ? '«${r.name}» vuelve a estar activa${nombre == null ? '' : ' para $nombre'}.'
+                : '«${r.name}» vuelve a tu biblioteca.',
+            type: TreinoToastType.success); // i18n
       case ResultadoDeRestaurar.topeDePlantillas:
         // El contador local se adelantó o hubo una carrera: el mismo aviso
         // que el embudo, no el mensaje genérico de abajo.
         await mostrarAvisoTopeDePlantillasPorRebote(context, ref);
       case ResultadoDeRestaurar.falloAlRestaurar:
-        _avisar('No se pudo. Probá de nuevo.'); // i18n
+        _avisar('No se pudo. Probá de nuevo.',
+            type: TreinoToastType.error); // i18n
     }
   }
 
@@ -643,28 +648,40 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
       await mostrarAvisoTopeDePlantillasPorRebote(context, ref);
       return;
     }
-    _avisar(switch (resultado) {
+    final (mensaje, tipo) = switch (resultado) {
       // i18n
-      ResultadoDePublicar.ok => '«$nombre» ya es pública. El plan de '
-          '${nombreAlumno ?? 'tu alumno'} quedó como estaba.',
+      ResultadoDePublicar.ok => (
+          '«$nombre» ya es pública. El plan de '
+              '${nombreAlumno ?? 'tu alumno'} quedó como estaba.',
+          TreinoToastType.success,
+        ),
       // El caso del medio NO se cuenta como error: la plantilla existe. Decir
-      // «no se pudo» mandaría al PF a reintentar y a crear una segunda.
+      // «no se pudo» mandaría al PF a reintentar y a crear una segunda. Por
+      // eso va como info y no como error.
       // i18n
-      ResultadoDePublicar.creadaPeroSinPublicar =>
-        '«$nombre» se creó en tus plantillas pero no se pudo publicar. '
-            'Publicala desde su propio menú — no repitas esto o vas a tener '
-            'dos.',
+      ResultadoDePublicar.creadaPeroSinPublicar => (
+          '«$nombre» se creó en tus plantillas pero no se pudo publicar. '
+              'Publicala desde su propio menú — no repitas esto o vas a tener '
+              'dos.',
+          TreinoToastType.info,
+        ),
       // i18n
-      ResultadoDePublicar.falloAlCrear => 'No se pudo. Probá de nuevo.',
+      ResultadoDePublicar.falloAlCrear => (
+          'No se pudo. Probá de nuevo.',
+          TreinoToastType.error,
+        ),
       // A diferencia de las otras ramas de este switch, ESTA usa AppL10n:
       // `moderationBlockedMessage` ya existe y lo usan otras cinco
       // superficies — inventar una copia hardcodeada en paralelo la
       // desalinearía si el texto de esa clave cambia.
-      ResultadoDePublicar.bloqueadoPorModeracion =>
-        AppL10n.of(context).moderationBlockedMessage,
+      ResultadoDePublicar.bloqueadoPorModeracion => (
+          AppL10n.of(context).moderationBlockedMessage,
+          TreinoToastType.error,
+        ),
       ResultadoDePublicar.topeDePlantillas =>
         throw StateError('manejado arriba'),
-    });
+    };
+    _avisar(mensaje, type: tipo);
   }
 
   /// Asigna la plantilla a un alumno elegido en el momento.
@@ -689,11 +706,13 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
 
     if (!mounted) return;
     setState(() => _ocupado = false);
-    _avisar(ok
-        // i18n
-        ? 'Se le asignó una copia de «${r.name}». La plantilla queda acá para '
-            'volver a usarla.'
-        : 'No se pudo asignar. Probá de nuevo.'); // i18n
+    _avisar(
+        ok
+            // i18n
+            ? 'Se le asignó una copia de «${r.name}». La plantilla queda acá para '
+                'volver a usarla.'
+            : 'No se pudo asignar. Probá de nuevo.', // i18n
+        type: ok ? TreinoToastType.success : TreinoToastType.error);
   }
 
   /// Publica o despublica la plantilla en la comunidad.
@@ -711,22 +730,27 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
     if (!mounted) return;
     setState(() => _ocupado = false);
     if (!ok) {
-      _avisar('No se pudo. Probá de nuevo.'); // i18n
+      _avisar('No se pudo. Probá de nuevo.',
+          type: TreinoToastType.error); // i18n
       return;
     }
-    _avisar(publicada
-        // i18n
-        ? '«${r.name}» ya es pública: cualquiera puede encontrarla y usarla.'
-        // Lo de las valoraciones no es un detalle: es la duda que frena a
-        // despublicar. Se conservan y vuelven si se republica.
-        // i18n
-        : '«${r.name}» vuelve a ser privada. Las valoraciones se guardan.');
+    _avisar(
+        publicada
+            // i18n
+            ? '«${r.name}» ya es pública: cualquiera puede encontrarla y usarla.'
+            // Lo de las valoraciones no es un detalle: es la duda que frena a
+            // despublicar. Se conservan y vuelven si se republica.
+            // i18n
+            : '«${r.name}» vuelve a ser privada. Las valoraciones se guardan.',
+        type: TreinoToastType.success);
   }
 
-  void _avisar(String mensaje) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(mensaje)));
+  void _avisar(String mensaje, {TreinoToastType type = TreinoToastType.info}) {
+    showTreinoToast(
+      context,
+      mensaje,
+      type: type,
+    );
   }
 }
 

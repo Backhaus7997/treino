@@ -6,10 +6,12 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/treino_collapsing_top_bar.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../paywall/application/athlete_entitlement_provider.dart';
 import '../../paywall/domain/athlete_entitlement.dart'
@@ -101,157 +103,113 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
   Widget build(BuildContext context) {
     final routineAsync = ref.watch(routineByIdStreamProvider(widget.routineId));
 
-    // Stack so the hero image can extend edge-to-edge from the top of the
-    // safe area while the back button floats over it. Non-data states still
-    // render the back button on top so the user can always escape.
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: TreinoStateSwitcher(
-            childKey: ValueKey(
-              routineAsync.when(
-                data: (routine) {
-                  if (routine == null) return 'not-found';
-                  if (routine.days.isEmpty) return 'empty';
-                  return 'data';
-                },
-                loading: () => 'loading',
-                error: (_, __) => 'error',
-              ),
+    final routine = routineAsync.valueOrNull;
+    final hasData = routine != null && routine.days.isNotEmpty;
+    final hasHeroPhoto = routine != null && routineHasHeroPhoto(routine);
+
+    // La barra superior aparece al scrollear (#1559): en offset 0 sólo flotan
+    // la flecha y las acciones, sin fondo ni círculo, y el contenido reserva
+    // su alto. Los estados sin datos también llevan la flecha, para que el
+    // usuario nunca quede en un callejón sin salida.
+    return TreinoCollapsingTopBar(
+      title: hasData
+          ? routine
+              .days[selectedDayIndex.clamp(0, routine.days.length - 1)].name
+          : null,
+      overHero: hasHeroPhoto,
+      // Hero con foto: el título grande va al pie de los 320 px. Encabezado
+      // compacto: arranca bajo la barra y mide ~100.
+      collapseOffset: hasHeroPhoto ? 240 : 100,
+      onBack: () => context.canPop()
+          ? context.pop()
+          : context.go(
+              widget.coachAthleteId != null
+                  ? '/coach/athlete/${widget.coachAthleteId}'
+                  : '/workout',
             ),
-            child: routineAsync.when(
-              data: (routine) {
-                if (routine == null) {
-                  return _NotFoundState(
-                    label: AppL10n.of(context).routineDetailNotFound,
-                  );
-                }
-                // `clamp(0, length - 1)` throws when length == 0 — empty-check
-                // BEFORE clamping.
-                if (routine.days.isEmpty) {
-                  return _EmptyState(
-                    message: AppL10n.of(context).routineDetailNoDaysConfigured,
-                  );
-                }
-                final dayIndex = selectedDayIndex.clamp(
-                  0,
-                  routine.days.length - 1,
-                );
-                final day = routine.days[dayIndex];
-                return _RoutineDetailContent(
-                  routine: routine,
-                  day: day,
-                  selectedDayIndex: dayIndex,
-                  selectedWeekIndex: selectedWeekIndex,
-                  onSelectDay: (i) => setState(() => selectedDayIndex = i),
-                  onSelectWeek: (i) => setState(() => selectedWeekIndex = i),
-                  onSlotTap: (slot) {
-                    // Pass the routine owner's uid as `ownerId` so the detail
-                    // screen can fall back to that owner's customExercises
-                    // subcollection when the slot references a custom exercise
-                    // instead of a public-catalogue one (see slotExerciseProvider).
-                    // Trainer-assigned plans → the trainer (assignedBy); athlete
-                    // self-created routines → the athlete (createdBy). Without the
-                    // createdBy fallback, an athlete's own custom exercise resolves
-                    // to null → "Ejercicio no encontrado".
-                    final ownerId = routine.assignedBy ?? routine.createdBy;
-                    // `name` is the slot's display name, carried through so
-                    // slotExerciseProvider can do a name/alias fallback when
-                    // `exerciseId` drifted from the catalogue.
-                    final nameParam =
-                        'name=${Uri.encodeQueryComponent(slot.exerciseName)}';
-                    // In the coach read-only context this screen is OUTSIDE the
-                    // shell, so the exercise detail must be pushed on the
-                    // top-level (out-of-shell) mirror — pushing the in-shell
-                    // `/workout/exercise/:id` from here rebuilds the shell branch
-                    // and lands blank (issue #410 Bug 1).
-                    final base = widget.coachAthleteId != null
-                        ? '/coach/athlete/${widget.coachAthleteId}'
-                            '/plan/${widget.routineId}'
-                            '/exercise/${slot.exerciseId}'
-                        : '/workout/exercise/${slot.exerciseId}';
-                    final target = ownerId != null && ownerId.isNotEmpty
-                        ? '$base?ownerId=$ownerId&$nameParam'
-                        : '$base?$nameParam';
-                    context.push(target);
-                  },
-                );
-              },
-              loading: () => const _RoutineLoadingSkeleton(),
-              error: (_, __) => _ErrorState(
-                message: AppL10n.of(context).routineDetailLoadError,
-                onRetry: () =>
-                    ref.invalidate(routineByIdStreamProvider(widget.routineId)),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          top: 0,
-          left: 0,
-          child: _BackBar(
-            routineAsync: routineAsync,
-            fallbackRoute: widget.coachAthleteId != null
-                ? '/coach/athlete/${widget.coachAthleteId}'
-                : '/workout',
-          ),
-        ),
-        // Top-right affordances, opposite the back button, same chip
-        // treatment for parity. The two are mutually exclusive by `source`
-        // (own routine → edit it; copyable template → fork it), so at most
-        // one chip ever measures anything; the Row just keeps them from
-        // stacking on top of each other if that ever stops being true.
-        Positioned(
-          top: 0,
-          right: 0,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _FollowTemplateBar(routineAsync: routineAsync),
-              _UseAsBaseBar(routineAsync: routineAsync),
-              _EditBar(routineAsync: routineAsync),
-            ],
-          ),
-        ),
+      // Opuestas a la flecha. Son mutuamente excluyentes por `source` (propia
+      // → editar; plantilla copiable → bifurcar), así que a lo sumo una mide
+      // algo.
+      actions: [
+        _FollowTemplateBar(routineAsync: routineAsync),
+        _UseAsBaseBar(routineAsync: routineAsync),
+        _EditBar(routineAsync: routineAsync),
       ],
-    );
-  }
-}
-
-/// Persistent top-left back button. Always visible so the user can never
-/// dead-end on a deep-linked screen — even in loading, error, or not-found
-/// states (REQ-RDT-016 strengthened). Now floats over the hero image with a
-/// translucent chip so it stays legible on bright photos.
-class _BackBar extends StatelessWidget {
-  const _BackBar({required this.fallbackRoute, required this.routineAsync});
-
-  /// Decide si hay foto detrás (ver [_floatingFill]).
-  final AsyncValue<Routine?> routineAsync;
-
-  /// Where to land when there is nothing to pop (deep-link / OS state
-  /// restoration). The athlete's own usage passes `/workout`; the coach
-  /// read-only context passes `/coach/athlete/:id` so the PF doesn't get
-  /// dumped on the athlete's Entrenar tab (issue #410 Bug 2).
-  final String fallbackRoute;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 8),
-      child: Material(
-        color: _floatingFill(palette, routineAsync.valueOrNull),
-        shape: _floatingShape(palette, routineAsync.valueOrNull),
-        clipBehavior: Clip.antiAlias,
-        child: Semantics(
-          button: true,
-          label: l10n.commonBack,
-          child: IconButton(
-            tooltip: l10n.commonBack,
-            icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-            onPressed: () =>
-                context.canPop() ? context.pop() : context.go(fallbackRoute),
+      body: TreinoStateSwitcher(
+        childKey: ValueKey(
+          routineAsync.when(
+            data: (routine) {
+              if (routine == null) return 'not-found';
+              if (routine.days.isEmpty) return 'empty';
+              return 'data';
+            },
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+          ),
+        ),
+        child: routineAsync.when(
+          data: (routine) {
+            if (routine == null) {
+              return _NotFoundState(
+                label: AppL10n.of(context).routineDetailNotFound,
+              );
+            }
+            // `clamp(0, length - 1)` throws when length == 0 — empty-check
+            // BEFORE clamping.
+            if (routine.days.isEmpty) {
+              return _EmptyState(
+                message: AppL10n.of(context).routineDetailNoDaysConfigured,
+              );
+            }
+            final dayIndex = selectedDayIndex.clamp(
+              0,
+              routine.days.length - 1,
+            );
+            final day = routine.days[dayIndex];
+            return _RoutineDetailContent(
+              routine: routine,
+              day: day,
+              selectedDayIndex: dayIndex,
+              selectedWeekIndex: selectedWeekIndex,
+              onSelectDay: (i) => setState(() => selectedDayIndex = i),
+              onSelectWeek: (i) => setState(() => selectedWeekIndex = i),
+              onSlotTap: (slot) {
+                // Pass the routine owner's uid as `ownerId` so the detail
+                // screen can fall back to that owner's customExercises
+                // subcollection when the slot references a custom exercise
+                // instead of a public-catalogue one (see slotExerciseProvider).
+                // Trainer-assigned plans → the trainer (assignedBy); athlete
+                // self-created routines → the athlete (createdBy). Without the
+                // createdBy fallback, an athlete's own custom exercise resolves
+                // to null → "Ejercicio no encontrado".
+                final ownerId = routine.assignedBy ?? routine.createdBy;
+                // `name` is the slot's display name, carried through so
+                // slotExerciseProvider can do a name/alias fallback when
+                // `exerciseId` drifted from the catalogue.
+                final nameParam =
+                    'name=${Uri.encodeQueryComponent(slot.exerciseName)}';
+                // In the coach read-only context this screen is OUTSIDE the
+                // shell, so the exercise detail must be pushed on the
+                // top-level (out-of-shell) mirror — pushing the in-shell
+                // `/workout/exercise/:id` from here rebuilds the shell branch
+                // and lands blank (issue #410 Bug 1).
+                final base = widget.coachAthleteId != null
+                    ? '/coach/athlete/${widget.coachAthleteId}'
+                        '/plan/${widget.routineId}'
+                        '/exercise/${slot.exerciseId}'
+                    : '/workout/exercise/${slot.exerciseId}';
+                final target = ownerId != null && ownerId.isNotEmpty
+                    ? '$base?ownerId=$ownerId&$nameParam'
+                    : '$base?$nameParam';
+                context.push(target);
+              },
+            );
+          },
+          loading: () => const _RoutineLoadingSkeleton(),
+          error: (_, __) => _ErrorState(
+            message: AppL10n.of(context).routineDetailLoadError,
+            onRetry: () =>
+                ref.invalidate(routineByIdStreamProvider(widget.routineId)),
           ),
         ),
       ),
@@ -286,24 +244,12 @@ class _EditBar extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final palette = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(right: 12, top: 8),
-      child: Material(
-        color: _floatingFill(palette, routineAsync.valueOrNull),
-        shape: _floatingShape(palette, routineAsync.valueOrNull),
-        clipBehavior: Clip.antiAlias,
-        child: Semantics(
-          button: true,
-          label: 'Editar rutina', // i18n: Fase W2
-          child: IconButton(
-            tooltip: 'Editar rutina', // i18n: Fase W2
-            icon: Icon(Icons.edit, color: palette.textPrimary),
-            onPressed: () =>
-                context.push('/workout/my-routine-editor', extra: routine.id),
-          ),
-        ),
-      ),
+    return TreinoTopBarAction(
+      buttonKey: const Key('routine_edit'),
+      icon: Icons.edit,
+      tooltip: 'Editar rutina', // i18n: Fase W2
+      onPressed: () =>
+          context.push('/workout/my-routine-editor', extra: routine.id),
     );
   }
 }
@@ -366,13 +312,11 @@ class _FollowTemplateBar extends ConsumerWidget {
       await ref.read(userRepositoryProvider).update(uid, {
         'activeRoutineId': r.id,
       });
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.workoutRoutineFollowSuccess)),
-      );
+      showTreinoToastOn(messenger, l10n.workoutRoutineFollowSuccess,
+          type: TreinoToastType.success);
     } catch (_) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.workoutRoutineFollowError)),
-      );
+      showTreinoToastOn(messenger, l10n.workoutRoutineFollowError,
+          type: TreinoToastType.error);
     }
   }
 
@@ -432,39 +376,23 @@ class _FollowTemplateBar extends ConsumerWidget {
     final label =
         yaLaSigue ? l10n.workoutRoutineFollowing : l10n.workoutRoutineFollow;
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 12, top: 8),
-      child: Material(
-        color: _floatingFill(palette, routineAsync.valueOrNull),
-        shape: _floatingShape(palette, routineAsync.valueOrNull),
-        clipBehavior: Clip.antiAlias,
-        child: Semantics(
-          button: true,
-          label: label,
-          child: IconButton(
-            key: const Key('routine_follow_template'),
-            tooltip: label,
-            icon: Icon(
-              locked
-                  ? TreinoIcon.lock
-                  : (yaLaSigue ? TreinoIcon.check : TreinoIcon.play),
-              color: locked
-                  ? palette.textMuted
-                  : (yaLaSigue ? palette.accent : palette.textPrimary),
-            ),
-            // Ya seguirla no es un estado que haya que "deshacer" desde acá:
-            // para cambiar de rutina activa se elige OTRA. Un botón que la
-            // desactiva dejaría al atleta sin ninguna, que no es algo que
-            // haya pedido.
-            onPressed: locked
-                ? () => showFreePlanLimitSheet(
-                      context,
-                      limit: FreePlanLimit.premiumTemplate,
-                    )
-                : (yaLaSigue ? null : () => _follow(context, ref, routine)),
-          ),
-        ),
-      ),
+    return TreinoTopBarAction(
+      buttonKey: const Key('routine_follow_template'),
+      tooltip: label,
+      icon: locked
+          ? TreinoIcon.lock
+          : (yaLaSigue ? TreinoIcon.check : TreinoIcon.play),
+      color: locked ? palette.textMuted : (yaLaSigue ? palette.accent : null),
+      // Ya seguirla no es un estado que haya que "deshacer" desde acá:
+      // para cambiar de rutina activa se elige OTRA. Un botón que la
+      // desactiva dejaría al atleta sin ninguna, que no es algo que
+      // haya pedido.
+      onPressed: locked
+          ? () => showFreePlanLimitSheet(
+                context,
+                limit: FreePlanLimit.premiumTemplate,
+              )
+          : (yaLaSigue ? null : () => _follow(context, ref, routine)),
     );
   }
 }
@@ -540,30 +468,27 @@ class _UseAsBaseBar extends ConsumerWidget {
                     : null;
     final locked = lockedReason != null;
 
+    // Con las DOS acciones bloqueadas, un solo candado. En una plantilla paga
+    // del catálogo, `_FollowTemplateBar` ya muestra el suyo y abre la hoja del
+    // plan pago, que incluye personalizarla; un segundo candado idéntico al
+    // lado no decía cuál era cuál (reporte del dueño en device). Con una
+    // plantilla gratis Seguir queda libre, y este candado sí es el único que
+    // avisa que copiarla es del plan pago, así que ahí se queda.
+    final seguirTambienBloqueado = esDelCatalogo &&
+        routine.isPremium &&
+        ref.watch(catalogLockActiveProvider);
+    if (locked && seguirTambienBloqueado) return const SizedBox.shrink();
+
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(right: 12, top: 8),
-      child: Material(
-        color: _floatingFill(palette, routineAsync.valueOrNull),
-        shape: _floatingShape(palette, routineAsync.valueOrNull),
-        clipBehavior: Clip.antiAlias,
-        child: Semantics(
-          button: true,
-          label: l10n.workoutRoutineUseAsBase,
-          child: IconButton(
-            key: const Key('routine_use_as_base'),
-            tooltip: l10n.workoutRoutineUseAsBase,
-            icon: Icon(
-              locked ? TreinoIcon.lock : TreinoIcon.copy,
-              color: locked ? palette.textMuted : palette.textPrimary,
-            ),
-            onPressed: () => lockedReason != null
-                ? showFreePlanLimitSheet(context, limit: lockedReason)
-                : context.push('/workout/customize-routine/${routine.id}'),
-          ),
-        ),
-      ),
+    return TreinoTopBarAction(
+      buttonKey: const Key('routine_use_as_base'),
+      tooltip: l10n.workoutRoutineUseAsBase,
+      icon: locked ? TreinoIcon.lock : TreinoIcon.copy,
+      color: locked ? palette.textMuted : null,
+      onPressed: () => lockedReason != null
+          ? showFreePlanLimitSheet(context, limit: lockedReason)
+          : context.push('/workout/customize-routine/${routine.id}'),
     );
   }
 }
@@ -1051,25 +976,6 @@ bool routineHasHeroPhoto(Routine routine) =>
     routine.source == RoutineSource.system &&
     routineIdsWithHeroPhoto.contains(routine.id);
 
-/// Fondo de los botones flotantes (atrás, editar, seguir, usar de base).
-///
-/// #1509: el disco translúcido oscuro existe para leer el ícono SOBRE LA
-/// FOTO. Sin foto —planes del PF, rutinas propias, plantillas sin foto—
-/// quedaba como un círculo gris enorme sobre el fondo liso. Ahí el disco es
-/// de superficie de card (con [_floatingShape] le pone el borde): sigue
-/// tapando lo que scrollea por debajo —la lista pasa bajo los botones— pero
-/// habla el idioma del resto de la pantalla.
-Color _floatingFill(AppPalette palette, Routine? routine) =>
-    routine != null && routineHasHeroPhoto(routine)
-        ? palette.scrimDark.withValues(alpha: 0.35)
-        : palette.bgCard;
-
-/// Forma del disco: con borde neutro cuando no hay foto (ver [_floatingFill]).
-ShapeBorder _floatingShape(AppPalette palette, Routine? routine) =>
-    routine != null && routineHasHeroPhoto(routine)
-        ? const CircleBorder()
-        : CircleBorder(side: BorderSide(color: palette.border));
-
 /// Ids de plantillas del catálogo que traen foto en `assets/routines/{id}.jpg`.
 ///
 /// Es síncrono a propósito: resolverlo con el AssetManifest sería async y el
@@ -1153,7 +1059,12 @@ class _HeroStrip extends ConsumerWidget {
     if (!hasHeroPhoto) {
       return Padding(
         key: const Key('routine-compact-header'),
-        padding: const EdgeInsets.fromLTRB(20, 64, 20, 8),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          TreinoTopBarMetrics.reservedHeightOf(context),
+          20,
+          8,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

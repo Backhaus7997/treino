@@ -33,6 +33,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Card «ESPECIALIDAD» + «PRECIO MENSUAL» — columna izquierda de
 /// `PerfilPublicoScreen` (WU-04).
@@ -85,7 +86,8 @@ class _EspecialidadPrecioCardState
     final specialty = _specialty;
     final error = _priceError;
     if (specialty == null || error != null) {
-      _toast(error ?? 'Elegí una especialidad.'); // i18n: Fase 11
+      _toast(error ?? 'Elegí una especialidad.',
+          type: TreinoToastType.error); // i18n: Fase 11
       return;
     }
     setState(() => _saving = true);
@@ -94,17 +96,23 @@ class _EspecialidadPrecioCardState
         'trainerSpecialty': TrainerSpecialtyX.toWire(specialty),
         'trainerMonthlyRate': int.parse(_price.text.trim()),
       });
-      _toast('Especialidad y precio guardados.'); // i18n: Fase 11
+      _toast('Especialidad y precio guardados.',
+          type: TreinoToastType.success); // i18n: Fase 11
     } catch (_) {
-      _toast('No se pudo guardar. Probá de nuevo.'); // i18n: Fase 11
+      _toast('No se pudo guardar. Probá de nuevo.',
+          type: TreinoToastType.error); // i18n: Fase 11
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  void _toast(String msg) {
+  void _toast(String msg, {TreinoToastType type = TreinoToastType.info}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showTreinoToast(
+      context,
+      msg,
+      type: type,
+    );
   }
 
   void _onSpecialtyChanged(Set<String> newSelected) {

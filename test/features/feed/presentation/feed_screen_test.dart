@@ -192,6 +192,33 @@ void main() {
       expect(find.text('FEED'), findsOneWidget);
     });
 
+    // #1470: el header no puede pintar un fondo sólido (corta los glows de
+    // AppBackground con un borde recto) ni ser `floating` (reaparecería
+    // encima del contenido sin fondo que lo tape).
+    //
+    // El SliverAppBar sólo existe en la vista del PF (`showTitle`): el atleta
+    // tiene la fila fija del toggle FEED/RANKINGS y ningún header que scrollee.
+    testWidgets('#1470: el header del PF no tiene fondo propio ni flota', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          ...baseOverrides,
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(role: UserRole.trainer)),
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      final header = tester.widget<SliverAppBar>(
+        find.byKey(const ValueKey('feed-collapsible-header')),
+      );
+      expect(header.backgroundColor, Colors.transparent);
+      expect(header.floating, isFalse);
+      expect(header.pinned, isFalse);
+    });
+
     // REQ-CHATUNREAD-005: the messages icon shows an unread-chats count badge.
     testWidgets('messages icon shows unread badge when count > 0', (
       tester,
@@ -777,11 +804,14 @@ void main() {
               UserPublicProfile(uid: uid, rankingOptIn: rankingOptIn),
             ),
           ),
-          streakLeaderboardProvider(gymId).overrideWith((_) async => []),
-          volumeLeaderboardProvider(gymId).overrideWith((_) async => []),
-          squatLeaderboardProvider(gymId).overrideWith((_) async => []),
-          benchLeaderboardProvider(gymId).overrideWith((_) async => []),
-          deadliftLeaderboardProvider(gymId).overrideWith((_) async => []),
+          streakLeaderboardProvider(gymId)
+              .overrideWith((_) => Stream.value([])),
+          volumeLeaderboardProvider(gymId)
+              .overrideWith((_) => Stream.value([])),
+          squatLeaderboardProvider(gymId).overrideWith((_) => Stream.value([])),
+          benchLeaderboardProvider(gymId).overrideWith((_) => Stream.value([])),
+          deadliftLeaderboardProvider(gymId)
+              .overrideWith((_) => Stream.value([])),
           rankingOptInControllerProvider
               .overrideWithValue(_FakeRankingOptInController()),
         ];

@@ -85,7 +85,7 @@ void main() {
       );
       expect(find.text('Días por semana'), findsOneWidget);
       expect(
-        find.textContaining('Ninguna respuesta filtra el catálogo'),
+        find.textContaining('Todo lo que elijas filtra el catálogo'),
         findsOneWidget,
       );
     });

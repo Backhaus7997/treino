@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
@@ -12,9 +13,9 @@ import '../../application/agenda_providers.dart';
 import '../../application/athlete_note_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
-import '../../domain/wall_clock.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../agenda_formatters.dart';
+import 'session_attendance_control.dart';
 
 class SessionDetailSheet extends ConsumerStatefulWidget {
   const SessionDetailSheet({
@@ -65,13 +66,17 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
             noteAfter: after.isEmpty ? null : after,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notas guardadas.')),
+      showTreinoToast(
+        context,
+        'Notas guardadas.',
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos guardar. Probá de nuevo.')),
+      showTreinoToast(
+        context,
+        'No pudimos guardar. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -99,18 +104,24 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
           );
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaCancellationSuccess)),
+      showTreinoToast(
+        context,
+        l10n.agendaCancellationSuccess,
+        type: TreinoToastType.success,
       );
     } on CancellationTooLateException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaCancellationTooLate)),
+      showTreinoToast(
+        context,
+        l10n.agendaCancellationTooLate,
+        type: TreinoToastType.error,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaGenericError)),
+      showTreinoToast(
+        context,
+        l10n.agendaGenericError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -123,7 +134,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
       palette: palette,
       title: 'Cancelar toda la serie',
       body:
-          'Se cancelan todas las sesiones futuras de esta serie recurrente (las que faltan más de 24h). No se puede deshacer.',
+          'Se cancelan todas las sesiones de esta serie recurrente que todavía no empezaron. No se puede deshacer.',
       confirmLabel: 'Cancelar serie',
       cancelLabel: 'No',
     );
@@ -139,17 +150,19 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
               );
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(n == 0
-              ? 'No había sesiones futuras para cancelar.'
-              : 'Se cancelaron $n sesiones de la serie.'),
-        ),
+      showTreinoToast(
+        context,
+        n == 0
+            ? 'No había sesiones futuras para cancelar.'
+            : 'Se cancelaron $n sesiones de la serie.',
+        type: n == 0 ? TreinoToastType.info : TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaGenericError)),
+      showTreinoToast(
+        context,
+        l10n.agendaGenericError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -183,12 +196,10 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
     final stickyNote = noteAsync.valueOrNull;
     final hasNote = stickyNote != null && stickyNote.note.trim().isNotEmpty;
 
-    // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against wall-clock
-    // "now" so the 24h cancel window isn't 3h short in ART.
-    final canCancel = !widget.isPast &&
-        appointment.startsAt.difference(nowWall()) > const Duration(hours: 24);
-    final isWithin24h = !widget.isPast && !canCancel;
     final isRecurring = appointment.recurringId != null;
+    // Una vez que empezó, lo que queda por decir es si el alumno vino.
+    final canMarkAttendance =
+        widget.isPast && appointment.status == AppointmentStatus.confirmed;
 
     return SafeArea(
       child: Padding(
@@ -428,39 +439,37 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                       ),
               ),
 
+              // ── Asistencia (#1492) ─────────────────────────────────────
+              if (canMarkAttendance) ...[
+                const SizedBox(height: 12),
+                SessionAttendanceControl(appointment: appointment),
+              ],
+
               // ── Cancel section ─────────────────────────────────────────
+              // #1492: el PF cancela hasta que la sesión empieza, sin la
+              // regla de 24 h (que es del atleta). `isPast` ya es "empezó" en
+              // los dos llamadores (day_timeline y trainer_day_detail_sheet).
               if (!widget.isPast) ...[
                 const SizedBox(height: 12),
-                if (canCancel)
-                  OutlinedButton(
-                    onPressed: _cancelAppointment,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: palette.highlight),
-                      foregroundColor: palette.highlight,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: Text(
-                      'CANCELAR RESERVA',
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        letterSpacing: 1.4,
-                      ),
-                    ),
-                  )
-                else if (isWithin24h)
-                  Center(
-                    child: Text(
-                      'No se puede cancelar (menos de 24h).',
-                      style: GoogleFonts.barlow(
-                        fontSize: 13,
-                        color: palette.textMuted,
-                      ),
+                OutlinedButton(
+                  onPressed: _cancelAppointment,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: palette.highlight),
+                    foregroundColor: palette.highlight,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Text(
+                    'CANCELAR RESERVA',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      letterSpacing: 1.4,
                     ),
                   ),
-                // Series teardown — cancels every future occurrence >24h away,
-                // even when this single one is within 24h.
+                ),
+                // Series teardown — cancels every occurrence that hasn't
+                // started yet (#1492: no 24h gate for the trainer).
                 if (isRecurring) ...[
                   const SizedBox(height: 8),
                   OutlinedButton(

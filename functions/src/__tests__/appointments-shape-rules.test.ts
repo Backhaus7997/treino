@@ -2594,8 +2594,12 @@ describe("appointments update — el gate de 24 h sigue mordiendo (#847)", () =>
     );
   });
 
-  it("DENIEGA al PF cancelar a menos de 24 h", async () => {
-    await assertFails(
+  // #1492 — este caso era «DENIEGA al PF cancelar a menos de 24 h». Se dio
+  // vuelta a propósito: el gate protege la agenda del PF de la baja tardía del
+  // ALUMNO, y aplicado al PF lo dejaba sin forma de avisar que no podía ir. El
+  // negativo del atleta de arriba es el que sigue custodiando el gate.
+  it("permite al PF cancelar a menos de 24 h — el gate es del atleta (#1492)", async () => {
+    await assertSucceeds(
       updateDoc(doc(dbAs(TRAINER), COL, CERCA), {
         status: "cancelled",
         cancelledBy: TRAINER,
@@ -2609,6 +2613,292 @@ describe("appointments update — el gate de 24 h sigue mordiendo (#847)", () =>
         status: "cancelled",
         cancelledBy: ATHLETE,
       })
+    );
+  });
+});
+
+/**
+ * El gate de 24 h son 24 h REALES en Argentina, no 27.
+ *
+ * `startsAt` es wall-clock etiquetado UTC (ADR-7): una sesión a las 10:00 de
+ * Buenos Aires se guarda como 10:00Z y ocurre a las 13:00Z. El gate restaba
+ * 24 h a ese valor contra `request.time` (el instante real), así que el alumno
+ * tenía que cancelar antes de las 07:00 ART del día anterior: 27 h. Medido:
+ * DENY a 25 h y a 26:59 reales, ALLOW a 27:01. Ahora resta 21 h.
+ *
+ * Los casos de arriba siembran `startsAt` como instante real, que es otra
+ * cosa: éstos lo siembran COMO LO GUARDA LA APP (real − 3 h), que es lo que
+ * escondía el desfase.
+ */
+describe("appointments update — el gate son 24 h reales en ART", () => {
+  const ART_MS = 3 * 3600000;
+  const MIN = 60000;
+  const TURNOS: Record<string, number> = {
+    "art-2359": 23 * 3600000 + 59 * MIN,
+    "art-2401": 24 * 3600000 + 1 * MIN,
+    "art-25h": 25 * 3600000,
+  };
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      for (const [id, faltan] of Object.entries(TURNOS)) {
+        await setDoc(
+          doc(ctx.firestore(), COL, id),
+          appointment({
+            id,
+            // La hora de reloj ART etiquetada UTC, como `createByTrainer`.
+            startsAt: Timestamp.fromMillis(Date.now() + faltan - ART_MS),
+          })
+        );
+      }
+    });
+  });
+
+  const cancelar = (id: string) =>
+    updateDoc(doc(dbAs(ATHLETE), COL, id), {
+      status: "cancelled",
+      cancelledBy: ATHLETE,
+    });
+
+  it("DENIEGA al atleta cancelar a 23 h 59 min reales", async () => {
+    await assertFails(cancelar("art-2359"));
+  });
+
+  it("permite al atleta cancelar a 24 h 01 min reales — el borde son 24 h", async () => {
+    await assertSucceeds(cancelar("art-2401"));
+  });
+
+  it("permite al atleta cancelar a 25 h reales — con −24 h daba DENY", async () => {
+    await assertSucceeds(cancelar("art-25h"));
+  });
+});
+
+/**
+ * #1492 — el PF cancela sin gate de tiempo, y marca la asistencia.
+ *
+ * Dos cambios del bloque `appointments`:
+ *
+ *  · El gate de 24 h del Path 1 pasó a ser SÓLO del atleta. El PF cancela su
+ *    turno cuando sea (el positivo vive en el bloque de #847, arriba, junto al
+ *    negativo del atleta que sigue mordiendo).
+ *  · `attendance` es la clave 16 de la allowlist: `null` (la sesión se dio, el
+ *    default) o `'absent'` (el alumno faltó). La escribe SÓLO el Path 2; el
+ *    Path 1 la pinea y el `create` la exige null. Es la fila 16 de la matriz de
+ *    `docs/security.md` §4.9, y cada celda tiene acá su escritura hostil y, al
+ *    lado, el ancla que muestra que el DENY no sale de otro lado.
+ *
+ * Por qué no es un `status` nuevo: las tres queries de
+ * `appointment_repository.dart` y el cobro exigen `status == 'confirmed'`; un
+ * `no_show` sacaba la sesión de la agenda de las dos partes y la volvía
+ * incobrable.
+ */
+describe("appointments — el PF cancela sin gate y marca la asistencia (#1492)", () => {
+  const PASADA = "appt-1492-pasada";
+  const LEJANA = "appt-1492-lejana";
+  const AUSENTE = "appt-1492-ausente";
+  const CANCELADA = "appt-1492-cancelada";
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      // Sesión de hace 2 h: el caso de uso real de la asistencia.
+      await setDoc(
+        doc(db, COL, PASADA),
+        appointment({
+          id: PASADA,
+          startsAt: Timestamp.fromMillis(Date.now() - 2 * 3600000),
+        })
+      );
+      // A 5 días: una cancelación del ATLETA pasa el gate, así que si un
+      // negativo sobre este doc da DENY, no es por la distancia.
+      await setDoc(
+        doc(db, COL, LEJANA),
+        appointment({ id: LEJANA, startsAt: inDays(5) })
+      );
+      await setDoc(
+        doc(db, COL, AUSENTE),
+        appointment({
+          id: AUSENTE,
+          startsAt: Timestamp.fromMillis(Date.now() - 26 * 3600000),
+          attendance: "absent",
+        })
+      );
+      await setDoc(
+        doc(db, COL, CANCELADA),
+        appointment({
+          id: CANCELADA,
+          startsAt: Timestamp.fromMillis(Date.now() - 2 * 3600000),
+          status: "cancelled",
+          cancelledAt: Timestamp.fromMillis(Date.now() - 3 * 3600000),
+          cancelledBy: TRAINER,
+          cancellationLog: [{ byUid: TRAINER, atMs: Date.now() - 3 * 3600000 }],
+        })
+      );
+    });
+  });
+
+  // ── Path 1 sin gate para el PF ────────────────────────────────────────────
+
+  it("permite al PF cancelar una sesión que ya pasó — la regla no sabe la zona (ADR-7)", async () => {
+    // Decisión, no descuido: "ya empezó" depende de la zona horaria del PF y
+    // `startsAt` es wall-clock. El cliente es el que no ofrece cancelar una
+    // sesión empezada.
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, PASADA), {
+        status: "cancelled",
+        cancelledAt: serverTimestamp(),
+        cancelledBy: TRAINER,
+        cancellationLog: arrayUnion({ byUid: TRAINER, atMs: Date.now() }),
+      })
+    );
+  });
+
+  it("DENIEGA al atleta cancelar la misma sesión pasada — la exención es del PF", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, PASADA), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("DENIEGA a un tercero cancelar sin gate — la exención no es de cualquiera", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(ATTACKER), COL, PASADA), {
+        status: "cancelled",
+        cancelledBy: ATTACKER,
+      })
+    );
+  });
+
+  // ── create ────────────────────────────────────────────────────────────────
+
+  it("DENIEGA crear un turno con la asistencia ya marcada", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "a-create-ausente"),
+        appointment({
+          id: "a-create-ausente",
+          trainerId: TRAINER_BOOKER,
+          attendance: "absent",
+        })
+      )
+    );
+  });
+
+  it("permite crear con `attendance: null` explícito — ancla del create", async () => {
+    // `toJson()` la omite cuando es null, pero un cliente que la mande en
+    // null no tiene por qué comerse un DENY.
+    await assertSucceeds(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "a-create-null"),
+        appointment({
+          id: "a-create-null",
+          trainerId: TRAINER_BOOKER,
+          attendance: null,
+        })
+      )
+    );
+  });
+
+  // ── Path 2: el PF la escribe ──────────────────────────────────────────────
+
+  it("permite al PF marcar ausente una sesión confirmada — el escritor real", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, PASADA), { attendance: "absent" })
+    );
+  });
+
+  it("permite al PF deshacer el ausente — el escritor real", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, AUSENTE), { attendance: null })
+    );
+  });
+
+  it("DENIEGA un valor que no es `'absent'` — 'present'", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, PASADA), { attendance: "present" })
+    );
+  });
+
+  it("DENIEGA 30 KB adentro de attendance", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, PASADA), {
+        attendance: "x".repeat(30000),
+      })
+    );
+  });
+
+  it("DENIEGA attendance de otro tipo — una LISTA con el valor bueno adentro", async () => {
+    // La cota es igualdad contra el literal, así que fija el tipo de paso:
+    // `['absent']` no es `'absent'`.
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, PASADA), { attendance: ["absent"] })
+    );
+  });
+
+  it("DENIEGA al PF marcar ausente una sesión CANCELADA", async () => {
+    // Misma escritura que el positivo de arriba; lo único distinto es el
+    // status del doc.
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, CANCELADA), { attendance: "absent" })
+    );
+  });
+
+  it("permite editar las notas de una sesión ausente — la clave no congela el turno", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, AUSENTE), { noteAfter: "no vino" })
+    );
+  });
+
+  // ── nadie más la escribe ──────────────────────────────────────────────────
+
+  it("DENIEGA al atleta marcarse la asistencia", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, PASADA), { attendance: "absent" })
+    );
+  });
+
+  it("DENIEGA al atleta tocar la asistencia colgándose de una cancelación válida", async () => {
+    // LEJANA está a 5 días: sin `attendance`, esta cancelación pasa. El DENY
+    // es el pin del Path 1, no el gate.
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, LEJANA), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+        attendance: "absent",
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(dbAs(ATHLETE), COL, LEJANA), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("DENIEGA al PF borrar un ausente de paso al cancelar — el pin vale para los dos", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, AUSENTE), {
+        status: "cancelled",
+        cancelledBy: TRAINER,
+        attendance: null,
+      })
+    );
+  });
+
+  it("permite cancelar una sesión ausente sin tocar la asistencia — el pin no congela", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, AUSENTE), {
+        status: "cancelled",
+        cancelledBy: TRAINER,
+      })
+    );
+  });
+
+  it("DENIEGA a un tercero marcar la asistencia", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(ATTACKER), COL, PASADA), { attendance: "absent" })
     );
   });
 });

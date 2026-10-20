@@ -6,9 +6,13 @@ import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_stats_row.dart';
 import 'package:treino/features/workout/presentation/widgets/session_stats_card.dart';
 import 'package:treino/features/workout/presentation/widgets/stat_tile.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrap(Widget w) => MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: Scaffold(body: w),
     );
 
@@ -62,7 +66,7 @@ void main() {
       expect(seguidores, 0);
     });
 
-    testWidgets('WORKOUTS y RACHA no son tappables aunque las otras lo sean',
+    testWidgets('ENTRENOS y RACHA no son tappables aunque las otras lo sean',
         (tester) async {
       await tester.pumpWidget(_wrap(
         PublicProfileStatsRow(
@@ -114,7 +118,7 @@ void main() {
 
       expect(find.byType(SessionStatsCard), findsOneWidget);
       expect(find.byType(StatTile), findsNWidgets(4));
-      expect(find.text('WORKOUTS'), findsOneWidget);
+      expect(find.text('ENTRENOS'), findsOneWidget);
       expect(find.text('RACHA'), findsOneWidget);
       expect(find.text('SEGUIDORES'), findsOneWidget);
       expect(find.text('SIGUIENDO'), findsOneWidget);

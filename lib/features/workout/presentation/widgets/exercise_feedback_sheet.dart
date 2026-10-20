@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/exercise_feedback_submitter.dart';
 import '../../domain/exercise_feedback.dart';
@@ -115,7 +116,6 @@ class _ExerciseFeedbackSheetState extends ConsumerState<ExerciseFeedbackSheet> {
 
   Future<void> _pickPhoto(ImageSource source) async {
     final l10n = AppL10n.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final picker = widget.picker ?? ImagePicker();
     try {
       final file = await picker.pickImage(
@@ -130,9 +130,10 @@ class _ExerciseFeedbackSheetState extends ConsumerState<ExerciseFeedbackSheet> {
       setState(() => _localPhotoPath = file.path);
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.exerciseFeedbackPhotoError)),
-      );
+      // Context del sheet, no el messenger de atrás: el sheet sigue abierto
+      // y taparía el aviso (#1490).
+      showTreinoToast(context, l10n.exerciseFeedbackPhotoError,
+          type: TreinoToastType.error);
     }
   }
 
@@ -155,24 +156,21 @@ class _ExerciseFeedbackSheetState extends ConsumerState<ExerciseFeedbackSheet> {
           );
       if (!mounted) return;
       navigator.pop();
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.exerciseFeedbackSuccess)),
-      );
+      showTreinoToastOn(messenger, l10n.exerciseFeedbackSuccess,
+          type: TreinoToastType.success);
     } on ArgumentError catch (e) {
       // Foto demasiado pesada o formato no soportado — el mensaje del guard
       // client-side es accionable; el permission-denied del server no.
       if (!mounted) return;
       setState(() => _submitting = false);
-      messenger.showSnackBar(
-        SnackBar(
-            content: Text(e.message?.toString() ?? l10n.exerciseFeedbackError)),
-      );
+      showTreinoToast(
+          context, e.message?.toString() ?? l10n.exerciseFeedbackError,
+          type: TreinoToastType.error);
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.exerciseFeedbackError)),
-      );
+      showTreinoToast(context, l10n.exerciseFeedbackError,
+          type: TreinoToastType.error);
     }
   }
 

@@ -7,8 +7,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/discard_changes_dialog.dart';
 import '../../../core/widgets/form_scroll_to_error.dart';
-import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../core/utils/metric_range.dart';
 import '../../../core/utils/metric_range_message.dart';
@@ -18,6 +18,7 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/measurement_providers.dart';
 import '../domain/measurement.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Upper sanity bound for any logged metric (kg, %, or cm).
 ///
@@ -148,6 +149,13 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   /// recompute [_hasValue] on each edit.
   late final List<TextEditingController> _allCtrls;
 
+  /// Texto de cada campo al abrir (en el mismo orden que [_allCtrls]): la
+  /// línea de base contra la que se mide si hay cambios sin guardar (#1502).
+  late final List<String> _initialTexts;
+
+  /// True si algún campo difiere de [_initialTexts]. Alimenta el `PopScope`.
+  bool _dirty = false;
+
   @override
   void initState() {
     super.initState();
@@ -207,6 +215,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
       _calfRCtrl,
       _notesCtrl,
     ];
+    _initialTexts = [for (final c in _allCtrls) c.text];
     for (final c in _allCtrls) {
       c.addListener(_onFieldChanged);
     }
@@ -233,13 +242,33 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   /// current form state without waiting for a submit attempt.
   void _onFieldChanged() {
     final has = _hasAnyValue();
+    final dirty = _hasUnsavedChanges();
     final invalid = _ranges.keys.any(_isMetricInvalid);
-    if (has != _hasValue || invalid != _hasInvalid) {
+    if (has != _hasValue || dirty != _dirty || invalid != _hasInvalid) {
       setState(() {
         _hasValue = has;
+        _dirty = dirty;
         _hasInvalid = invalid;
       });
     }
+  }
+
+  bool _hasUnsavedChanges() {
+    for (var i = 0; i < _allCtrls.length; i++) {
+      if (_allCtrls[i].text != _initialTexts[i]) return true;
+    }
+    return false;
+  }
+
+  /// Salir sin guardar (Cancelar, back del sistema, swipe de iOS): con datos
+  /// cargados pregunta antes de tirarlos (#1502).
+  Future<void> _confirmLeave() async {
+    if (!_dirty) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final discard = await confirmDiscardChanges(context);
+    if (discard && mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -372,8 +401,10 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     final l10n = AppL10n.of(context);
     final uid = ref.read(currentUidProvider);
     if (uid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.measurementLogNoSession)),
+      showTreinoToast(
+        context,
+        l10n.measurementLogNoSession,
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -403,9 +434,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     if (!validateAndRevealFirstError(_formKey)) return;
 
     if (!_hasAnyValue()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.logEmptyRecordWarning)),
-      );
+      showTreinoToast(context, l10n.logEmptyRecordWarning);
       return;
     }
 
@@ -455,33 +484,23 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
         await repo.add(measurement);
       }
       if (!mounted) return;
+      // Messenger capturado ANTES del pop: después la pantalla se desmonta.
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // El pop ya pasó (línea de arriba) — el check no compite con
-              // ninguna navegación, solo acompaña el mensaje mientras el
-              // SnackBar hace su propia entrada.
-              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  initial != null
-                      ? l10n.measurementLogUpdateSuccess
-                      : l10n.measurementLogSaveSuccess,
-                ),
-              ),
-            ],
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        initial != null
+            ? l10n.measurementLogUpdateSuccess
+            : l10n.measurementLogSaveSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.measurementLogSaveError)),
+      showTreinoToast(
+        context,
+        l10n.measurementLogSaveError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -490,6 +509,20 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      // El back del sistema y el swipe de iOS pasan por acá; con cambios sin
+      // guardar piden confirmación en vez de descartarlos (#1502). Un pop
+      // programático (el de GUARDAR) no se frena.
+      canPop: !_dirty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _confirmLeave();
+      },
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final uid = ref.watch(currentUidProvider);
@@ -539,9 +572,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
                         child: TextButton(
-                          onPressed: _saving
-                              ? null
-                              : () => Navigator.of(context).pop(),
+                          onPressed: _saving ? null : _confirmLeave,
                           child: Text(
                             l10n.commonCancel.toUpperCase(),
                             style: GoogleFonts.barlowCondensed(

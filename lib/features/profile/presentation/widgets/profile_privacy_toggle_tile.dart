@@ -6,6 +6,7 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../application/user_public_profile_providers.dart';
 import 'profile_section_tile.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// PRIVACIDAD section tile — flips `UserPublicProfile.isProfilePublic`.
 ///
@@ -50,29 +51,20 @@ class _ProfilePrivacyToggleTileState
       // invalidation needed. Snackbar confirms the flip so the user sees
       // an explicit outcome even before the switch re-renders.
       if (!mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              newValue
-                  ? 'Perfil público. Cualquiera puede seguirte.' // i18n: Fase W2
-                  : 'Perfil privado. Los nuevos seguidores necesitan tu aprobación.', // i18n: Fase W2
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+      showTreinoToastOn(
+        messenger,
+        newValue
+            ? 'Perfil público. Cualquiera puede seguirte.' // i18n: Fase W2
+            : 'Perfil privado. Los nuevos seguidores necesitan tu aprobación.', // i18n: Fase W2
+        type: TreinoToastType.success,
+      );
     } catch (_) {
       if (!mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'No pudimos cambiar la privacidad del perfil.', // i18n: Fase W2
-            ),
-          ),
-        );
+      showTreinoToastOn(
+        messenger,
+        'No pudimos cambiar la privacidad del perfil.', // i18n: Fase W2
+        type: TreinoToastType.error,
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }

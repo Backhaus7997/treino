@@ -396,6 +396,104 @@ test('SCENARIO-RANKS-05: non-owner cannot write a rank on someone else\'s doc', 
 });
 
 // ---------------------------------------------------------------------------
+// SCENARIO-SEARCH: searchPrefixes de userPublicProfiles (#1478).
+//
+// Los prefijos plegados del nombre con los que la búsqueda de usuarios
+// pregunta por `array-contains`. Los escribe SÓLO la Cloud Function
+// (`functions/src/profile/user-search-prefixes.ts`): si el dueño pudiera
+// escribirlos, se cargaría prefijos ajenos para aparecer en búsquedas de
+// otros. Y como el `hasOnly` evalúa el doc mergeado, el campo tiene que estar
+// en la allowlist de update: si no, un perfil que la CF ya completó no se
+// puede volver a editar (SEARCH-01).
+// ---------------------------------------------------------------------------
+const PREFIJOS_DE_MARTIN = ['ma', 'mar', 'mart', 'marti', 'martin'];
+
+test('SCENARIO-SEARCH-01: owner of a doc with CF-written searchPrefixes can still edit it', async () => {
+  await seedRankedAthlete('u1', {
+    displayName: 'Martín',
+    displayNameLowercase: 'martín',
+    searchPrefixes: PREFIJOS_DE_MARTIN,
+  });
+
+  const ref = testEnv
+    .authenticatedContext('u1')
+    .firestore()
+    .collection('userPublicProfiles')
+    .doc('u1');
+  // Cambiar el nombre: los prefijos viejos quedan hasta que la CF los
+  // recalcule, y eso no es motivo para rechazar la edición.
+  await assertSucceeds(
+    ref.update({ displayName: 'Ana', displayNameLowercase: 'ana' }),
+  );
+  // Re-presentar lo guardado (lo que hace un set con merge) no es falsificar.
+  await assertSucceeds(
+    ref.set({ uid: 'u1', searchPrefixes: PREFIJOS_DE_MARTIN }, { merge: true }),
+  );
+});
+
+test('SCENARIO-SEARCH-02: owner cannot forge, seed or delete searchPrefixes', async () => {
+  await seedRankedAthlete('u1', {
+    displayName: 'Martín',
+    searchPrefixes: PREFIJOS_DE_MARTIN,
+  });
+  await seedRankedAthlete('u2', { displayName: 'Ana' });
+
+  const pub = (uid) =>
+    testEnv
+      .authenticatedContext(uid)
+      .firestore()
+      .collection('userPublicProfiles')
+      .doc(uid);
+  const { FieldValue } = firebaseCompat.firestore;
+
+  // Cambiarlos.
+  await assertFails(pub('u1').update({ searchPrefixes: ['me', 'mes', 'messi'] }));
+  await assertFails(pub('u1').update({ searchPrefixes: [] }));
+  // Borrarlos: el pin compara con `get` de los dos lados por esto.
+  await assertFails(pub('u1').update({ searchPrefixes: FieldValue.delete() }));
+  // Sembrarlos en un perfil que todavía no los tiene (no pasó por el backfill).
+  await assertFails(pub('u2').update({ searchPrefixes: ['me', 'mes', 'messi'] }));
+  await assertFails(pub('u2').update({ searchPrefixes: [] }));
+});
+
+test('SCENARIO-SEARCH-03: a create cannot seed searchPrefixes, not even empty', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('users').doc('u1').set({
+      uid: 'u1',
+      role: 'athlete',
+      gymId: null,
+    });
+  });
+
+  const ref = testEnv
+    .authenticatedContext('u1')
+    .firestore()
+    .collection('userPublicProfiles')
+    .doc('u1');
+  await assertFails(ref.set({ uid: 'u1', searchPrefixes: ['me', 'messi'] }));
+  await assertFails(ref.set({ uid: 'u1', searchPrefixes: [] }));
+  await assertSucceeds(ref.set({ uid: 'u1', displayName: 'Martín' }));
+});
+
+test('SCENARIO-SEARCH-04: any signed-in user can search by array-contains on searchPrefixes', async () => {
+  await seedRankedAthlete('u1', {
+    displayName: 'Martín López',
+    searchPrefixes: [...PREFIJOS_DE_MARTIN, 'lo', 'lop', 'lope', 'lopez'],
+  });
+
+  const snap = await assertSucceeds(
+    testEnv
+      .authenticatedContext('u3')
+      .firestore()
+      .collection('userPublicProfiles')
+      .where('searchPrefixes', 'array-contains', 'lopez')
+      .limit(20)
+      .get(),
+  );
+  expect(snap.docs.map((d) => d.id)).toEqual(['u1']);
+});
+
+// ---------------------------------------------------------------------------
 // SCENARIO-271: reading a non-existent friendship doc returns empty
 // snapshot without permission-denied. Covers the friendships rule fix
 // (resource == null branch) discovered during user-public-profiles

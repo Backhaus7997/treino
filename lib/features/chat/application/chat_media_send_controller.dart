@@ -7,6 +7,7 @@ import '../../../app/root_scaffold_messenger.dart';
 import '../../../l10n/app_l10n.dart';
 import '../domain/media_type.dart';
 import 'chat_providers.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Estado del envío de media de UN chat (family key = chatId).
 @immutable
@@ -133,10 +134,10 @@ class ChatMediaSendController
   void _notifyFailure() {
     final messenger = ref.read(rootScaffoldMessengerKeyProvider).currentState;
     if (messenger == null) return;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(AppL10n.of(messenger.context).chatMediaUploadFailed),
-      ),
+    showTreinoToastOn(
+      messenger,
+      AppL10n.of(messenger.context).chatMediaUploadFailed,
+      type: TreinoToastType.error,
     );
   }
 }

@@ -5,11 +5,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/utils/firestore_write.dart';
 import '../domain/nutrition_plan.dart';
 
-/// Repository of PF-authored nutrition plans (Coach Hub web).
+/// Repository of PF-authored nutrition plans.
 ///
 /// - Firestore doc at `nutrition_plans/{trainerId}_{athleteId}`. Single plan
 ///   per pair — every save overwrites the previous version.
-/// - Trainer-only in rules (see `firestore.rules`).
+/// - Only the PF writes; the PF and the athlete of the pair read (see
+///   `firestore.rules`). The athlete's app reads it read-only.
 /// - No composite index needed (queried by doc id).
 class NutritionPlanRepository {
   NutritionPlanRepository({required FirebaseFirestore firestore})

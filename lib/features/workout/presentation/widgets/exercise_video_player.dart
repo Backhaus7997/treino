@@ -10,6 +10,7 @@ import '../../../../core/firebase/emuladores.dart'
     show esUrlDeDescargaDelEmuladorDeStorage;
 import '../../../../core/widgets/firebase_storage_video_player.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../core/widgets/treino_toast.dart';
 
 /// Tappable card for an exercise's tutorial video. Dual-mode:
 ///
@@ -73,9 +74,8 @@ Future<void> openYoutubeWatchPage(BuildContext context, String videoId) async {
     }
   } catch (_) {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('No pudimos abrir el video.')),
-    );
+    showTreinoToast(context, 'No pudimos abrir el video.',
+        type: TreinoToastType.error);
   }
 }
 

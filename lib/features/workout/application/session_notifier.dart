@@ -851,14 +851,35 @@ class SessionNotifier
     ));
   }
 
-  Future<void> finishSession() async {
+  /// Cierra la sesión.
+  ///
+  /// Con la sesión completa es el cierre de siempre. Con [allowIncomplete]
+  /// (#1511, "TERMINAR IGUAL") también cierra una sesión con series sin hacer,
+  /// pero exige al menos una serie hecha — con cero series no hay nada que
+  /// guardar y el camino es abandonar.
+  ///
+  /// `Session.wasFullyCompleted` se guarda como
+  /// [SessionState.countsAsWorkoutIfFinished]: una sesión incompleta que llegó
+  /// al [kEarlyFinishCountsRatio] de lo planificado cuenta como entreno
+  /// (racha, rankings, progresión, PF); por debajo queda como incompleta, igual
+  /// que abandonar. El campo conserva su nombre —lo leen el backend y ~20
+  /// consumidores— aunque ahora signifique "cuenta como entreno" y no
+  /// literalmente "hizo todas las series".
+  Future<void> finishSession({bool allowIncomplete = false}) async {
     if (_finalized) return;
     final current = state.value;
     if (current == null) return;
     if (!current.isFullyCompleted) {
-      throw StateError(
-          'finishSession llamado antes de que isFullyCompleted sea true');
+      if (!allowIncomplete) {
+        throw StateError(
+            'finishSession llamado antes de que isFullyCompleted sea true');
+      }
+      if (current.doneSetsTotal == 0) {
+        throw StateError(
+            'finishSession(allowIncomplete) sin ninguna serie hecha');
+      }
     }
+    final countsAsWorkout = current.countsAsWorkoutIfFinished;
 
     final repo = ref.read(sessionRepositoryProvider);
     final uid = ref.read(currentUidProvider);
@@ -874,7 +895,7 @@ class SessionNotifier
         uid: uid,
         sessionId: current.session.id,
         finishedAt: DateTime.now(),
-        wasFullyCompleted: true,
+        wasFullyCompleted: countsAsWorkout,
         totalVolumeKg: current.totalVolumeKg,
         durationMin: _durationMin(current.elapsedSeconds),
         // Leído acá y no adentro del repositorio: la racha semanal se mide
@@ -917,16 +938,19 @@ class SessionNotifier
     // provider, so a single invalidate cascades.
     ref.invalidate(sessionsByUidProvider(uid));
     _nudgeWatch(WatchNudgeService.reasonWorkoutFinished);
-    // Solo en el path "finished fully completed" — los abandonos no cuentan
-    // como "routine_finished" para producto. Si más adelante producto pide
-    // ver abandons, se agrega `routine_abandoned` aparte.
-    ref.read(analyticsServiceProvider).logRoutineFinished(
-          routineId: current.session.routineId,
-          sessionId: current.session.id,
-          durationSeconds: current.elapsedSeconds,
-        );
+    // Solo cuando la sesión CUENTA como entreno — los abandonos (y las
+    // terminadas igual por debajo del piso, #1511) no cuentan como
+    // "routine_finished" para producto. Si más adelante producto pide ver
+    // abandons, se agrega `routine_abandoned` aparte.
+    if (countsAsWorkout) {
+      ref.read(analyticsServiceProvider).logRoutineFinished(
+            routineId: current.session.routineId,
+            sessionId: current.session.id,
+            durationSeconds: current.elapsedSeconds,
+          );
+    }
     state = AsyncData(current.copyWith(
-      session: current.session.copyWith(wasFullyCompleted: true),
+      session: current.session.copyWith(wasFullyCompleted: countsAsWorkout),
     ));
   }
 
