@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
@@ -123,65 +124,75 @@ class RutinasSection extends ConsumerWidget {
         // ── Content ───────────────────────────────────────────────────────────
         // TreinoStateSwitcher: cross-fade skeleton → lista (sin salto). Las keys
         // distinguen los estados; `skipLoadingOnReload` evita re-fadear en reloads.
-        TreinoStateSwitcher(
-          child: entriesAsync.when(
-            // Keep the previous list on screen while the underlying streams
-            // recompose (archive/create/assignment) — no spinner flicker.
-            skipLoadingOnReload: true,
-            loading: () => const KeyedSubtree(
-              key: ValueKey('rutinas_loading'),
-              child: _SectionLoadingState(),
-            ),
-            error: (err, _) => KeyedSubtree(
-              key: const ValueKey('rutinas_error'),
-              child: _SectionErrorState(
-                onRetry: () {
-                  ref
-                    ..invalidate(assignedRoutinesProvider(uid))
-                    ..invalidate(userCreatedRoutinesProvider(uid))
-                    ..invalidate(unifiedRoutinesProvider(uid));
-                },
+        // AnimatedSize: los 3 skeletons miden 264 px y el resultado puede ser
+        // una sola línea (vacío) o una card. Sin esto, TreinoStateSwitcher
+        // fundía a la altura mayor y al terminar todo lo de abajo subía de golpe
+        // en un frame — el mismo salto que el skeleton venía a evitar (Codex,
+        // #1601).
+        AnimatedSize(
+          duration: AppMotion.resolve(context, AppMotion.base),
+          curve: AppMotion.standard,
+          alignment: Alignment.topCenter,
+          child: TreinoStateSwitcher(
+            child: entriesAsync.when(
+              // Keep the previous list on screen while the underlying streams
+              // recompose (archive/create/assignment) — no spinner flicker.
+              skipLoadingOnReload: true,
+              loading: () => const KeyedSubtree(
+                key: ValueKey('rutinas_loading'),
+                child: _SectionLoadingState(),
               ),
-            ),
-            data: (entries) {
-              if (entries.isEmpty) {
-                return KeyedSubtree(
-                  key: const ValueKey('rutinas_empty'),
-                  child: _SectionEmptyState(
-                    onCta: () => context.push('/workout/my-routine-editor'),
+              error: (err, _) => KeyedSubtree(
+                key: const ValueKey('rutinas_error'),
+                child: _SectionErrorState(
+                  onRetry: () {
+                    ref
+                      ..invalidate(assignedRoutinesProvider(uid))
+                      ..invalidate(userCreatedRoutinesProvider(uid))
+                      ..invalidate(unifiedRoutinesProvider(uid));
+                  },
+                ),
+              ),
+              data: (entries) {
+                if (entries.isEmpty) {
+                  return KeyedSubtree(
+                    key: const ValueKey('rutinas_empty'),
+                    child: _SectionEmptyState(
+                      onCta: () => context.push('/workout/my-routine-editor'),
+                    ),
+                  );
+                }
+                // `activeRoutineId` viene del UserProfile; durante el loading de
+                // profile (cold start) ningún card se marca como activa — estado
+                // transitorio aceptable hasta que la adopción perezosa resuelva.
+                final activeId = ref.watch(
+                  userProfileProvider.select(
+                    (a) => a.valueOrNull?.activeRoutineId,
                   ),
                 );
-              }
-              // `activeRoutineId` viene del UserProfile; durante el loading de
-              // profile (cold start) ningún card se marca como activa — estado
-              // transitorio aceptable hasta que la adopción perezosa resuelva.
-              final activeId = ref.watch(
-                userProfileProvider.select(
-                  (a) => a.valueOrNull?.activeRoutineId,
-                ),
-              );
-              final linkAsync = ref.watch(currentAthleteLinkProvider);
-              // El toggle solo aporta cuando hay algo que elegir — con una
-              // sola rutina la adopción perezosa ya la dejó activa.
-              final canToggleActive = entries.length > 1;
-              return Column(
-                key: const ValueKey('rutinas_data'),
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final entry in entries)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _RoutineCard(
-                        routine: entry.routine,
-                        fromCoach: entry.fromCoach,
-                        isActive: entry.routine.id == activeId,
-                        canToggleActive: canToggleActive,
-                        linkAsync: linkAsync,
+                final linkAsync = ref.watch(currentAthleteLinkProvider);
+                // El toggle solo aporta cuando hay algo que elegir — con una
+                // sola rutina la adopción perezosa ya la dejó activa.
+                final canToggleActive = entries.length > 1;
+                return Column(
+                  key: const ValueKey('rutinas_data'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final entry in entries)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _RoutineCard(
+                          routine: entry.routine,
+                          fromCoach: entry.fromCoach,
+                          isActive: entry.routine.id == activeId,
+                          canToggleActive: canToggleActive,
+                          linkAsync: linkAsync,
+                        ),
                       ),
-                    ),
-                ],
-              );
-            },
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ],

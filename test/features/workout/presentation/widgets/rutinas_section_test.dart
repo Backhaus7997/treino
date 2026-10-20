@@ -551,6 +551,41 @@ void main() {
       expect(find.byType(TreinoShimmer), findsNothing);
     });
 
+    // Codex en #1601: los 3 skeletons miden más que un estado vacío; sin
+    // AnimatedSize lo de abajo subía de golpe al terminar el fundido.
+    testWidgets('al resolver a algo más bajo, la altura se achica de a poco',
+        (tester) async {
+      final completer = Completer<List<Routine>>();
+      await _pumpSection(
+        tester,
+        extraOverrides: [
+          assignedRoutinesProvider('athlete-1')
+              .overrideWith((ref) => completer.future),
+        ],
+      );
+      await tester.pump();
+      final size = find.byType(AnimatedSize);
+      final alto = tester.getSize(size).height;
+
+      completer.complete(const []);
+      // Frame a frame (16 ms) hasta que todo se asiente: ningún frame puede
+      // comerse más de la mitad de la diferencia total de alto.
+      final alturas = <double>[alto];
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        alturas.add(tester.getSize(size).height);
+      }
+      final fin = alturas.last;
+      expect(fin, lessThan(alto));
+      var mayorSalto = 0.0;
+      for (var i = 1; i < alturas.length; i++) {
+        final salto = alturas[i - 1] - alturas[i];
+        if (salto > mayorSalto) mayorSalto = salto;
+      }
+      expect(mayorSalto, lessThan((alto - fin) / 2),
+          reason: 'alturas por frame: $alturas');
+    });
+
     testWidgets(
         'error state renders message + Reintentar, and retry re-fetches the '
         'unified list', (tester) async {

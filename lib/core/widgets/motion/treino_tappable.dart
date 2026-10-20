@@ -70,24 +70,39 @@ class _TreinoTappableState extends State<TreinoTappable> {
 
     final reduce = AppMotion.reduceMotion(context);
 
-    return GestureDetector(
-      onTap: widget.onTap,
-      onLongPress: widget.onLongPress,
-      // Con reduce-motion no trackeamos presión: ni setState ni AnimatedScale.
-      onTapDown: reduce ? null : (_) => _setPressed(true),
-      onTapUp: reduce ? null : (_) => _setPressed(false),
-      onTapCancel: reduce ? null : () => _setPressed(false),
-      // opaque: toda el área del CTA responde, no solo los px pintados —
-      // mismo comportamiento que los GestureDetector que reemplaza.
-      behavior: HitTestBehavior.opaque,
-      child: reduce
-          ? widget.child
-          : AnimatedScale(
-              scale: _pressed ? TreinoTappable.pressedScale : 1.0,
-              duration: AppMotion.resolve(context, AppMotion.micro),
-              curve: AppMotion.standard,
-              child: widget.child,
-            ),
+    // FocusableActionDetector: lo que el InkWell que esto suele reemplazar
+    // daba gratis y un GestureDetector solo no — entrar en el foco con Tab y
+    // activarse con Enter/Espacio (web, teclado físico, Switch Control).
+    // Sin él, cada card migrada quedaba inalcanzable por teclado (Codex,
+    // #1601).
+    return FocusableActionDetector(
+      actions: <Type, Action<Intent>>{
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap?.call();
+            return null;
+          },
+        ),
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        // Con reduce-motion no trackeamos presión: ni setState ni AnimatedScale.
+        onTapDown: reduce ? null : (_) => _setPressed(true),
+        onTapUp: reduce ? null : (_) => _setPressed(false),
+        onTapCancel: reduce ? null : () => _setPressed(false),
+        // opaque: toda el área del CTA responde, no solo los px pintados —
+        // mismo comportamiento que los GestureDetector que reemplaza.
+        behavior: HitTestBehavior.opaque,
+        child: reduce
+            ? widget.child
+            : AnimatedScale(
+                scale: _pressed ? TreinoTappable.pressedScale : 1.0,
+                duration: AppMotion.resolve(context, AppMotion.micro),
+                curve: AppMotion.standard,
+                child: widget.child,
+              ),
+      ),
     );
   }
 }
