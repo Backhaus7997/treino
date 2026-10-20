@@ -19,6 +19,14 @@ import '../domain/nutrition_plan.dart';
 import '../domain/nutrition_plan_ids.dart';
 import '../domain/nutrition_plan_presets.dart';
 
+// Pie fijo con GUARDAR PLAN. Vive dentro del body: el `Scaffold` no lo
+// conoce, así que un aviso con el editor abierto le taparía el botón. Su alto
+// va en `bottomOffset` (mismo caso que `_kAltoDelPieFijo` del editor web).
+const double _kPieArriba = 12;
+const double _kPieAbajo = 20;
+const double _kAltoBoton = 48;
+const double _kAltoDelPie = _kPieArriba + _kAltoBoton + _kPieAbajo;
+
 /// Editor mobile del plan nutricional de un alumno, para el PF (#1538).
 ///
 /// Hasta acá el plan sólo se podía cargar desde el Coach Hub web, y el alumno
@@ -37,14 +45,6 @@ import '../domain/nutrition_plan_presets.dart';
 /// - Si la lectura falla NO arranca de los presets: guardar ese borrador
 ///   pisaría un plan que existe y no se pudo leer. Muestra el error y deja
 ///   reintentar.
-// Pie fijo con GUARDAR PLAN. Vive dentro del body: el `Scaffold` no lo
-// conoce, así que un aviso con el editor abierto le taparía el botón. Su alto
-// va en `bottomOffset` (mismo caso que `_kAltoDelPieFijo` del editor web).
-const double _kPieArriba = 12;
-const double _kPieAbajo = 20;
-const double _kAltoBoton = 48;
-const double _kAltoDelPie = _kPieArriba + _kAltoBoton + _kPieAbajo;
-
 class TrainerNutritionPlanEditorScreen extends ConsumerStatefulWidget {
   const TrainerNutritionPlanEditorScreen({super.key, required this.athleteId});
 
