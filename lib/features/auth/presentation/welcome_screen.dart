@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
-import '../../../app/theme/tokens/primitives.dart';
 import '../../../core/contact/quiero_ser_entrenador.dart';
 import '../../../core/widgets/treino_toast.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
@@ -196,7 +195,30 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                                   : () => context.push('/register'),
                               showArrow: false,
                             ),
-                            const SizedBox(height: 12),
+                            // Iniciar sesión: mismo pill que EMPEZAR pero
+                            // invertido, separado por la pregunta. Antes era
+                            // un link de texto al pie que costaba encontrar y
+                            // acertarle.
+                            const SizedBox(height: 10),
+                            Text(
+                              l10n.authWelcomeHaveAccount,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.barlow(
+                                fontSize: 14,
+                                color: palette.textMuted,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            AuthPillButton(
+                              key: const Key('welcome-sign-in'),
+                              label: l10n.authWelcomeSignIn,
+                              onPressed: isLoading
+                                  ? null
+                                  : () => context.push('/login'),
+                              showArrow: false,
+                              outlined: true,
+                            ),
+                            const SizedBox(height: 20),
                             Row(
                               children: [
                                 Expanded(
@@ -241,58 +263,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                             // TREINO account just like Register — the user must
                             // be told before tapping the social button.
                             const TermsNoticeText(),
-                            const SizedBox(height: 10),
-                            // Toda la línea es el botón, no sólo «Iniciar
-                            // sesión»: el GestureDetector pegado al texto daba
-                            // ~20 pt de alto, lejos de los 44 pt mínimos, y
-                            // costaba acertarle. Wrap (no un Row de tamaño
-                            // mínimo) para que baje de línea en vez de
-                            // desbordar con texto largo, pantalla angosta o
-                            // fuente escalada.
-                            Semantics(
-                              button: true,
-                              child: InkWell(
-                                key: const Key('welcome-sign-in'),
-                                onTap: () => context.push('/login'),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadius.full),
-                                child: ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(minHeight: 52),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 12,
-                                    ),
-                                    child: Center(
-                                      child: Wrap(
-                                        alignment: WrapAlignment.center,
-                                        crossAxisAlignment:
-                                            WrapCrossAlignment.center,
-                                        children: [
-                                          Text(
-                                            '${l10n.authWelcomeHaveAccount} · ',
-                                            style: GoogleFonts.barlow(
-                                              fontSize: 16,
-                                              color: palette.textMuted,
-                                            ),
-                                          ),
-                                          Text(
-                                            l10n.authWelcomeSignIn,
-                                            style: GoogleFonts.barlow(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w700,
-                                              color: palette.accent,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 20),
                             // Misma tarjeta violeta que Login y Registro, pero
                             // abre el mail directo (ver _contactarParaSerEntrenador).
                             Semantics(

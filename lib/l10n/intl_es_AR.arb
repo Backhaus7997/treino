@@ -152,8 +152,8 @@
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",
   "authWelcomeBody": "Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo querés.",
   "authWelcomeCta": "EMPEZAR",
-  "authWelcomeHaveAccount": "Ya tengo cuenta",
-  "authWelcomeSignIn": "Iniciar sesión",
+  "authWelcomeHaveAccount": "¿Ya tenés cuenta?",
+  "authWelcomeSignIn": "INICIAR SESIÓN",
   "authWelcomeTrainerPrompt": "¿Sos entrenador?",
   "@authWelcomeTrainerPrompt": {
     "description": "Welcome screen — lead-in before the «Quiero ser entrenador» link. Trainers are created by the team (no self-service), so the link opens the contact mail."

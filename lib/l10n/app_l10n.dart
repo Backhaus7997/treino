@@ -347,13 +347,13 @@ abstract class AppL10n {
   /// No description provided for @authWelcomeHaveAccount.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ya tengo cuenta'**
+  /// **'¿Ya tenés cuenta?'**
   String get authWelcomeHaveAccount;
 
   /// No description provided for @authWelcomeSignIn.
   ///
   /// In es_AR, this message translates to:
-  /// **'Iniciar sesión'**
+  /// **'INICIAR SESIÓN'**
   String get authWelcomeSignIn;
 
   /// Welcome screen — lead-in before the «Quiero ser entrenador» link. Trainers are created by the team (no self-service), so the link opens the contact mail.

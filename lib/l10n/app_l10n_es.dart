@@ -162,10 +162,10 @@ class AppL10nEs extends AppL10n {
   String get authWelcomeCta => 'EMPEZAR';
 
   @override
-  String get authWelcomeHaveAccount => 'Ya tengo cuenta';
+  String get authWelcomeHaveAccount => '¿Ya tenés cuenta?';
 
   @override
-  String get authWelcomeSignIn => 'Iniciar sesión';
+  String get authWelcomeSignIn => 'INICIAR SESIÓN';
 
   @override
   String get authWelcomeTrainerPrompt => '¿Eres entrenador?';
@@ -5811,10 +5811,10 @@ class AppL10nEsAr extends AppL10nEs {
   String get authWelcomeCta => 'EMPEZAR';
 
   @override
-  String get authWelcomeHaveAccount => 'Ya tengo cuenta';
+  String get authWelcomeHaveAccount => '¿Ya tenés cuenta?';
 
   @override
-  String get authWelcomeSignIn => 'Iniciar sesión';
+  String get authWelcomeSignIn => 'INICIAR SESIÓN';
 
   @override
   String get authWelcomeTrainerPrompt => '¿Sos entrenador?';

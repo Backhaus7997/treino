@@ -155,7 +155,7 @@ void main() {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(AuthPillButton));
+    await tester.tap(find.widgetWithText(AuthPillButton, 'EMPEZAR'));
     await tester.pumpAndSettle();
 
     expect(find.text('REGISTER'), findsOneWidget);
@@ -193,18 +193,30 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  testWidgets('«Ya tengo cuenta · Iniciar sesión» es un blanco cómodo',
-      (tester) async {
+  testWidgets(
+      'INICIAR SESIÓN es un pill invertido justo debajo de EMPEZAR, '
+      'separado por «¿Ya tenés cuenta?»', (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    final size = tester.getSize(find.byKey(const Key('welcome-sign-in')));
-    expect(size.height, greaterThanOrEqualTo(48));
-    // Toda la línea es tocable, no sólo la palabra resaltada.
+    final empezar =
+        tester.getRect(find.widgetWithText(AuthPillButton, 'EMPEZAR'));
+    final pregunta = tester.getRect(find.text('¿Ya tenés cuenta?'));
+    final signIn = tester.getRect(find.byKey(const Key('welcome-sign-in')));
+
+    expect(pregunta.top, greaterThan(empezar.bottom));
+    expect(signIn.top, greaterThan(pregunta.bottom));
+    // Mismo tamaño que EMPEZAR: es un botón, no un link.
+    expect(signIn.height, empezar.height);
+    expect(signIn.width, empezar.width);
+    // Y va antes de Google/Apple.
     expect(
-      size.width,
-      greaterThan(tester.getSize(find.text('Iniciar sesión')).width * 2),
+      signIn.bottom,
+      lessThan(tester.getRect(find.byType(AuthSecondaryButton).first).top),
     );
+    final button =
+        tester.widget<AuthPillButton>(find.byKey(const Key('welcome-sign-in')));
+    expect(button.outlined, isTrue);
   });
 
   // B03: "Iniciar sesión" link navigates to /login
@@ -213,7 +225,7 @@ void main() {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Iniciar sesión'));
+    await tester.tap(find.text('INICIAR SESIÓN'));
     await tester.pumpAndSettle();
 
     expect(find.text('LOGIN'), findsOneWidget);
@@ -265,6 +277,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.byType(TrainerInquiryCard));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(TrainerInquiryCard));
     await tester.pumpAndSettle();
 
@@ -284,6 +297,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.byType(TrainerInquiryCard));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(TrainerInquiryCard));
     await tester.pumpAndSettle();
 
@@ -298,6 +312,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.byType(TrainerInquiryCard));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(TrainerInquiryCard));
     await tester.pumpAndSettle();
 
