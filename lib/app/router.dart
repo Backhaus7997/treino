@@ -460,18 +460,25 @@ GoRouter buildRouter({
         path: '/welcome',
         pageBuilder: (_, __) => _noAnim(const WelcomeScreen()),
       ),
-      // Auth routes — full screen, NO bottom bar
+      // Auth routes — full screen, NO bottom bar.
+      //
+      // `builder` (no `pageBuilder` + `_noAnim`): se llega siempre con `push`
+      // (bienvenida → login → registro / olvidé la contraseña), así que tienen
+      // que comportarse como cualquier pantalla apilada. En iOS eso es
+      // CupertinoPageRoute: slide nativo y deslizar desde el borde izquierdo
+      // para volver. Con `_noAnim` el gesto no existía y la única salida era
+      // la flecha.
       GoRoute(
         path: '/login',
-        pageBuilder: (_, __) => _noAnim(const LoginScreen()),
+        builder: (_, __) => const LoginScreen(),
       ),
       GoRoute(
         path: '/register',
-        pageBuilder: (_, __) => _noAnim(const RegisterScreen()),
+        builder: (_, __) => const RegisterScreen(),
       ),
       GoRoute(
         path: '/forgot-password',
-        pageBuilder: (_, __) => _noAnim(const ForgotPasswordScreen()),
+        builder: (_, __) => const ForgotPasswordScreen(),
       ),
 
       // ProfileSetup — fullscreen post-signup flow. No bottom bar.

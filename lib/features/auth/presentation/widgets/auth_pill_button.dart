@@ -7,6 +7,10 @@ import '../../../../core/widgets/treino_icon.dart';
 
 /// Full-width pill CTA with loading state and glow shadow.
 /// Replaces AuthPrimaryButton with mockup-aligned styling.
+///
+/// [outlined] es la versión invertida —fondo `bg`, borde y texto `accent`,
+/// sin glow— para la acción secundaria que va debajo de la principal con el
+/// mismo tamaño y forma (p. ej. INICIAR SESIÓN bajo EMPEZAR).
 class AuthPillButton extends StatelessWidget {
   const AuthPillButton({
     super.key,
@@ -14,16 +18,20 @@ class AuthPillButton extends StatelessWidget {
     required this.onPressed,
     this.isLoading = false,
     this.showArrow = true,
+    this.outlined = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
   final bool showArrow;
+  final bool outlined;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final fill = outlined ? palette.bg : palette.accent;
+    final ink = outlined ? palette.accent : palette.bg;
 
     return Container(
       width: double.infinity,
@@ -31,21 +39,29 @@ class AuthPillButton extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.full),
         boxShadow: [
-          BoxShadow(
-            color: palette.accent.withValues(alpha: 0.18),
-            blurRadius: 24,
-            spreadRadius: 0,
-            offset: const Offset(0, 8),
-          ),
+          if (!outlined)
+            BoxShadow(
+              color: palette.accent.withValues(alpha: 0.18),
+              blurRadius: 24,
+              spreadRadius: 0,
+              offset: const Offset(0, 8),
+            ),
         ],
       ),
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: palette.accent,
-          foregroundColor: TreinoButtonTokens.foreground(context),
-          disabledBackgroundColor: palette.accent.withValues(alpha: 0.5),
-          shape: const StadiumBorder(),
+          backgroundColor: fill,
+          foregroundColor: outlined
+              ? palette.accent
+              : TreinoButtonTokens.foreground(context),
+          disabledBackgroundColor: fill.withValues(alpha: 0.5),
+          shape: StadiumBorder(
+            side: outlined
+                ? BorderSide(color: palette.accent, width: 1.5)
+                : BorderSide.none,
+          ),
+          elevation: outlined ? 0 : null,
           padding: EdgeInsets.zero,
         ),
         child: isLoading
@@ -55,7 +71,10 @@ class AuthPillButton extends StatelessWidget {
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                      TreinoButtonTokens.foreground(context)),
+                    outlined
+                        ? palette.accent
+                        : TreinoButtonTokens.foreground(context),
+                  ),
                 ),
               )
             : Row(
@@ -68,7 +87,7 @@ class AuthPillButton extends StatelessWidget {
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.0,
-                      color: palette.bg,
+                      color: ink,
                     ),
                   ),
                   if (showArrow) ...[
@@ -76,7 +95,7 @@ class AuthPillButton extends StatelessWidget {
                     Icon(
                       TreinoIcon.arrowRight,
                       size: 18,
-                      color: palette.bg,
+                      color: ink,
                     ),
                   ],
                 ],

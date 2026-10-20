@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/tokens.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
@@ -17,11 +16,13 @@ import '../domain/email_password_validator.dart';
 import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_input.dart';
 import 'widgets/auth_pill_button.dart';
-import 'widgets/auth_secondary_button.dart';
+import 'widgets/auth_screen_header.dart';
+import 'widgets/auth_social_buttons.dart';
+import 'widgets/auth_switch_link.dart';
 import 'widgets/password_strength_bar.dart';
 import 'widgets/terms_checkbox.dart';
+import 'widgets/terms_notice_text.dart';
 import 'widgets/trainer_inquiry_card.dart';
-import '../../../core/widgets/treino_logo.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -32,13 +33,14 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+  /// Qué botón social dispara el OAuth en curso (spinner en ese botón).
+  AuthSocialProvider? _pendingProvider;
+
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final _confirmPasswordCtrl = TextEditingController();
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
-  final _confirmPasswordFocus = FocusNode();
 
   bool _termsAccepted = false;
 
@@ -47,24 +49,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.initState();
     _emailCtrl.addListener(() => setState(() {}));
     _passwordCtrl.addListener(() => setState(() {}));
-    _confirmPasswordCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
-    _confirmPasswordCtrl.dispose();
     _emailFocus.dispose();
     _passwordFocus.dispose();
-    _confirmPasswordFocus.dispose();
     super.dispose();
   }
 
   bool get _fieldsEmpty =>
-      _emailCtrl.text.trim().isEmpty ||
-      _passwordCtrl.text.isEmpty ||
-      _confirmPasswordCtrl.text.isEmpty;
+      _emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty;
 
   bool get _canSubmit => !_fieldsEmpty && _termsAccepted;
 
@@ -99,6 +96,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       );
       return;
     }
+    setState(() => _pendingProvider = AuthSocialProvider.google);
     await ref.read(authNotifierProvider.notifier).signInWithGoogle();
   }
 
@@ -113,6 +111,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       );
       return;
     }
+    setState(() => _pendingProvider = AuthSocialProvider.apple);
     await ref.read(authNotifierProvider.notifier).signInWithApple();
   }
 
@@ -135,190 +134,130 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       backgroundColor: palette.bg,
       body: AppBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Back button — top left (same pattern as Login)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      tooltip: l10n.commonBack,
-                      icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-                      onPressed: () => context.canPop()
-                          ? context.pop()
-                          : context.go('/welcome'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Headline: "SUMATE A" + TREINO brand logo below.
-                  // Space Grotesk for the prose, brand SVG for the wordmark.
-                  TreinoFadeSlideIn(
+          // Mismo patrón que Login: el bloque de abajo queda al pie en pantallas
+          // altas y todo scrollea en teléfonos chicos o con el teclado.
+          child: CustomScrollView(
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Form(
+                    key: _formKey,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          l10n.authRegisterTitle,
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.4,
-                            color: palette.textPrimary,
-                            height: 1.05,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        const TreinoLogo(size: 44),
-                        const SizedBox(height: 14),
-                        Text(
-                          l10n.authRegisterSubtitle,
-                          style: GoogleFonts.barlow(
-                            fontSize: 15,
-                            color: palette.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Email field (no display name field — ProfileSetup owns it).
-                  TreinoFadeSlideIn(
-                    delay: AppMotion.stagger(1),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        AuthInput(
-                          controller: _emailCtrl,
-                          label: l10n.authRegisterEmailLabel,
-                          leadingIcon: TreinoIcon.mail,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          focusNode: _emailFocus,
-                          nextFocusNode: _passwordFocus,
-                          autofillHints: const [AutofillHints.email],
-                          validator: EmailPasswordValidator.validateEmail,
-                        ),
-                        const SizedBox(height: 14),
-                        // Password field
-                        AuthInput(
-                          controller: _passwordCtrl,
-                          label: l10n.authRegisterPasswordLabel,
-                          leadingIcon: TreinoIcon.lock,
-                          obscureText: true,
-                          suffixToggle: true,
-                          textInputAction: TextInputAction.next,
-                          focusNode: _passwordFocus,
-                          nextFocusNode: _confirmPasswordFocus,
-                          autofillHints: const [AutofillHints.newPassword],
-                          validator: EmailPasswordValidator.validatePassword,
-                        ),
-                        const SizedBox(height: 4),
-                        // Strength bar — pegada al input por diseño (single block)
-                        ValueListenableBuilder<TextEditingValue>(
-                          valueListenable: _passwordCtrl,
-                          builder: (_, value, __) =>
-                              PasswordStrengthBar(password: value.text),
-                        ),
-                        const SizedBox(height: 14),
-                        // Confirm password field
-                        AuthInput(
-                          controller: _confirmPasswordCtrl,
-                          label: l10n.authRegisterConfirmPasswordLabel,
-                          leadingIcon: TreinoIcon.lock,
-                          obscureText: true,
-                          suffixToggle: true,
-                          textInputAction: TextInputAction.done,
-                          focusNode: _confirmPasswordFocus,
-                          autofillHints: const [AutofillHints.newPassword],
-                          validator: (value) =>
-                              EmailPasswordValidator.validatePasswordMatch(
-                            _passwordCtrl.text,
-                            value,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        // Terms checkbox
-                        TermsCheckbox(
-                          value: _termsAccepted,
-                          onChanged: (v) => setState(() => _termsAccepted = v),
-                        ),
-                        const SizedBox(height: 20),
-                        // Error banner
-                        if (failure != null) ...[
-                          AuthFailureBanner(failure: failure),
-                          const SizedBox(height: 12),
-                        ],
-                        // CTA
-                        AuthPillButton(
-                          label: l10n.authRegisterCta,
-                          onPressed: _canSubmit ? _submit : null,
-                          isLoading: isLoading,
-                        ),
-                        const SizedBox(height: 20),
-                        // Divider "O"
-                        Row(
-                          children: [
-                            const Expanded(child: Divider()),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                l10n.authRegisterDividerOr,
-                                style: GoogleFonts.barlowCondensed(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1.5,
+                        TreinoFadeSlideIn(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SizedBox(height: 8),
+                              AuthScreenHeader(
+                                title: l10n.authRegisterHeaderTitle,
+                                onBack: () => context.canPop()
+                                    ? context.pop()
+                                    : context.go('/welcome'),
+                              ),
+                              const SizedBox(height: 20),
+                              // Email (sin nombre: lo pide ProfileSetup).
+                              AuthInput(
+                                controller: _emailCtrl,
+                                label: l10n.authRegisterEmailLabel,
+                                leadingIcon: TreinoIcon.mail,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
+                                focusNode: _emailFocus,
+                                nextFocusNode: _passwordFocus,
+                                autofillHints: const [AutofillHints.email],
+                                validator: EmailPasswordValidator.validateEmail,
+                              ),
+                              const SizedBox(height: 14),
+                              AuthInput(
+                                controller: _passwordCtrl,
+                                label: l10n.authRegisterPasswordLabel,
+                                leadingIcon: TreinoIcon.lock,
+                                obscureText: true,
+                                suffixToggle: true,
+                                textInputAction: TextInputAction.done,
+                                focusNode: _passwordFocus,
+                                autofillHints: const [
+                                  AutofillHints.newPassword,
+                                ],
+                                validator:
+                                    EmailPasswordValidator.validatePassword,
+                              ),
+                              const SizedBox(height: 4),
+                              // Strength bar — pegada al input por diseño.
+                              ValueListenableBuilder<TextEditingValue>(
+                                valueListenable: _passwordCtrl,
+                                builder: (_, value, __) =>
+                                    PasswordStrengthBar(password: value.text),
+                              ),
+                              const SizedBox(height: 14),
+                              TermsCheckbox(
+                                value: _termsAccepted,
+                                onChanged: (v) =>
+                                    setState(() => _termsAccepted = v),
+                              ),
+                              const SizedBox(height: 20),
+                              if (failure != null) ...[
+                                AuthFailureBanner(failure: failure),
+                                const SizedBox(height: 12),
+                              ],
+                              AuthPillButton(
+                                label: l10n.authRegisterCta,
+                                onPressed: _canSubmit ? _submit : null,
+                                isLoading: isLoading,
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                l10n.authRegisterOrSignUpWith,
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.barlow(
+                                  fontSize: AppTextSize.body,
                                   color: palette.textMuted,
                                 ),
                               ),
-                            ),
-                            const Expanded(child: Divider()),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        // Social buttons. Google stays enabled regardless of the
-                        // Terms checkbox so that tapping yields explicit feedback
-                        // (snackbar) instead of looking like a "Próximamente"
-                        // disabled control. The Terms requirement is enforced
-                        // inside _signInWithGoogle.
-                        Row(
-                          children: [
-                            Expanded(
-                              child: AuthSecondaryButton(
-                                icon: FontAwesomeIcons.google,
-                                iconWidget: SvgPicture.asset(
-                                  'assets/logo/google_g.svg',
-                                  width: 18,
-                                  height: 18,
-                                ),
-                                label: l10n.authGoogleLabel,
-                                onPressed: isLoading ? null : _signInWithGoogle,
+                              const SizedBox(height: 14),
+                              // Google/Apple quedan habilitados sin importar el
+                              // checkbox para que el tap dé feedback explícito
+                              // (toast) en vez de parecer un control apagado;
+                              // el gate de Términos vive en _signInWith*.
+                              AuthSocialButtons(
+                                onGoogle: isLoading ? null : _signInWithGoogle,
+                                onApple: isLoading ? null : _signInWithApple,
+                                pending: isLoading ? _pendingProvider : null,
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: AuthSecondaryButton(
-                                icon: FontAwesomeIcons.apple,
-                                label: l10n.authAppleLabel,
-                                onPressed: isLoading ? null : _signInWithApple,
-                              ),
-                            ),
-                          ],
+                              const SizedBox(height: 14),
+                              const TermsNoticeText(),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 20),
-                        // Trainer inquiry card
-                        const TrainerInquiryCard(),
-                        const SizedBox(height: 20),
+                        TreinoFadeSlideIn(
+                          delay: AppMotion.stagger(1),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SizedBox(height: 20),
+                              const TrainerInquiryCard(),
+                              const SizedBox(height: 8),
+                              // `pushReplacement`: ver el comentario en Login.
+                              AuthSwitchLink(
+                                prompt: l10n.authRegisterHaveAccount,
+                                action: l10n.authRegisterSignInLink,
+                                onTap: () => context.pushReplacement('/login'),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
