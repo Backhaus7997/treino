@@ -24,16 +24,14 @@ Widget _screen({
   bool overHero = false,
   ThemeData? theme,
   List<Widget>? actions,
-  bool insideSafeArea = false,
 }) {
-  Widget wrap(Widget child) => insideSafeArea ? SafeArea(child: child) : child;
   return MaterialApp(
     theme: theme ?? AppTheme.dark(),
     localizationsDelegates: AppL10n.localizationsDelegates,
     supportedLocales: AppL10n.supportedLocales,
     locale: const Locale('es', 'AR'),
     home: Scaffold(
-      body: wrap(Builder(
+      body: Builder(
         builder: (context) => TreinoCollapsingTopBar(
           title: _title,
           overHero: overHero,
@@ -58,7 +56,7 @@ Widget _screen({
             ],
           ),
         ),
-      )),
+      ),
     ),
   );
 }
@@ -78,57 +76,6 @@ Future<void> _scroll(WidgetTester tester, double dy) async {
 }
 
 void main() {
-  testWidgets(
-      'dentro de un SafeArea (shell), el fondo colapsado igual cubre la '
-      'status bar de borde a borde', (tester) async {
-    await _pump(tester, _screen(insideSafeArea: true));
-    await _scroll(tester, -300);
-
-    final surface = tester.getRect(find.byKey(_surface));
-    expect(surface.top, 0, reason: 'el fondo arranca debajo del reloj');
-    expect(
-      surface.bottom,
-      _safeTop + TreinoTopBarMetrics.barHeight,
-    );
-    expect(surface.width, 390);
-  });
-
-  testWidgets(
-      'dentro de un SafeArea (shell), el body arranca bajo la status bar y '
-      'recupera el inset para reservarlo', (tester) async {
-    late double bodyInset;
-    await _pump(
-      tester,
-      MaterialApp(
-        theme: AppTheme.dark(),
-        localizationsDelegates: AppL10n.localizationsDelegates,
-        supportedLocales: AppL10n.supportedLocales,
-        locale: const Locale('es', 'AR'),
-        home: Scaffold(
-          body: SafeArea(
-            child: TreinoCollapsingTopBar(
-              onBack: () {},
-              body: Builder(
-                builder: (context) {
-                  bodyInset = MediaQuery.paddingOf(context).top;
-                  return const SizedBox.expand(key: Key('body'));
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    expect(tester.getRect(find.byKey(const Key('body'))).top, 0);
-    expect(bodyInset, _safeTop);
-    // La flecha no se mueve: sigue colgando del borde del área segura.
-    expect(
-      tester.getRect(find.byKey(_back)).top,
-      _safeTop + TreinoTopBarMetrics.topInset,
-    );
-  });
-
   testWidgets(
       'offset 0: sin fondo ni título chico; el título grande queda '
       'debajo de la flecha', (tester) async {

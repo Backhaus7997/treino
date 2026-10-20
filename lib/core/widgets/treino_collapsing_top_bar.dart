@@ -183,18 +183,7 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final media = MediaQuery.of(context);
-    // Inset superior que un `SafeArea` de arriba (el del shell o
-    // `_immersive`) ya consumió. La pantalla entera —body y barra— se estira
-    // hacia arriba esa distancia y se le devuelve el inset en el MediaQuery:
-    // el hero/gradiente y el fondo de la barra llegan al borde físico, bajo el
-    // reloj, en vez de arrancar debajo y verse como un bloque suelto.
-    final view = View.maybeOf(context);
-    final bleed = view == null
-        ? 0.0
-        : (MediaQueryData.fromView(view).padding.top - media.padding.top)
-            .clamp(0.0, double.infinity);
-    final top = media.padding.top + bleed;
+    final top = MediaQuery.paddingOf(context).top;
     final title = widget.title;
 
     // Sobre foto y sin colapsar: blanco con sombra. Si no, color del tema.
@@ -210,7 +199,7 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
           ]
         : const <Shadow>[];
 
-    final content = Stack(
+    return Stack(
       children: [
         Positioned.fill(
           child: NotificationListener<ScrollNotification>(
@@ -328,32 +317,6 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
                 ),
               ),
             ],
-          ),
-        ),
-      ],
-    );
-
-    if (bleed == 0) return content;
-    // Clip.none: el hijo se pinta por encima de los propios límites, sobre la
-    // franja que el SafeArea dejó vacía. Esa franja no recibe toques (queda
-    // fuera del área de hit-test), y no hay nada tocable ahí: los botones
-    // arrancan en `top + topInset`, dentro de los límites.
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          top: -bleed,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: MediaQuery(
-            data: media.copyWith(
-              padding: media.padding.copyWith(top: top),
-              viewPadding: media.viewPadding.copyWith(
-                top: media.viewPadding.top + bleed,
-              ),
-            ),
-            child: content,
           ),
         ),
       ],

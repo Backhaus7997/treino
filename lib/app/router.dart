@@ -716,7 +716,7 @@ GoRouter buildRouter({
         builder: (context, state) {
           final athleteId = state.pathParameters['athleteId']!;
           final routineId = state.pathParameters['routineId']!;
-          return _immersive(RoutineDetailScreen(
+          return _immersiveEdgeToEdge(RoutineDetailScreen(
             routineId: routineId,
             coachAthleteId: athleteId,
           ));
@@ -785,7 +785,7 @@ GoRouter buildRouter({
           final exerciseId = state.pathParameters['exerciseId']!;
           final ownerId = state.uri.queryParameters['ownerId'];
           final exerciseName = state.uri.queryParameters['name'];
-          return _immersive(ExerciseDetailScreen(
+          return _immersiveEdgeToEdge(ExerciseDetailScreen(
             exerciseId: exerciseId,
             ownerId: ownerId,
             exerciseName: exerciseName,
@@ -917,7 +917,9 @@ GoRouter buildRouter({
             // values fall back to page 0 inside the screen (mirrors /feed
             // and /coach `?tab=` forwarding).
             pageBuilder: (_, state) => _noAnim(
-              WorkoutScreen(initialTab: state.uri.queryParameters['tab']),
+              _shellTab(
+                WorkoutScreen(initialTab: state.uri.queryParameters['tab']),
+              ),
             ),
             routes: [
               GoRoute(
@@ -932,7 +934,7 @@ GoRouter buildRouter({
                       int.tryParse(state.uri.queryParameters['day'] ?? '');
                   final initialWeek =
                       int.tryParse(state.uri.queryParameters['week'] ?? '');
-                  return _withBg(RoutineDetailScreen(
+                  return _withBgEdgeToEdge(RoutineDetailScreen(
                     routineId: routineId,
                     initialDayNumber: initialDay,
                     initialWeekIndex: initialWeek,
@@ -951,7 +953,7 @@ GoRouter buildRouter({
                   // can do a name/alias fallback when `exerciseId` drifted
                   // from the catalogue (Spanish-slug seeds, dedup'd generics).
                   final exerciseName = state.uri.queryParameters['name'];
-                  return _withBg(ExerciseDetailScreen(
+                  return _withBgEdgeToEdge(ExerciseDetailScreen(
                     exerciseId: exerciseId,
                     ownerId: ownerId,
                     exerciseName: exerciseName,
@@ -970,7 +972,7 @@ GoRouter buildRouter({
             // relocated here from the Entrenar tab.
             pageBuilder: (_, state) {
               final tab = state.uri.queryParameters['tab'];
-              return _noAnim(FeedScreen(initialTab: tab));
+              return _noAnim(_shellTab(FeedScreen(initialTab: tab)));
             },
             routes: [
               GoRoute(
@@ -991,7 +993,7 @@ GoRouter buildRouter({
                 path: 'profile/:uid',
                 builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return _withBg(PublicProfileScreen(targetUid: uid));
+                  return _withBgEdgeToEdge(PublicProfileScreen(targetUid: uid));
                 },
                 routes: [_followListRoute],
               ),
@@ -1017,7 +1019,7 @@ GoRouter buildRouter({
           ),
           GoRoute(
             path: '/home',
-            pageBuilder: (_, __) => _noAnim(const HomeScreen()),
+            pageBuilder: (_, __) => _noAnim(_shellTab(const HomeScreen())),
             routes: [
               // Centro de notificaciones. Vive bajo /home y no bajo /feed
               // porque la campana se movió a la pantalla principal: el
@@ -1046,7 +1048,7 @@ GoRouter buildRouter({
                 path: 'profile/:uid',
                 builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return _withBg(PublicProfileScreen(targetUid: uid));
+                  return _withBgEdgeToEdge(PublicProfileScreen(targetUid: uid));
                 },
                 routes: [_followListRoute],
               ),
@@ -1056,14 +1058,15 @@ GoRouter buildRouter({
             path: '/coach',
             pageBuilder: (context, state) {
               final tab = state.uri.queryParameters['tab'];
-              return _noAnim(CoachScreen(initialTab: tab));
+              return _noAnim(_shellTab(CoachScreen(initialTab: tab)));
             },
             routes: [
               GoRoute(
                 path: 'trainer/:uid',
                 builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return _withBg(TrainerPublicProfileScreen(uid: uid));
+                  return _withBgEdgeToEdge(
+                      TrainerPublicProfileScreen(uid: uid));
                 },
               ),
               // athlete detail + 1-1 chat moved to top-level immersive routes
@@ -1100,7 +1103,7 @@ GoRouter buildRouter({
           ),
           GoRoute(
             path: '/profile',
-            pageBuilder: (_, __) => _noAnim(const ProfileScreen()),
+            pageBuilder: (_, __) => _noAnim(_shellTab(const ProfileScreen())),
             routes: [
               // Existing — Fase 3 Etapa 6
               GoRoute(
@@ -1186,7 +1189,7 @@ GoRouter buildRouter({
                 path: 'trainer-preview/:uid',
                 builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return _withBg(
+                  return _withBgEdgeToEdge(
                     TrainerPublicProfileScreen(uid: uid, preview: true),
                   );
                 },
@@ -1286,7 +1289,22 @@ class _ReportPageRoute extends CupertinoPageRoute<void> {
 ///
 /// Use INSIDE the ShellRoute branches' GoRoute builders only; top-level
 /// routes (outside the shell) own their own Scaffold + background.
-Widget _withBg(Widget child) => AppBackground(child: child);
+///
+/// Consume el inset superior (la status bar) porque `_ShellScaffold` ya no lo
+/// hace por todo el navigator: ver [_withBgEdgeToEdge].
+Widget _withBg(Widget child) =>
+    AppBackground(child: SafeArea(bottom: false, child: child));
+
+/// Como [_withBg] pero SIN consumir el inset superior: la pantalla se pinta
+/// desde el borde físico, bajo la status bar. Sólo para las que montan
+/// `TreinoCollapsingTopBar`, que reservan ese inset ellas mismas
+/// (`TreinoTopBarMetrics.reservedHeightOf`) y extienden su hero y el fondo
+/// de la barra hasta arriba (#1559).
+Widget _withBgEdgeToEdge(Widget child) =>
+    AppBackground(child: SafeArea(top: false, bottom: false, child: child));
+
+/// Raíz de un tab del shell: consume el inset superior (ver [_withBg]).
+Widget _shellTab(Widget child) => SafeArea(bottom: false, child: child);
 
 /// Listas de SEGUIDORES / SEGUIDOS, colgada de `profile/:uid`.
 ///
@@ -1317,6 +1335,13 @@ final GoRoute _followListRoute = GoRoute(
 Widget _immersive(Widget child) => Scaffold(
       backgroundColor: Colors.transparent,
       body: AppBackground(child: SafeArea(child: child)),
+    );
+
+/// [_immersive] sin consumir el inset superior, para las pantallas con
+/// `TreinoCollapsingTopBar` fuera del shell (ver [_withBgEdgeToEdge]).
+Widget _immersiveEdgeToEdge(Widget child) => Scaffold(
+      backgroundColor: Colors.transparent,
+      body: AppBackground(child: SafeArea(top: false, child: child)),
     );
 
 /// Resuelve el uid actual y monta [MonthlyReportScreen] (AD6/PR5a).
@@ -1737,7 +1762,12 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
       body: NotificationListener<ScrollNotification>(
         onNotification: _handleScroll,
         child: AppBackground(
-          child: SafeArea(bottom: false, child: widget.child),
+          // top: false — el inset superior lo consume cada PÁGINA
+          // (`_shellTab`, `_withBg`), no el navigator entero. Si lo consumiera
+          // acá, el Overlay del navigator recorta a esos límites y ninguna
+          // pantalla podría pintar bajo la status bar: las de barra colapsable
+          // (`_withBgEdgeToEdge`) quedaban con una franja suelta arriba.
+          child: SafeArea(top: false, bottom: false, child: widget.child),
         ),
       ),
       bottomNavigationBar: ValueListenableBuilder<bool>(
