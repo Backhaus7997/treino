@@ -31,6 +31,7 @@ import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
 import '../features/coach/presentation/trainer_dashboard_tab.dart'
     show RecentActivityScreen;
+import '../features/coach/presentation/trainer_nutrition_plan_editor_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -741,6 +742,17 @@ GoRouter buildRouter({
           state.pageKey,
           SessionHistoryScreen(
             coachAthleteId: state.pathParameters['athleteId']!,
+          ),
+        ),
+      ),
+      GoRoute(
+        // Editor mobile del plan nutricional del alumno, para el PF (#1538).
+        // Top-level como su origen `/coach/athlete/:id` (#399, #410). Pantalla
+        // sin Scaffold propio → `_immersive`, como la ficha.
+        path: '/coach/athlete/:athleteId/nutricion',
+        builder: (_, state) => _immersive(
+          TrainerNutritionPlanEditorScreen(
+            athleteId: state.pathParameters['athleteId']!,
           ),
         ),
       ),
