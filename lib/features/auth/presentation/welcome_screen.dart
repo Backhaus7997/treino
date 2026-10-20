@@ -14,6 +14,7 @@ import 'legal/legal_content.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/account_deletion_notifier.dart';
 import 'widgets/auth_pill_button.dart';
+import 'widgets/terms_notice_text.dart';
 import 'widgets/trainer_inquiry_card.dart';
 import '../../../core/widgets/treino_logo.dart';
 
@@ -180,6 +181,12 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                               child: TrainerInquiryCard(
                                 onTap: _contactarParaSerEntrenador,
                               ),
+                            ),
+                            const SizedBox(height: 16),
+                            // EMPEZAR lleva a crear la cuenta: el aviso de lo
+                            // que se acepta va también acá, no sólo en Registro.
+                            const TermsNoticeText(
+                              lead: TermsNoticeText.leadGeneric,
                             ),
                             const SizedBox(height: 20),
                           ],

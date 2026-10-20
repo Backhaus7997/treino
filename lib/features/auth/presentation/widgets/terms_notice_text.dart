@@ -14,8 +14,17 @@ import '../legal/legal_document_screen.dart';
 /// real y la persistencia de `termsAcceptedAt` para cuentas OAuth nuevas
 /// viven en el submit de ProfileSetup. Esta leyenda es sólo informativa, con
 /// los mismos links tappables que abren los documentos legales in-app.
+///
+/// [lead] es el arranque de la frase. Por defecto nombra a Google/Apple (va
+/// pegada a esos botones); la bienvenida, que ya no los tiene, pasa
+/// [leadGeneric] porque lo que se acepta al continuar es lo mismo.
 class TermsNoticeText extends StatefulWidget {
-  const TermsNoticeText({super.key});
+  const TermsNoticeText({super.key, this.lead = leadSocial});
+
+  static const leadSocial = 'Al continuar con Google o Apple, aceptás los ';
+  static const leadGeneric = 'Al continuar, aceptás los ';
+
+  final String lead;
 
   @override
   State<TermsNoticeText> createState() => _TermsNoticeTextState();
@@ -74,9 +83,7 @@ class _TermsNoticeTextState extends State<TermsNoticeText> {
       TextSpan(
         style: baseStyle,
         children: [
-          const TextSpan(
-            text: 'Al continuar con Google o Apple, aceptás los ',
-          ),
+          TextSpan(text: widget.lead),
           TextSpan(
             text: 'Términos y Condiciones',
             style: linkStyle,

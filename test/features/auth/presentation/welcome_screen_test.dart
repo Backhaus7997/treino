@@ -177,7 +177,22 @@ void main() {
     expect(find.byType(AuthSecondaryButton), findsNothing);
     expect(find.textContaining('Google'), findsNothing);
     expect(find.textContaining('Apple'), findsNothing);
-    expect(find.byType(TermsNoticeText), findsNothing);
+  });
+
+  testWidgets(
+      'el aviso de Términos y Privacidad va debajo de la tarjeta de '
+      'entrenador, sin nombrar a Google/Apple', (tester) async {
+    await tester.pumpWidget(_buildApp());
+    await tester.pumpAndSettle();
+
+    final aviso = find.byType(TermsNoticeText);
+    expect(aviso, findsOneWidget);
+    expect(tester.widget<TermsNoticeText>(aviso).lead,
+        TermsNoticeText.leadGeneric);
+    expect(
+      tester.getRect(aviso).top,
+      greaterThan(tester.getRect(find.byType(TrainerInquiryCard)).bottom),
+    );
   });
 
   testWidgets(
