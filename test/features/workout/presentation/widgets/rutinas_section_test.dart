@@ -21,6 +21,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_shimmer.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -523,7 +525,8 @@ void main() {
       expect(find.textContaining('máximo'), findsOneWidget);
     });
 
-    testWidgets('loading state renders a spinner', (tester) async {
+    testWidgets('loading state renders a skeleton, not a spinner',
+        (tester) async {
       final completer = Completer<List<Routine>>();
       await _pumpSection(
         tester,
@@ -534,10 +537,17 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(TreinoShimmer), findsOneWidget);
+      expect(find.byType(TreinoStateSwitcher), findsOneWidget);
 
       // Resolve to avoid resource leak warnings.
       completer.complete(const []);
+      await tester.pumpAndSettle();
+
+      // Tras resolver, el skeleton se reemplaza (cross-fade) por el estado
+      // vacío y ya no queda shimmer montado.
+      expect(find.byType(TreinoShimmer), findsNothing);
     });
 
     testWidgets(

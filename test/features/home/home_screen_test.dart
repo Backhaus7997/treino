@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_background.dart';
+import 'package:treino/app/theme/app_motion.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/features/home/application/todays_routine_provider.dart';
@@ -179,6 +181,32 @@ void main() {
       expect(find.byType(HomeHeader), findsOneWidget);
       expect(find.byType(EmpezarEntrenamientoCard), findsOneWidget);
       expect(find.byType(EstaSemanaCard), findsOneWidget);
+    });
+
+    testWidgets(
+        'skeleton → HomeHeader pasa por TreinoStateSwitcher (cross-fade, sin '
+        'salto)', (tester) async {
+      final controller = StreamController<UserProfile?>();
+      addTearDown(controller.close);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const HomeScreen(),
+        [userProfileProvider.overrideWith((ref) => controller.stream)],
+      ));
+      await tester.pump();
+
+      expect(find.byType(TreinoStateSwitcher), findsWidgets);
+      expect(find.byType(HomeHeader), findsNothing);
+
+      controller.add(makeProfile());
+      await tester.pump();
+      await tester.pump(AppMotion.base ~/ 2);
+      // A mitad del fade conviven el skeleton saliente y el header entrante.
+      expect(find.byType(HomeHeader), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_header_loading')), findsOneWidget);
+
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeHeader), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_header_loading')), findsNothing);
     });
 
     testWidgets(

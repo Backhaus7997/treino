@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_shimmer.dart';
+import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
@@ -118,54 +120,68 @@ class RutinasSection extends ConsumerWidget {
           orElse: () => const SizedBox.shrink(),
         ),
         // ── Content ───────────────────────────────────────────────────────────
-        entriesAsync.when(
-          // Keep the previous list on screen while the underlying streams
-          // recompose (archive/create/assignment) — no spinner flicker.
-          skipLoadingOnReload: true,
-          loading: () => const _SectionLoadingState(),
-          error: (err, _) => _SectionErrorState(
-            onRetry: () {
-              ref
-                ..invalidate(assignedRoutinesProvider(uid))
-                ..invalidate(userCreatedRoutinesProvider(uid))
-                ..invalidate(unifiedRoutinesProvider(uid));
+        // TreinoStateSwitcher: cross-fade skeleton → lista (sin salto). Las keys
+        // distinguen los estados; `skipLoadingOnReload` evita re-fadear en reloads.
+        TreinoStateSwitcher(
+          child: entriesAsync.when(
+            // Keep the previous list on screen while the underlying streams
+            // recompose (archive/create/assignment) — no spinner flicker.
+            skipLoadingOnReload: true,
+            loading: () => const KeyedSubtree(
+              key: ValueKey('rutinas_loading'),
+              child: _SectionLoadingState(),
+            ),
+            error: (err, _) => KeyedSubtree(
+              key: const ValueKey('rutinas_error'),
+              child: _SectionErrorState(
+                onRetry: () {
+                  ref
+                    ..invalidate(assignedRoutinesProvider(uid))
+                    ..invalidate(userCreatedRoutinesProvider(uid))
+                    ..invalidate(unifiedRoutinesProvider(uid));
+                },
+              ),
+            ),
+            data: (entries) {
+              if (entries.isEmpty) {
+                return KeyedSubtree(
+                  key: const ValueKey('rutinas_empty'),
+                  child: _SectionEmptyState(
+                    onCta: () => context.push('/workout/my-routine-editor'),
+                  ),
+                );
+              }
+              // `activeRoutineId` viene del UserProfile; durante el loading de
+              // profile (cold start) ningún card se marca como activa — estado
+              // transitorio aceptable hasta que la adopción perezosa resuelva.
+              final activeId = ref.watch(
+                userProfileProvider.select(
+                  (a) => a.valueOrNull?.activeRoutineId,
+                ),
+              );
+              final linkAsync = ref.watch(currentAthleteLinkProvider);
+              // El toggle solo aporta cuando hay algo que elegir — con una
+              // sola rutina la adopción perezosa ya la dejó activa.
+              final canToggleActive = entries.length > 1;
+              return Column(
+                key: const ValueKey('rutinas_data'),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final entry in entries)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _RoutineCard(
+                        routine: entry.routine,
+                        fromCoach: entry.fromCoach,
+                        isActive: entry.routine.id == activeId,
+                        canToggleActive: canToggleActive,
+                        linkAsync: linkAsync,
+                      ),
+                    ),
+                ],
+              );
             },
           ),
-          data: (entries) {
-            if (entries.isEmpty) {
-              return _SectionEmptyState(
-                onCta: () => context.push('/workout/my-routine-editor'),
-              );
-            }
-            // `activeRoutineId` viene del UserProfile; durante el loading de
-            // profile (cold start) ningún card se marca como activa — estado
-            // transitorio aceptable hasta que la adopción perezosa resuelva.
-            final activeId = ref.watch(
-              userProfileProvider.select(
-                (a) => a.valueOrNull?.activeRoutineId,
-              ),
-            );
-            final linkAsync = ref.watch(currentAthleteLinkProvider);
-            // El toggle solo aporta cuando hay algo que elegir — con una
-            // sola rutina la adopción perezosa ya la dejó activa.
-            final canToggleActive = entries.length > 1;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final entry in entries)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _RoutineCard(
-                      routine: entry.routine,
-                      fromCoach: entry.fromCoach,
-                      isActive: entry.routine.id == activeId,
-                      canToggleActive: canToggleActive,
-                      linkAsync: linkAsync,
-                    ),
-                  ),
-              ],
-            );
-          },
         ),
       ],
     );
@@ -208,10 +224,26 @@ class _SectionLoadingState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Center(
-        child: CircularProgressIndicator(color: palette.accent),
+    // Tres placeholders con la altura real de _RoutineCard (14 de padding x2 +
+    // 48 del botón de overflow = 76) para que el skeleton → lista no salte.
+    return Semantics(
+      label: AppL10n.of(context).commonLoading,
+      liveRegion: true,
+      child: TreinoShimmer(
+        child: Column(
+          children: [
+            for (var i = 0; i < 3; i++)
+              Container(
+                height: 76,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: palette.bgCard,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: palette.border),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -408,8 +440,8 @@ class _RoutineCard extends ConsumerWidget {
     );
 
     return InkWell(
-      key: Key('routine_card_${routine.id}'),
       borderRadius: BorderRadius.circular(AppRadius.md),
+      key: Key('routine_card_${routine.id}'),
       onTap: () => context.push('/workout/routine/${routine.id}'),
       child: Container(
         decoration: BoxDecoration(
