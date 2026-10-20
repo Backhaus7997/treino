@@ -193,6 +193,20 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  testWidgets('«Ya tengo cuenta · Iniciar sesión» es un blanco cómodo',
+      (tester) async {
+    await tester.pumpWidget(_buildApp());
+    await tester.pumpAndSettle();
+
+    final size = tester.getSize(find.byKey(const Key('welcome-sign-in')));
+    expect(size.height, greaterThanOrEqualTo(48));
+    // Toda la línea es tocable, no sólo la palabra resaltada.
+    expect(
+      size.width,
+      greaterThan(tester.getSize(find.text('Iniciar sesión')).width * 2),
+    );
+  });
+
   // B03: "Iniciar sesión" link navigates to /login
   // ---------------------------------------------------------------------------
   testWidgets('"Iniciar sesión" link navigates to /login', (tester) async {
