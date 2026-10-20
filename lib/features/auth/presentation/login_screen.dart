@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/tokens.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
@@ -17,10 +16,11 @@ import '../domain/email_password_validator.dart';
 import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_input.dart';
 import 'widgets/auth_pill_button.dart';
-import 'widgets/auth_secondary_button.dart';
+import 'widgets/auth_screen_header.dart';
+import 'widgets/auth_social_buttons.dart';
+import 'widgets/auth_switch_link.dart';
 import 'widgets/terms_notice_text.dart';
 import 'widgets/trainer_inquiry_card.dart';
-import '../../../core/widgets/treino_logo.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -30,6 +30,9 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  /// Qué botón social dispara el OAuth en curso (spinner en ese botón).
+  AuthSocialProvider? _pendingProvider;
+
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -76,10 +79,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _signInWithGoogle() async {
+    setState(() => _pendingProvider = AuthSocialProvider.google);
     await ref.read(authNotifierProvider.notifier).signInWithGoogle();
   }
 
   Future<void> _signInWithApple() async {
+    setState(() => _pendingProvider = AuthSocialProvider.apple);
     await ref.read(authNotifierProvider.notifier).signInWithApple();
   }
 
@@ -102,215 +107,131 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       backgroundColor: palette.bg,
       body: AppBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Back button — top left
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      tooltip: l10n.commonBack,
-                      icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-                      onPressed: () => context.canPop()
-                          ? context.pop()
-                          : context.go('/welcome'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Logo — left-aligned to match headline column.
-                  // Decorative: the TREINO brand mark conveys no info that the
-                  // adjacent headline does not, so it is hidden from a11y tree.
-                  TreinoFadeSlideIn(
+          // SliverFillRemaining(hasScrollBody: false): el bloque de abajo (tarjeta
+          // de entrenador + cambio a Registro) queda al pie cuando la pantalla
+          // es alta, y todo scrollea en teléfonos chicos o con el teclado.
+          child: CustomScrollView(
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Form(
+                    key: _formKey,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const ExcludeSemantics(child: TreinoLogo(size: 56)),
-                        const SizedBox(height: 20),
-                        // Headline
-                        Text(
-                          l10n.authLoginTitle,
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.4,
-                            color: palette.textPrimary,
-                            height: 1.05,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // Subtitle
-                        Text(
-                          l10n.authLoginSubtitle,
-                          style: GoogleFonts.barlow(
-                            fontSize: 15,
-                            color: palette.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Email field — no label per mockup (icon-only)
-                  TreinoFadeSlideIn(
-                    delay: AppMotion.stagger(1),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        AuthInput(
-                          controller: _emailCtrl,
-                          hint: l10n.authLoginEmailHint,
-                          leadingIcon: TreinoIcon.mail,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          focusNode: _emailFocus,
-                          nextFocusNode: _passwordFocus,
-                          autofillHints: const [AutofillHints.email],
-                          validator: EmailPasswordValidator.validateEmail,
-                        ),
-                        const SizedBox(height: 14),
-                        // Password field — no label per mockup (icon-only)
-                        AuthInput(
-                          controller: _passwordCtrl,
-                          leadingIcon: TreinoIcon.lock,
-                          obscureText: true,
-                          suffixToggle: true,
-                          textInputAction: TextInputAction.done,
-                          focusNode: _passwordFocus,
-                          onFieldSubmitted: (_) =>
-                              _fieldsEmpty ? null : _submit(),
-                          autofillHints: const [AutofillHints.password],
-                        ),
-                        // Forgot password — right aligned
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () => context.push('/forgot-password'),
-                            child: Text(
-                              l10n.authLoginForgot,
-                              style: GoogleFonts.barlow(
-                                fontSize: 14,
-                                color: palette.accent,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Error banner
-                        if (failure != null) ...[
-                          AuthFailureBanner(failure: failure),
-                          const SizedBox(height: 12),
-                        ],
-                        // CTA
-                        AuthPillButton(
-                          label: l10n.authLoginCta,
-                          onPressed: _fieldsEmpty ? null : _submit,
-                          isLoading: isLoading,
-                        ),
-                        const SizedBox(height: 18),
-                        // Divider "O CONTINUÁ CON"
-                        Row(
-                          children: [
-                            const Expanded(child: Divider()),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                l10n.authLoginContinueWith,
-                                style: GoogleFonts.barlowCondensed(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1.5,
-                                  color: palette.textMuted,
-                                ),
-                              ),
-                            ),
-                            const Expanded(child: Divider()),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        // Social buttons
-                        Row(
-                          children: [
-                            Expanded(
-                              child: AuthSecondaryButton(
-                                icon: FontAwesomeIcons.google,
-                                iconWidget: SvgPicture.asset(
-                                  'assets/logo/google_g.svg',
-                                  width: 18,
-                                  height: 18,
-                                ),
-                                label: l10n.authGoogleLabel,
-                                onPressed: isLoading ? null : _signInWithGoogle,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: AuthSecondaryButton(
-                                icon: FontAwesomeIcons.apple,
-                                label: l10n.authAppleLabel,
-                                onPressed: isLoading ? null : _signInWithApple,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        // QA-AUTH-001 (issue #434): Google/Apple create a TREINO
-                        // account just like Register — the user must be told
-                        // before tapping the social button.
-                        const TermsNoticeText(),
-                        const SizedBox(height: 20),
-                        // No account row
-                        Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        TreinoFadeSlideIn(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text(
-                                '${l10n.authLoginNoAccount} ',
-                                style: GoogleFonts.barlow(
-                                  fontSize: 14,
-                                  color: palette.textMuted,
-                                ),
+                              const SizedBox(height: 8),
+                              AuthScreenHeader(
+                                title: l10n.authLoginHeaderTitle,
+                                onBack: () => context.canPop()
+                                    ? context.pop()
+                                    : context.go('/welcome'),
                               ),
-                              Semantics(
-                                button: true,
-                                label: l10n.authLoginRegisterLink,
-                                child: GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: () => context.push('/register'),
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      minHeight: 44,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        l10n.authLoginRegisterLink,
-                                        style: GoogleFonts.barlow(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: palette.accent,
-                                        ),
-                                      ),
+                              const SizedBox(height: 20),
+                              AuthInput(
+                                controller: _emailCtrl,
+                                hint: l10n.authLoginEmailHint,
+                                leadingIcon: TreinoIcon.mail,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
+                                focusNode: _emailFocus,
+                                nextFocusNode: _passwordFocus,
+                                autofillHints: const [AutofillHints.email],
+                                validator: EmailPasswordValidator.validateEmail,
+                              ),
+                              const SizedBox(height: 14),
+                              AuthInput(
+                                controller: _passwordCtrl,
+                                leadingIcon: TreinoIcon.lock,
+                                obscureText: true,
+                                suffixToggle: true,
+                                textInputAction: TextInputAction.done,
+                                focusNode: _passwordFocus,
+                                onFieldSubmitted: (_) =>
+                                    _fieldsEmpty ? null : _submit(),
+                                autofillHints: const [AutofillHints.password],
+                              ),
+                              // Forgot password — right aligned
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () =>
+                                      context.push('/forgot-password'),
+                                  child: Text(
+                                    l10n.authLoginForgot,
+                                    style: GoogleFonts.barlow(
+                                      fontSize: 14,
+                                      color: palette.accent,
                                     ),
                                   ),
                                 ),
                               ),
+                              if (failure != null) ...[
+                                AuthFailureBanner(failure: failure),
+                                const SizedBox(height: 12),
+                              ],
+                              AuthPillButton(
+                                label: l10n.authLoginCta,
+                                onPressed: _fieldsEmpty ? null : _submit,
+                                isLoading: isLoading,
+                              ),
+                              const SizedBox(height: 20),
+                              // Texto plano centrado, sin líneas (como Spotify).
+                              Text(
+                                l10n.authLoginOrSignInWith,
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.barlow(
+                                  fontSize: AppTextSize.body,
+                                  color: palette.textMuted,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              AuthSocialButtons(
+                                onGoogle: isLoading ? null : _signInWithGoogle,
+                                onApple: isLoading ? null : _signInWithApple,
+                                pending: isLoading ? _pendingProvider : null,
+                              ),
+                              const SizedBox(height: 14),
+                              // QA-AUTH-001 (issue #434): Google/Apple crean una
+                              // cuenta TREINO igual que Registro — el usuario
+                              // tiene que saberlo antes de tocar el botón.
+                              const TermsNoticeText(),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        // Trainer inquiry card
-                        const TrainerInquiryCard(),
-                        const SizedBox(height: 20),
+                        TreinoFadeSlideIn(
+                          delay: AppMotion.stagger(1),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SizedBox(height: 20),
+                              const TrainerInquiryCard(),
+                              const SizedBox(height: 8),
+                              // `pushReplacement`: reemplaza Login por Registro
+                              // y deja la bienvenida abajo. Con `push`, ir y
+                              // venir apilaba login→registro→login sin fin.
+                              AuthSwitchLink(
+                                prompt: l10n.authLoginNoAccount,
+                                action: l10n.authLoginRegisterLink,
+                                onTap: () =>
+                                    context.pushReplacement('/register'),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),

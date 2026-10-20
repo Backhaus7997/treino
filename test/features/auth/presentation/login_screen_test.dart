@@ -226,6 +226,7 @@ void main() {
 
     // Scroll down to reveal the "Registrate" link (it may be below the fold).
     await tester.ensureVisible(find.text('Registrate'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Registrate'));
     await tester.pumpAndSettle();
 

@@ -1047,6 +1047,10 @@ class _EmptyLeaderboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: emptyKey,
+      // Ancho completo: la columna que lo contiene alinea al inicio, y sin
+      // esto la caja medía lo que el texto y quedaba más angosta que las filas
+      // del ranking y los chips de arriba.
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
       decoration: BoxDecoration(
         color: palette.bgCard,

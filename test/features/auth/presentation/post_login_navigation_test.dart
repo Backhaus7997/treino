@@ -12,7 +12,6 @@ import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/presentation/login_screen.dart';
 import 'package:treino/features/auth/presentation/register_screen.dart';
 import 'package:treino/features/auth/presentation/splash_screen.dart';
-import 'package:treino/features/auth/presentation/welcome_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
 import 'package:treino/features/auth/presentation/widgets/terms_checkbox.dart';
@@ -256,7 +255,6 @@ void main() {
       final fields = find.byType(TextFormField);
       await tester.enterText(fields.at(0), 'nuevo@example.com');
       await tester.enterText(fields.at(1), 'Pass1234');
-      await tester.enterText(fields.at(2), 'Pass1234');
       await tester.pump();
       await tester.ensureVisible(find.byType(TermsCheckbox));
       await tester.tap(find.byType(Checkbox));
@@ -365,13 +363,13 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // welcome_screen.dart:284-288,294-298
+  // OAuth: ya no vive en la bienvenida sino en Login (y Registro).
   // -------------------------------------------------------------------------
-  group('WelcomeScreen', () {
+  group('LoginScreen OAuth', () {
     Future<_Harness> pumpAndOAuth(WidgetTester tester) async {
       final h = _Harness(
-        screen: const WelcomeScreen(),
-        initialLocation: '/welcome',
+        screen: const LoginScreen(),
+        initialLocation: '/login',
       );
       addTearDown(h.dispose);
 
@@ -379,9 +377,10 @@ void main() {
       await tester.pump();
       h.notifier.onAuth = () => h.notifier.state = AsyncData(mockUser);
 
-      // Primer AuthSecondaryButton del Row = GOOGLE.
+      // Primer AuthSecondaryButton = GOOGLE.
       final google = find.byType(AuthSecondaryButton).first;
       await tester.ensureVisible(google);
+      await tester.pumpAndSettle();
       await tester.tap(google);
       await _pumpRedirect(tester);
       return h;

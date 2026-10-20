@@ -576,6 +576,27 @@ void main() {
     });
 
     testWidgets(
+        'los estados vacíos ocupan el ancho de su sección, no el de su texto',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        overrides: baseOverrides(
+          squat: [_rankedProfile(uid: 'u2', displayName: 'Lu')],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      for (final (empty, section) in [
+        ('rankings_empty_streak', 'rankings_section_streak'),
+        ('rankings_empty_squat', 'rankings_section_lifts'),
+      ]) {
+        final caja = tester.getRect(find.byKey(Key(empty)));
+        final seccion = tester.getRect(find.byKey(Key(section)));
+        expect(caja.width, seccion.width, reason: '$empty más angosto');
+        expect(caja.left, seccion.left);
+      }
+    });
+
+    testWidgets(
         'no-gym state renders instead of leaderboards when the athlete has '
         'no gym', (tester) async {
       await tester.pumpWidget(_buildScreen(

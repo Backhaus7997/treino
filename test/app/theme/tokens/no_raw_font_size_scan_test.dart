@@ -67,7 +67,7 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo: cada migración lo baja.
-    const allowlistCeiling = 248;
+    const allowlistCeiling = 247;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
     const rawFontSizeDebtCeiling = 1681;
@@ -81,7 +81,6 @@ void main() {
       'features/auth/presentation/legal/legal_document_screen.dart',
       'features/auth/presentation/login_screen.dart',
       'features/auth/presentation/profile_unavailable_screen.dart',
-      'features/auth/presentation/register_screen.dart',
       'features/auth/presentation/splash_screen.dart',
       'features/auth/presentation/welcome_screen.dart',
       'features/auth/presentation/widgets/auth_input.dart',

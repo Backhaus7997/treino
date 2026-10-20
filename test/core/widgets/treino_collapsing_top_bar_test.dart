@@ -9,7 +9,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 /// #1559: la barra superior aparece al scrollear. En offset 0 sólo flotan la
-/// flecha y las acciones (sin fondo ni círculo) y el contenido arranca debajo;
+/// flecha (en su burbuja) y las acciones, sin barra, y el contenido arranca debajo;
 /// pasado el umbral aparecen el fondo translúcido y el título chico.
 
 const _title = 'DÍA 1';
@@ -111,9 +111,9 @@ void main() {
 
     await _scroll(tester, -300);
 
-    final surface = tester.widget<AnimatedOpacity>(find.byKey(_surface));
+    final surface = tester.widget<Opacity>(find.byKey(_surface));
     expect(surface.opacity, 1);
-    final title = tester.widget<AnimatedOpacity>(find.byKey(_smallTitle));
+    final title = tester.widget<Opacity>(find.byKey(_smallTitle));
     expect(title.opacity, 1);
     expect(
       find.descendant(
@@ -165,10 +165,13 @@ void main() {
     expect(find.byKey(_smallTitle), findsNothing);
   });
 
-  testWidgets('antes del umbral no aparece', (tester) async {
+  testWidgets('antes de que arranque la aparición no hay barra',
+      (tester) async {
     await _pump(tester, _screen());
 
-    await _scroll(tester, -60);
+    // La aparición arranca `revealDistance` px antes de `collapseOffset`
+    // (100 en este helper): 20 px quedan antes de ese tramo.
+    await _scroll(tester, -20);
 
     expect(find.byKey(_surface), findsNothing);
   });
@@ -254,5 +257,101 @@ void main() {
 
     expect(iconTheme().color, isNot(Colors.white));
     expect(iconTheme().shadows, anyOf(isNull, isEmpty));
+  });
+
+  group('aparición que sigue al scroll', () {
+    // Lo que se desliza es el contenido del FractionalTranslation, no su caja.
+    final surfacePaint = find.descendant(
+      of: find.byKey(const Key('treino-top-bar-surface-slide')),
+      matching: find.byType(BackdropFilter),
+    );
+    const bubble = Key('treino-top-bar-back-bubble');
+    double opacityOf(WidgetTester tester, Key key) =>
+        tester.widget<Opacity>(find.byKey(key)).opacity;
+
+    // `collapseOffset` del helper: 100. La aparición dura `revealDistance` px
+    // y termina ahí.
+    const start = 100 - TreinoTopBarMetrics.revealDistance;
+
+    Future<void> scrollTo(WidgetTester tester, double pixels) async {
+      final pos =
+          tester.state<ScrollableState>(find.byType(Scrollable)).position;
+      pos.jumpTo(pixels);
+      await tester.pump();
+    }
+
+    testWidgets('a mitad del recorrido, la barra queda a mitad',
+        (tester) async {
+      await _pump(tester, _screen());
+      await scrollTo(tester, start + TreinoTopBarMetrics.revealDistance / 2);
+
+      final opacity = opacityOf(tester, _surface);
+      expect(opacity, greaterThan(0));
+      expect(opacity, lessThan(1));
+      expect(tester.getRect(surfacePaint).top, lessThan(0),
+          reason: 'el fondo todavía viene bajando');
+      expect(opacityOf(tester, bubble), closeTo(1 - opacity, 1e-9));
+    });
+
+    testWidgets('no avanza sola: sin scroll, no cambia aunque pase el tiempo',
+        (tester) async {
+      await _pump(tester, _screen());
+      await scrollTo(tester, start + 20);
+      final antes = opacityOf(tester, _surface);
+
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(opacityOf(tester, _surface), antes);
+    });
+
+    testWidgets('pasado el umbral: barra entera, sin burbuja', (tester) async {
+      await _pump(tester, _screen());
+      await scrollTo(tester, 300);
+
+      expect(opacityOf(tester, _surface), 1);
+      expect(tester.getRect(surfacePaint).top, 0);
+      expect(find.byKey(bubble), findsNothing);
+    });
+
+    testWidgets('arriba del todo: burbuja en la flecha y nada de barra',
+        (tester) async {
+      await _pump(tester, _screen());
+
+      expect(find.byKey(_surface), findsNothing);
+      expect(opacityOf(tester, bubble), 1);
+      final burbuja = tester.getRect(find.byKey(bubble));
+      final flecha = tester.getRect(find.byKey(_back));
+      expect(burbuja.center, flecha.center);
+      expect(burbuja.width, TreinoTopBarMetrics.bubbleSize);
+    });
+
+    testWidgets('al volver arriba se va al mismo ritmo y se desmonta',
+        (tester) async {
+      await _pump(tester, _screen());
+      await scrollTo(tester, 300);
+      await scrollTo(tester, start + TreinoTopBarMetrics.revealDistance / 2);
+      expect(opacityOf(tester, _surface), lessThan(1));
+
+      await scrollTo(tester, 0);
+      expect(find.byKey(_surface), findsNothing);
+    });
+
+    testWidgets('con «reducir movimiento» no se desliza, sólo funde',
+        (tester) async {
+      await _pump(
+        tester,
+        MediaQuery(
+          data: const MediaQueryData(
+            disableAnimations: true,
+            padding: EdgeInsets.only(top: _safeTop),
+          ),
+          child: _screen(),
+        ),
+      );
+      await scrollTo(tester, start + TreinoTopBarMetrics.revealDistance / 2);
+
+      expect(opacityOf(tester, _surface), lessThan(1));
+      expect(tester.getRect(surfacePaint).top, 0);
+    });
   });
 }

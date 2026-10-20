@@ -209,4 +209,60 @@ void main() {
           reason: 'la pantalla nueva se ve desde arriba');
     });
   });
+
+  group('Nav bar — sigue al scroll', () {
+    double expansion(WidgetTester tester) =>
+        tester.widget<TreinoBottomBar>(find.byType(TreinoBottomBar)).expansion!;
+
+    /// Mueve el dedo apoyado (sin soltar) en pasos de 4 px, como un dedo real:
+    /// con un solo `moveBy` Flutter sólo reconoce el arranque del drag.
+    Future<void> move(WidgetTester tester, TestGesture g, double dy) async {
+      final steps = (dy.abs() / 4).ceil();
+      for (var i = 0; i < steps; i++) {
+        await g.moveBy(Offset(0, dy / steps));
+        await tester.pump();
+      }
+    }
+
+    /// Apoya el dedo, sale de la zona del tope (que siempre la deja entera) y
+    /// devuelve el gesto todavía apoyado, con la barra entera.
+    Future<TestGesture> holdPastTop(WidgetTester tester) async {
+      final scroller = find.byType(CustomScrollView).first;
+      final g = await tester.startGesture(tester.getCenter(scroller));
+      await move(tester, g, -140);
+      await move(tester, g, 70); // vuelve a entera lejos de la zona del tope
+      return g;
+    }
+
+    testWidgets('a mitad del gesto queda a mitad, y quieta si el dedo para',
+        (tester) async {
+      await _pumpShell(tester, '/feed');
+      final g = await holdPastTop(tester);
+      final antes = expansion(tester);
+
+      await move(tester, g, -32); // medio `_collapseRange` (64)
+      final mitad = expansion(tester);
+      expect(antes - mitad, closeTo(0.5, 0.05),
+          reason: '32 px de dedo mueven la barra media carrera');
+      expect(mitad, greaterThan(0));
+
+      await tester.pump(const Duration(seconds: 1));
+      expect(expansion(tester), mitad,
+          reason: 'sin scroll no se mueve: no es una animación con tiempo');
+      await g.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('al soltar a medias se asienta del lado más cercano',
+        (tester) async {
+      await _pumpShell(tester, '/feed');
+      final g = await holdPastTop(tester);
+      await move(tester, g, -24);
+      expect(expansion(tester), greaterThan(0.5));
+
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(expansion(tester), anyOf(0.0, 1.0));
+    });
+  });
 }

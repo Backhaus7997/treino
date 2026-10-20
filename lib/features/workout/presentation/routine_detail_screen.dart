@@ -107,9 +107,9 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
     final hasData = routine != null && routine.days.isNotEmpty;
     final hasHeroPhoto = routine != null && routineHasHeroPhoto(routine);
 
-    // La barra superior aparece al scrollear (#1559): en offset 0 sólo flotan
-    // la flecha y las acciones, sin fondo ni círculo, y el contenido reserva
-    // su alto. Los estados sin datos también llevan la flecha, para que el
+    // La barra superior aparece siguiendo al scroll (#1559): en offset 0 sólo
+    // flotan la flecha (en su burbuja) y las acciones, sin barra, y el
+    // contenido reserva su alto. Los estados sin datos también llevan la flecha, para que el
     // usuario nunca quede en un callejón sin salida.
     return TreinoCollapsingTopBar(
       title: hasData

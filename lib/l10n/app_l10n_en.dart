@@ -285,6 +285,30 @@ class AppL10nEn extends AppL10n {
   String get authAppleLabel => '';
 
   @override
+  String get authLoginHeaderTitle => '';
+
+  @override
+  String get authRegisterHeaderTitle => '';
+
+  @override
+  String get authLoginOrSignInWith => '';
+
+  @override
+  String get authRegisterOrSignUpWith => '';
+
+  @override
+  String get authContinueWithGoogle => '';
+
+  @override
+  String get authContinueWithApple => '';
+
+  @override
+  String get authRegisterHaveAccount => '';
+
+  @override
+  String get authRegisterSignInLink => '';
+
+  @override
   String get authComingSoonTooltip => '';
 
   @override

@@ -38,9 +38,12 @@ class PublicProfileHero extends ConsumerWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
+          // Se desvanece a transparente, no a `bg` opaco: abajo está el
+          // AppBackground (con sus halos), y un `bg` sólido dejaba un corte
+          // recto donde terminaba el hero.
           colors: [
             palette.accent.withValues(alpha: 0.18),
-            palette.bg,
+            palette.accent.withValues(alpha: 0),
           ],
         ),
       ),
