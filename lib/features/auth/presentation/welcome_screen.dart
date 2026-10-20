@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,21 +10,12 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/contact/quiero_ser_entrenador.dart';
 import '../../../core/widgets/treino_toast.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
-import '../application/auth_providers.dart';
-import '../domain/auth_failure.dart';
 import 'legal/legal_content.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/account_deletion_notifier.dart';
-import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_pill_button.dart';
-import 'widgets/auth_secondary_button.dart';
-import 'widgets/terms_notice_text.dart';
 import 'widgets/trainer_inquiry_card.dart';
 import '../../../core/widgets/treino_logo.dart';
-
-/// Identifies which social provider button is currently awaiting its OAuth
-/// round-trip, so only that button shows an in-flight spinner.
-enum _SocialProvider { google, apple }
 
 class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key, this.abrirUrl = launchUrl});
@@ -40,24 +29,10 @@ class WelcomeScreen extends ConsumerStatefulWidget {
 }
 
 class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
-  /// The provider button the user last tapped. Used to scope the loading
-  /// spinner to the tapped button while authNotifierProvider.isLoading is true.
-  _SocialProvider? _pendingProvider;
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final authState = ref.watch(authNotifierProvider);
-    // El spinner del botón tapeado sigue girando después de un OAuth exitoso:
-    // la pantalla queda montada hasta que `authRedirect` resuelve el perfil, y
-    // un botón que vuelve a su glifo en ese hueco lee como que el tap no hizo
-    // nada (issue #499). Estando logueado en una ruta pública el único
-    // desenlace es el redirect.
-    final isLoading = authState.isLoading || authState.valueOrNull != null;
-    final failure = authState.hasError && authState.error is AuthFailure
-        ? authState.error as AuthFailure
-        : null;
 
     // Show "Tu cuenta fue eliminada" SnackBar when the deletion flag is set.
     ref.listen<bool>(accountDeletedFlagProvider, (_, isDeleted) {
@@ -176,94 +151,28 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                           ],
                         ),
                       ),
-                      // ── Bottom block: CTA + social + sign-in link ────────
+                      // ── Bottom block: EMPEZAR + INICIAR SESIÓN + tarjeta ─
+                      // Sin social acá: Google/Apple viven en Login y Registro,
+                      // donde el usuario ya eligió qué quiere hacer.
                       TreinoFadeSlideIn(
                         delay: AppMotion.stagger(1),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Surface social sign-in failures (and OAuth
-                            // cancellations) — previously swallowed silently.
-                            if (failure != null) ...[
-                              AuthFailureBanner(failure: failure),
-                              const SizedBox(height: 12),
-                            ],
                             AuthPillButton(
                               label: l10n.authWelcomeCta,
-                              onPressed: isLoading
-                                  ? null
-                                  : () => context.push('/register'),
+                              onPressed: () => context.push('/register'),
                               showArrow: false,
                             ),
-                            // Iniciar sesión: mismo pill que EMPEZAR pero
-                            // invertido, separado por la pregunta. Antes era
-                            // un link de texto al pie que costaba encontrar y
-                            // acertarle.
-                            const SizedBox(height: 10),
-                            Text(
-                              l10n.authWelcomeHaveAccount,
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.barlow(
-                                fontSize: 14,
-                                color: palette.textMuted,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
                             AuthPillButton(
                               key: const Key('welcome-sign-in'),
                               label: l10n.authWelcomeSignIn,
-                              onPressed: isLoading
-                                  ? null
-                                  : () => context.push('/login'),
+                              onPressed: () => context.push('/login'),
                               showArrow: false,
                               outlined: true,
                             ),
-                            const SizedBox(height: 20),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: AuthSecondaryButton(
-                                    icon: FontAwesomeIcons.google,
-                                    // Swap the brand glyph for a spinner while
-                                    // this provider's OAuth round-trip is in
-                                    // flight, so the screen is not frozen with no
-                                    // feedback.
-                                    iconWidget: isLoading &&
-                                            _pendingProvider ==
-                                                _SocialProvider.google
-                                        ? _buttonSpinner(palette)
-                                        : SvgPicture.asset(
-                                            'assets/logo/google_g.svg',
-                                            width: 18,
-                                            height: 18,
-                                          ),
-                                    label: l10n.authGoogleLabel,
-                                    onPressed:
-                                        isLoading ? null : _signInWithGoogle,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: AuthSecondaryButton(
-                                    icon: FontAwesomeIcons.apple,
-                                    iconWidget: isLoading &&
-                                            _pendingProvider ==
-                                                _SocialProvider.apple
-                                        ? _buttonSpinner(palette)
-                                        : null,
-                                    label: l10n.authAppleLabel,
-                                    onPressed:
-                                        isLoading ? null : _signInWithApple,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            // QA-AUTH-001 (issue #434): Google/Apple create a
-                            // TREINO account just like Register — the user must
-                            // be told before tapping the social button.
-                            const TermsNoticeText(),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 24),
                             // Misma tarjeta violeta que Login y Registro, pero
                             // abre el mail directo (ver _contactarParaSerEntrenador).
                             Semantics(
@@ -307,41 +216,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       context,
       l10n.authWelcomeBecomeTrainerFallback(kLegalContactEmail),
     );
-  }
-
-  /// Small spinner shown in place of a social button's brand glyph while its
-  /// OAuth call is in flight. Mirrors AuthPillButton's loading indicator.
-  Widget _buttonSpinner(AppPalette palette) {
-    return SizedBox(
-      width: 18,
-      height: 18,
-      child: CircularProgressIndicator(
-        strokeWidth: 2,
-        valueColor: AlwaysStoppedAnimation<Color>(palette.textPrimary),
-      ),
-    );
-  }
-
-  // La navegación post-OAuth NO vive acá: la resuelve `authRedirect`
-  // (app/router.dart). Ni bien authNotifier emite el user, RouterRefreshNotifier
-  // re-dispara el redirect; ese gate se bloquea mientras userProfileProvider
-  // carga y recién con el snapshot real manda a /profile-setup (alta nueva por
-  // OAuth) o a /home (usuario existente). El viejo `context.go('/home')` manual
-  // corría una carrera contra ese stream: adelantaba el redirect, HomeScreen
-  // alcanzaba a pintar y el gate rebotaba a /profile-setup — flicker visible en
-  // el 100% de los registros nuevos (issue #499). Mismo criterio que ya se
-  // aplicó en ProfileSetupFlow (audit F3).
-
-  Future<void> _signInWithGoogle() async {
-    // No intent gating on Welcome — el mismo botón sirve para alta y para
-    // login; el destino lo decide el redirect según el perfil que llegue.
-    setState(() => _pendingProvider = _SocialProvider.google);
-    await ref.read(authNotifierProvider.notifier).signInWithGoogle();
-  }
-
-  Future<void> _signInWithApple() async {
-    setState(() => _pendingProvider = _SocialProvider.apple);
-    await ref.read(authNotifierProvider.notifier).signInWithApple();
   }
 
   Widget _headlineLine(AppPalette palette,

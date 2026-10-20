@@ -162,63 +162,47 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // B03: Google and Apple buttons are disabled with tooltip "Próximamente"
+  // Spotify layout: la bienvenida muestra SOLO los dos pills. Google/Apple y su
+  // leyenda legal viven en Login y Registro.
   // ---------------------------------------------------------------------------
-  testWidgets('Google and Apple AuthSecondaryButtons are present',
+  testWidgets('muestra exactamente dos pills y nada de Google/Apple',
       (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.byType(AuthSecondaryButton), findsNWidgets(2));
+    expect(find.byType(AuthPillButton), findsNWidgets(2));
+    expect(find.widgetWithText(AuthPillButton, 'EMPEZAR'), findsOneWidget);
+    expect(
+        find.widgetWithText(AuthPillButton, 'INICIAR SESIÓN'), findsOneWidget);
+    expect(find.byType(AuthSecondaryButton), findsNothing);
+    expect(find.textContaining('Google'), findsNothing);
+    expect(find.textContaining('Apple'), findsNothing);
+    expect(find.byType(TermsNoticeText), findsNothing);
   });
 
-  testWidgets('Google and Apple buttons are both wired to AuthNotifier',
-      (tester) async {
-    await tester.pumpWidget(_buildApp());
-    await tester.pumpAndSettle();
-
-    // Find each AuthSecondaryButton and inspect its onPressed.
-    final secondary = tester
-        .widgetList<AuthSecondaryButton>(find.byType(AuthSecondaryButton))
-        .toList();
-    expect(secondary, hasLength(2));
-
-    // First in the Row is Google, second is Apple.
-    expect(secondary[0].label, 'GOOGLE');
-    expect(secondary[0].onPressed, isNotNull,
-        reason: 'Google must be wired to AuthNotifier.signInWithGoogle');
-    expect(secondary[1].label, 'APPLE');
-    expect(secondary[1].onPressed, isNotNull,
-        reason: 'Apple must be wired to AuthNotifier.signInWithApple');
-  });
-
-  // ---------------------------------------------------------------------------
   testWidgets(
-      'INICIAR SESIÓN es un pill invertido justo debajo de EMPEZAR, '
-      'separado por «¿Ya tenés cuenta?»', (tester) async {
+      'INICIAR SESIÓN es un pill invertido a 12 px de EMPEZAR, sin pregunta '
+      'en el medio, y la tarjeta de entrenador va debajo', (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
     final empezar =
         tester.getRect(find.widgetWithText(AuthPillButton, 'EMPEZAR'));
-    final pregunta = tester.getRect(find.text('¿Ya tenés cuenta?'));
     final signIn = tester.getRect(find.byKey(const Key('welcome-sign-in')));
+    final tarjeta = tester.getRect(find.byType(TrainerInquiryCard));
 
-    expect(pregunta.top, greaterThan(empezar.bottom));
-    expect(signIn.top, greaterThan(pregunta.bottom));
+    expect(find.text('¿Ya tenés cuenta?'), findsNothing);
+    expect(signIn.top - empezar.bottom, 12);
     // Mismo tamaño que EMPEZAR: es un botón, no un link.
     expect(signIn.height, empezar.height);
     expect(signIn.width, empezar.width);
-    // Y va antes de Google/Apple.
-    expect(
-      signIn.bottom,
-      lessThan(tester.getRect(find.byType(AuthSecondaryButton).first).top),
-    );
+    expect(tarjeta.top, greaterThan(signIn.bottom));
     final button =
         tester.widget<AuthPillButton>(find.byKey(const Key('welcome-sign-in')));
     expect(button.outlined, isTrue);
   });
 
+  // ---------------------------------------------------------------------------
   // B03: "Iniciar sesión" link navigates to /login
   // ---------------------------------------------------------------------------
   testWidgets('"Iniciar sesión" link navigates to /login', (tester) async {
@@ -229,17 +213,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('LOGIN'), findsOneWidget);
-  });
-
-  // ---------------------------------------------------------------------------
-  // QA-AUTH-001 (issue #434): Terms notice below the social buttons
-  // ---------------------------------------------------------------------------
-  testWidgets('renders the TermsNoticeText legend below the social buttons',
-      (tester) async {
-    await tester.pumpWidget(_buildApp());
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TermsNoticeText), findsOneWidget);
   });
 
   // ---------------------------------------------------------------------------

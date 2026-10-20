@@ -584,6 +584,54 @@ abstract class AppL10n {
   /// **'APPLE'**
   String get authAppleLabel;
 
+  /// No description provided for @authLoginHeaderTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Iniciar sesión'**
+  String get authLoginHeaderTitle;
+
+  /// No description provided for @authRegisterHeaderTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Crear una cuenta'**
+  String get authRegisterHeaderTitle;
+
+  /// No description provided for @authLoginOrSignInWith.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'O iniciá sesión con'**
+  String get authLoginOrSignInWith;
+
+  /// No description provided for @authRegisterOrSignUpWith.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'O registrate con'**
+  String get authRegisterOrSignUpWith;
+
+  /// No description provided for @authContinueWithGoogle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Continuar con Google'**
+  String get authContinueWithGoogle;
+
+  /// No description provided for @authContinueWithApple.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Continuar con Apple'**
+  String get authContinueWithApple;
+
+  /// No description provided for @authRegisterHaveAccount.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Ya tenés cuenta?'**
+  String get authRegisterHaveAccount;
+
+  /// No description provided for @authRegisterSignInLink.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Iniciá sesión'**
+  String get authRegisterSignInLink;
+
   /// No description provided for @authComingSoonTooltip.
   ///
   /// In es_AR, this message translates to:

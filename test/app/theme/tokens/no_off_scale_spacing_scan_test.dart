@@ -83,7 +83,7 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo.
-    const allowlistCeiling = 157;
+    const allowlistCeiling = 156;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
     const offScaleDebtCeiling = 949;
@@ -97,7 +97,6 @@ void main() {
       'features/auth/presentation/forgot_password_screen.dart',
       'features/auth/presentation/legal/legal_document_screen.dart',
       'features/auth/presentation/profile_unavailable_screen.dart',
-      'features/auth/presentation/register_screen.dart',
       'features/auth/presentation/splash_screen.dart',
       'features/auth/presentation/welcome_screen.dart',
       'features/auth/presentation/widgets/auth_pill_button.dart',

@@ -290,6 +290,30 @@ class AppL10nEs extends AppL10n {
   String get authAppleLabel => 'APPLE';
 
   @override
+  String get authLoginHeaderTitle => 'Iniciar sesión';
+
+  @override
+  String get authRegisterHeaderTitle => 'Crear una cuenta';
+
+  @override
+  String get authLoginOrSignInWith => 'O iniciá sesión con';
+
+  @override
+  String get authRegisterOrSignUpWith => 'O registrate con';
+
+  @override
+  String get authContinueWithGoogle => 'Continuar con Google';
+
+  @override
+  String get authContinueWithApple => 'Continuar con Apple';
+
+  @override
+  String get authRegisterHaveAccount => '¿Ya tenés cuenta?';
+
+  @override
+  String get authRegisterSignInLink => 'Iniciá sesión';
+
+  @override
   String get authComingSoonTooltip => 'Próximamente';
 
   @override
@@ -5937,6 +5961,30 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get authAppleLabel => 'APPLE';
+
+  @override
+  String get authLoginHeaderTitle => 'Iniciar sesión';
+
+  @override
+  String get authRegisterHeaderTitle => 'Crear una cuenta';
+
+  @override
+  String get authLoginOrSignInWith => 'O iniciá sesión con';
+
+  @override
+  String get authRegisterOrSignUpWith => 'O registrate con';
+
+  @override
+  String get authContinueWithGoogle => 'Continuar con Google';
+
+  @override
+  String get authContinueWithApple => 'Continuar con Apple';
+
+  @override
+  String get authRegisterHaveAccount => '¿Ya tenés cuenta?';
+
+  @override
+  String get authRegisterSignInLink => 'Iniciá sesión';
 
   @override
   String get authComingSoonTooltip => 'Próximamente';
