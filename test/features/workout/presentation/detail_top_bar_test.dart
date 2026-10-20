@@ -147,7 +147,7 @@ void main() {
 
       await _scroll(tester, -400);
       expect(
-        tester.widget<AnimatedOpacity>(find.byKey(_surface)).opacity,
+        tester.widget<Opacity>(find.byKey(_surface)).opacity,
         1,
       );
       expect(

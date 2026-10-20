@@ -536,9 +536,7 @@ class TreinoBottomBar extends StatelessWidget {
             ),
             child: TweenAnimationBuilder<double>(
               tween: Tween<double>(
-                end: !metrics.labelsFit
-                    ? 0
-                    : expansion ?? (expanded ? 1 : 0),
+                end: !metrics.labelsFit ? 0 : expansion ?? (expanded ? 1 : 0),
               ),
               // Con `expansion` del shell el valor ya viene animado por el
               // scroll (o por el asentamiento al soltar): acá no se suma otra
