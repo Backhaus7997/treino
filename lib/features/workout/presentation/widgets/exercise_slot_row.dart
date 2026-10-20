@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/muscle_group.dart';
 import '../../domain/reps_format.dart';
@@ -175,9 +176,11 @@ class ExerciseSlotRow extends StatelessWidget {
       label: 'Ejercicio ${slot.exerciseName}, $setsReps, descanso $restText',
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
+        // TreinoTappable REEMPLAZA al InkWell: press feedback (scale 0.97).
+        child: TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+          focusable: true,
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadius.md),
           child: Container(
             decoration: BoxDecoration(
               color: palette.bgCard,

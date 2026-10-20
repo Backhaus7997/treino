@@ -87,6 +87,7 @@ import '../features/profile_setup/presentation/birth_date_gate_screen.dart';
 import '../features/profile_setup/domain/profile_setup_validators.dart';
 import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
+import '../core/widgets/motion/treino_tab_fade_in.dart';
 import 'theme/app_background.dart';
 import 'theme/app_motion.dart';
 import '../features/coach/application/pending_invite_providers.dart';
@@ -907,8 +908,8 @@ GoRouter buildRouter({
           ),
         ),
         routes: [
-          // Tab roots use pageBuilder + _noAnim (instant transition, no
-          // swipe-back — they are the bottom-nav destinations).
+          // Tab roots use pageBuilder + _tabFade (cross-fade corto, sin
+          // swipe-back — son los destinos de la barra inferior).
           //
           // SHELL SUB-ROUTES use `builder` → CupertinoPageRoute on iOS, which
           // gives the native slide + edge swipe-back gesture. RoutineDetail /
@@ -935,7 +936,8 @@ GoRouter buildRouter({
             // `?tab=plantillas` deep-links to the PLANTILLAS page; unknown
             // values fall back to page 0 inside the screen (mirrors /feed
             // and /coach `?tab=` forwarding).
-            pageBuilder: (_, state) => _noAnim(
+            pageBuilder: (_, state) => _tabFade(
+              'workout',
               _shellTab(
                 WorkoutScreen(initialTab: state.uri.queryParameters['tab']),
               ),
@@ -991,7 +993,7 @@ GoRouter buildRouter({
             // relocated here from the Entrenar tab.
             pageBuilder: (_, state) {
               final tab = state.uri.queryParameters['tab'];
-              return _noAnim(_shellTab(FeedScreen(initialTab: tab)));
+              return _tabFade('feed', _shellTab(FeedScreen(initialTab: tab)));
             },
             routes: [
               GoRoute(
@@ -1038,7 +1040,8 @@ GoRouter buildRouter({
           ),
           GoRoute(
             path: '/home',
-            pageBuilder: (_, __) => _noAnim(_shellTab(const HomeScreen())),
+            pageBuilder: (_, __) =>
+                _tabFade('home', _shellTab(const HomeScreen())),
             routes: [
               // Centro de notificaciones. Vive bajo /home y no bajo /feed
               // porque la campana se movió a la pantalla principal: el
@@ -1077,7 +1080,7 @@ GoRouter buildRouter({
             path: '/coach',
             pageBuilder: (context, state) {
               final tab = state.uri.queryParameters['tab'];
-              return _noAnim(_shellTab(CoachScreen(initialTab: tab)));
+              return _tabFade('coach', _shellTab(CoachScreen(initialTab: tab)));
             },
             routes: [
               GoRoute(
@@ -1122,7 +1125,8 @@ GoRouter buildRouter({
           ),
           GoRoute(
             path: '/profile',
-            pageBuilder: (_, __) => _noAnim(_shellTab(const ProfileScreen())),
+            pageBuilder: (_, __) =>
+                _tabFade('profile', _shellTab(const ProfileScreen())),
             routes: [
               // Existing — Fase 3 Etapa 6
               GoRoute(
@@ -1243,6 +1247,28 @@ GoRouter buildRouter({
 
 CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
       child: child,
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+      transitionsBuilder: (_, __, ___, child) => child,
+    );
+
+/// Página de los roots de tab (barra inferior): sin transición de ruta (la
+/// página del shell, el splash y los gates siguen en [_noAnim] — ver el
+/// comentario del ShellRoute) pero con un fade-in corto del contenido.
+///
+/// Dos trampas, las dos medidas:
+///  * El fade NO puede ser un `transitionsBuilder`: go_router no anima el
+///    reemplazo de páginas dentro del ShellRoute, la animación llega en 1.0.
+///    Ver [TreinoTabFadeIn].
+///  * La [Page] necesita una `key` por tab. Sin key, Navigator ve dos
+///    `CustomTransitionPage` del mismo tipo y las trata como la MISMA ruta
+///    actualizada en el lugar: el State del fade se reusa y no hay remount, o
+///    sea, no hay fade al cambiar de tab. `?tab=` sobre el mismo tab conserva
+///    la key y sigue actualizando en el lugar (no re-fadea).
+CustomTransitionPage<void> _tabFade(String tab, Widget child) =>
+    CustomTransitionPage(
+      key: ValueKey('tab-root-$tab'),
+      child: TreinoTabFadeIn(child: child),
       transitionDuration: Duration.zero,
       reverseTransitionDuration: Duration.zero,
       transitionsBuilder: (_, __, ___, child) => child,

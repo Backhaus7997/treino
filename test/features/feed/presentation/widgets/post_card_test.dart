@@ -15,6 +15,7 @@ import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/domain/reaction.dart';
 import 'package:treino/features/feed/domain/reaction_type.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
 import 'package:treino/features/feed/domain/workout_snapshot.dart';
 import 'package:treino/features/feed/domain/workout_stats.dart';
@@ -429,6 +430,23 @@ void main() {
       await tester.pumpWidget(_wrapRouter(PostCard(post: post)));
       await tester.pump();
 
+      expect(
+        find.ancestor(
+          of: find.text('Push · Día 4'),
+          matching: find.byType(TreinoTappable),
+        ),
+        findsOneWidget,
+      );
+      // Reemplazó un InkWell: tiene que seguir alcanzable por teclado.
+      expect(
+          tester
+              .widget<TreinoTappable>(find.ancestor(
+                of: find.text('Push · Día 4'),
+                matching: find.byType(TreinoTappable),
+              ))
+              .focusable,
+          isTrue);
+
       await tester.tap(find.text('Push · Día 4'));
       await tester.pumpAndSettle();
 
@@ -573,6 +591,23 @@ void main() {
         _wrap(PostCard(post: post, onAuthorTap: () => tapped = true)),
       );
       await tester.pump();
+
+      expect(
+        find.ancestor(
+          of: find.text('Tincho'),
+          matching: find.byType(TreinoTappable),
+        ),
+        findsOneWidget,
+      );
+      // Reemplazó un InkWell: tiene que seguir alcanzable por teclado.
+      expect(
+          tester
+              .widget<TreinoTappable>(find.ancestor(
+                of: find.text('Tincho'),
+                matching: find.byType(TreinoTappable),
+              ))
+              .focusable,
+          isTrue);
 
       await tester.tap(find.text('Tincho'));
       await tester.pumpAndSettle();
