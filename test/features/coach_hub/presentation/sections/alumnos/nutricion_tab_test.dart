@@ -7,6 +7,8 @@
 //   - save flow: tap "GUARDAR PLAN" hits repository.save() with the draft
 //   - cross-alumno: swap athlete resets the draft
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +27,7 @@ import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
@@ -421,5 +424,135 @@ void main() {
 
     expect(find.textContaining('Solo vos lo ves'), findsNothing);
     expect(find.textContaining('Tu alumno lo ve'), findsOneWidget);
+  });
+
+  // ── #1581: el error de lectura gana sobre la copia de la caché ──────────
+  //
+  // Con la copia buena en la caché y el doc que el servidor devuelve ilegible,
+  // Riverpod deja un `AsyncError` CON el valor viejo adentro. Sembrar de ahí
+  // dejaba GUARDAR PLAN pisando el doc del servidor con la copia vieja.
+  group('el error de lectura gana sobre la copia de la caché', () {
+    late StreamController<NutritionPlan?> lectura;
+    final ilegible = Exception('NutritionPlanIlegible: meals no es lista');
+    const avisoBloqueo = 'No pudimos leer el plan guardado. Para no pisarlo, '
+        'GUARDAR PLAN queda bloqueado hasta volver a leerlo.';
+
+    setUp(() => lectura = StreamController<NutritionPlan?>.broadcast());
+    tearDown(() => lectura.close());
+
+    Future<void> montar(WidgetTester tester) async {
+      _useDesktopViewport(tester);
+      await tester.pumpWidget(_wrap(
+        _baseOverrides(athleteUid: _athleteUid, planStream: lectura.stream),
+        _athleteUid,
+      ));
+    }
+
+    TreinoButton guardar(WidgetTester tester) => tester.widget<TreinoButton>(
+          find.widgetWithText(TreinoButton, 'GUARDAR PLAN'),
+        );
+
+    testWidgets('abrir con el error ya puesto no siembra la copia vieja',
+        (tester) async {
+      await montar(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(AlumnoDetailScreen)),
+      );
+      const key = (trainerId: _trainerUid, athleteId: _athleteUid);
+      final sub = container.listen(nutritionPlanProvider(key), (_, __) {});
+      addTearDown(sub.close);
+      lectura.add(planWith(const [
+        Meal(id: 'm1', name: 'Desayuno viejo', groups: []),
+      ]));
+      await tester.pump();
+      lectura.addError(ilegible);
+      await tester.pump();
+      final estado = container.read(nutritionPlanProvider(key));
+      expect(estado.hasValue && estado.hasError, isTrue,
+          reason: 'el caso a probar: error con el valor viejo adentro');
+
+      await _selectNutricionTab(tester);
+
+      expect(
+        find.text('No pudimos cargar el plan nutricional.'),
+        findsOneWidget,
+      );
+      expect(find.text('GUARDAR PLAN'), findsNothing);
+      expect(find.text('Desayuno viejo'), findsNothing);
+    });
+
+    testWidgets(
+        'carrera sin ediciones: se descarta el borrador y gana el error',
+        (tester) async {
+      await montar(tester);
+      await _selectNutricionTab(tester);
+      lectura.add(planWith(const [
+        Meal(id: 'm1', name: 'Desayuno', groups: []),
+      ]));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextFormField, 'Desayuno'), findsOneWidget);
+
+      lectura.addError(ilegible);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No pudimos cargar el plan nutricional.'),
+        findsOneWidget,
+      );
+      expect(find.text('GUARDAR PLAN'), findsNothing);
+    });
+
+    testWidgets(
+        'carrera con ediciones: conserva el borrador y bloquea GUARDAR PLAN '
+        'hasta volver a leer', (tester) async {
+      final repo = _StubNutritionRepo();
+      _useDesktopViewport(tester);
+      await tester.pumpWidget(_wrap(
+        _baseOverrides(
+          athleteUid: _athleteUid,
+          planStream: lectura.stream,
+          repo: repo,
+        ),
+        _athleteUid,
+      ));
+      await _selectNutricionTab(tester);
+      lectura.add(planWith(const [
+        Meal(id: 'm1', name: 'Desayuno', groups: []),
+      ]));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Desayuno'),
+        'Desayuno liviano',
+      );
+      await tester.pump();
+
+      lectura.addError(ilegible);
+      await tester.pumpAndSettle();
+
+      // No se le tira el trabajo al PF…
+      expect(
+        find.widgetWithText(TextFormField, 'Desayuno liviano'),
+        findsOneWidget,
+      );
+      // …pero tampoco se lo deja guardar encima de lo que no se pudo leer.
+      expect(find.text(avisoBloqueo), findsOneWidget);
+      expect(guardar(tester).onPressed, isNull);
+
+      // Reintentar lee bien: se desbloquea y el borrador sigue.
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+      lectura.add(planWith(const [
+        Meal(id: 'm1', name: 'Desayuno', groups: []),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(avisoBloqueo), findsNothing);
+      expect(guardar(tester).onPressed, isNotNull);
+      expect(
+        find.widgetWithText(TextFormField, 'Desayuno liviano'),
+        findsOneWidget,
+      );
+      expect(repo.saved, isEmpty, reason: 'nada se guardó solo');
+    });
   });
 }
