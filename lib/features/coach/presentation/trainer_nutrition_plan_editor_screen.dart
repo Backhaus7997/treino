@@ -7,6 +7,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../app/theme/tokens/tokens.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_confirm_dialog.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -36,6 +37,14 @@ import '../domain/nutrition_plan_presets.dart';
 /// - Si la lectura falla NO arranca de los presets: guardar ese borrador
 ///   pisaría un plan que existe y no se pudo leer. Muestra el error y deja
 ///   reintentar.
+// Pie fijo con GUARDAR PLAN. Vive dentro del body: el `Scaffold` no lo
+// conoce, así que un aviso con el editor abierto le taparía el botón. Su alto
+// va en `bottomOffset` (mismo caso que `_kAltoDelPieFijo` del editor web).
+const double _kPieArriba = 12;
+const double _kPieAbajo = 20;
+const double _kAltoBoton = 48;
+const double _kAltoDelPie = _kPieArriba + _kAltoBoton + _kPieAbajo;
+
 class TrainerNutritionPlanEditorScreen extends ConsumerStatefulWidget {
   const TrainerNutritionPlanEditorScreen({super.key, required this.athleteId});
 
@@ -109,11 +118,12 @@ class _TrainerNutritionPlanEditorScreenState
     final draft = _draft;
     if (draft == null || _saving) return;
     final l10n = AppL10n.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final clean = draft.sanitizeForSave();
     if (clean.meals.isEmpty) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.trainerNutritionEditorEmptyPlan)),
+      showTreinoToast(
+        context,
+        l10n.trainerNutritionEditorEmptyPlan,
+        bottomOffset: _kAltoDelPie,
       );
       return;
     }
@@ -127,15 +137,21 @@ class _TrainerNutritionPlanEditorScreenState
         _draft = clean;
         _baseline = clean;
       });
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.trainerNutritionEditorSaved)),
+      // Sin `bottomOffset`: se ve en la ficha, que no tiene el pie.
+      showTreinoToast(
+        context,
+        l10n.trainerNutritionEditorSaved,
+        type: TreinoToastType.success,
       );
       _leave();
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.trainerNutritionEditorSaveError)),
+      showTreinoToast(
+        context,
+        l10n.trainerNutritionEditorSaveError,
+        type: TreinoToastType.error,
+        bottomOffset: _kAltoDelPie,
       );
     }
   }
@@ -347,7 +363,12 @@ class _TrainerNutritionPlanEditorScreenState
           ),
           if (draft != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              padding: const EdgeInsets.fromLTRB(
+                20,
+                _kPieArriba,
+                20,
+                _kPieAbajo,
+              ),
               child: ElevatedButton(
                 onPressed: _saving ? null : _save,
                 style: ElevatedButton.styleFrom(
@@ -355,7 +376,7 @@ class _TrainerNutritionPlanEditorScreenState
                   foregroundColor: TreinoButtonTokens.foreground(context),
                   disabledBackgroundColor:
                       palette.accent.withValues(alpha: 0.3),
-                  minimumSize: const Size.fromHeight(48),
+                  minimumSize: const Size.fromHeight(_kAltoBoton),
                   shape: const StadiumBorder(),
                 ),
                 child: _saving

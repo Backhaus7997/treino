@@ -306,6 +306,50 @@ void main() {
     expect(_field('Desayuno'), findsNothing);
   });
 
+  // Paridad con #1553 (web): el contador de ids del web arrancaba en 0 en
+  // cada sesión, y la comida nueva salía con el `meal-1` de una guardada.
+  testWidgets('una comida nueva no hereda el id de una ya guardada',
+      (tester) async {
+    final db = await _firestoreWith(_plan(meals: const [
+      Meal(id: 'meal-1', name: 'Desayuno', groups: []),
+    ]));
+    await _pumpEditor(tester, db: db);
+
+    await tester.tap(find.text('AGREGAR COMIDA'));
+    await tester.pumpAndSettle();
+    // `.last`: el hint queda en el árbol aunque el campo tenga texto, así que
+    // también matchea el de «Desayuno». La comida nueva es la última.
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nombre de la comida').last,
+      'Cena',
+    );
+    await tester.tap(find.text('GUARDAR PLAN'));
+    await tester.pumpAndSettle();
+
+    final meals = (await _saved(db))!.meals;
+    expect(meals.map((m) => m.name), ['Desayuno', 'Cena']);
+    expect(meals.map((m) => m.id).toSet().length, 2);
+  });
+
+  // Paridad con #1553 (web): sin `Key`, Flutter reusa por POSICIÓN el estado
+  // del campo, y al borrar la primera comida la card de arriba seguía
+  // mostrando el nombre de la borrada.
+  testWidgets('borrar la primera comida no deja su nombre en la siguiente',
+      (tester) async {
+    final db = await _firestoreWith(_plan(meals: const [
+      Meal(id: 'm1', name: 'Desayuno', groups: []),
+      Meal(id: 'm2', name: 'Almuerzo', groups: []),
+    ]));
+    await _pumpEditor(tester, db: db);
+
+    // Sin opciones no pide confirmación.
+    await tester.tap(find.byTooltip('Eliminar comida').first);
+    await tester.pumpAndSettle();
+
+    expect(_field('Desayuno'), findsNothing);
+    expect(_field('Almuerzo'), findsOneWidget);
+  });
+
   // Un plan guardado por el editor web puede traer ids repetidos (su contador
   // arranca en 0 cada vez). Con ids como `Key`, eso tiraba abajo el build; y
   // sin normalizar, editar una comida editaba también su gemela.
