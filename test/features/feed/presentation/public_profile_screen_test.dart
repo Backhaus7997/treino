@@ -625,7 +625,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final surface = tester.widget<AnimatedOpacity>(
+      final surface = tester.widget<Opacity>(
         find.byKey(const Key('treino-top-bar-surface')),
       );
       expect(

@@ -315,7 +315,14 @@ class TreinoBottomBar extends StatelessWidget {
     this.coachUnreadCount = 0,
     this.feedUnreadCount = 0,
     this.collapsed = false,
+    this.expansion,
   });
+
+  /// Expansión exacta de 0 (compacta) a 1 (entera) que manda el shell para
+  /// que la barra SIGA AL SCROLL en vez de animarse sola. Si viene, se usa tal
+  /// cual y [collapsed] sólo informa de qué lado de la mitad está; si es null,
+  /// la barra anima por su cuenta hacia [collapsed] (tests, previews).
+  final double? expansion;
 
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -528,8 +535,15 @@ class TreinoBottomBar extends StatelessWidget {
               0,
             ),
             child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(end: expanded ? 1 : 0),
-              duration: AppMotion.resolve(context, AppMotion.base),
+              tween: Tween<double>(
+                end: !metrics.labelsFit ? 0 : expansion ?? (expanded ? 1 : 0),
+              ),
+              // Con `expansion` del shell el valor ya viene animado por el
+              // scroll (o por el asentamiento al soltar): acá no se suma otra
+              // animación encima, que lo dejaría siempre un paso atrás.
+              duration: expansion != null
+                  ? Duration.zero
+                  : AppMotion.resolve(context, AppMotion.base),
               curve: AppMotion.standard,
               builder: (context, expansion, _) {
                 // El ancho se angosta con el mismo `expansion` que el alto.
