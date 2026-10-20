@@ -62,7 +62,11 @@ class NutricionPlanRow extends ConsumerWidget {
 
     final subtitle = plan != null
         ? 'Con plan · ${plan.meals.length} comidas · actualizado ${_relativeTime(plan.updatedAt)}' // i18n: Fase W2
-        : 'Sin plan todavía'; // i18n: Fase W2
+        // El doc existe y no se pudo leer (#1581): «Sin plan todavía» sería
+        // falso.
+        : e.planError
+            ? 'No pudimos leer su plan' // i18n: Fase W2
+            : 'Sin plan todavía'; // i18n: Fase W2
 
     return TreinoListRow(
       leading: Semantics(
