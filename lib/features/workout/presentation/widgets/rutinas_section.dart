@@ -7,6 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
@@ -439,52 +440,72 @@ class _RoutineCard extends ConsumerWidget {
       ],
     );
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      key: Key('routine_card_${routine.id}'),
-      onTap: () => context.push('/workout/routine/${routine.id}'),
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          // Outline más marcado en la activa para que destaque sin gritar.
-          border: Border.all(
-            color: isActive ? palette.accent : palette.border,
-            width: isActive ? 1.5 : 1,
+    // TreinoTappable REEMPLAZA al InkWell: scale 0.97 al apoyar el dedo. El
+    // PopupMenuButton de adentro sigue ganando su propio tap en la arena.
+    return Semantics(
+      button: true,
+      child: TreinoTappable(
+        key: Key('routine_card_${routine.id}'),
+        onTap: () => context.push('/workout/routine/${routine.id}'),
+        child: Container(
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            // Outline más marcado en la activa para que destaque sin gritar.
+            border: Border.all(
+              color: isActive ? palette.accent : palette.border,
+              width: isActive ? 1.5 : 1,
+            ),
           ),
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (useStackedTitle) ...[
-                    title,
-                    if (fromCoach || isActive) ...[
-                      const SizedBox(height: 8),
-                      statusChips,
-                    ],
-                  ] else
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: title),
-                        if (fromCoach || isActive) ...[
-                          const SizedBox(width: 8),
-                          statusChips,
-                        ],
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (useStackedTitle) ...[
+                      title,
+                      if (fromCoach || isActive) ...[
+                        const SizedBox(height: 8),
+                        statusChips,
                       ],
-                    ),
-                  if (fromCoach) ...[
-                    // Mirrors the old _PlanCard: the trainer-name line only
-                    // renders once the public profile resolves.
-                    if (trainerName != null) ...[
+                    ] else
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: title),
+                          if (fromCoach || isActive) ...[
+                            const SizedBox(width: 8),
+                            statusChips,
+                          ],
+                        ],
+                      ),
+                    if (fromCoach) ...[
+                      // Mirrors the old _PlanCard: the trainer-name line only
+                      // renders once the public profile resolves.
+                      if (trainerName != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          trainerName,
+                          style: GoogleFonts.barlow(
+                            fontWeight: FontWeight.w400,
+                            fontSize: 12,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    ] else ...[
                       const SizedBox(height: 4),
                       Text(
-                        trainerName,
+                        // #648: la jerga deja de liderar. Antes esta línea era
+                        // '{SPLIT} · {NIVEL}' y el split iba primero y en
+                        // mayúsculas. Ahora comparte fuente con la tarjeta de
+                        // EXPLORAR, que es lo que impide que vuelvan a divergir.
+                        routineMetaSegments(routine, l10n)
+                            .map((s) => s.toUpperCase())
+                            .join(' · '),
                         style: GoogleFonts.barlow(
                           fontWeight: FontWeight.w400,
                           fontSize: 12,
@@ -492,69 +513,53 @@ class _RoutineCard extends ConsumerWidget {
                         ),
                       ),
                     ],
-                  ] else ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      // #648: la jerga deja de liderar. Antes esta línea era
-                      // '{SPLIT} · {NIVEL}' y el split iba primero y en
-                      // mayúsculas. Ahora comparte fuente con la tarjeta de
-                      // EXPLORAR, que es lo que impide que vuelvan a divergir.
-                      routineMetaSegments(routine, l10n)
-                          .map((s) => s.toUpperCase())
-                          .join(' · '),
-                      style: GoogleFonts.barlow(
-                        fontWeight: FontWeight.w400,
-                        fontSize: 12,
-                        color: palette.textMuted,
+                    if (isTerminated) ...[
+                      const SizedBox(height: 8),
+                      const _FinalizadoChip(),
+                    ],
+                  ],
+                ),
+              ),
+              // Overflow menu
+              if (showMenu)
+                PopupMenuButton<_CardAction>(
+                  key: Key('routine_card_more_${routine.id}'),
+                  tooltip: l10n.workoutRoutineOptionsA11y,
+                  icon: Icon(TreinoIcon.dotsThree, color: palette.textMuted),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _CardAction.edit:
+                        context.push(
+                          '/workout/my-routine-editor',
+                          extra: routine.id,
+                        );
+                      case _CardAction.archive:
+                        _confirmArchive(context, ref);
+                      case _CardAction.markActive:
+                        _markActive(context, ref);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    if (showToggle)
+                      PopupMenuItem(
+                        key: Key('routine_card_toggle_active_${routine.id}'),
+                        value: _CardAction.markActive,
+                        child: Text(l10n.workoutMisRutinasOverflowMarkActive),
                       ),
-                    ),
+                    if (!fromCoach) ...[
+                      PopupMenuItem(
+                        value: _CardAction.edit,
+                        child: Text(l10n.workoutMisRutinasOverflowEdit),
+                      ),
+                      PopupMenuItem(
+                        value: _CardAction.archive,
+                        child: Text(l10n.workoutMisRutinasOverflowArchive),
+                      ),
+                    ],
                   ],
-                  if (isTerminated) ...[
-                    const SizedBox(height: 8),
-                    const _FinalizadoChip(),
-                  ],
-                ],
-              ),
-            ),
-            // Overflow menu
-            if (showMenu)
-              PopupMenuButton<_CardAction>(
-                key: Key('routine_card_more_${routine.id}'),
-                tooltip: l10n.workoutRoutineOptionsA11y,
-                icon: Icon(TreinoIcon.dotsThree, color: palette.textMuted),
-                onSelected: (action) {
-                  switch (action) {
-                    case _CardAction.edit:
-                      context.push(
-                        '/workout/my-routine-editor',
-                        extra: routine.id,
-                      );
-                    case _CardAction.archive:
-                      _confirmArchive(context, ref);
-                    case _CardAction.markActive:
-                      _markActive(context, ref);
-                  }
-                },
-                itemBuilder: (_) => [
-                  if (showToggle)
-                    PopupMenuItem(
-                      key: Key('routine_card_toggle_active_${routine.id}'),
-                      value: _CardAction.markActive,
-                      child: Text(l10n.workoutMisRutinasOverflowMarkActive),
-                    ),
-                  if (!fromCoach) ...[
-                    PopupMenuItem(
-                      value: _CardAction.edit,
-                      child: Text(l10n.workoutMisRutinasOverflowEdit),
-                    ),
-                    PopupMenuItem(
-                      value: _CardAction.archive,
-                      child: Text(l10n.workoutMisRutinasOverflowArchive),
-                    ),
-                  ],
-                ],
-              ),
-          ],
+                ),
+            ],
+          ),
         ),
       ),
     );

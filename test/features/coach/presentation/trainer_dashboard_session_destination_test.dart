@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/coach/application/recent_activity_provider.dart';
 import 'package:treino/features/coach/application/trained_today_provider.dart';
 import 'package:treino/features/coach/presentation/trainer_dashboard_tab.dart';
@@ -117,6 +118,14 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
+    expect(
+      find.ancestor(
+        of: find.text('Lucía'),
+        matching: find.byType(TreinoTappable),
+      ),
+      findsOneWidget,
+      reason: 'la fila usa TreinoTappable (press feedback), no un InkWell',
+    );
     await tester.tap(find.text('Lucía'));
     await tester.pumpAndSettle();
 
@@ -142,6 +151,14 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
+    expect(
+      find.ancestor(
+        of: find.text('Lucía'),
+        matching: find.byType(TreinoTappable),
+      ),
+      findsOneWidget,
+      reason: 'la fila usa TreinoTappable (press feedback), no un InkWell',
+    );
     await tester.tap(find.text('Lucía'));
     await tester.pumpAndSettle();
 

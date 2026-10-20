@@ -23,6 +23,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -628,6 +629,19 @@ void main() {
         activeRoutineId: 'plan-1',
       );
       await tester.pumpAndSettle();
+
+      // La card usa TreinoTappable (press feedback), no un InkWell.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('routine_card_plan-1')),
+          matching: find.byType(AnimatedScale),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget(find.byKey(const Key('routine_card_plan-1'))),
+        isA<TreinoTappable>(),
+      );
 
       await tester.tap(find.byKey(const Key('routine_card_plan-1')));
       await tester.pumpAndSettle();

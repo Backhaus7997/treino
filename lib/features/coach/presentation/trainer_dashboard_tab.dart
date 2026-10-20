@@ -15,6 +15,7 @@ import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/aligned_dropdown_menu.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
@@ -1387,7 +1388,7 @@ class _ProximaSesionRow extends ConsumerWidget {
         : athleteName;
     final initials = _initials(showName);
 
-    return InkWell(
+    return TreinoTappable(
       onTap: () => showModalBottomSheet(
         context: context,
         useRootNavigator: true,
@@ -1402,7 +1403,6 @@ class _ProximaSesionRow extends ConsumerWidget {
           trainerId: ref.watch(currentUidProvider) ?? '',
         ),
       ),
-      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
@@ -1527,14 +1527,13 @@ class _EntrenaronHoyRow extends ConsumerWidget {
     final initials = _initials(showName);
     final session = entry.session;
 
-    return InkWell(
+    return TreinoTappable(
       // Al entrenamiento que tocaste, no a la ficha entera del alumno: la fila
       // habla de UNA sesión y hasta ahora te dejaba en una pantalla larga donde
       // había que ir a buscarla a mano.
       onTap: () => context.push(
         '/coach/athlete/${entry.athleteId}/session/${session.id}',
       ),
-      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
@@ -1815,14 +1814,13 @@ class _ActividadRecienteRow extends ConsumerWidget {
     final initials = _initials(showName);
     final session = entry.session;
 
-    return InkWell(
+    return TreinoTappable(
       // Al entrenamiento que tocaste, no a la ficha entera del alumno: la fila
       // habla de UNA sesión y hasta ahora te dejaba en una pantalla larga donde
       // había que ir a buscarla a mano.
       onTap: () => context.push(
         '/coach/athlete/${entry.athleteId}/session/${session.id}',
       ),
-      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(

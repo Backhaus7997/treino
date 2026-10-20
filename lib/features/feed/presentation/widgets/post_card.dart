@@ -9,6 +9,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/kg_format.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../auth/application/auth_providers.dart';
@@ -97,9 +98,8 @@ class PostCard extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: GestureDetector(
+                child: TreinoTappable(
                   onTap: onAuthorTap,
-                  behavior: HitTestBehavior.opaque,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -490,9 +490,8 @@ class _RoutineTagChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    return GestureDetector(
+    return TreinoTappable(
       onTap: () => context.push('/workout/routine/${tag.routineId}'),
-      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(

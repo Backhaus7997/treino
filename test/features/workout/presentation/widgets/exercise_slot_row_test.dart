@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_slot_row.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -65,6 +66,14 @@ void main() {
           onTap: () => tapped = true,
         ),
       ));
+      // Press feedback vía TreinoTappable (no InkWell).
+      expect(
+        find.descendant(
+          of: find.byType(ExerciseSlotRow),
+          matching: find.byType(TreinoTappable),
+        ),
+        findsOneWidget,
+      );
       await tester.tap(find.byType(ExerciseSlotRow));
       expect(tapped, isTrue);
     });
