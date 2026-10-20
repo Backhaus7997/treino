@@ -437,6 +437,15 @@ void main() {
         ),
         findsOneWidget,
       );
+      // Reemplazó un InkWell: tiene que seguir alcanzable por teclado.
+      expect(
+          tester
+              .widget<TreinoTappable>(find.ancestor(
+                of: find.text('Push · Día 4'),
+                matching: find.byType(TreinoTappable),
+              ))
+              .focusable,
+          isTrue);
 
       await tester.tap(find.text('Push · Día 4'));
       await tester.pumpAndSettle();
@@ -590,6 +599,15 @@ void main() {
         ),
         findsOneWidget,
       );
+      // Reemplazó un InkWell: tiene que seguir alcanzable por teclado.
+      expect(
+          tester
+              .widget<TreinoTappable>(find.ancestor(
+                of: find.text('Tincho'),
+                matching: find.byType(TreinoTappable),
+              ))
+              .focusable,
+          isTrue);
 
       await tester.tap(find.text('Tincho'));
       await tester.pumpAndSettle();

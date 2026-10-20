@@ -456,6 +456,8 @@ class _RoutineCard extends ConsumerWidget {
     return Semantics(
       button: true,
       child: TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+        focusable: true,
         key: Key('routine_card_${routine.id}'),
         onTap: () => context.push('/workout/routine/${routine.id}'),
         child: Container(

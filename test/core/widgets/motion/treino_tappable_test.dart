@@ -184,6 +184,7 @@ void main() {
         await tester.pumpWidget(_wrap(
           child: TreinoTappable(
             onTap: () => taps++,
+            focusable: true,
             child: const SizedBox(width: 100, height: 48),
           ),
         ));
@@ -204,5 +205,23 @@ void main() {
       ));
       expect(find.byType(FocusableActionDetector), findsNothing);
     });
+  });
+
+  // Por defecto NO entra en el foco: buena parte del kit del Coach Hub ya lo
+  // envuelve en su propio FocusableActionDetector, y prenderlo por defecto le
+  // daba dos paradas de Tab al mismo botón.
+  testWidgets('por defecto no agrega una parada de Tab propia', (tester) async {
+    var taps = 0;
+    await tester.pumpWidget(_wrap(
+      child: TreinoTappable(
+        onTap: () => taps++,
+        child: const SizedBox(width: 100, height: 48),
+      ),
+    ));
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(taps, 0);
   });
 }

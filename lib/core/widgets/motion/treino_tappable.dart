@@ -34,8 +34,18 @@ class TreinoTappable extends StatefulWidget {
     super.key,
     this.onTap,
     this.onLongPress,
+    this.focusable = false,
     required this.child,
   });
+
+  /// Si entra en el foco de teclado y se activa con Enter/Espacio.
+  ///
+  /// `true` en las cards que reemplazan un `InkWell` (que daba eso gratis)
+  /// sin otro foco alrededor. `false` por defecto porque buena parte del kit
+  /// del Coach Hub ya envuelve a TreinoTappable en su propio
+  /// `FocusableActionDetector`: prenderlo ahí daría dos paradas de Tab en el
+  /// mismo botón.
+  final bool focusable;
 
   /// Acción primaria. `null` → disabled: child pelado, sin gesture.
   final VoidCallback? onTap;
@@ -70,11 +80,34 @@ class _TreinoTappableState extends State<TreinoTappable> {
 
     final reduce = AppMotion.reduceMotion(context);
 
-    // FocusableActionDetector: lo que el InkWell que esto suele reemplazar
-    // daba gratis y un GestureDetector solo no — entrar en el foco con Tab y
-    // activarse con Enter/Espacio (web, teclado físico, Switch Control).
-    // Sin él, cada card migrada quedaba inalcanzable por teclado (Codex,
-    // #1601).
+    final gestures = GestureDetector(
+      onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
+      // Con reduce-motion no trackeamos presión: ni setState ni AnimatedScale.
+      onTapDown: reduce ? null : (_) => _setPressed(true),
+      onTapUp: reduce ? null : (_) => _setPressed(false),
+      onTapCancel: reduce ? null : () => _setPressed(false),
+      // opaque: toda el área del CTA responde, no solo los px pintados —
+      // mismo comportamiento que los GestureDetector que reemplaza.
+      behavior: HitTestBehavior.opaque,
+      child: reduce
+          ? widget.child
+          : AnimatedScale(
+              scale: _pressed ? TreinoTappable.pressedScale : 1.0,
+              duration: AppMotion.resolve(context, AppMotion.micro),
+              curve: AppMotion.standard,
+              child: widget.child,
+            ),
+    );
+
+    // Sin [focusable] no se monta el detector: uno deshabilitado igual corta el
+    // foco de los descendientes (`descendantsAreFocusable`), y varios botones
+    // del Coach Hub tienen su FocusableActionDetector ADENTRO de esto.
+    if (!widget.focusable) return gestures;
+
+    // Lo que un InkWell daba gratis y un GestureDetector solo no: entrar en el
+    // foco con Tab y activarse con Enter/Espacio (web, teclado físico, Switch
+    // Control). Codex, #1601.
     return FocusableActionDetector(
       actions: <Type, Action<Intent>>{
         ActivateIntent: CallbackAction<ActivateIntent>(
@@ -84,25 +117,7 @@ class _TreinoTappableState extends State<TreinoTappable> {
           },
         ),
       },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onLongPress: widget.onLongPress,
-        // Con reduce-motion no trackeamos presión: ni setState ni AnimatedScale.
-        onTapDown: reduce ? null : (_) => _setPressed(true),
-        onTapUp: reduce ? null : (_) => _setPressed(false),
-        onTapCancel: reduce ? null : () => _setPressed(false),
-        // opaque: toda el área del CTA responde, no solo los px pintados —
-        // mismo comportamiento que los GestureDetector que reemplaza.
-        behavior: HitTestBehavior.opaque,
-        child: reduce
-            ? widget.child
-            : AnimatedScale(
-                scale: _pressed ? TreinoTappable.pressedScale : 1.0,
-                duration: AppMotion.resolve(context, AppMotion.micro),
-                curve: AppMotion.standard,
-                child: widget.child,
-              ),
-      ),
+      child: gestures,
     );
   }
 }

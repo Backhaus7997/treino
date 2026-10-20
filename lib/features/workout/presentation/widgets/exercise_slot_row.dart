@@ -178,6 +178,8 @@ class ExerciseSlotRow extends StatelessWidget {
         color: Colors.transparent,
         // TreinoTappable REEMPLAZA al InkWell: press feedback (scale 0.97).
         child: TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+          focusable: true,
           onTap: onTap,
           child: Container(
             decoration: BoxDecoration(

@@ -126,6 +126,15 @@ void main() {
       findsOneWidget,
       reason: 'la fila usa TreinoTappable (press feedback), no un InkWell',
     );
+    // Reemplazó un InkWell: tiene que seguir alcanzable por teclado.
+    expect(
+        tester
+            .widget<TreinoTappable>(find.ancestor(
+              of: find.text('Lucía'),
+              matching: find.byType(TreinoTappable),
+            ))
+            .focusable,
+        isTrue);
     await tester.tap(find.text('Lucía'));
     await tester.pumpAndSettle();
 
@@ -159,6 +168,15 @@ void main() {
       findsOneWidget,
       reason: 'la fila usa TreinoTappable (press feedback), no un InkWell',
     );
+    // Reemplazó un InkWell: tiene que seguir alcanzable por teclado.
+    expect(
+        tester
+            .widget<TreinoTappable>(find.ancestor(
+              of: find.text('Lucía'),
+              matching: find.byType(TreinoTappable),
+            ))
+            .focusable,
+        isTrue);
     await tester.tap(find.text('Lucía'));
     await tester.pumpAndSettle();
 

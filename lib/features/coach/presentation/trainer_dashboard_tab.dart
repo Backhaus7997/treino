@@ -1389,6 +1389,8 @@ class _ProximaSesionRow extends ConsumerWidget {
     final initials = _initials(showName);
 
     return TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+      focusable: true,
       onTap: () => showModalBottomSheet(
         context: context,
         useRootNavigator: true,
@@ -1528,6 +1530,8 @@ class _EntrenaronHoyRow extends ConsumerWidget {
     final session = entry.session;
 
     return TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+      focusable: true,
       // Al entrenamiento que tocaste, no a la ficha entera del alumno: la fila
       // habla de UNA sesión y hasta ahora te dejaba en una pantalla larga donde
       // había que ir a buscarla a mano.
@@ -1815,6 +1819,8 @@ class _ActividadRecienteRow extends ConsumerWidget {
     final session = entry.session;
 
     return TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+      focusable: true,
       // Al entrenamiento que tocaste, no a la ficha entera del alumno: la fila
       // habla de UNA sesión y hasta ahora te dejaba en una pantalla larga donde
       // había que ir a buscarla a mano.

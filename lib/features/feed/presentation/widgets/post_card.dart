@@ -99,6 +99,8 @@ class PostCard extends ConsumerWidget {
             children: [
               Expanded(
                 child: TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+                  focusable: true,
                   onTap: onAuthorTap,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -491,6 +493,8 @@ class _RoutineTagChip extends StatelessWidget {
     final palette = AppPalette.of(context);
 
     return TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+      focusable: true,
       onTap: () => context.push('/workout/routine/${tag.routineId}'),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
