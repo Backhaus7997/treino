@@ -341,6 +341,191 @@
   "@athleteNutritionNeedsActiveLink": {
     "description": "Estado de la ruta nutricional cuando el alumno no tiene un vínculo activo."
   },
+  "trainerNutritionSectionTitle": "PLAN NUTRICIONAL",
+  "@trainerNutritionSectionTitle": {
+    "description": "Header de la sección del plan nutricional en el detalle de alumno mobile del PF."
+  },
+  "trainerNutritionSectionLoadCta": "+ Cargar",
+  "@trainerNutritionSectionLoadCta": {
+    "description": "Acción de la sección del plan nutricional cuando el alumno todavía no tiene plan. Abre el editor mobile."
+  },
+  "trainerNutritionSectionEditCta": "Editar",
+  "@trainerNutritionSectionEditCta": {
+    "description": "Acción de la sección del plan nutricional cuando el alumno ya tiene plan. Abre el editor mobile."
+  },
+  "trainerNutritionSectionEmpty": "Todavía no le cargaste un plan nutricional.",
+  "@trainerNutritionSectionEmpty": {
+    "description": "Estado vacío de la sección del plan nutricional en el detalle de alumno del PF."
+  },
+  "trainerNutritionSectionUntitled": "Plan nutricional",
+  "@trainerNutritionSectionUntitled": {
+    "description": "Nombre que muestra la sección cuando el PF guardó el plan sin título (el título es opcional)."
+  },
+  "trainerNutritionSectionSummary": "{count, plural, =1{1 comida} other{{count} comidas}} · actualizado el {date}",
+  "@trainerNutritionSectionSummary": {
+    "description": "Resumen de la sección del plan nutricional: cuántas comidas tiene y cuándo se guardó por última vez.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "trainerNutritionLoadError": "No pudimos cargar el plan nutricional.",
+  "@trainerNutritionLoadError": {
+    "description": "Error al leer el plan nutricional, en la sección del detalle de alumno y en el editor del PF."
+  },
+  "trainerNutritionEditorTitle": "PLAN NUTRICIONAL",
+  "@trainerNutritionEditorTitle": {
+    "description": "Título del editor mobile del plan nutricional del alumno (PF)."
+  },
+  "trainerNutritionEditorPlanTitleLabel": "Título del plan (opcional)",
+  "@trainerNutritionEditorPlanTitleLabel": {
+    "description": "Label del campo título en el editor del plan nutricional."
+  },
+  "trainerNutritionEditorPlanTitleHint": "Ej: Progresión 4 - Semana 9 en adelante",
+  "@trainerNutritionEditorPlanTitleHint": {
+    "description": "Placeholder del campo título en el editor del plan nutricional."
+  },
+  "trainerNutritionEditorMealNameHint": "Nombre de la comida",
+  "@trainerNutritionEditorMealNameHint": {
+    "description": "Placeholder del nombre de una comida en el editor del plan nutricional."
+  },
+  "trainerNutritionEditorMealTimeHint": "Hora",
+  "@trainerNutritionEditorMealTimeHint": {
+    "description": "Placeholder del horario (texto libre) de una comida en el editor del plan nutricional."
+  },
+  "trainerNutritionEditorDeleteMealTooltip": "Eliminar comida",
+  "@trainerNutritionEditorDeleteMealTooltip": {
+    "description": "Tooltip del botón que borra una comida del borrador del plan nutricional."
+  },
+  "trainerNutritionEditorAddMeal": "AGREGAR COMIDA",
+  "@trainerNutritionEditorAddMeal": {
+    "description": "Botón que agrega una comida vacía al borrador del plan nutricional."
+  },
+  "trainerNutritionEditorGroupNameHint": "Nombre del grupo",
+  "@trainerNutritionEditorGroupNameHint": {
+    "description": "Placeholder del nombre de un grupo de alimentos (hidratos, proteínas…) en el editor."
+  },
+  "trainerNutritionEditorDeleteGroupTooltip": "Eliminar grupo",
+  "@trainerNutritionEditorDeleteGroupTooltip": {
+    "description": "Tooltip del botón que borra un grupo de alimentos del borrador."
+  },
+  "trainerNutritionEditorAddGroup": "+ Agregar grupo",
+  "@trainerNutritionEditorAddGroup": {
+    "description": "Acción que agrega un grupo de alimentos vacío a una comida."
+  },
+  "trainerNutritionEditorChooseOne": "Elegir una",
+  "@trainerNutritionEditorChooseOne": {
+    "description": "Chip del modo de selección del grupo: el alumno elige UNA de las opciones. El alumno lo lee como «Elegí una»."
+  },
+  "trainerNutritionEditorAll": "Todas",
+  "@trainerNutritionEditorAll": {
+    "description": "Chip del modo de selección del grupo: el plato lleva TODAS las opciones. El alumno lo lee como «Va todo»."
+  },
+  "trainerNutritionEditorAddOption": "+ Agregar opción",
+  "@trainerNutritionEditorAddOption": {
+    "description": "Acción que abre el sheet para cargar una opción nueva en un grupo de alimentos."
+  },
+  "trainerNutritionEditorEmptyGroup": "Sin opciones todavía.",
+  "@trainerNutritionEditorEmptyGroup": {
+    "description": "Se muestra dentro de un grupo de alimentos que no tiene opciones cargadas."
+  },
+  "trainerNutritionEditorSave": "GUARDAR PLAN",
+  "@trainerNutritionEditorSave": {
+    "description": "Botón que guarda el plan nutricional entero en Firestore."
+  },
+  "trainerNutritionEditorSaved": "Plan nutricional guardado.",
+  "@trainerNutritionEditorSaved": {
+    "description": "Snackbar al guardar el plan nutricional desde mobile."
+  },
+  "trainerNutritionEditorSaveError": "No pudimos guardar el plan. Probá de nuevo.",
+  "@trainerNutritionEditorSaveError": {
+    "description": "Snackbar cuando falla el guardado del plan nutricional."
+  },
+  "trainerNutritionEditorEmptyPlan": "El plan está vacío. Agregá al menos una comida con nombre.",
+  "@trainerNutritionEditorEmptyPlan": {
+    "description": "Snackbar al guardar un plan sin ninguna comida con nombre (las vacías se descartan al guardar)."
+  },
+  "trainerNutritionEditorDiscardTitle": "¿Descartar cambios?",
+  "@trainerNutritionEditorDiscardTitle": {
+    "description": "Título del diálogo al salir del editor del plan nutricional con cambios sin guardar."
+  },
+  "trainerNutritionEditorDiscardBody": "Si salís ahora vas a perder los cambios del plan sin guardar.",
+  "@trainerNutritionEditorDiscardBody": {
+    "description": "Cuerpo del diálogo de descarte del editor del plan nutricional."
+  },
+  "trainerNutritionEditorDiscardConfirm": "Descartar",
+  "@trainerNutritionEditorDiscardConfirm": {
+    "description": "Botón que confirma salir del editor del plan nutricional perdiendo los cambios."
+  },
+  "trainerNutritionEditorDeleteTitle": "¿Eliminar «{name}»?",
+  "@trainerNutritionEditorDeleteTitle": {
+    "description": "Título del diálogo al borrar una comida o un grupo que tiene opciones cargadas.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "trainerNutritionEditorDeleteMealBody": "Se borra la comida con todos sus grupos y opciones.",
+  "@trainerNutritionEditorDeleteMealBody": {
+    "description": "Cuerpo del diálogo al borrar una comida que tiene opciones cargadas."
+  },
+  "trainerNutritionEditorDeleteGroupBody": "Se borra el grupo con todas sus opciones.",
+  "@trainerNutritionEditorDeleteGroupBody": {
+    "description": "Cuerpo del diálogo al borrar un grupo que tiene opciones cargadas."
+  },
+  "trainerNutritionOptionNewTitle": "NUEVA OPCIÓN",
+  "@trainerNutritionOptionNewTitle": {
+    "description": "Título del sheet para cargar una opción nueva en un grupo de alimentos."
+  },
+  "trainerNutritionOptionEditTitle": "EDITAR OPCIÓN",
+  "@trainerNutritionOptionEditTitle": {
+    "description": "Título del sheet para editar una opción de un grupo de alimentos."
+  },
+  "trainerNutritionOptionNameLabel": "ALIMENTO",
+  "@trainerNutritionOptionNameLabel": {
+    "description": "Label del campo obligatorio de la opción: el alimento."
+  },
+  "trainerNutritionOptionNameHint": "Ej: 5 discos de arroz",
+  "@trainerNutritionOptionNameHint": {
+    "description": "Placeholder del alimento de una opción."
+  },
+  "trainerNutritionOptionQuantityLabel": "CANTIDAD",
+  "@trainerNutritionOptionQuantityLabel": {
+    "description": "Label del campo cantidad (opcional, texto libre) de una opción."
+  },
+  "trainerNutritionOptionQuantityHint": "Ej: 230-240",
+  "@trainerNutritionOptionQuantityHint": {
+    "description": "Placeholder de la cantidad de una opción."
+  },
+  "trainerNutritionOptionUnitLabel": "UNIDAD",
+  "@trainerNutritionOptionUnitLabel": {
+    "description": "Label del campo unidad (opcional) de una opción."
+  },
+  "trainerNutritionOptionUnitHint": "Ej: grs peso cocido",
+  "@trainerNutritionOptionUnitHint": {
+    "description": "Placeholder de la unidad de una opción."
+  },
+  "trainerNutritionOptionNotesLabel": "NOTAS",
+  "@trainerNutritionOptionNotesLabel": {
+    "description": "Label del campo notas (opcional) de una opción."
+  },
+  "trainerNutritionOptionNotesHint": "Marca, aclaraciones…",
+  "@trainerNutritionOptionNotesHint": {
+    "description": "Placeholder de las notas de una opción."
+  },
+  "trainerNutritionOptionDone": "LISTO",
+  "@trainerNutritionOptionDone": {
+    "description": "Botón del sheet de opción. Dice LISTO y no GUARDAR a propósito: la opción entra al borrador, y el plan recién se persiste con GUARDAR PLAN."
+  },
+  "trainerNutritionOptionDelete": "ELIMINAR OPCIÓN",
+  "@trainerNutritionOptionDelete": {
+    "description": "Botón del sheet que saca la opción del borrador."
+  },
   "athleteLinkRequired": "No encontramos un vínculo activo con un PF.",
   "@athleteLinkRequired": {
     "description": "Gate de las rutas que necesitan un vínculo activo (agenda, nutrición). Dice NO ENCONTRAMOS y no NO TENÉS a propósito: el provider emite lo mismo cuando el servidor contesta que no hay vínculo y cuando se agota la espera sin llegar al servidor, y afirmar la segunda como la primera sería una advertencia falsa."

@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/presentation/athlete_detail_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -210,7 +211,12 @@ Future<void> _pumpScreen(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: overrides,
+      overrides: [
+        // Sin plan nutricional por default: la sección (#1538) no es lo que
+        // miran estos tests, y sin override le pegaría a Firestore real.
+        nutritionPlanProvider.overrideWith((ref, key) => Stream.value(null)),
+        ...overrides,
+      ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
@@ -1271,6 +1277,8 @@ void main() {
       expect(find.text('EN CURSO'), findsOneWidget);
       expect(find.text('Full Body'), findsOneWidget);
 
+      await tester.ensureVisible(find.text('EN CURSO'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('EN CURSO'));
       await tester.pumpAndSettle();
 
@@ -1328,6 +1336,8 @@ void main() {
       expect(find.text('Full Body'), findsOneWidget);
       expect(find.text('Pierna vieja'), findsNothing);
 
+      await tester.ensureVisible(find.text('EN CURSO'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('EN CURSO'));
       await tester.pumpAndSettle();
 

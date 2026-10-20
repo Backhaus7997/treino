@@ -13,7 +13,7 @@ import '../domain/nutrition_plan.dart';
 
 /// Plan nutricional que el alumno recibe de su PF.
 ///
-/// Es deliberadamente read-only: la edición vive en el Coach Hub.
+/// Es deliberadamente read-only: el plan lo escribe sólo el PF.
 class AthleteNutritionPlanScreen extends ConsumerWidget {
   const AthleteNutritionPlanScreen({
     super.key,
@@ -272,13 +272,14 @@ class _FoodOptionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final quantity = option.quantity?.trim();
-    final unit = option.unit?.trim();
+    // Lo que haya de cantidad y unidad, juntas o por separado. Antes exigía
+    // las dos: «Huevos» + cantidad «2» le llegaba al alumno como «Huevos» a
+    // secas, aunque el PF lo hubiera escrito (#1553).
+    final amount = [option.quantity, option.unit]
+        .map((s) => s?.trim() ?? '')
+        .where((s) => s.isNotEmpty)
+        .join(' ');
     final notes = option.notes?.trim();
-    final hasAmount = quantity != null &&
-        quantity.isNotEmpty &&
-        unit != null &&
-        unit.isNotEmpty;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,10 +298,10 @@ class _FoodOptionRow extends StatelessWidget {
                   color: palette.textPrimary,
                 ),
               ),
-              if (hasAmount) ...[
+              if (amount.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.hairline),
                 Text(
-                  '$quantity $unit',
+                  amount,
                   style: GoogleFonts.barlow(
                     fontSize: AppTextSize.bodyDense,
                     color: palette.textMuted,

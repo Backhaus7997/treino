@@ -1076,6 +1076,264 @@ abstract class AppL10n {
   /// **'Necesitás un vínculo activo con un PF para ver tu plan nutricional.'**
   String get athleteNutritionNeedsActiveLink;
 
+  /// Header de la sección del plan nutricional en el detalle de alumno mobile del PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN NUTRICIONAL'**
+  String get trainerNutritionSectionTitle;
+
+  /// Acción de la sección del plan nutricional cuando el alumno todavía no tiene plan. Abre el editor mobile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'+ Cargar'**
+  String get trainerNutritionSectionLoadCta;
+
+  /// Acción de la sección del plan nutricional cuando el alumno ya tiene plan. Abre el editor mobile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar'**
+  String get trainerNutritionSectionEditCta;
+
+  /// Estado vacío de la sección del plan nutricional en el detalle de alumno del PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no le cargaste un plan nutricional.'**
+  String get trainerNutritionSectionEmpty;
+
+  /// Nombre que muestra la sección cuando el PF guardó el plan sin título (el título es opcional).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan nutricional'**
+  String get trainerNutritionSectionUntitled;
+
+  /// Resumen de la sección del plan nutricional: cuántas comidas tiene y cuándo se guardó por última vez.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 comida} other{{count} comidas}} · actualizado el {date}'**
+  String trainerNutritionSectionSummary(int count, String date);
+
+  /// Error al leer el plan nutricional, en la sección del detalle de alumno y en el editor del PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar el plan nutricional.'**
+  String get trainerNutritionLoadError;
+
+  /// Título del editor mobile del plan nutricional del alumno (PF).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN NUTRICIONAL'**
+  String get trainerNutritionEditorTitle;
+
+  /// Label del campo título en el editor del plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Título del plan (opcional)'**
+  String get trainerNutritionEditorPlanTitleLabel;
+
+  /// Placeholder del campo título en el editor del plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Progresión 4 - Semana 9 en adelante'**
+  String get trainerNutritionEditorPlanTitleHint;
+
+  /// Placeholder del nombre de una comida en el editor del plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nombre de la comida'**
+  String get trainerNutritionEditorMealNameHint;
+
+  /// Placeholder del horario (texto libre) de una comida en el editor del plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hora'**
+  String get trainerNutritionEditorMealTimeHint;
+
+  /// Tooltip del botón que borra una comida del borrador del plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar comida'**
+  String get trainerNutritionEditorDeleteMealTooltip;
+
+  /// Botón que agrega una comida vacía al borrador del plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AGREGAR COMIDA'**
+  String get trainerNutritionEditorAddMeal;
+
+  /// Placeholder del nombre de un grupo de alimentos (hidratos, proteínas…) en el editor.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nombre del grupo'**
+  String get trainerNutritionEditorGroupNameHint;
+
+  /// Tooltip del botón que borra un grupo de alimentos del borrador.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar grupo'**
+  String get trainerNutritionEditorDeleteGroupTooltip;
+
+  /// Acción que agrega un grupo de alimentos vacío a una comida.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'+ Agregar grupo'**
+  String get trainerNutritionEditorAddGroup;
+
+  /// Chip del modo de selección del grupo: el alumno elige UNA de las opciones. El alumno lo lee como «Elegí una».
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegir una'**
+  String get trainerNutritionEditorChooseOne;
+
+  /// Chip del modo de selección del grupo: el plato lleva TODAS las opciones. El alumno lo lee como «Va todo».
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todas'**
+  String get trainerNutritionEditorAll;
+
+  /// Acción que abre el sheet para cargar una opción nueva en un grupo de alimentos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'+ Agregar opción'**
+  String get trainerNutritionEditorAddOption;
+
+  /// Se muestra dentro de un grupo de alimentos que no tiene opciones cargadas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin opciones todavía.'**
+  String get trainerNutritionEditorEmptyGroup;
+
+  /// Botón que guarda el plan nutricional entero en Firestore.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR PLAN'**
+  String get trainerNutritionEditorSave;
+
+  /// Snackbar al guardar el plan nutricional desde mobile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan nutricional guardado.'**
+  String get trainerNutritionEditorSaved;
+
+  /// Snackbar cuando falla el guardado del plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar el plan. Probá de nuevo.'**
+  String get trainerNutritionEditorSaveError;
+
+  /// Snackbar al guardar un plan sin ninguna comida con nombre (las vacías se descartan al guardar).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El plan está vacío. Agregá al menos una comida con nombre.'**
+  String get trainerNutritionEditorEmptyPlan;
+
+  /// Título del diálogo al salir del editor del plan nutricional con cambios sin guardar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Descartar cambios?'**
+  String get trainerNutritionEditorDiscardTitle;
+
+  /// Cuerpo del diálogo de descarte del editor del plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si salís ahora vas a perder los cambios del plan sin guardar.'**
+  String get trainerNutritionEditorDiscardBody;
+
+  /// Botón que confirma salir del editor del plan nutricional perdiendo los cambios.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Descartar'**
+  String get trainerNutritionEditorDiscardConfirm;
+
+  /// Título del diálogo al borrar una comida o un grupo que tiene opciones cargadas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar «{name}»?'**
+  String trainerNutritionEditorDeleteTitle(String name);
+
+  /// Cuerpo del diálogo al borrar una comida que tiene opciones cargadas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se borra la comida con todos sus grupos y opciones.'**
+  String get trainerNutritionEditorDeleteMealBody;
+
+  /// Cuerpo del diálogo al borrar un grupo que tiene opciones cargadas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se borra el grupo con todas sus opciones.'**
+  String get trainerNutritionEditorDeleteGroupBody;
+
+  /// Título del sheet para cargar una opción nueva en un grupo de alimentos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NUEVA OPCIÓN'**
+  String get trainerNutritionOptionNewTitle;
+
+  /// Título del sheet para editar una opción de un grupo de alimentos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EDITAR OPCIÓN'**
+  String get trainerNutritionOptionEditTitle;
+
+  /// Label del campo obligatorio de la opción: el alimento.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ALIMENTO'**
+  String get trainerNutritionOptionNameLabel;
+
+  /// Placeholder del alimento de una opción.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: 5 discos de arroz'**
+  String get trainerNutritionOptionNameHint;
+
+  /// Label del campo cantidad (opcional, texto libre) de una opción.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANTIDAD'**
+  String get trainerNutritionOptionQuantityLabel;
+
+  /// Placeholder de la cantidad de una opción.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: 230-240'**
+  String get trainerNutritionOptionQuantityHint;
+
+  /// Label del campo unidad (opcional) de una opción.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'UNIDAD'**
+  String get trainerNutritionOptionUnitLabel;
+
+  /// Placeholder de la unidad de una opción.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: grs peso cocido'**
+  String get trainerNutritionOptionUnitHint;
+
+  /// Label del campo notas (opcional) de una opción.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOTAS'**
+  String get trainerNutritionOptionNotesLabel;
+
+  /// Placeholder de las notas de una opción.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Marca, aclaraciones…'**
+  String get trainerNutritionOptionNotesHint;
+
+  /// Botón del sheet de opción. Dice LISTO y no GUARDAR a propósito: la opción entra al borrador, y el plan recién se persiste con GUARDAR PLAN.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LISTO'**
+  String get trainerNutritionOptionDone;
+
+  /// Botón del sheet que saca la opción del borrador.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ELIMINAR OPCIÓN'**
+  String get trainerNutritionOptionDelete;
+
   /// Gate de las rutas que necesitan un vínculo activo (agenda, nutrición). Dice NO ENCONTRAMOS y no NO TENÉS a propósito: el provider emite lo mismo cuando el servidor contesta que no hay vínculo y cuando se agota la espera sin llegar al servidor, y afirmar la segunda como la primera sería una advertencia falsa.
   ///
   /// In es_AR, this message translates to:

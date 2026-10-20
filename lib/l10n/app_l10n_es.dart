@@ -558,6 +558,154 @@ class AppL10nEs extends AppL10n {
       'Necesitás un vínculo activo con un PF para ver tu plan nutricional.';
 
   @override
+  String get trainerNutritionSectionTitle => 'PLAN NUTRICIONAL';
+
+  @override
+  String get trainerNutritionSectionLoadCta => '+ Cargar';
+
+  @override
+  String get trainerNutritionSectionEditCta => 'Editar';
+
+  @override
+  String get trainerNutritionSectionEmpty =>
+      'Todavía no le cargaste un plan nutricional.';
+
+  @override
+  String get trainerNutritionSectionUntitled => 'Plan nutricional';
+
+  @override
+  String trainerNutritionSectionSummary(int count, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count comidas',
+      one: '1 comida',
+    );
+    return '$_temp0 · actualizado el $date';
+  }
+
+  @override
+  String get trainerNutritionLoadError =>
+      'No pudimos cargar el plan nutricional.';
+
+  @override
+  String get trainerNutritionEditorTitle => 'PLAN NUTRICIONAL';
+
+  @override
+  String get trainerNutritionEditorPlanTitleLabel =>
+      'Título del plan (opcional)';
+
+  @override
+  String get trainerNutritionEditorPlanTitleHint =>
+      'Ej: Progresión 4 - Semana 9 en adelante';
+
+  @override
+  String get trainerNutritionEditorMealNameHint => 'Nombre de la comida';
+
+  @override
+  String get trainerNutritionEditorMealTimeHint => 'Hora';
+
+  @override
+  String get trainerNutritionEditorDeleteMealTooltip => 'Eliminar comida';
+
+  @override
+  String get trainerNutritionEditorAddMeal => 'AGREGAR COMIDA';
+
+  @override
+  String get trainerNutritionEditorGroupNameHint => 'Nombre del grupo';
+
+  @override
+  String get trainerNutritionEditorDeleteGroupTooltip => 'Eliminar grupo';
+
+  @override
+  String get trainerNutritionEditorAddGroup => '+ Agregar grupo';
+
+  @override
+  String get trainerNutritionEditorChooseOne => 'Elegir una';
+
+  @override
+  String get trainerNutritionEditorAll => 'Todas';
+
+  @override
+  String get trainerNutritionEditorAddOption => '+ Agregar opción';
+
+  @override
+  String get trainerNutritionEditorEmptyGroup => 'Sin opciones todavía.';
+
+  @override
+  String get trainerNutritionEditorSave => 'GUARDAR PLAN';
+
+  @override
+  String get trainerNutritionEditorSaved => 'Plan nutricional guardado.';
+
+  @override
+  String get trainerNutritionEditorSaveError =>
+      'No pudimos guardar el plan. Probá de nuevo.';
+
+  @override
+  String get trainerNutritionEditorEmptyPlan =>
+      'El plan está vacío. Agregá al menos una comida con nombre.';
+
+  @override
+  String get trainerNutritionEditorDiscardTitle => '¿Descartar cambios?';
+
+  @override
+  String get trainerNutritionEditorDiscardBody =>
+      'Si salís ahora vas a perder los cambios del plan sin guardar.';
+
+  @override
+  String get trainerNutritionEditorDiscardConfirm => 'Descartar';
+
+  @override
+  String trainerNutritionEditorDeleteTitle(String name) {
+    return '¿Eliminar «$name»?';
+  }
+
+  @override
+  String get trainerNutritionEditorDeleteMealBody =>
+      'Se borra la comida con todos sus grupos y opciones.';
+
+  @override
+  String get trainerNutritionEditorDeleteGroupBody =>
+      'Se borra el grupo con todas sus opciones.';
+
+  @override
+  String get trainerNutritionOptionNewTitle => 'NUEVA OPCIÓN';
+
+  @override
+  String get trainerNutritionOptionEditTitle => 'EDITAR OPCIÓN';
+
+  @override
+  String get trainerNutritionOptionNameLabel => 'ALIMENTO';
+
+  @override
+  String get trainerNutritionOptionNameHint => 'Ej: 5 discos de arroz';
+
+  @override
+  String get trainerNutritionOptionQuantityLabel => 'CANTIDAD';
+
+  @override
+  String get trainerNutritionOptionQuantityHint => 'Ej: 230-240';
+
+  @override
+  String get trainerNutritionOptionUnitLabel => 'UNIDAD';
+
+  @override
+  String get trainerNutritionOptionUnitHint => 'Ej: grs peso cocido';
+
+  @override
+  String get trainerNutritionOptionNotesLabel => 'NOTAS';
+
+  @override
+  String get trainerNutritionOptionNotesHint => 'Marca, aclaraciones…';
+
+  @override
+  String get trainerNutritionOptionDone => 'LISTO';
+
+  @override
+  String get trainerNutritionOptionDelete => 'ELIMINAR OPCIÓN';
+
+  @override
   String get athleteLinkRequired =>
       'No encontramos un vínculo activo con un PF.';
 
@@ -6205,6 +6353,154 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get athleteNutritionNeedsActiveLink =>
       'Necesitás un vínculo activo con un PF para ver tu plan nutricional.';
+
+  @override
+  String get trainerNutritionSectionTitle => 'PLAN NUTRICIONAL';
+
+  @override
+  String get trainerNutritionSectionLoadCta => '+ Cargar';
+
+  @override
+  String get trainerNutritionSectionEditCta => 'Editar';
+
+  @override
+  String get trainerNutritionSectionEmpty =>
+      'Todavía no le cargaste un plan nutricional.';
+
+  @override
+  String get trainerNutritionSectionUntitled => 'Plan nutricional';
+
+  @override
+  String trainerNutritionSectionSummary(int count, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count comidas',
+      one: '1 comida',
+    );
+    return '$_temp0 · actualizado el $date';
+  }
+
+  @override
+  String get trainerNutritionLoadError =>
+      'No pudimos cargar el plan nutricional.';
+
+  @override
+  String get trainerNutritionEditorTitle => 'PLAN NUTRICIONAL';
+
+  @override
+  String get trainerNutritionEditorPlanTitleLabel =>
+      'Título del plan (opcional)';
+
+  @override
+  String get trainerNutritionEditorPlanTitleHint =>
+      'Ej: Progresión 4 - Semana 9 en adelante';
+
+  @override
+  String get trainerNutritionEditorMealNameHint => 'Nombre de la comida';
+
+  @override
+  String get trainerNutritionEditorMealTimeHint => 'Hora';
+
+  @override
+  String get trainerNutritionEditorDeleteMealTooltip => 'Eliminar comida';
+
+  @override
+  String get trainerNutritionEditorAddMeal => 'AGREGAR COMIDA';
+
+  @override
+  String get trainerNutritionEditorGroupNameHint => 'Nombre del grupo';
+
+  @override
+  String get trainerNutritionEditorDeleteGroupTooltip => 'Eliminar grupo';
+
+  @override
+  String get trainerNutritionEditorAddGroup => '+ Agregar grupo';
+
+  @override
+  String get trainerNutritionEditorChooseOne => 'Elegir una';
+
+  @override
+  String get trainerNutritionEditorAll => 'Todas';
+
+  @override
+  String get trainerNutritionEditorAddOption => '+ Agregar opción';
+
+  @override
+  String get trainerNutritionEditorEmptyGroup => 'Sin opciones todavía.';
+
+  @override
+  String get trainerNutritionEditorSave => 'GUARDAR PLAN';
+
+  @override
+  String get trainerNutritionEditorSaved => 'Plan nutricional guardado.';
+
+  @override
+  String get trainerNutritionEditorSaveError =>
+      'No pudimos guardar el plan. Probá de nuevo.';
+
+  @override
+  String get trainerNutritionEditorEmptyPlan =>
+      'El plan está vacío. Agregá al menos una comida con nombre.';
+
+  @override
+  String get trainerNutritionEditorDiscardTitle => '¿Descartar cambios?';
+
+  @override
+  String get trainerNutritionEditorDiscardBody =>
+      'Si salís ahora vas a perder los cambios del plan sin guardar.';
+
+  @override
+  String get trainerNutritionEditorDiscardConfirm => 'Descartar';
+
+  @override
+  String trainerNutritionEditorDeleteTitle(String name) {
+    return '¿Eliminar «$name»?';
+  }
+
+  @override
+  String get trainerNutritionEditorDeleteMealBody =>
+      'Se borra la comida con todos sus grupos y opciones.';
+
+  @override
+  String get trainerNutritionEditorDeleteGroupBody =>
+      'Se borra el grupo con todas sus opciones.';
+
+  @override
+  String get trainerNutritionOptionNewTitle => 'NUEVA OPCIÓN';
+
+  @override
+  String get trainerNutritionOptionEditTitle => 'EDITAR OPCIÓN';
+
+  @override
+  String get trainerNutritionOptionNameLabel => 'ALIMENTO';
+
+  @override
+  String get trainerNutritionOptionNameHint => 'Ej: 5 discos de arroz';
+
+  @override
+  String get trainerNutritionOptionQuantityLabel => 'CANTIDAD';
+
+  @override
+  String get trainerNutritionOptionQuantityHint => 'Ej: 230-240';
+
+  @override
+  String get trainerNutritionOptionUnitLabel => 'UNIDAD';
+
+  @override
+  String get trainerNutritionOptionUnitHint => 'Ej: grs peso cocido';
+
+  @override
+  String get trainerNutritionOptionNotesLabel => 'NOTAS';
+
+  @override
+  String get trainerNutritionOptionNotesHint => 'Marca, aclaraciones…';
+
+  @override
+  String get trainerNutritionOptionDone => 'LISTO';
+
+  @override
+  String get trainerNutritionOptionDelete => 'ELIMINAR OPCIÓN';
 
   @override
   String get athleteLinkRequired =>
