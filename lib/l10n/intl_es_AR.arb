@@ -445,6 +445,10 @@
   "@trainerNutritionEditorSaveError": {
     "description": "Snackbar cuando falla el guardado del plan nutricional."
   },
+  "trainerNutritionEditorStaleReadError": "No pudimos leer el plan guardado. Para no pisarlo, no se puede guardar hasta volver a leerlo.",
+  "@trainerNutritionEditorStaleReadError": {
+    "description": "Aviso del editor mobile cuando el PF ya tenía cambios y la lectura del plan falló después (#1581). Sus cambios quedan en pantalla, pero GUARDAR se bloquea: guardaría encima de un plan que no se pudo leer."
+  },
   "trainerNutritionEditorEmptyPlan": "El plan está vacío. Agregá al menos una comida con nombre.",
   "@trainerNutritionEditorEmptyPlan": {
     "description": "Snackbar al guardar un plan sin ninguna comida con nombre (las vacías se descartan al guardar)."

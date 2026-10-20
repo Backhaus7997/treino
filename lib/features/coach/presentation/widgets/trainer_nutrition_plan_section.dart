@@ -40,9 +40,15 @@ class TrainerNutritionPlanSection extends ConsumerWidget {
     if (trainerUid.isEmpty) return const SizedBox.shrink();
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final planAsync = ref.watch(
-      nutritionPlanProvider((trainerId: trainerUid, athleteId: athleteId)),
-    );
+    final provider =
+        nutritionPlanProvider((trainerId: trainerUid, athleteId: athleteId));
+    final planAsync = ref.watch(provider);
+    // El error GANA sobre un valor previo, igual que en el `when` de abajo
+    // (#1581). Riverpod conserva el valor viejo dentro del `AsyncError`: con
+    // la copia buena del plan en la caché del teléfono y un doc que el
+    // servidor devuelve ilegible, `hasValue` daba true, y «Editar» abría el
+    // editor sobre la copia vieja con GUARDAR habilitado.
+    final hasPlanData = planAsync.hasValue && !planAsync.hasError;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,7 +67,7 @@ class TrainerNutritionPlanSection extends ConsumerWidget {
             const Spacer(),
             // Sólo con el dato en la mano: mientras carga, «+ Cargar» sobre un
             // alumno que YA tiene plan le diría al PF que no lo tiene.
-            if (planAsync.hasValue)
+            if (hasPlanData)
               Semantics(
                 button: true,
                 child: TreinoTappable(
@@ -94,7 +100,28 @@ class TrainerNutritionPlanSection extends ConsumerWidget {
             ),
             error: (_, __) => _card(
               palette: palette,
-              child: _muted(l10n.trainerNutritionLoadError, palette),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _muted(l10n.trainerNutritionLoadError, palette),
+                  ),
+                  const SizedBox(width: 8),
+                  Semantics(
+                    button: true,
+                    child: TreinoTappable(
+                      onTap: () => ref.invalidate(provider),
+                      child: Text(
+                        l10n.coachRetryLabel,
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w600,
+                          fontSize: AppTextSize.bodyDense,
+                          color: palette.accentText,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             data: (plan) => plan == null
                 ? _card(

@@ -643,6 +643,10 @@ class AppL10nEs extends AppL10n {
       'No pudimos guardar el plan. Probá de nuevo.';
 
   @override
+  String get trainerNutritionEditorStaleReadError =>
+      'No pudimos leer el plan guardado. Para no pisarlo, no se puede guardar hasta volver a leerlo.';
+
+  @override
   String get trainerNutritionEditorEmptyPlan =>
       'El plan está vacío. Agregá al menos una comida con nombre.';
 
@@ -6438,6 +6442,10 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get trainerNutritionEditorSaveError =>
       'No pudimos guardar el plan. Probá de nuevo.';
+
+  @override
+  String get trainerNutritionEditorStaleReadError =>
+      'No pudimos leer el plan guardado. Para no pisarlo, no se puede guardar hasta volver a leerlo.';
 
   @override
   String get trainerNutritionEditorEmptyPlan =>

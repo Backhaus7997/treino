@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
+import 'package:treino/features/coach/data/nutrition_plan_repository.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/presentation/trainer_nutrition_plan_editor_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
@@ -72,6 +75,7 @@ Future<void> _pumpEditor(
   WidgetTester tester, {
   required FakeFirebaseFirestore db,
   List<Override> extra = const [],
+  bool open = true,
 }) async {
   tester.view.physicalSize = const Size(800, 2400);
   tester.view.devicePixelRatio = 1;
@@ -122,8 +126,21 @@ Future<void> _pumpEditor(
     ),
   );
   await tester.pumpAndSettle();
-  router.push('/coach/athlete/$_athleteId/nutricion');
-  await tester.pumpAndSettle();
+  if (open) await _openEditor(tester);
+}
+
+/// [settle] en `false` cuando el editor abre en loading: el spinner anima
+/// en loop y `pumpAndSettle` no termina nunca. Se pumpea lo que dura la
+/// transición de la ruta.
+Future<void> _openEditor(WidgetTester tester, {bool settle = true}) async {
+  GoRouter.of(tester.element(find.text('ficha')))
+      .push('/coach/athlete/$_athleteId/nutricion');
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+  }
 }
 
 Finder _field(String text) => find.widgetWithText(TextFormField, text);
@@ -387,5 +404,122 @@ void main() {
       findsOneWidget,
     );
     expect((await _saved(db))!.meals.single.name, 'Desayuno');
+  });
+
+  // #1581: la caché del teléfono tiene la copia buena y el servidor devuelve
+  // el doc ilegible (p. ej. un formato más nuevo que esta versión no parsea).
+  // Riverpod deja un `AsyncError` CON el valor viejo adentro, y sembrar de
+  // ahí dejaba GUARDAR pisando el doc del servidor con la copia vieja.
+  group('el error de lectura gana sobre la copia de la caché', () {
+    late StreamController<NutritionPlan?> lectura;
+    const ilegible = NutritionPlanIlegible(_docId, 'meals no es lista');
+    const avisoBloqueo = 'No pudimos leer el plan guardado. Para no pisarlo, '
+        'no se puede guardar hasta volver a leerlo.';
+
+    setUp(() => lectura = StreamController<NutritionPlan?>.broadcast());
+    tearDown(() => lectura.close());
+
+    List<Override> leyendoDeLaCarrera() => [
+          nutritionPlanProvider.overrideWith((ref, key) => lectura.stream),
+        ];
+
+    testWidgets('abrir con el error ya puesto no siembra la copia vieja',
+        (tester) async {
+      final db = await _firestoreWith(null);
+      await _pumpEditor(
+        tester,
+        db: db,
+        extra: leyendoDeLaCarrera(),
+        open: false,
+      );
+      // La ficha ya estaba leyendo el plan (su sección lo hace) cuando llegó
+      // el error: el editor abre con `AsyncError` + valor previo.
+      final container =
+          ProviderScope.containerOf(tester.element(find.text('ficha')));
+      const key = (trainerId: _trainerId, athleteId: _athleteId);
+      final sub = container.listen(nutritionPlanProvider(key), (_, __) {});
+      addTearDown(sub.close);
+      lectura.add(_plan());
+      await tester.pump();
+      lectura.addError(ilegible);
+      await tester.pump();
+      final estado = container.read(nutritionPlanProvider(key));
+      expect(estado.hasValue && estado.hasError, isTrue,
+          reason: 'el caso a probar: error con el valor viejo adentro');
+
+      await _openEditor(tester);
+
+      expect(
+        find.text('No pudimos cargar el plan nutricional.'),
+        findsOneWidget,
+      );
+      expect(find.text('GUARDAR PLAN'), findsNothing);
+      expect(_field('Desayuno'), findsNothing);
+    });
+
+    testWidgets(
+        'carrera sin ediciones: se descarta el borrador y gana el error',
+        (tester) async {
+      final db = await _firestoreWith(null);
+      await _pumpEditor(
+        tester,
+        db: db,
+        extra: leyendoDeLaCarrera(),
+        open: false,
+      );
+      await _openEditor(tester, settle: false);
+      lectura.add(_plan());
+      await tester.pumpAndSettle();
+      expect(_field('Desayuno'), findsOneWidget);
+
+      lectura.addError(ilegible);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No pudimos cargar el plan nutricional.'),
+        findsOneWidget,
+      );
+      expect(find.text('GUARDAR PLAN'), findsNothing);
+    });
+
+    testWidgets(
+        'carrera con ediciones: conserva el borrador y bloquea GUARDAR '
+        'hasta volver a leer', (tester) async {
+      final db = await _firestoreWith(null);
+      await _pumpEditor(
+        tester,
+        db: db,
+        extra: leyendoDeLaCarrera(),
+        open: false,
+      );
+      await _openEditor(tester, settle: false);
+      lectura.add(_plan());
+      await tester.pumpAndSettle();
+      await tester.enterText(_field('Plan de fuerza'), 'Plan de definición');
+      await tester.pump();
+
+      lectura.addError(ilegible);
+      await tester.pumpAndSettle();
+
+      ElevatedButton guardar() => tester.widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, 'GUARDAR PLAN'),
+          );
+      // No se le tira el trabajo al PF…
+      expect(_field('Plan de definición'), findsOneWidget);
+      // …pero tampoco se lo deja guardar encima de lo que no se pudo leer.
+      expect(find.text(avisoBloqueo), findsOneWidget);
+      expect(guardar().onPressed, isNull);
+
+      // Reintentar lee bien: se desbloquea y el borrador sigue.
+      await tester.tap(find.widgetWithText(TextButton, 'Reintentar'));
+      await tester.pump();
+      lectura.add(_plan());
+      await tester.pumpAndSettle();
+
+      expect(find.text(avisoBloqueo), findsNothing);
+      expect(guardar().onPressed, isNotNull);
+      expect(_field('Plan de definición'), findsOneWidget);
+      expect((await _saved(db)), isNull, reason: 'nada se guardó solo');
+    });
   });
 }
