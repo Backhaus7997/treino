@@ -1220,6 +1220,12 @@ abstract class AppL10n {
   /// **'No pudimos guardar el plan. Probá de nuevo.'**
   String get trainerNutritionEditorSaveError;
 
+  /// Aviso del editor mobile cuando el PF ya tenía cambios y la lectura del plan falló después (#1581). Sus cambios quedan en pantalla, pero GUARDAR se bloquea: guardaría encima de un plan que no se pudo leer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos leer el plan guardado. Para no pisarlo, no se puede guardar hasta volver a leerlo.'**
+  String get trainerNutritionEditorStaleReadError;
+
   /// Snackbar al guardar un plan sin ninguna comida con nombre (las vacías se descartan al guardar).
   ///
   /// In es_AR, this message translates to:

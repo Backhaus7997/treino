@@ -71,6 +71,7 @@ void main() {
       link: _link(),
       plan: _plan(updatedAt: DateTime.utc(2020, 6, 17, 1, 30)),
       planLoading: false,
+      planError: false,
     );
     await tester.pumpWidget(_buildRow(entry: entry));
     await tester.pump();
@@ -85,6 +86,7 @@ void main() {
       link: _link(),
       plan: _plan(meals: 4),
       planLoading: false,
+      planError: false,
     );
 
     await tester.pumpWidget(_buildRow(entry: entry));
@@ -99,6 +101,7 @@ void main() {
       link: _link(),
       plan: null,
       planLoading: false,
+      planError: false,
     );
 
     await tester.pumpWidget(_buildRow(entry: entry));
@@ -107,12 +110,30 @@ void main() {
     expect(find.text('Sin plan todavía'), findsOneWidget);
   });
 
+  // #1581: el doc existe y no se pudo leer. «Sin plan todavía» era falso.
+  testWidgets('planError dice que no se pudo leer, no «Sin plan todavía»',
+      (tester) async {
+    final entry = (
+      link: _link(),
+      plan: null,
+      planLoading: false,
+      planError: true,
+    );
+
+    await tester.pumpWidget(_buildRow(entry: entry));
+    await tester.pump();
+
+    expect(find.text('No pudimos leer su plan'), findsOneWidget);
+    expect(find.text('Sin plan todavía'), findsNothing);
+  });
+
   testWidgets('planLoading muestra shimmer (skeleton del list row)',
       (tester) async {
     final entry = (
       link: _link(),
       plan: null,
       planLoading: true,
+      planError: false,
     );
 
     await tester.pumpWidget(_buildRow(entry: entry));
@@ -146,6 +167,7 @@ void main() {
       link: _link(),
       plan: _plan(meals: 2),
       planLoading: false,
+      planError: false,
     );
 
     await tester.pumpWidget(
@@ -166,6 +188,7 @@ void main() {
       link: _link(),
       plan: _plan(meals: 2),
       planLoading: false,
+      planError: false,
     );
 
     await tester.pumpWidget(_buildRow(entry: entry));

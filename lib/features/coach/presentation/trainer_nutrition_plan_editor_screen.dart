@@ -312,16 +312,33 @@ class _TrainerNutritionPlanEditorScreenState
       (trainerId: trainerUid, athleteId: widget.athleteId),
     );
     final planAsync = ref.watch(provider);
-    if (planAsync.hasValue) {
+    // El error GANA sobre un valor previo (#1581). Riverpod conserva el valor
+    // viejo dentro del `AsyncError`: con la copia buena del plan en la caché
+    // del teléfono y el doc que el servidor devuelve ilegible, `hasValue` da
+    // true, y sembrar de ahí dejaba GUARDAR pisando el doc del servidor con
+    // la copia vieja.
+    final readFailed = planAsync.hasError;
+    if (planAsync.hasValue && !readFailed) {
       _seedIfNeeded(planAsync.requireValue, trainerUid);
+    } else if (readFailed && _draft != null && !_dirty) {
+      // Carrera: se sembró con la copia de la caché y el servidor falló
+      // después. Sin ediciones del PF no hay nada que perder: se descarta el
+      // borrador y se muestra el error.
+      _draft = null;
+      _baseline = null;
     }
     final draft = _draft;
+    // Con ediciones del PF el borrador se conserva —no se le tira su
+    // trabajo—, pero GUARDAR queda bloqueado mientras la lectura esté en
+    // error: guardaría encima de un plan que no se pudo leer. Si Reintentar
+    // lee bien, se desbloquea.
+    final saveBlocked = readFailed && draft != null;
 
     final Widget body;
     final String bodyKey;
     if (draft != null) {
       bodyKey = 'form';
-      body = _PlanForm(
+      final form = _PlanForm(
         plan: draft,
         onTitleChanged: (v) => _setDraft((p) => p.copyWith(title: v)),
         onMealChanged: _updateMeal,
@@ -332,6 +349,19 @@ class _TrainerNutritionPlanEditorScreenState
         onAddGroup: _addGroup,
         onEditOption: _editOption,
       );
+      body = !saveBlocked
+          ? form
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _StaleReadBanner(
+                  message: l10n.trainerNutritionEditorStaleReadError,
+                  retryLabel: l10n.coachRetryLabel,
+                  onRetry: () => ref.invalidate(provider),
+                ),
+                Expanded(child: form),
+              ],
+            );
     } else if (planAsync.hasError) {
       bodyKey = 'error';
       body = _LoadError(
@@ -370,7 +400,7 @@ class _TrainerNutritionPlanEditorScreenState
                 _kPieAbajo,
               ),
               child: ElevatedButton(
-                onPressed: _saving ? null : _save,
+                onPressed: _saving || saveBlocked ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
                   foregroundColor: TreinoButtonTokens.foreground(context),
@@ -897,6 +927,50 @@ class _TextAction extends StatelessWidget {
               color: palette.accentText,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Aviso arriba del formulario cuando la lectura falló con el PF ya editando.
+class _StaleReadBanner extends StatelessWidget {
+  const _StaleReadBanner({
+    required this.message,
+    required this.retryLabel,
+    required this.onRetry,
+  });
+
+  final String message;
+  final String retryLabel;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: Border.all(color: palette.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.barlow(
+                  fontSize: AppTextSize.bodyDense,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(onPressed: onRetry, child: Text(retryLabel)),
+          ],
         ),
       ),
     );

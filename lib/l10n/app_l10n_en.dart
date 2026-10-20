@@ -634,6 +634,10 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t save the plan. Try again.';
 
   @override
+  String get trainerNutritionEditorStaleReadError =>
+      'We couldn\'t read the saved plan. To avoid overwriting it, you can\'t save until it\'s read again.';
+
+  @override
   String get trainerNutritionEditorEmptyPlan =>
       'The plan is empty. Add at least one meal with a name.';
 

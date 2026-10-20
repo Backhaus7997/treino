@@ -6300,8 +6300,14 @@ class _NutricionTab extends ConsumerStatefulWidget {
 
 class _NutricionTabState extends ConsumerState<_NutricionTab> {
   NutritionPlan? _draft;
+
+  /// El borrador tal como se sembró o se guardó por última vez: contra esto se
+  /// mide si el PF editó algo (#1581).
+  NutritionPlan? _baseline;
   bool _loadedOnce = false;
   bool _saving = false;
+
+  bool get _dirty => _draft != null && _draft != _baseline;
 
   /// Un id que no usa ningún ítem del borrador. Antes era un contador que
   /// arrancaba en 0 en cada sesión: sobre un plan con `meal-1` guardado, la
@@ -6324,6 +6330,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
         updatedAt: DateTime(2000),
       );
     }
+    _baseline = _draft;
   }
 
   @override
@@ -6332,6 +6339,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     // Reset cross-alumno para que el swap no muestre el plan del anterior.
     if (oldWidget.athleteId != widget.athleteId) {
       _draft = null;
+      _baseline = null;
       _loadedOnce = false;
     }
   }
@@ -6353,6 +6361,8 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     try {
       await ref.read(nutritionPlanRepositoryProvider).save(clean);
       if (!mounted) return;
+      // Lo que está en pantalla ya quedó guardado: no hay cambios pendientes.
+      _baseline = draft;
       showTreinoToastOn(
         messenger,
         'Plan guardado.', // i18n: Fase W2
@@ -6420,9 +6430,25 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     );
     final planAsync = ref.watch(provider);
 
-    if (planAsync.hasValue) {
+    // El error GANA sobre un valor previo (#1581). Riverpod conserva el valor
+    // viejo dentro del `AsyncError`: con la copia buena en la caché y el doc
+    // que el servidor devuelve ilegible, `hasValue` da true, y sembrar de ahí
+    // dejaba GUARDAR PLAN pisando el doc del servidor con la copia vieja.
+    final readFailed = planAsync.hasError;
+    if (planAsync.hasValue && !readFailed) {
       _seedIfNeeded(planAsync.requireValue, trainerUid);
+    } else if (readFailed && _draft != null && !_dirty) {
+      // Carrera: se sembró con la copia de la caché y el servidor falló
+      // después. Sin ediciones del PF no hay nada que perder: se descarta el
+      // borrador y se muestra el error.
+      _draft = null;
+      _baseline = null;
+      _loadedOnce = false;
     }
+    // Con ediciones del PF el borrador se conserva, pero GUARDAR PLAN queda
+    // bloqueado mientras la lectura esté en error: guardaría encima de un plan
+    // que no se pudo leer. Si Reintentar lee bien, se desbloquea.
+    final saveBlocked = readFailed && _draft != null;
 
     if (_draft == null && planAsync.hasError) {
       // NO arrancamos de los presets: guardar ese borrador pisaría el plan
@@ -6489,10 +6515,17 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                 TreinoButton(
                   label: 'GUARDAR PLAN', // i18n: Fase W2
                   loading: _saving,
-                  onPressed: _save,
+                  onPressed: saveBlocked ? null : _save,
                 ),
               ],
             ),
+            if (saveBlocked) ...[
+              StaleDataNotice(onRetry: () => ref.invalidate(provider)),
+              Text(
+                'No pudimos leer el plan guardado. Para no pisarlo, GUARDAR PLAN queda bloqueado hasta volver a leerlo.', // i18n: Fase W2
+                style: TextStyle(color: palette.textMuted, fontSize: 13),
+              ),
+            ],
             const SizedBox(height: 16),
             Expanded(
               child: SingleChildScrollView(

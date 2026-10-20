@@ -668,6 +668,7 @@
   "trainerNutritionEditorSave": "GUARDAR PLAN",
   "trainerNutritionEditorSaved": "Plan nutricional guardado.",
   "trainerNutritionEditorSaveError": "No pudimos guardar el plan. Probá de nuevo.",
+  "trainerNutritionEditorStaleReadError": "No pudimos leer el plan guardado. Para no pisarlo, no se puede guardar hasta volver a leerlo.",
   "trainerNutritionEditorEmptyPlan": "El plan está vacío. Agregá al menos una comida con nombre.",
   "trainerNutritionEditorDiscardTitle": "¿Descartar cambios?",
   "trainerNutritionEditorDiscardBody": "Si salís ahora vas a perder los cambios del plan sin guardar.",
