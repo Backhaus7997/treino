@@ -4273,9 +4273,29 @@ service cloud.firestore {
          // El disyunto lee `resource.data.trainerId`, el valor GUARDADO, que
          // de todas formas está pineado más arriba: un atleta no puede
          // pasar por acá reescribiéndose como PF del turno.
+         //
+         // ─── 21 h y no 24 h: son 24 h REALES en ART ───────────────────────
+         //
+         // `startsAt` es wall-clock etiquetado UTC (ADR-7): una sesión a las
+         // 10:00 de Buenos Aires se guarda como 10:00Z, pero OCURRE a las
+         // 13:00Z. `request.time` es el instante real. Con el `- 24 h` que
+         // había acá, el alumno tenía que cancelar antes de las 10:00Z del
+         // día anterior = 07:00 ART: 27 h antes de la sesión, no 24. Medido
+         // en el emulador: DENY a 25 h y a 26:59 reales, ALLOW a 27:01.
+         //
+         // Restar 21 h (= 24 h − el offset de ART) devuelve las 24 h reales, y
+         // deja la regla igual al cliente, que mide en wall-clock
+         // (`AppointmentRepository.cancel`, `AppointmentTile` de MI AGENDA).
+         //
+         // Fijar UTC−3 es la misma apuesta que ya hace la app
+         // (`core/utils/argentina_time.dart`): Argentina no tiene horario de
+         // verano desde 2009. Un alumno con el teléfono en otra zona sigue
+         // desfasado, igual que con todo ADR-7. La alternativa —guardar
+         // también el instante real del turno— agregaba una clave escrita por
+         // el cliente que esta regla no puede verificar, y se descartó.
          && (request.auth.uid == resource.data.trainerId
              || !(resource.data.get('startsAt', null) is timestamp)
-             || resource.data.startsAt.toMillis() - 86400000
+             || resource.data.startsAt.toMillis() - 75600000
                 > request.time.toMillis()))
         ||
         // Path 2: trainer edits coaching notes OR links a Payment on their own

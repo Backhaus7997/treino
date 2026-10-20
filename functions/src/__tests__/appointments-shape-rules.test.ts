@@ -2618,6 +2618,62 @@ describe("appointments update — el gate de 24 h sigue mordiendo (#847)", () =>
 });
 
 /**
+ * El gate de 24 h son 24 h REALES en Argentina, no 27.
+ *
+ * `startsAt` es wall-clock etiquetado UTC (ADR-7): una sesión a las 10:00 de
+ * Buenos Aires se guarda como 10:00Z y ocurre a las 13:00Z. El gate restaba
+ * 24 h a ese valor contra `request.time` (el instante real), así que el alumno
+ * tenía que cancelar antes de las 07:00 ART del día anterior: 27 h. Medido:
+ * DENY a 25 h y a 26:59 reales, ALLOW a 27:01. Ahora resta 21 h.
+ *
+ * Los casos de arriba siembran `startsAt` como instante real, que es otra
+ * cosa: éstos lo siembran COMO LO GUARDA LA APP (real − 3 h), que es lo que
+ * escondía el desfase.
+ */
+describe("appointments update — el gate son 24 h reales en ART", () => {
+  const ART_MS = 3 * 3600000;
+  const MIN = 60000;
+  const TURNOS: Record<string, number> = {
+    "art-2359": 23 * 3600000 + 59 * MIN,
+    "art-2401": 24 * 3600000 + 1 * MIN,
+    "art-25h": 25 * 3600000,
+  };
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      for (const [id, faltan] of Object.entries(TURNOS)) {
+        await setDoc(
+          doc(ctx.firestore(), COL, id),
+          appointment({
+            id,
+            // La hora de reloj ART etiquetada UTC, como `createByTrainer`.
+            startsAt: Timestamp.fromMillis(Date.now() + faltan - ART_MS),
+          })
+        );
+      }
+    });
+  });
+
+  const cancelar = (id: string) =>
+    updateDoc(doc(dbAs(ATHLETE), COL, id), {
+      status: "cancelled",
+      cancelledBy: ATHLETE,
+    });
+
+  it("DENIEGA al atleta cancelar a 23 h 59 min reales", async () => {
+    await assertFails(cancelar("art-2359"));
+  });
+
+  it("permite al atleta cancelar a 24 h 01 min reales — el borde son 24 h", async () => {
+    await assertSucceeds(cancelar("art-2401"));
+  });
+
+  it("permite al atleta cancelar a 25 h reales — con −24 h daba DENY", async () => {
+    await assertSucceeds(cancelar("art-25h"));
+  });
+});
+
+/**
  * #1492 — el PF cancela sin gate de tiempo, y marca la asistencia.
  *
  * Dos cambios del bloque `appointments`:
