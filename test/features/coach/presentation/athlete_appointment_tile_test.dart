@@ -5,10 +5,12 @@
 // nuevo en el turno — «AVISAR A MI PF» abre el chat, y el PF (que desde #1492
 // cancela a menos de 24 h) decide.
 //
-// Los horarios se arman relativos a un reloj congelado, y los márgenes son
-// anchos a propósito (3 h y 3 días) para que el resultado no dependa de la
-// zona horaria de la máquina: la tarjeta mide el "ya empezó" en wall-clock y
-// las 24 h contra el instante real, como el servidor.
+// Los horarios se arman relativos a un reloj congelado y en wall-clock
+// (`nowWall()`), que es como mide la tarjeta tanto el "ya empezó" como las
+// 24 h: así el resultado no depende de la zona horaria de la máquina. El
+// servidor resta 21 h a `startsAt` contra el instante real, que en ART son
+// las mismas 24 h; los bordes de abajo (23:59 / 24:01) son los mismos que
+// prueban las dos suites de reglas.
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -156,6 +158,33 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('chat chat-1515 con $_kTrainer'), findsOneWidget);
+  });
+
+  // El borde: CANCELAR aparece exactamente donde la regla deja cancelar.
+  testWidgets('a 23 h 59 min todavía no hay CANCELAR', (tester) async {
+    final appt = _appt(
+      't-2359',
+      nowWall().add(const Duration(hours: 23, minutes: 59)),
+    );
+
+    await tester.pumpWidget(_wrap(appt, firestore));
+    await tester.pumpAndSettle();
+
+    expect(find.text('CANCELAR'), findsNothing);
+    expect(find.text('AVISAR A MI PF'), findsOneWidget);
+  });
+
+  testWidgets('a 24 h 01 min ya hay CANCELAR', (tester) async {
+    final appt = _appt(
+      't-2401',
+      nowWall().add(const Duration(hours: 24, minutes: 1)),
+    );
+
+    await tester.pumpWidget(_wrap(appt, firestore));
+    await tester.pumpAndSettle();
+
+    expect(find.text('CANCELAR'), findsOneWidget);
+    expect(find.text('AVISAR A MI PF'), findsNothing);
   });
 
   testWidgets('con la sesión empezada no hay ninguna acción', (tester) async {

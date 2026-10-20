@@ -8,7 +8,6 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
-import '../../../core/utils/app_clock.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -517,20 +516,20 @@ class AppointmentTile extends ConsumerWidget {
 
   final Appointment appointment;
 
-  /// Wall-clock "now" (ADR-7): decide si la sesión ya empezó.
+  /// Wall-clock "now" (ADR-7): decide si la sesión ya empezó y si faltan más
+  /// de 24 h.
   final DateTime now;
 
   /// ¿El alumno todavía la puede cancelar?
   ///
-  /// Mide contra el instante REAL y no contra [now], a propósito: es lo que
-  /// compara el gate de `firestore.rules` (`startsAt - 24 h > request.time`).
-  /// Como `startsAt` es wall-clock, en ART el servidor exige ~27 h de reloj;
-  /// medido en wall-clock, el botón aparecería entre las 24 y las 27 h y
-  /// fallaría con permission-denied. Mejor no ofrecer lo que el servidor va a
-  /// rechazar.
+  /// En wall-clock, igual que `AppointmentRepository.cancel`. El gate de
+  /// `firestore.rules` resta 21 h y no 24 a un `startsAt` wall-clock contra
+  /// el instante real: en ART son las mismas 24 h. Antes restaba 24, el
+  /// servidor exigía ~27 h, y esta tarjeta medía contra el instante real para
+  /// no ofrecer un CANCELAR que iba a rebotar (#1554). Con la regla
+  /// corregida, las tres medidas coinciden.
   bool get _puedeCancelar =>
-      appointment.startsAt.difference(AppClock.now().toUtc()) >
-      const Duration(hours: 24);
+      appointment.startsAt.difference(now) > const Duration(hours: 24);
 
   Future<void> _cancelar(BuildContext context, WidgetRef ref) async {
     final l10n = AppL10n.of(context);
@@ -558,8 +557,10 @@ class AppointmentTile extends ConsumerWidget {
         type: TreinoToastType.error,
       );
     } on FirebaseException catch (e) {
-      // El cliente y el servidor miden las 24 h con relojes distintos; si el
-      // tap cae justo en el borde, el que manda es el servidor.
+      // Cliente y servidor miden las mismas 24 h, pero con relojes distintos
+      // (el del teléfono y el de Firestore): si el tap cae justo en el borde,
+      // o el teléfono no está en hora de Argentina, el que manda es el
+      // servidor.
       showTreinoToastOn(
         messenger,
         e.code == 'permission-denied'
