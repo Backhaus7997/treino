@@ -94,6 +94,42 @@ void main() {
   });
 
   testWidgets(
+      'dentro de un SafeArea (shell), el body arranca bajo la status bar y '
+      'recupera el inset para reservarlo', (tester) async {
+    late double bodyInset;
+    await _pump(
+      tester,
+      MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: Scaffold(
+          body: SafeArea(
+            child: TreinoCollapsingTopBar(
+              onBack: () {},
+              body: Builder(
+                builder: (context) {
+                  bodyInset = MediaQuery.paddingOf(context).top;
+                  return const SizedBox.expand(key: Key('body'));
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.getRect(find.byKey(const Key('body'))).top, 0);
+    expect(bodyInset, _safeTop);
+    // La flecha no se mueve: sigue colgando del borde del área segura.
+    expect(
+      tester.getRect(find.byKey(_back)).top,
+      _safeTop + TreinoTopBarMetrics.topInset,
+    );
+  });
+
+  testWidgets(
       'offset 0: sin fondo ni título chico; el título grande queda '
       'debajo de la flecha', (tester) async {
     await _pump(tester, _screen());

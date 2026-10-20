@@ -183,16 +183,18 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final top = MediaQuery.paddingOf(context).top;
+    final media = MediaQuery.of(context);
     // Inset superior que un `SafeArea` de arriba (el del shell o
-    // `_immersive`) ya consumió: el fondo de la barra se estira hacia arriba
-    // esa distancia para cubrir la status bar. Sin esto la barra arrancaba
-    // debajo del reloj y se veía como un componente suelto en el medio.
+    // `_immersive`) ya consumió. La pantalla entera —body y barra— se estira
+    // hacia arriba esa distancia y se le devuelve el inset en el MediaQuery:
+    // el hero/gradiente y el fondo de la barra llegan al borde físico, bajo el
+    // reloj, en vez de arrancar debajo y verse como un bloque suelto.
     final view = View.maybeOf(context);
     final bleed = view == null
         ? 0.0
-        : (MediaQueryData.fromView(view).padding.top - top)
+        : (MediaQueryData.fromView(view).padding.top - media.padding.top)
             .clamp(0.0, double.infinity);
+    final top = media.padding.top + bleed;
     final title = widget.title;
 
     // Sobre foto y sin colapsar: blanco con sombra. Si no, color del tema.
@@ -208,9 +210,7 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
           ]
         : const <Shadow>[];
 
-    return Stack(
-      // El fondo pinta fuera de los límites (hacia la status bar).
-      clipBehavior: Clip.none,
+    final content = Stack(
       children: [
         Positioned.fill(
           child: NotificationListener<ScrollNotification>(
@@ -224,16 +224,10 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
           right: 0,
           height: top + TreinoTopBarMetrics.barHeight,
           child: Stack(
-            clipBehavior: Clip.none,
             children: [
-              // Fondo: translúcido + desenfoque + borde inferior, de borde a
-              // borde físico (incluida la status bar ya consumida).
+              // Fondo: translúcido + desenfoque + borde inferior.
               if (_mounted)
-                Positioned(
-                  top: -bleed,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
+                Positioned.fill(
                   child: IgnorePointer(
                     child: AnimatedOpacity(
                       key: const Key('treino-top-bar-surface'),
@@ -334,6 +328,32 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+
+    if (bleed == 0) return content;
+    // Clip.none: el hijo se pinta por encima de los propios límites, sobre la
+    // franja que el SafeArea dejó vacía. Esa franja no recibe toques (queda
+    // fuera del área de hit-test), y no hay nada tocable ahí: los botones
+    // arrancan en `top + topInset`, dentro de los límites.
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          top: -bleed,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: MediaQuery(
+            data: media.copyWith(
+              padding: media.padding.copyWith(top: top),
+              viewPadding: media.viewPadding.copyWith(
+                top: media.viewPadding.top + bleed,
+              ),
+            ),
+            child: content,
           ),
         ),
       ],
