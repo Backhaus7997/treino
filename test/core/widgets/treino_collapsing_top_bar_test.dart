@@ -255,4 +255,60 @@ void main() {
     expect(iconTheme().color, isNot(Colors.white));
     expect(iconTheme().shadows, anyOf(isNull, isEmpty));
   });
+
+  group('animación de aparición', () {
+    // Lo que se desliza es el contenido del AnimatedSlide, no su caja.
+    final surfacePaint = find.descendant(
+      of: find.byKey(const Key('treino-top-bar-surface-slide')),
+      matching: find.byType(BackdropFilter),
+    );
+
+    // Entre el frame en que se monta y el final de la animación, el fondo está
+    // corrido hacia arriba; al terminar, pegado al borde.
+    Future<double> surfaceTopMidway(WidgetTester tester) async {
+      await tester.pump(); // monta en 0
+      await tester.pump(); // post-frame: arranca hacia 1
+      await tester.pump(const Duration(milliseconds: 60));
+      return tester.getRect(surfacePaint).top;
+    }
+
+    testWidgets('el fondo baja desde arriba al aparecer', (tester) async {
+      await _pump(tester, _screen());
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+
+      expect(await surfaceTopMidway(tester), lessThan(0));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(surfacePaint).top, 0);
+    });
+
+    testWidgets('al volver arriba sube y se desmonta', (tester) async {
+      await _pump(tester, _screen());
+      await _scroll(tester, -300);
+
+      await tester.drag(find.byType(ListView), const Offset(0, 300));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(tester.getRect(surfacePaint).top, lessThan(0));
+
+      await tester.pumpAndSettle();
+      expect(find.byKey(_surface), findsNothing);
+    });
+
+    testWidgets('con «reducir movimiento» no se desliza, sólo funde',
+        (tester) async {
+      await _pump(
+        tester,
+        MediaQuery(
+          data: const MediaQueryData(
+            disableAnimations: true,
+            padding: EdgeInsets.only(top: _safeTop),
+          ),
+          child: _screen(),
+        ),
+      );
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+
+      expect(await surfaceTopMidway(tester), 0);
+    });
+  });
 }

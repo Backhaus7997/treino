@@ -48,6 +48,12 @@ abstract final class TreinoTopBarMetrics {
   /// Opacidad del color de superficie de la barra (translúcida: se insinúa
   /// el contenido que pasa por debajo).
   static const double surfaceAlpha = 0.78;
+
+  /// Fracción de su propio alto desde la que baja el fondo al aparecer.
+  static const double enterSlide = 0.35;
+
+  /// Fracción de su propio alto desde la que sube el título al aparecer.
+  static const double titleEnterSlide = 0.4;
 }
 
 /// Acción de la barra superior (editar, seguir, menú…): un [IconButton] de
@@ -186,6 +192,15 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
     final top = MediaQuery.paddingOf(context).top;
     final title = widget.title;
 
+    // Entrar y salir no pesan lo mismo: aparece con [AppMotion.base] y curva
+    // de entrada, y se va más rápido con la de salida, para que al volver
+    // arriba no quede colgando. Con «reducir movimiento» no hay deslizamiento,
+    // sólo el fundido.
+    final reduce = AppMotion.reduceMotion(context);
+    final fadeDuration = _shown ? AppMotion.base : AppMotion.fast;
+    final fadeCurve = _shown ? AppMotion.standard : AppMotion.exit;
+    final slideDuration = reduce ? Duration.zero : fadeDuration;
+
     // Sobre foto y sin colapsar: blanco con sombra. Si no, color del tema.
     final onMedia = widget.overHero && !_collapsed;
     // intentional: media surface (el ícono vive sobre una foto/video).
@@ -221,22 +236,33 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
                     child: AnimatedOpacity(
                       key: const Key('treino-top-bar-surface'),
                       opacity: _shown ? 1 : 0,
-                      duration: AppMotion.fast,
-                      curve: AppMotion.standard,
+                      duration: fadeDuration,
+                      curve: fadeCurve,
                       onEnd: _onFadeEnd,
-                      child: ClipRect(
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(
-                            sigmaX: TreinoTopBarMetrics.blurSigma,
-                            sigmaY: TreinoTopBarMetrics.blurSigma,
-                          ),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: palette.bgCard.withValues(
-                                alpha: TreinoTopBarMetrics.surfaceAlpha,
-                              ),
-                              border: Border(
-                                bottom: BorderSide(color: palette.border),
+                      // Baja desde arriba mientras aparece (y sube al irse):
+                      // se lee como una barra que entra, no como un fondo que
+                      // se enciende en el lugar.
+                      child: AnimatedSlide(
+                        key: const Key('treino-top-bar-surface-slide'),
+                        offset: _shown || reduce
+                            ? Offset.zero
+                            : const Offset(0, -TreinoTopBarMetrics.enterSlide),
+                        duration: slideDuration,
+                        curve: fadeCurve,
+                        child: ClipRect(
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(
+                              sigmaX: TreinoTopBarMetrics.blurSigma,
+                              sigmaY: TreinoTopBarMetrics.blurSigma,
+                            ),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: palette.bgCard.withValues(
+                                  alpha: TreinoTopBarMetrics.surfaceAlpha,
+                                ),
+                                border: Border(
+                                  bottom: BorderSide(color: palette.border),
+                                ),
                               ),
                             ),
                           ),
@@ -289,18 +315,30 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
                                 child: AnimatedOpacity(
                                   key: const Key('treino-top-bar-title'),
                                   opacity: _shown ? 1 : 0,
-                                  duration: AppMotion.fast,
-                                  curve: AppMotion.standard,
-                                  child: Center(
-                                    child: Text(
-                                      title.toUpperCase(),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.barlowCondensed(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: AppTextSize.title,
-                                        letterSpacing: 0.5,
-                                        color: palette.textPrimary,
+                                  duration: fadeDuration,
+                                  curve: fadeCurve,
+                                  // El título sube un poco al entrar: acompaña
+                                  // al grande que acaba de salir por arriba.
+                                  child: AnimatedSlide(
+                                    offset: _shown || reduce
+                                        ? Offset.zero
+                                        : const Offset(
+                                            0,
+                                            TreinoTopBarMetrics.titleEnterSlide,
+                                          ),
+                                    duration: slideDuration,
+                                    curve: fadeCurve,
+                                    child: Center(
+                                      child: Text(
+                                        title.toUpperCase(),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.barlowCondensed(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: AppTextSize.title,
+                                          letterSpacing: 0.5,
+                                          color: palette.textPrimary,
+                                        ),
                                       ),
                                     ),
                                   ),
