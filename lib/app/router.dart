@@ -1663,11 +1663,13 @@ class _ShellScaffold extends ConsumerStatefulWidget {
   ConsumerState<_ShellScaffold> createState() => _ShellScaffoldState();
 }
 
-class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
-  /// Cuánto scroll vertical acumulado hace falta para cambiar de estado.
-  /// Chico dispara con el temblor del dedo; grande se siente trabado.
-  static const double _collapseThreshold = 20;
-  static const double _expandThreshold = 12;
+class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
+    with SingleTickerProviderStateMixin {
+  /// Cuántos px de scroll lleva pasar de barra entera a compacta (y al
+  /// revés). La barra SIGUE AL DEDO dentro de ese tramo: scrollear despacio
+  /// la compacta despacio, frenar a mitad la deja a mitad. Al soltar se
+  /// asienta del lado más cercano.
+  static const double _collapseRange = 64;
 
   /// Zona muerta arriba de todo: dentro de ella la barra siempre está
   /// expandida, sin importar el gesto. Evita que un micro-scroll al tope deje
@@ -1678,20 +1680,36 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
   /// se reconstruye la barra. Con `setState` se reconstruiría también el body
   /// —o sea la pantalla entera— en medio de un scroll, que es exactamente el
   /// momento en el que menos se puede pagar (`docs/performance.md`).
-  final ValueNotifier<bool> _navCollapsed = ValueNotifier(false);
+  ///
+  /// Es un [AnimationController] (y no un `ValueNotifier`) porque además de
+  /// seguir al scroll tiene que poder animarse solo: al soltar se asienta, y
+  /// al volver al tope o cambiar de tab vuelve a 1. 1 = entera, 0 = compacta.
+  late final AnimationController _nav = AnimationController(
+    vsync: this,
+    value: 1,
+  );
 
   @override
   void dispose() {
-    _navCollapsed.dispose();
+    _nav.dispose();
     super.dispose();
+  }
+
+  /// Lleva la barra a [target] animando (o de una si se pidió reducir
+  /// movimiento).
+  void _settleNav(double target) {
+    if (_nav.value == target && !_nav.isAnimating) return;
+    _nav.animateTo(
+      target,
+      duration: AppMotion.resolve(context, AppMotion.fast),
+      curve: AppMotion.standard,
+    );
   }
 
   int get _currentIndex {
     final i = _kTabs.indexWhere((t) => widget.location.startsWith(t));
     return i < 0 ? 2 : i;
   }
-
-  double _dragAccumulator = 0;
 
   /// Escucha el scroll de CUALQUIER pantalla del shell.
   ///
@@ -1706,6 +1724,14 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
   /// barra, que es justo lo que nadie pidió.
   bool _handleScroll(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
+    // Al soltar (y cuando termina la inercia) la barra no puede quedar a
+    // medias: se asienta del lado que esté más cerca.
+    if (notification is ScrollEndNotification) {
+      if (_nav.value > 0 && _nav.value < 1) {
+        _settleNav(_nav.value < 0.5 ? 0 : 1);
+      }
+      return false;
+    }
     if (notification is! ScrollUpdateNotification) return false;
 
     final delta = notification.scrollDelta;
@@ -1713,8 +1739,7 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
 
     final metrics = notification.metrics;
     if (metrics.pixels <= metrics.minScrollExtent + _topRevealZone) {
-      _dragAccumulator = 0;
-      _navCollapsed.value = false;
+      _settleNav(1);
       return false;
     }
 
@@ -1725,23 +1750,12 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
     // 20 px en pleno rebote, y la última fila queda pegada al vidrio: se
     // sentía trabado justo al llegar abajo. Mientras la posición está fuera
     // de rango, la barra se queda como está.
-    if (metrics.pixels > metrics.maxScrollExtent) {
-      _dragAccumulator = 0;
-      return false;
-    }
+    if (metrics.pixels > metrics.maxScrollExtent) return false;
 
-    // Cambiar de dirección resetea: la intención nueva no arrastra el saldo
-    // de la anterior.
-    if (delta.isNegative != _dragAccumulator.isNegative) _dragAccumulator = 0;
-    _dragAccumulator += delta;
-
-    if (_dragAccumulator >= _collapseThreshold) {
-      _dragAccumulator = 0;
-      _navCollapsed.value = true;
-    } else if (_dragAccumulator <= -_expandThreshold) {
-      _dragAccumulator = 0;
-      _navCollapsed.value = false;
-    }
+    // Sigue al dedo: cada px de scroll mueve la barra 1/_collapseRange. Si
+    // estaba asentándose, el dedo manda y la animación se corta.
+    if (_nav.isAnimating) _nav.stop();
+    _nav.value = (_nav.value - delta / _collapseRange).clamp(0.0, 1.0);
     return false;
   }
 
@@ -1770,13 +1784,14 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
           child: SafeArea(top: false, bottom: false, child: widget.child),
         ),
       ),
-      bottomNavigationBar: ValueListenableBuilder<bool>(
-        valueListenable: _navCollapsed,
-        builder: (context, collapsed, _) => TreinoBottomBar(
+      bottomNavigationBar: AnimatedBuilder(
+        animation: _nav,
+        builder: (context, _) => TreinoBottomBar(
           currentIndex: _currentIndex,
           coachUnreadCount: coachUnreadCount,
           feedUnreadCount: feedUnreadCount,
-          collapsed: collapsed,
+          collapsed: _nav.value < 0.5,
+          expansion: _nav.value,
           onTap: (i) {
             // Pop any open popup (modal bottom sheet, dialog) on the SHELL
             // navigator so it animates closed when the user switches tabs —
@@ -1793,8 +1808,7 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
                 .popUntil((route) => route is! PopupRoute);
             // Cambiar de tab arranca de cero: la pantalla nueva se ve desde
             // arriba, así que la barra tiene que estar entera.
-            _dragAccumulator = 0;
-            _navCollapsed.value = false;
+            _nav.value = 1;
             context.go(_kTabs[i]);
           },
         ),
