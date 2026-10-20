@@ -6,11 +6,15 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 
-/// Card shown at the bottom of LoginScreen and RegisterScreen for trainer
-/// access inquiry.
-/// Tapping opens an AlertDialog with the team email.
+/// Card shown at the bottom of WelcomeScreen, LoginScreen and RegisterScreen
+/// for trainer access inquiry.
+/// Tapping opens an AlertDialog with the team email, unless [onTap] replaces
+/// it (WelcomeScreen opens the contact mail directly).
 class TrainerInquiryCard extends StatelessWidget {
-  const TrainerInquiryCard({super.key});
+  const TrainerInquiryCard({super.key, this.onTap});
+
+  /// Acción al tocar. Null = el diálogo con el mail del equipo.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +22,7 @@ class TrainerInquiryCard extends StatelessWidget {
     final l10n = AppL10n.of(context);
 
     return GestureDetector(
-      onTap: () => _showDialog(context, palette),
+      onTap: onTap ?? () => _showDialog(context, palette),
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(

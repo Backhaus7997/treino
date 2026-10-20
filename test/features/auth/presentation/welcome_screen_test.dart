@@ -8,6 +8,7 @@ import 'package:treino/features/auth/presentation/welcome_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
 import 'package:treino/features/auth/presentation/widgets/terms_notice_text.dart';
+import 'package:treino/features/auth/presentation/widgets/trainer_inquiry_card.dart';
 import 'package:treino/core/widgets/treino_logo.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -220,13 +221,16 @@ void main() {
   // equipo por Admin SDK), así que el acceso lleva al mismo contacto por mail
   // que el Coach Hub, no a un registro.
   // ---------------------------------------------------------------------------
-  testWidgets('muestra el acceso «Quiero ser entrenador»', (tester) async {
+  testWidgets(
+      'muestra el acceso «Quiero ser entrenador» con la misma tarjeta '
+      'que Login y Registro', (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    final cta = find.text('Quiero ser entrenador');
+    final cta = find.byType(TrainerInquiryCard);
     expect(cta, findsOneWidget);
     expect(find.text('¿Sos entrenador?'), findsOneWidget);
+    expect(find.text('Pedí tu alta al equipo TREINO'), findsOneWidget);
     expect(
       find
           .ancestor(of: cta, matching: find.byType(Semantics))
@@ -246,8 +250,8 @@ void main() {
     }));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Quiero ser entrenador'));
-    await tester.tap(find.text('Quiero ser entrenador'));
+    await tester.ensureVisible(find.byType(TrainerInquiryCard));
+    await tester.tap(find.byType(TrainerInquiryCard));
     await tester.pumpAndSettle();
 
     expect(abiertas, hasLength(1));
@@ -256,6 +260,8 @@ void main() {
     expect(url.path, kLegalContactEmail);
     expect(url.query, 'subject=Quiero%20ser%20entrenador%20en%20TREINO');
     expect(find.byType(SnackBar), findsNothing);
+    // Abre el mail directo: no el diálogo que la tarjeta muestra en Login.
+    expect(find.byType(AlertDialog), findsNothing);
   });
 
   testWidgets('sin cliente de mail avisa y deja la dirección a la vista',
@@ -263,8 +269,8 @@ void main() {
     await tester.pumpWidget(_buildApp(abrirUrl: (_) async => false));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Quiero ser entrenador'));
-    await tester.tap(find.text('Quiero ser entrenador'));
+    await tester.ensureVisible(find.byType(TrainerInquiryCard));
+    await tester.tap(find.byType(TrainerInquiryCard));
     await tester.pumpAndSettle();
 
     expect(find.byType(SnackBar), findsOneWidget);
@@ -277,8 +283,8 @@ void main() {
         _buildApp(abrirUrl: (_) async => throw Exception('sin handler')));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Quiero ser entrenador'));
-    await tester.tap(find.text('Quiero ser entrenador'));
+    await tester.ensureVisible(find.byType(TrainerInquiryCard));
+    await tester.tap(find.byType(TrainerInquiryCard));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);

@@ -9,9 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
-import '../../../app/theme/tokens/primitives.dart';
 import '../../../core/contact/quiero_ser_entrenador.dart';
-import '../../../core/widgets/treino_icon.dart';
 import '../../../core/widgets/treino_toast.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../application/auth_providers.dart';
@@ -23,6 +21,7 @@ import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
 import 'widgets/terms_notice_text.dart';
+import 'widgets/trainer_inquiry_card.dart';
 import '../../../core/widgets/treino_logo.dart';
 
 /// Identifies which social provider button is currently awaiting its OAuth
@@ -269,8 +268,15 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: AppSpacing.s12),
-                            _quieroSerEntrenador(palette, l10n),
+                            const SizedBox(height: 20),
+                            // Misma tarjeta violeta que Login y Registro, pero
+                            // abre el mail directo (ver _contactarParaSerEntrenador).
+                            Semantics(
+                              button: true,
+                              child: TrainerInquiryCard(
+                                onTap: _contactarParaSerEntrenador,
+                              ),
+                            ),
                             const SizedBox(height: 20),
                           ],
                         ),
@@ -289,47 +295,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   /// Acceso «Quiero ser entrenador». No hay alta self-service de PF —el rol lo
   /// asigna el equipo por Admin SDK—, así que lleva al mismo mail de contacto
   /// que la pantalla de no-autorizado del Coach Hub, no a un registro.
-  Widget _quieroSerEntrenador(AppPalette palette, AppL10n l10n) {
-    return Center(
-      child: Semantics(
-        button: true,
-        child: InkWell(
-          onTap: _contactarParaSerEntrenador,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s14,
-              vertical: AppSpacing.s12,
-            ),
-            child: Wrap(
-              alignment: WrapAlignment.center,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: AppSpacing.s8,
-              children: [
-                Icon(TreinoIcon.mail, size: 18, color: palette.accentText),
-                Text(
-                  l10n.authWelcomeTrainerPrompt,
-                  style: GoogleFonts.barlow(
-                    fontSize: 14,
-                    color: palette.textMuted,
-                  ),
-                ),
-                Text(
-                  l10n.authWelcomeBecomeTrainer,
-                  style: GoogleFonts.barlow(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: palette.accentText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _contactarParaSerEntrenador() async {
     final l10n = AppL10n.of(context);
     var abierto = false;
