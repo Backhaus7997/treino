@@ -24,14 +24,16 @@ Widget _screen({
   bool overHero = false,
   ThemeData? theme,
   List<Widget>? actions,
+  bool insideSafeArea = false,
 }) {
+  Widget wrap(Widget child) => insideSafeArea ? SafeArea(child: child) : child;
   return MaterialApp(
     theme: theme ?? AppTheme.dark(),
     localizationsDelegates: AppL10n.localizationsDelegates,
     supportedLocales: AppL10n.supportedLocales,
     locale: const Locale('es', 'AR'),
     home: Scaffold(
-      body: Builder(
+      body: wrap(Builder(
         builder: (context) => TreinoCollapsingTopBar(
           title: _title,
           overHero: overHero,
@@ -56,7 +58,7 @@ Widget _screen({
             ],
           ),
         ),
-      ),
+      )),
     ),
   );
 }
@@ -76,6 +78,21 @@ Future<void> _scroll(WidgetTester tester, double dy) async {
 }
 
 void main() {
+  testWidgets(
+      'dentro de un SafeArea (shell), el fondo colapsado igual cubre la '
+      'status bar de borde a borde', (tester) async {
+    await _pump(tester, _screen(insideSafeArea: true));
+    await _scroll(tester, -300);
+
+    final surface = tester.getRect(find.byKey(_surface));
+    expect(surface.top, 0, reason: 'el fondo arranca debajo del reloj');
+    expect(
+      surface.bottom,
+      _safeTop + TreinoTopBarMetrics.barHeight,
+    );
+    expect(surface.width, 390);
+  });
+
   testWidgets(
       'offset 0: sin fondo ni título chico; el título grande queda '
       'debajo de la flecha', (tester) async {

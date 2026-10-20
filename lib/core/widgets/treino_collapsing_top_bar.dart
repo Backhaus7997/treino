@@ -184,6 +184,15 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final top = MediaQuery.paddingOf(context).top;
+    // Inset superior que un `SafeArea` de arriba (el del shell o
+    // `_immersive`) ya consumió: el fondo de la barra se estira hacia arriba
+    // esa distancia para cubrir la status bar. Sin esto la barra arrancaba
+    // debajo del reloj y se veía como un componente suelto en el medio.
+    final view = View.maybeOf(context);
+    final bleed = view == null
+        ? 0.0
+        : (MediaQueryData.fromView(view).padding.top - top)
+            .clamp(0.0, double.infinity);
     final title = widget.title;
 
     // Sobre foto y sin colapsar: blanco con sombra. Si no, color del tema.
@@ -200,6 +209,8 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
         : const <Shadow>[];
 
     return Stack(
+      // El fondo pinta fuera de los límites (hacia la status bar).
+      clipBehavior: Clip.none,
       children: [
         Positioned.fill(
           child: NotificationListener<ScrollNotification>(
@@ -213,10 +224,16 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
           right: 0,
           height: top + TreinoTopBarMetrics.barHeight,
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              // Fondo: translúcido + desenfoque + borde inferior.
+              // Fondo: translúcido + desenfoque + borde inferior, de borde a
+              // borde físico (incluida la status bar ya consumida).
               if (_mounted)
-                Positioned.fill(
+                Positioned(
+                  top: -bleed,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   child: IgnorePointer(
                     child: AnimatedOpacity(
                       key: const Key('treino-top-bar-surface'),
