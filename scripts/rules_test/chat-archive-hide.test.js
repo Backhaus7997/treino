@@ -45,7 +45,9 @@ beforeAll(async () => {
       port: Number(PORT),
     },
   });
-});
+  // Cargar firestore.rules entero en un emulador frío pasa los 5 s por
+  // defecto de jest, y el hook caído tumba la suite como si fueran 15 rojos.
+}, 30000);
 
 afterAll(async () => {
   await testEnv.cleanup();
