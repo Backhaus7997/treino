@@ -18,9 +18,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// `lib/core/widgets/treino_select.dart`: hoja del kit en teléfono, menú
 /// anclado en pantallas anchas.
 ///
-/// EL ESTADO AL CONGELAR: los archivos de [allowlist], con [deudaCeiling]
-/// ocurrencias. Es deuda con fecha de vencimiento —la migración va en el PR
-/// siguiente de la misma cadena—, no licencia: el techo sólo baja.
+/// EL ESTADO AL CONGELAR: 10 dropdowns en 6 archivos. La app mobile ya está
+/// migrada; queda `TreinoDropdown` del Coach Hub, que se va en el PR
+/// siguiente. El techo sólo baja.
 ///
 /// QUÉ **NO** PROHÍBE, y por qué:
 ///   - `PopupMenuButton` / `TreinoPopupMenuButton`. Casi todos son menús de
@@ -44,27 +44,25 @@ void main() {
       r'|DropdownMenuFormField|DropdownMenu)\s*(<[^;{}]*?>)?\(',
     );
 
-    /// Registro de deuda, no licencia. Cada entrada se va con su migración.
+    /// Registro de deuda, no licencia. Lo que queda es el Coach Hub web, que
+    /// se migra en el PR siguiente de la cadena.
     const allowlist = <String>{
-      'features/coach/presentation/trainer_dashboard_tab.dart',
-      'features/coach/presentation/widgets/new_session_sheet.dart',
       'features/coach_hub/presentation/widgets/treino_dropdown.dart',
-      'features/profile/presentation/profile_edit_trainer_screen.dart',
-      'features/workout/presentation/custom_exercise_editor_screen.dart',
-      'features/workout/presentation/routine_editor_screen.dart',
     };
-    const allowlistCeiling = 6;
+    const allowlistCeiling = 1;
 
     /// Techo de ocurrencias en `lib/`. Sólo baja.
-    const deudaCeiling = 10;
+    const deudaCeiling = 1;
 
     late List<String> offenders;
     late List<String> staleEntries;
     late int deudaTotal;
+    late Set<String> vistos;
 
     setUpAll(() {
       offenders = <String>[];
       deudaTotal = 0;
+      vistos = <String>{};
       final seen = <String>{};
 
       for (final entity in Directory('lib').listSync(recursive: true)) {
@@ -75,6 +73,7 @@ void main() {
         final libIndex = normalized.indexOf('lib/');
         if (libIndex == -1) continue;
         final relativePath = normalized.substring(libIndex + 4);
+        vistos.add(relativePath);
 
         final src = _sinComentarios(entity.readAsStringSync());
         final hits = patron.allMatches(src).toList();
@@ -166,11 +165,18 @@ void main() {
 
     // CONTROL DEL CONTROL. Que el regex cace un string no prueba que el
     // recorrido de `lib/` lo vea: un `Directory` mal apuntado da cero
-    // archivos y todo verde. Mientras quede deuda, el recorrido tiene que
-    // haberla encontrado.
-    test('el recorrido encontró los archivos congelados', () {
-      expect(deudaTotal, greaterThan(0));
-      expect(staleEntries, isEmpty);
+    // archivos y todo verde. Con la deuda en cero ya no hay hits que lo
+    // delaten, así que se verifica que haya recorrido archivos reales —entre
+    // ellos el del componente y uno de cada zona migrada—.
+    test('el recorrido mira el árbol real (control del control)', () {
+      expect(vistos.length, greaterThan(500));
+      expect(
+        vistos,
+        containsAll(<String>[
+          'core/widgets/treino_select.dart',
+          'features/workout/presentation/custom_exercise_editor_screen.dart',
+        ]),
+      );
     });
   });
 }

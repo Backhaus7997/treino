@@ -11,6 +11,7 @@ import '../../../core/widgets/discard_changes_dialog.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_select.dart';
 import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/custom_exercise_limit_gate.dart';
@@ -266,10 +267,10 @@ class _CustomExerciseEditorScreenState
               const SizedBox(height: 14),
               _Label('Grupo muscular', palette: palette),
               const SizedBox(height: 6),
-              _MuscleDropdown(
+              _MuscleSelect(
                 value: _primaryMuscle,
                 hint: 'Seleccionar…',
-                palette: palette,
+                title: 'Grupo muscular',
                 onChanged: (v) => setState(() {
                   _primaryMuscle = v;
                   // Keep secondary distinct from the primary.
@@ -279,10 +280,10 @@ class _CustomExerciseEditorScreenState
               const SizedBox(height: 14),
               _Label('Músculo secundario (opcional)', palette: palette),
               const SizedBox(height: 6),
-              _MuscleDropdown(
+              _MuscleSelect(
                 value: _secondaryMuscle,
                 hint: 'Ninguno',
-                palette: palette,
+                title: 'Músculo secundario',
                 // Exclude the primary so you can't pick the same muscle twice.
                 exclude: _primaryMuscle,
                 // Let the user clear it back to "Ninguno".
@@ -292,9 +293,8 @@ class _CustomExerciseEditorScreenState
               const SizedBox(height: 14),
               _Label('Equipamiento (opcional)', palette: palette),
               const SizedBox(height: 6),
-              _EquipmentDropdown(
+              _EquipmentSelect(
                 value: _equipment,
-                palette: palette,
                 onChanged: (v) => setState(() => _equipment = v),
               ),
               const SizedBox(height: 14),
@@ -797,16 +797,16 @@ class _Field extends StatelessWidget {
   }
 }
 
-/// Single-select dropdown over the canonical [MuscleGroup] taxonomy.
+/// Single-select over the canonical [MuscleGroup] taxonomy.
 ///
 /// Used for both the primary muscle (required-ish, no clear option) and the
 /// optional secondary muscle ([allowClear] adds a "Ninguno" row, [exclude]
 /// hides the primary so the same muscle can't be picked twice).
-class _MuscleDropdown extends StatelessWidget {
-  const _MuscleDropdown({
+class _MuscleSelect extends StatelessWidget {
+  const _MuscleSelect({
     required this.value,
     required this.hint,
-    required this.palette,
+    required this.title,
     required this.onChanged,
     this.exclude,
     this.allowClear = false,
@@ -814,127 +814,57 @@ class _MuscleDropdown extends StatelessWidget {
 
   final MuscleGroup? value;
   final String hint;
-  final AppPalette palette;
+  final String title;
   final void Function(MuscleGroup?) onChanged;
   final MuscleGroup? exclude;
   final bool allowClear;
 
   @override
   Widget build(BuildContext context) {
-    final groups = MuscleGroup.displayOrder.where((g) => g != exclude).toList();
-    return _DropdownShell(
-      palette: palette,
-      child: DropdownButton<MuscleGroup?>(
-        value: value,
-        isExpanded: true,
-        dropdownColor: palette.bgCard,
-        hint: _hintText(hint, palette),
-        style: GoogleFonts.barlow(
-          fontWeight: FontWeight.w500,
-          fontSize: 14,
-          color: palette.textPrimary,
-        ),
-        icon: Icon(TreinoIcon.chevronDown, size: 16, color: palette.textMuted),
-        items: [
-          if (allowClear)
-            DropdownMenuItem<MuscleGroup?>(
-              value: null,
-              child: _itemText(hint, palette, muted: true),
-            ),
-          for (final g in groups)
-            DropdownMenuItem<MuscleGroup?>(
-              value: g,
-              child: _itemText(g.label, palette),
-            ),
-        ],
-        onChanged: onChanged,
-      ),
+    final groups = MuscleGroup.displayOrder.where((g) => g != exclude);
+    return TreinoSelectField<MuscleGroup?>(
+      value: value,
+      hint: hint,
+      sheetTitle: title,
+      options: [
+        if (allowClear)
+          TreinoSelectOption(value: null, label: hint, muted: true),
+        for (final g in groups) TreinoSelectOption(value: g, label: g.label),
+      ],
+      onChanged: onChanged,
     );
   }
 }
 
-/// Single-select dropdown over [EquipmentType], always clearable back to a
+/// Single-select over [EquipmentType], always clearable back to a
 /// "Sin especificar" (null) state — equipment is optional.
-class _EquipmentDropdown extends StatelessWidget {
-  const _EquipmentDropdown({
-    required this.value,
-    required this.palette,
-    required this.onChanged,
-  });
+class _EquipmentSelect extends StatelessWidget {
+  const _EquipmentSelect({required this.value, required this.onChanged});
 
   final EquipmentType? value;
-  final AppPalette palette;
   final void Function(EquipmentType?) onChanged;
 
+  static const _sinEspecificar = 'Sin especificar';
+
   @override
   Widget build(BuildContext context) {
-    return _DropdownShell(
-      palette: palette,
-      child: DropdownButton<EquipmentType?>(
-        value: value,
-        isExpanded: true,
-        dropdownColor: palette.bgCard,
-        hint: _hintText('Sin especificar', palette),
-        style: GoogleFonts.barlow(
-          fontWeight: FontWeight.w500,
-          fontSize: 14,
-          color: palette.textPrimary,
+    return TreinoSelectField<EquipmentType?>(
+      value: value,
+      hint: _sinEspecificar,
+      sheetTitle: 'Equipamiento',
+      options: [
+        const TreinoSelectOption(
+          value: null,
+          label: _sinEspecificar,
+          muted: true,
         ),
-        icon: Icon(TreinoIcon.chevronDown, size: 16, color: palette.textMuted),
-        items: [
-          DropdownMenuItem<EquipmentType?>(
-            value: null,
-            child: _itemText('Sin especificar', palette, muted: true),
-          ),
-          for (final e in EquipmentType.values)
-            DropdownMenuItem<EquipmentType?>(
-              value: e,
-              child: _itemText(e.label, palette),
-            ),
-        ],
-        onChanged: onChanged,
-      ),
+        for (final e in EquipmentType.values)
+          TreinoSelectOption(value: e, label: e.label),
+      ],
+      onChanged: onChanged,
     );
   }
 }
-
-/// Shared bordered container + hidden underline for the editor dropdowns.
-class _DropdownShell extends StatelessWidget {
-  const _DropdownShell({required this.palette, required this.child});
-  final AppPalette palette;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: palette.border, width: 1),
-      ),
-      child: DropdownButtonHideUnderline(child: child),
-    );
-  }
-}
-
-Widget _hintText(String text, AppPalette palette) => Text(
-      text,
-      style: GoogleFonts.barlow(
-        fontWeight: FontWeight.w400,
-        fontSize: 14,
-        color: palette.textMuted,
-      ),
-    );
-
-Widget _itemText(String text, AppPalette palette, {bool muted = false}) => Text(
-      text,
-      style: GoogleFonts.barlow(
-        fontWeight: muted ? FontWeight.w400 : FontWeight.w500,
-        fontSize: 14,
-        color: muted ? palette.textMuted : palette.textPrimary,
-      ),
-    );
 
 class _UploadVideoButton extends StatelessWidget {
   const _UploadVideoButton({

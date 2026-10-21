@@ -14,9 +14,9 @@ import '../../notifications/presentation/widgets/notification_bell.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/utils/appointment_window.dart';
-import '../../../core/widgets/aligned_dropdown_menu.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_select.dart';
 import '../../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/pagos_por_cobrar_provider.dart';
@@ -2569,46 +2569,31 @@ class _AthleteDropdown extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
-    return AlignedDropdownMenu(
-        child: DropdownButtonFormField<String>(
-      initialValue: selectedId,
-      hint: Text(
-        l10n.dashboardSeleccionaAlumnoHint,
-        style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
-      ),
-      dropdownColor: palette.bgCard,
-      style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: palette.bg,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.accent, width: 1.5),
-        ),
-      ),
-      items: links.map((link) {
-        final profileAsync = ref.watch(
-          userPublicProfileProvider(link.athleteId),
-        );
-        final rawName = profileAsync.valueOrNull?.displayName ?? '';
-        final showName = rawName.isEmpty || _looksLikeUid(rawName)
-            ? '${l10n.dashboardAlumnoFallback} (${link.athleteId.substring(0, 6)})'
-            : rawName;
-        return DropdownMenuItem<String>(
-          value: link.athleteId,
-          child: Text(showName),
-        );
-      }).toList(),
+    return TreinoSelectField<String>(
+      value: selectedId,
+      hint: l10n.dashboardSeleccionaAlumnoHint,
+      sheetTitle: 'Alumno',
+      decoration: InputDecoration(fillColor: palette.bg),
+      options: [
+        for (final link in links)
+          TreinoSelectOption(
+            value: link.athleteId,
+            label: _nombre(link, ref, l10n),
+          ),
+      ],
       onChanged: onChanged,
-    ));
+    );
+  }
+
+  String _nombre(TrainerLink link, WidgetRef ref, AppL10n l10n) {
+    final rawName = ref
+            .watch(userPublicProfileProvider(link.athleteId))
+            .valueOrNull
+            ?.displayName ??
+        '';
+    return rawName.isEmpty || _looksLikeUid(rawName)
+        ? '${l10n.dashboardAlumnoFallback} (${link.athleteId.substring(0, 6)})'
+        : rawName;
   }
 }
 

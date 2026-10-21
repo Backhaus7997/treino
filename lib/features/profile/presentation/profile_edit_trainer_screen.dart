@@ -13,6 +13,7 @@ import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/form_scroll_to_error.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_select.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../coach/application/location_permission_gateway.dart';
 import '../../coach/presentation/widgets/location_permission_flow.dart';
@@ -452,8 +453,7 @@ class _ProfileEditTrainerScreenState
             const SizedBox(height: 14),
             _SectionLabel(palette: palette, text: 'ESPECIALIDAD'),
             const SizedBox(height: 8),
-            _SpecialtyDropdown(
-              palette: palette,
+            _SpecialtySelect(
               value: _specialty,
               onChanged: (s) => setState(() {
                 _specialty = s;
@@ -758,13 +758,8 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _SpecialtyDropdown extends StatelessWidget {
-  const _SpecialtyDropdown({
-    required this.palette,
-    required this.value,
-    required this.onChanged,
-  });
-  final AppPalette palette;
+class _SpecialtySelect extends StatelessWidget {
+  const _SpecialtySelect({required this.value, required this.onChanged});
   final TrainerSpecialty? value;
   final ValueChanged<TrainerSpecialty?> onChanged;
 
@@ -773,33 +768,18 @@ class _SpecialtyDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.border),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<TrainerSpecialty>(
-          value: value,
-          isExpanded: true,
-          hint: Text(
-            'Elegí una especialidad',
-            style: TextStyle(color: palette.textMuted),
+    return TreinoSelectField<TrainerSpecialty>(
+      value: value,
+      hint: 'Elegí una especialidad',
+      sheetTitle: 'Especialidad',
+      options: [
+        for (final s in TrainerSpecialty.values)
+          TreinoSelectOption(
+            value: s,
+            label: _capitalize(TrainerSpecialtyX.toWire(s)),
           ),
-          dropdownColor: palette.bgCard,
-          style: TextStyle(color: palette.textPrimary),
-          icon: Icon(TreinoIcon.chevronDown, color: palette.textMuted),
-          items: TrainerSpecialty.values
-              .map((s) => DropdownMenuItem(
-                    value: s,
-                    child: Text(_capitalize(TrainerSpecialtyX.toWire(s))),
-                  ))
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
+      ],
+      onChanged: onChanged,
     );
   }
 }
