@@ -496,7 +496,7 @@ class _ProgressionChartLoader extends ConsumerWidget {
 
 /// [AD7] Hevy-style period selector pill — tap to pick [ChartPeriod.last30d]
 /// (default) / [ChartPeriod.thisWeek] / [ChartPeriod.month].
-class ChartPeriodSelector extends StatelessWidget {
+class ChartPeriodSelector extends StatefulWidget {
   const ChartPeriodSelector({
     super.key,
     required this.selected,
@@ -525,19 +525,24 @@ class ChartPeriodSelector extends StatelessWidget {
   final void Function(ChartPeriod)? onLockedTap;
 
   @override
+  State<ChartPeriodSelector> createState() => _ChartPeriodSelectorState();
+}
+
+class _ChartPeriodSelectorState extends State<ChartPeriodSelector> {
+  @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
     return Semantics(
       button: true,
-      label: labels.labelFor(selected),
+      label: widget.labels.labelFor(widget.selected),
       excludeSemantics: true,
-      onTap: () => _abrir(context),
+      onTap: () => _abrir(),
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          onTap: () => _abrir(context),
+          onTap: () => _abrir(),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -549,7 +554,7 @@ class ChartPeriodSelector extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  labels.labelFor(selected),
+                  widget.labels.labelFor(widget.selected),
                   style: GoogleFonts.barlow(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -567,21 +572,22 @@ class ChartPeriodSelector extends StatelessWidget {
     );
   }
 
-  Future<void> _abrir(BuildContext context) async {
+  Future<void> _abrir() async {
     final picked = await showTreinoSelect<ChartPeriod>(
       context,
       title: 'Período', // i18n
-      selected: selected,
+      selected: widget.selected,
       options: [
         for (final p in ChartPeriod.values)
           TreinoSelectOption(
             value: p,
-            label: labels.labelFor(p),
+            label: widget.labels.labelFor(p),
             // Bloqueado se DIBUJA (con candado y atenuado) y sigue tocable:
             // el tap abre la hoja que explica por qué. Un candado que no dice
             // nada al tocarlo es peor que no tener candado.
-            trailingIcon: lockedPeriods.contains(p) ? TreinoIcon.lock : null,
-            muted: lockedPeriods.contains(p),
+            trailingIcon:
+                widget.lockedPeriods.contains(p) ? TreinoIcon.lock : null,
+            muted: widget.lockedPeriods.contains(p),
           ),
       ],
     );
@@ -591,10 +597,10 @@ class ChartPeriodSelector extends StatelessWidget {
     // El bloqueado NO pasa por `onSelect`: si pasara, el período quedaría
     // seleccionado y el gráfico mostraría el año igual. Se desvía antes.
     final p = picked.value;
-    if (lockedPeriods.contains(p)) {
-      onLockedTap?.call(p);
+    if (widget.lockedPeriods.contains(p)) {
+      widget.onLockedTap?.call(p);
     } else {
-      onSelect(p);
+      widget.onSelect(p);
     }
   }
 }

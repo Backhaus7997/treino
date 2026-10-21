@@ -214,5 +214,76 @@ void main() {
       await tester.pumpAndSettle();
       // Sin expectativas: lo que se verifica es que no tira.
     });
+
+    // El entitlement puede resolverse con la hoja abierta. Lo que decide si
+    // un período está bloqueado es el estado al ELEGIR, no al abrir.
+    Future<void> elegirConCambio(
+      WidgetTester tester, {
+      required Set<ChartPeriod> alAbrir,
+      required Set<ChartPeriod> alElegir,
+      required List<ChartPeriod> seleccionados,
+      required List<ChartPeriod> bloqueados,
+    }) async {
+      var locked = alAbrir;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark(),
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                rebuild = setState;
+                return ChartPeriodSelector(
+                  selected: ChartPeriod.last30d,
+                  labels: _labels,
+                  onSelect: seleccionados.add,
+                  lockedPeriods: locked,
+                  onLockedTap: bloqueados.add,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(ChartPeriodSelector));
+      await tester.pumpAndSettle();
+
+      rebuild(() => locked = alElegir);
+      await tester.pump();
+
+      await tester.tap(find.text('1 año').last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('si el lock llega con la hoja abierta, 1 año va al paywall',
+        (tester) async {
+      final seleccionados = <ChartPeriod>[];
+      final bloqueados = <ChartPeriod>[];
+      await elegirConCambio(
+        tester,
+        alAbrir: const {}, // entitlement todavía unknown
+        alElegir: kPaidChartPeriods, // se resolvió: free
+        seleccionados: seleccionados,
+        bloqueados: bloqueados,
+      );
+      expect(seleccionados, isEmpty, reason: 'no debe saltarse el paywall');
+      expect(bloqueados, [ChartPeriod.last1y]);
+    });
+
+    testWidgets('si el lock se va con la hoja abierta, 1 año se elige',
+        (tester) async {
+      final seleccionados = <ChartPeriod>[];
+      final bloqueados = <ChartPeriod>[];
+      await elegirConCambio(
+        tester,
+        alAbrir: kPaidChartPeriods,
+        alElegir: const {}, // acaba de pagar
+        seleccionados: seleccionados,
+        bloqueados: bloqueados,
+      );
+      expect(bloqueados, isEmpty, reason: 'no hay paywall para quien pagó');
+      expect(seleccionados, [ChartPeriod.last1y]);
+    });
   });
 }
