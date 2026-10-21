@@ -500,21 +500,12 @@ class _ExerciseRow extends StatelessWidget {
     // provided by _ShellScaffold in the shell flow. Opening it from inside this
     // modal sheet via go_router's `context.push` mounts it in a context where it
     // never renders → full black screen (device feedback 2026-06-12). Push it
-    // imperatively with its own Scaffold host instead, mirroring _openCreateNew.
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          backgroundColor: AppPalette.of(context).bg,
-          body: SafeArea(
-            child: ExerciseDetailScreen(
-              exerciseId: id,
-              ownerId: isCustom && ownerId != null && ownerId!.isNotEmpty
-                  ? ownerId
-                  : null,
-            ),
-          ),
-        ),
-      ),
+    // imperatively with its own Scaffold host instead (ExerciseDetailScreen.push).
+    ExerciseDetailScreen.push(
+      context,
+      exerciseId: id,
+      ownerId:
+          isCustom && ownerId != null && ownerId!.isNotEmpty ? ownerId : null,
     );
   }
 

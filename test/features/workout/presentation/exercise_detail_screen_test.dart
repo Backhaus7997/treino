@@ -779,4 +779,97 @@ void main() {
       expect(tecnicaDy, lessThan(progresionDy));
     });
   });
+
+  group('hero de borde a borde (#1559)', () {
+    const safeTop = 59.0; // iPhone con Dynamic Island
+
+    void useIphoneViewport(WidgetTester tester) {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.padding = const FakeViewPadding(top: safeTop);
+      addTearDown(tester.view.reset);
+    }
+
+    List<Override> overrides() => [
+          exerciseByIdProvider('bench-press')
+              .overrideWith((ref) async => _makeExercise()),
+        ];
+
+    Rect mediaRect(WidgetTester tester) =>
+        tester.getRect(find.byType(ExerciseAssetImage));
+
+    testWidgets(
+        'abierto con push imperativo (player, picker del PF), la foto arranca '
+        'en el borde físico, no debajo de la status bar', (tester) async {
+      useIphoneViewport(tester);
+      await tester.pumpWidget(_wrapWithOverrides(
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () =>
+                ExerciseDetailScreen.push(context, exerciseId: 'bench-press'),
+            child: const Text('abrir'),
+          ),
+        ),
+        overrides(),
+      ));
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      expect(mediaRect(tester).top, 0);
+      // La flecha sí respeta el área segura.
+      expect(
+        tester.getRect(find.byKey(const Key('treino-top-bar-back'))).top,
+        greaterThanOrEqualTo(safeTop),
+      );
+    });
+
+    testWidgets('al scrollear, la foto sube más lento que el contenido',
+        (tester) async {
+      useIphoneViewport(tester);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        overrides(),
+      ));
+      await tester.pumpAndSettle();
+      final title = find.text('BENCH PRESS').first;
+      final titleTop0 = tester.getRect(title).top;
+      expect(mediaRect(tester).top, 0);
+
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(100);
+      await tester.pump();
+
+      expect(tester.getRect(title).top, titleTop0 - 100);
+      expect(mediaRect(tester).top, closeTo(-60, 0.01));
+    });
+
+    testWidgets(
+        'tirando hacia abajo (rebote de iOS) la foto se estira y sigue '
+        'tapando el borde superior', (tester) async {
+      useIphoneViewport(tester);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        overrides(),
+      ));
+      await tester.pumpAndSettle();
+
+      final gesture = await tester.startGesture(const Offset(200, 400));
+      await gesture.moveBy(const Offset(0, 40));
+      await gesture.moveBy(const Offset(0, 80));
+      await tester.pump();
+
+      final pixels = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .pixels;
+      expect(pixels, lessThan(0), reason: 'hay rebote');
+      expect(mediaRect(tester).top, 0);
+      expect(mediaRect(tester).height, greaterThan(320));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+  });
 }

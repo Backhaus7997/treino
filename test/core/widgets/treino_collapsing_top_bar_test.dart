@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
@@ -352,6 +353,62 @@ void main() {
 
       expect(opacityOf(tester, _surface), lessThan(1));
       expect(tester.getRect(surfacePaint).top, 0);
+    });
+  });
+
+  group('sobre foto: status bar integrada al hero (#1559)', () {
+    const scrim = Key('treino-top-bar-hero-scrim');
+
+    SystemUiOverlayStyle overlayStyle(WidgetTester tester) => tester
+        .widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+          find
+              .ancestor(
+                of: find.byKey(_back),
+                matching: find.byType(AnnotatedRegion<SystemUiOverlayStyle>),
+              )
+              .first,
+        )
+        .value;
+
+    for (final entry in {
+      'light': AppTheme.light(),
+      'dark': AppTheme.dark(),
+    }.entries) {
+      testWidgets(
+          'tema ${entry.key}: en offset 0 el scrim cubre desde el borde '
+          'físico y los íconos de la status bar van claros', (tester) async {
+        await _pump(tester, _screen(overHero: true, theme: entry.value));
+
+        final rect = tester.getRect(find.byKey(scrim));
+        expect(rect.top, 0, reason: 'arranca en el borde físico');
+        expect(
+          rect.bottom,
+          greaterThan(_safeTop + TreinoTopBarMetrics.barHeight),
+          reason: 'cubre la status bar Y la flecha',
+        );
+        expect(overlayStyle(tester), SystemUiOverlayStyle.light);
+      });
+
+      testWidgets(
+          'tema ${entry.key}: con la barra puesta el scrim se va y la '
+          'status bar vuelve al estilo del tema', (tester) async {
+        await _pump(tester, _screen(overHero: true, theme: entry.value));
+        await _scroll(tester, -300);
+
+        expect(find.byKey(scrim), findsNothing);
+        expect(
+          overlayStyle(tester),
+          AppTheme.systemOverlayStyleFor(entry.value.brightness),
+        );
+      });
+    }
+
+    testWidgets('sin foto no hay scrim y la status bar sigue al tema',
+        (tester) async {
+      await _pump(tester, _screen(theme: AppTheme.light()));
+
+      expect(find.byKey(scrim), findsNothing);
+      expect(overlayStyle(tester), SystemUiOverlayStyle.dark);
     });
   });
 }

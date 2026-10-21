@@ -1088,25 +1088,8 @@ class _HeroStrip extends ConsumerWidget {
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => gradient,
           ),
-          // Top scrim — keeps the floating back button legible on bright photos.
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 96,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    palette.scrimDark.withValues(alpha: 0.45),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
+          // Sin scrim superior propio: lo pone TreinoCollapsingTopBar
+          // (overHero), fijo a la pantalla y cubriendo la status bar (#1559).
           // Bottom scrim — makes the badge + title overlay readable and
           // softens the seam between the photo and the body content.
           Positioned(

@@ -92,6 +92,39 @@ class ExerciseDetailScreen extends ConsumerWidget {
   /// back fallback).
   final String backFallbackRoute;
 
+  /// Abre el detalle con un push IMPERATIVO y su propio Scaffold host, para
+  /// los lugares fuera del shell donde la ruta de go_router no sirve (el
+  /// player de sesión, el picker de ejercicios del PF): ahí monta el detalle
+  /// sin `_ShellScaffold` → pantalla negra.
+  ///
+  /// El host NO consume el inset superior, igual que `_withBgEdgeToEdge` del
+  /// router: [TreinoCollapsingTopBar] lo reserva solo y el hero tiene que
+  /// llegar hasta el borde físico. Con un `SafeArea` entero quedaba una franja
+  /// lisa del alto de la status bar arriba de la foto (#1559, captura del
+  /// 2026-10-21).
+  static Future<void> push(
+    BuildContext context, {
+    required String exerciseId,
+    String? ownerId,
+    String? exerciseName,
+  }) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          backgroundColor: AppPalette.of(context).bg,
+          body: SafeArea(
+            top: false,
+            child: ExerciseDetailScreen(
+              exerciseId: exerciseId,
+              ownerId: ownerId,
+              exerciseName: exerciseName,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final exerciseAsync = ref.watch(
@@ -661,6 +694,9 @@ class _HeroStrip extends StatelessWidget {
       width: double.infinity,
       child: Stack(
         fit: StackFit.expand,
+        // La foto se estira por ARRIBA del hero al tirar hacia abajo (ver
+        // [_HeroParallax]): el Stack no la recorta, la recorta el parallax.
+        clipBehavior: Clip.none,
         children: [
           // Shared cascade (see ExerciseAssetImage): id variants under
           // `assets/exercises/` and `assets/muscles/`, then the muscle-group
@@ -669,13 +705,14 @@ class _HeroStrip extends StatelessWidget {
           // docs/video-catalog-audit/NUEVO-catalogo.json), so id matches are
           // the exception. Gradient is the last resort when even the muscle
           // is unknown.
-          ExerciseAssetImage(
-            exerciseId: exerciseId,
-            muscleGroup: muscleGroup,
-            thumbnailUrl: thumbnailUrl,
-            fallback: const _HeroGradientFallback(),
+          _HeroParallax(
+            child: ExerciseAssetImage(
+              exerciseId: exerciseId,
+              muscleGroup: muscleGroup,
+              thumbnailUrl: thumbnailUrl,
+              fallback: const _HeroGradientFallback(),
+            ),
           ),
-          const _HeroTopScrim(),
           const _HeroBottomScrim(),
           _HeroTitleOverlay(badgeText: badgeText, titleText: titleText),
         ],
@@ -711,32 +748,72 @@ class _HeroGradientFallback extends StatelessWidget {
   }
 }
 
-/// Top scrim — keeps the floating back button legible on bright photos.
-class _HeroTopScrim extends StatelessWidget {
-  const _HeroTopScrim();
+/// Capa de media del hero que acompaña al scroll (#1559, «que quede toda la
+/// pantalla integrada»):
+///
+///   * scrolleando hacia arriba, la foto/video sube MÁS LENTO que el contenido
+///     ([_kHeroParallax]) — parallax suave, la foto se queda un poco atrás
+///     mientras el título grande se va y entra la barra con el título chico;
+///   * tirando hacia abajo (rebote de iOS), la foto se estira hacia arriba y
+///     cubre el hueco: sin esto, el hero de borde a borde despegaba del borde
+///     superior y volvía a aparecer la franja lisa que se quería sacar.
+///
+/// Sigue al [ScrollPosition] con un [AnimatedBuilder]: sólo repinta esta capa,
+/// nunca los scrims ni el título. Con «reducir movimiento» no hay parallax,
+/// pero el estiramiento queda: no es decorativo, tapa un hueco.
+class _HeroParallax extends StatelessWidget {
+  const _HeroParallax({required this.child});
+
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 96,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              palette.scrimDark.withValues(alpha: 0.45),
-              Colors.transparent,
+    final position = Scrollable.maybeOf(context)?.position;
+    if (position == null) return child;
+    final reduce = AppMotion.reduceMotion(context);
+    return ClipRect(
+      clipper: const _ClipBelowOnly(),
+      child: AnimatedBuilder(
+        animation: position,
+        child: child,
+        builder: (context, child) {
+          final offset = position.hasPixels ? position.pixels : 0.0;
+          final overscroll = offset < 0 ? -offset : 0.0;
+          final shift = offset > 0 && !reduce ? offset * _kHeroParallax : 0.0;
+          return Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                top: shift - overscroll,
+                left: 0,
+                right: 0,
+                height: _kHeroHeight + overscroll,
+                child: child!,
+              ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
+}
+
+/// Fracción del scroll que la foto del hero acompaña: 0 = scrollea pegada al
+/// contenido, 1 = queda fija. 0.4 se nota sin marear.
+const double _kHeroParallax = 0.4;
+
+/// Recorta sólo por DEBAJO (el parallax corre la foto hacia el contenido) y
+/// deja pasar lo de arriba (el estiramiento del rebote cubre el borde físico).
+class _ClipBelowOnly extends CustomClipper<Rect> {
+  const _ClipBelowOnly();
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(0, -size.height * 4, size.width, size.height);
+
+  @override
+  bool shouldReclip(covariant _ClipBelowOnly oldClipper) => false;
 }
 
 /// Bottom scrim — makes the badge + title overlay readable and softens the
@@ -951,28 +1028,31 @@ class _VideoHeroStripState extends State<_VideoHeroStrip> {
           behavior: HitTestBehavior.opaque,
           child: Stack(
             fit: StackFit.expand,
+            // Ver [_HeroStrip]: el estiramiento del rebote sale por arriba.
+            clipBehavior: Clip.none,
             children: [
               // Media layer: the poster until the player is ready (also the
               // backdrop while it initialises — loading never reads as a
               // black hole), then the video filling the strip with the same
               // cover crop as the poster frame.
-              if (c == null)
-                ExerciseAssetImage(
-                  exerciseId: widget.exerciseId,
-                  muscleGroup: widget.muscleGroup,
-                  thumbnailUrl: widget.thumbnailUrl,
-                  fallback: const _HeroGradientFallback(),
-                )
-              else
-                FittedBox(
-                  fit: BoxFit.cover,
-                  clipBehavior: Clip.hardEdge,
-                  child: SizedBox(
-                    width: c.value.size.width,
-                    height: c.value.size.height,
-                    child: VideoPlayer(c),
-                  ),
-                ),
+              _HeroParallax(
+                child: c == null
+                    ? ExerciseAssetImage(
+                        exerciseId: widget.exerciseId,
+                        muscleGroup: widget.muscleGroup,
+                        thumbnailUrl: widget.thumbnailUrl,
+                        fallback: const _HeroGradientFallback(),
+                      )
+                    : FittedBox(
+                        fit: BoxFit.cover,
+                        clipBehavior: Clip.hardEdge,
+                        child: SizedBox(
+                          width: c.value.size.width,
+                          height: c.value.size.height,
+                          child: VideoPlayer(c),
+                        ),
+                      ),
+              ),
               // Chrome (scrims + badge + title): visible on poster/pause,
               // fades out while playing so nothing covers the technique.
               AnimatedOpacity(
@@ -981,7 +1061,6 @@ class _VideoHeroStripState extends State<_VideoHeroStrip> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    const _HeroTopScrim(),
                     const _HeroBottomScrim(),
                     _HeroTitleOverlay(
                       badgeText: widget.badgeText,

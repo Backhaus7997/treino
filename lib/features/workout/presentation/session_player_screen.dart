@@ -820,19 +820,11 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         ? ref.read(routineByIdProvider(routineId)).valueOrNull
         : null;
     final ownerId = routine?.assignedBy ?? routine?.createdBy;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          backgroundColor: AppPalette.of(context).bg,
-          body: SafeArea(
-            child: ExerciseDetailScreen(
-              exerciseId: slot.exerciseId,
-              ownerId: ownerId,
-              exerciseName: slot.exerciseName,
-            ),
-          ),
-        ),
-      ),
+    ExerciseDetailScreen.push(
+      context,
+      exerciseId: slot.exerciseId,
+      ownerId: ownerId,
+      exerciseName: slot.exerciseName,
     );
   }
 
