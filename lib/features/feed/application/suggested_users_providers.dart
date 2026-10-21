@@ -106,7 +106,8 @@ final suggestedUsersProvider =
         p.uid != currentUid &&
         !excludedUids.contains(p.uid) &&
         !blockedUids.contains(p.uid) &&
-        hasVisibleName(p);
+        hasVisibleName(p) &&
+        isDiscoverable(p);
 
     Future<List<UserPublicProfile>> profilesInGyms(List<String> ids) async {
       if (ids.isEmpty) return const [];

@@ -477,4 +477,71 @@ void main() {
       expect(result.map((p) => p.uid), containsAll(['u1', 'u2']));
     });
   });
+
+  // ─── hiddenFromDiscovery: cuentas internas fuera de los listados ──────────
+  group('hiddenFromDiscovery', () {
+    // Matchea las DOS consultas de la búsqueda: prefijo de
+    // `displayNameLowercase` y `searchPrefixes`.
+    Future<void> seedPersona(String uid, String name, [Object? hidden]) =>
+        firestore.collection('userPublicProfiles').doc(uid).set({
+          'uid': uid,
+          'displayName': name,
+          'displayNameLowercase': name.toLowerCase(),
+          'searchPrefixes': ['tr', 'tre', 'trei', 'trein', 'treino'],
+          'gymId': 'g1',
+          'rankingOptIn': true,
+          'lifetimeVolumeKg': 1000,
+          'rachaSemanas': 3,
+          if (hidden != null) 'hiddenFromDiscovery': hidden,
+        });
+
+    test('la búsqueda no devuelve la cuenta oculta y sí la visible', () async {
+      await seedPersona('soporte', 'treinoSupport', true);
+      await seedPersona('visible', 'treinoFan');
+
+      final uids =
+          (await repo.searchByDisplayName('treino')).map((p) => p.uid).toList();
+
+      expect(uids, ['visible']);
+    });
+
+    test('ausente, false o un valor roto cuentan como visible', () async {
+      await seedPersona('ausente', 'treinoA');
+      await seedPersona('falso', 'treinoB', false);
+      await seedPersona('roto', 'treinoC', 'si');
+
+      final uids =
+          (await repo.searchByDisplayName('treino')).map((p) => p.uid).toSet();
+
+      expect(uids, {'ausente', 'falso', 'roto'});
+    });
+
+    test('los rankings no muestran la cuenta oculta (volumen y racha)',
+        () async {
+      await seedPersona('soporte', 'treinoSupport', true);
+      await seedPersona('visible', 'treinoFan');
+
+      final volumen =
+          await repo.leaderboard(gymId: 'g1', metricField: 'lifetimeVolumeKg');
+      final racha =
+          await repo.leaderboard(gymId: 'g1', metricField: 'rachaSemanas');
+
+      expect(volumen.map((p) => p.uid), ['visible']);
+      expect(racha.map((p) => p.uid), ['visible']);
+    });
+
+    test('abrir el perfil por uid sigue andando', () async {
+      await seedPersona('soporte', 'treinoSupport', true);
+
+      final perfil = await repo.get('soporte');
+
+      expect(perfil?.hiddenFromDiscovery, isTrue);
+    });
+
+    test('el cliente nunca escribe el campo (no viaja en toJson)', () {
+      const perfil = UserPublicProfile(uid: 'u', hiddenFromDiscovery: true);
+
+      expect(perfil.toJson().containsKey('hiddenFromDiscovery'), isFalse);
+    });
+  });
 }

@@ -146,8 +146,33 @@ class UserPublicProfile with _$UserPublicProfile {
     int? squatRank,
     int? benchRank,
     int? deadliftRank,
+
+    /// Saca a la cuenta de los listados sociales —búsqueda de personas,
+    /// «gente para seguir» y rankings por gym— sin borrarla. Es para cuentas
+    /// internas (soporte, QA, revisores de las tiendas), atletas o PFs: por
+    /// eso vive acá y no sólo en `trainerPublicProfiles`, que un atleta no
+    /// tiene. Mismo nombre que el flag del directorio de coaches.
+    ///
+    /// Lo escribe SÓLO el admin con
+    /// `scripts/set_trainer_discovery_visibility.js`; las reglas le niegan el
+    /// campo al dueño. `includeToJson: false` para que ningún write del
+    /// cliente lo arrastre. Abrir el perfil por uid sigue andando.
+    ///
+    /// Cualquier valor distinto de `true` cuenta como visible: un doc con el
+    /// campo roto no tiene que esconder a nadie por accidente.
+    // ignore: invalid_annotation_target
+    @JsonKey(fromJson: _hiddenFromJson, includeToJson: false)
+    @Default(false)
+    bool hiddenFromDiscovery,
   }) = _UserPublicProfile;
 
   factory UserPublicProfile.fromJson(Map<String, Object?> json) =>
       _$UserPublicProfileFromJson(json);
 }
+
+bool _hiddenFromJson(Object? value) => value == true;
+
+/// `true` si [profile] puede aparecer en un listado social. Se filtra en el
+/// cliente a propósito: `where('hiddenFromDiscovery', isEqualTo: false)`
+/// excluiría los docs sin el campo, que son casi todos.
+bool isDiscoverable(UserPublicProfile profile) => !profile.hiddenFromDiscovery;

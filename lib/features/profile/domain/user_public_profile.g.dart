@@ -33,6 +33,9 @@ _$UserPublicProfileImpl _$$UserPublicProfileImplFromJson(
       squatRank: (json['squatRank'] as num?)?.toInt(),
       benchRank: (json['benchRank'] as num?)?.toInt(),
       deadliftRank: (json['deadliftRank'] as num?)?.toInt(),
+      hiddenFromDiscovery: json['hiddenFromDiscovery'] == null
+          ? false
+          : _hiddenFromJson(json['hiddenFromDiscovery']),
     );
 
 Map<String, dynamic> _$$UserPublicProfileImplToJson(
