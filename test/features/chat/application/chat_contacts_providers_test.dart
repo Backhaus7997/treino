@@ -37,31 +37,31 @@ Chat _chat(String other) {
 
 List<ChatContact> _from({
   List<TrainerLink> links = const [],
-  List<String> followers = const [],
+  List<String> following = const [],
   List<String> blocked = const [],
   List<String> chatPartners = const [],
 }) =>
     chatContactsFrom(
       selfUid: _me,
       links: links,
-      followerUids: followers,
+      followingUids: following,
       blockedUids: blocked,
       chatPartnerUids: chatPartners,
     );
 
 void main() {
   group('chatContactsFrom — espejo de chatCreateOk', () {
-    test('quien me sigue (follows/{otro}_{yo} aceptada) está habilitado', () {
+    test('a quien sigo (follows/{yo}_{otro} aceptada) está habilitado', () {
       expect(
-        _from(followers: ['lucia']),
-        [const ChatContact(uid: 'lucia', reason: ChatContactReason.follower)],
+        _from(following: ['lucia']),
+        [const ChatContact(uid: 'lucia', reason: ChatContactReason.following)],
       );
     });
 
-    test('a quien sigo yo y no me sigue NO está habilitado', () {
-      // followAccepted(other, me) es direccional: seguir a alguien no habilita
-      // escribirle. Esa persona nunca llega en `followerUids`.
-      expect(_from(followers: const []), isEmpty);
+    test('quien sólo me sigue, o a quien le pedí y no aceptó, NO aparece', () {
+      // La fuente es `watchFollowingOf`: aristas `{yo}_{otro}` ACEPTADAS. Un
+      // seguidor que no sigo o una solicitud pendiente nunca llegan acá.
+      expect(_from(following: const []), isEmpty);
     });
 
     test('vínculo active o paused habilita; pending/terminated no', () {
@@ -94,21 +94,21 @@ void main() {
     });
 
     test('bloqueados afuera: el primer mensaje rebotaría en senderMayPost', () {
-      expect(_from(followers: ['lucia'], blocked: ['lucia']), isEmpty);
+      expect(_from(following: ['lucia'], blocked: ['lucia']), isEmpty);
     });
 
     test('con chat ya existente se muestra el chat, no el contacto', () {
       expect(
-        _from(followers: ['lucia', 'vale'], chatPartners: [_me, 'lucia']),
-        [const ChatContact(uid: 'vale', reason: ChatContactReason.follower)],
+        _from(following: ['lucia', 'vale'], chatPartners: [_me, 'lucia']),
+        [const ChatContact(uid: 'vale', reason: ChatContactReason.following)],
       );
     });
 
-    test('PF que además me sigue aparece una sola vez, como PF', () {
+    test('PF que además sigo aparece una sola vez, como PF', () {
       expect(
         _from(
           links: [_link(trainerId: 'pf', athleteId: _me)],
-          followers: ['pf'],
+          following: ['pf'],
         ),
         [const ChatContact(uid: 'pf', reason: ChatContactReason.coach)],
       );
@@ -116,23 +116,23 @@ void main() {
   });
 
   group('chatContactsProvider — reactivo', () {
-    late StreamController<List<String>> followers;
+    late StreamController<List<String>> following;
     late ProviderContainer container;
 
     setUp(() {
-      followers = StreamController<List<String>>();
+      following = StreamController<List<String>>();
       container = ProviderContainer(overrides: [
         currentUidProvider.overrideWith((_) => _me),
         chatContactLinksAsAthleteProvider
             .overrideWith((_) => Stream.value(const [])),
         chatContactLinksAsTrainerProvider
             .overrideWith((_) => Stream.value(const [])),
-        chatContactFollowersProvider.overrideWith((_) => followers.stream),
+        chatContactFollowingProvider.overrideWith((_) => following.stream),
         chatsForCurrentUserProvider.overrideWith((_) => Stream.value([])),
         blockedUidsProvider(_me).overrideWith((_) => Stream.value(const [])),
       ]);
       addTearDown(container.dispose);
-      addTearDown(followers.close);
+      addTearDown(following.close);
     });
 
     Future<AsyncValue<List<ChatContact>>> read() async {
@@ -146,27 +146,27 @@ void main() {
       expect((await read()).isLoading, isTrue);
     });
 
-    test('pasa de no habilitado a habilitado cuando aceptan el follow',
+    test('pasa de no habilitado a habilitado cuando aceptan mi solicitud',
         () async {
       container.listen(chatContactsProvider, (_, __) {});
 
-      followers.add(const []);
+      following.add(const []);
       expect((await read()).requireValue, isEmpty);
 
-      followers.add(const ['lucia']);
+      following.add(const ['lucia']);
       expect(
         (await read()).requireValue,
-        [const ChatContact(uid: 'lucia', reason: ChatContactReason.follower)],
+        [const ChatContact(uid: 'lucia', reason: ChatContactReason.following)],
       );
 
-      // Y sale apenas deja de seguirme.
-      followers.add(const []);
+      // Y sale apenas lo dejo de seguir.
+      following.add(const []);
       expect((await read()).requireValue, isEmpty);
     });
 
     test('un error de una fuente es error, no lista vacía', () async {
       container.listen(chatContactsProvider, (_, __) {});
-      followers.addError(Exception('permission-denied'));
+      following.addError(Exception('permission-denied'));
       expect((await read()).hasError, isTrue);
     });
   });
@@ -179,7 +179,7 @@ void main() {
           .overrideWith((_) => Stream.value(const [])),
       chatContactLinksAsTrainerProvider
           .overrideWith((_) => Stream.value(const [])),
-      chatContactFollowersProvider
+      chatContactFollowingProvider
           .overrideWith((_) => Stream.value(const ['lucia', 'vale'])),
       chatsForCurrentUserProvider
           .overrideWith((_) => Stream.value([_chat('lucia')])),
@@ -190,7 +190,7 @@ void main() {
     await pumpEventQueue();
     expect(
       container.read(chatContactsProvider).requireValue,
-      [const ChatContact(uid: 'vale', reason: ChatContactReason.follower)],
+      [const ChatContact(uid: 'vale', reason: ChatContactReason.following)],
     );
   });
 }

@@ -58,8 +58,8 @@ void main() {
       final l10n = await _pumpAndGetL10n(tester);
       expect(
         l10n.chatListEmptyBody,
-        'Le podés escribir a tu PF y a quienes te siguen. Cuando alguien '
-        'empiece a seguirte, lo vas a ver acá.',
+        'Le podés escribir a tu PF y a quienes seguís, y a cualquier perfil '
+        'público desde su perfil. Cuando sigas a alguien, lo vas a ver acá.',
       );
     });
 

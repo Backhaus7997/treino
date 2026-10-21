@@ -11,14 +11,16 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../chat/application/chat_providers.dart';
+import '../../moderation/application/moderation_providers.dart'
+    show myBlockedUidsProvider;
 import '../../moderation/domain/report_target_kind.dart';
 import '../../moderation/presentation/moderation_actions.dart';
 import '../../workout/application/user_routines_providers.dart';
 import '../application/follow_list_providers.dart';
 import '../application/post_providers.dart';
 import '../application/profile_chat_access_providers.dart';
+import '../domain/public_profile_view.dart';
 import '../application/public_profile_providers.dart';
-import '../domain/follow.dart';
 import '../domain/follow_status.dart';
 import 'widgets/post_card.dart';
 import 'widgets/public_profile_follow_button.dart';
@@ -116,6 +118,8 @@ class PublicProfileScreen extends ConsumerWidget {
             final isAcceptedFollower =
                 view.outgoingFollow?.status == FollowStatus.accepted;
             final gated = !view.isSelf && !view.isPublic && !isAcceptedFollower;
+            final canMessage = !view.isSelf &&
+                _canOpenChat(ref, view, targetUid, isAcceptedFollower);
             // Inset inferior para que el último post/rutina despeje la
             // TreinoBottomBar flotante. Acá había un `+ 88` que rearmaba a mano
             // la composición de la barra (72 del pill + 8 de margen + safe
@@ -158,14 +162,15 @@ class PublicProfileScreen extends ConsumerWidget {
                               targetIsPublic: view.isPublic,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _MessageButton(
-                              incomingFollow: view.incomingFollow,
-                              viewerUid: viewerUid,
-                              targetUid: targetUid,
+                          if (canMessage) ...[
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _MessageButton(
+                                viewerUid: viewerUid,
+                                targetUid: targetUid,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -303,43 +308,44 @@ class _PrivateProfileNotice extends StatelessWidget {
   }
 }
 
-/// MENSAJE pill on the public profile screen.
+/// ¿Las rules me dejarían abrir (o reabrir) el chat con [targetUid]?
 ///
-/// **Habilitado si puedo abrir el chat**, que es la disyunción de `chatCreateOk`
-/// en las rules (abrir un chat es poder mandar el primer mensaje):
+/// Espejo de `chatCreateOk` en `firestore.rules` (cambio de producto del
+/// 2026-10-21): lo sigo con la arista aceptada, o su perfil es público, o ya
+/// hay un chat o un vínculo PF↔alumno vigente ([chatViaRelationshipProvider]:
+/// abrir un chat existente es `getOrCreate`, que no pasa por el `create`).
+/// Un bloqueo mío gana sobre todo, igual que `notBlocked` en las rules; si el
+/// otro me bloqueó no lo puedo leer, y el `create` rebota.
 ///
-/// 1. el DEL PERFIL me sigue a mí — la arista ENTRANTE aceptada
-///    (REQ-FOLLOW-012 / LD-08), la rama social; o
-/// 2. ya hay un chat entre los dos, o hay un vínculo PF↔alumno vigente — ver
-///    [chatViaRelationshipProvider]. Sin esto el PF veía a su propio alumno,
-///    con el chat ya abierto, con el botón gris (#1476): la rama de
-///    `trainer_link` de la regla no depende de que el alumno lo siga.
+/// Si cliente y rules no coinciden el UX miente: o el botón aparece y el
+/// chat rebota con permission-denied, o falta cuando el servidor sí lo
+/// permitiría. Si cambia `chatCreateOk`, esto cambia con ella.
+bool _canOpenChat(
+  WidgetRef ref,
+  PublicProfileView view,
+  String targetUid,
+  bool iFollowThem,
+) {
+  if (ref.watch(myBlockedUidsProvider).contains(targetUid)) return false;
+  return iFollowThem ||
+      view.isPublic ||
+      ref.watch(chatViaRelationshipProvider(targetUid));
+}
+
+/// MENSAJE pill on the public profile screen. Sólo se monta cuando
+/// [_canOpenChat] da true.
 ///
-/// En la rama social **no es el OR de las dos direcciones**, y tampoco la
-/// saliente. El OR era el espejo de la regla vieja, cuando `friendships` tenía
-/// un doc por par y las dos direcciones eran el mismo hecho — de hecho
-/// `_isAcceptedFriend` miraba UN documento y habilitaba a los dos lados. Si el
-/// cliente y las rules no coinciden exactamente, el UX miente: o el botón está
-/// habilitado y el envío rebota con `permission-denied`, o está gris cuando el
-/// servidor sí lo permitiría. Si cambia `chatCreateOk`, esto cambia con ella.
-///
-/// Cuando queda deshabilitado, tocarlo explica por qué (el aviso de
-/// `chatBlockedComposerNotice`) en vez de no hacer nada.
-///
-/// When enabled, tapping the pill calls `ChatRepository.getOrCreate` and
-/// pushes `/coach/chat/{chatId}?other={targetUid}` — the same route already
-/// used by `chat_list_screen.dart`, `athlete_coach_view.dart` and
+/// Tapping it calls `ChatRepository.getOrCreate` and pushes
+/// `/coach/chat/{chatId}?other={targetUid}` — the same route already used by
+/// `chat_list_screen.dart`, `athlete_coach_view.dart` and
 /// `athlete_detail_screen.dart`. The route is misnamed "/coach/" for
 /// historical reasons but it's actually generic between any two uids.
 class _MessageButton extends ConsumerStatefulWidget {
   const _MessageButton({
-    required this.incomingFollow,
     required this.viewerUid,
     required this.targetUid,
   });
 
-  /// `follows/{target}_{viewer}` — ¿el del perfil me sigue?
-  final Follow? incomingFollow;
   final String viewerUid;
   final String targetUid;
 
@@ -349,17 +355,6 @@ class _MessageButton extends ConsumerStatefulWidget {
 
 class _MessageButtonState extends ConsumerState<_MessageButton> {
   bool _busy = false;
-
-  bool get _followsMe => widget.incomingFollow?.status == FollowStatus.accepted;
-
-  /// MENSAJE deshabilitado: no hace nada, pero dice por qué.
-  void _explainDisabled() {
-    showTreinoToast(
-      context,
-      AppL10n.of(context).chatBlockedComposerNotice,
-      type: TreinoToastType.info,
-    );
-  }
 
   Future<void> _onTap() async {
     if (_busy) return;
@@ -385,22 +380,17 @@ class _MessageButtonState extends ConsumerState<_MessageButton> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    final eligible =
-        _followsMe || ref.watch(chatViaRelationshipProvider(widget.targetUid));
-    final enabled = eligible && !_busy;
+    final enabled = !_busy;
     final textColor = enabled ? palette.textPrimary : palette.textMuted;
     return Semantics(
       button: true,
       enabled: enabled,
-      label: enabled
-          ? 'Mensaje' // i18n: Fase W2
-          : l10n.publicProfileMessageDisabledA11y,
+      label: 'Mensaje', // i18n: Fase W2
       child: ExcludeSemantics(
         child: Opacity(
           opacity: enabled ? 1.0 : 0.6,
           child: GestureDetector(
-            onTap: enabled ? _onTap : (eligible ? null : _explainDisabled),
+            onTap: enabled ? _onTap : null,
             behavior: HitTestBehavior.opaque,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),

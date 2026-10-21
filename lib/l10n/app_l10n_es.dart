@@ -2208,7 +2208,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get chatListEmptyBody =>
-      'Le podés escribir a tu PF y a quienes te siguen. Cuando alguien empiece a seguirte, lo vas a ver acá.';
+      'Le podés escribir a tu PF y a quienes seguís, y a cualquier perfil público desde su perfil. Cuando sigas a alguien, lo vas a ver acá.';
 
   @override
   String get chatListError => 'No pudimos cargar tus mensajes.';
@@ -2226,7 +2226,7 @@ class AppL10nEs extends AppL10n {
   String get chatContactReasonAthlete => 'Tu alumno';
 
   @override
-  String get chatContactReasonFollower => 'Te sigue';
+  String get chatContactReasonFollowing => 'Lo seguís';
 
   @override
   String get chatContactsError =>
@@ -4648,7 +4648,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get chatBlockedComposerNotice =>
-      'Para escribirle, esta persona tiene que seguirte.';
+      'Bloqueaste a esta persona. Desbloqueala para escribirle.';
 
   @override
   String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
@@ -8053,7 +8053,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get chatListEmptyBody =>
-      'Le podés escribir a tu PF y a quienes te siguen. Cuando alguien empiece a seguirte, lo vas a ver acá.';
+      'Le podés escribir a tu PF y a quienes seguís, y a cualquier perfil público desde su perfil. Cuando sigas a alguien, lo vas a ver acá.';
 
   @override
   String get chatListError => 'No pudimos cargar tus mensajes.';
@@ -8071,7 +8071,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get chatContactReasonAthlete => 'Tu alumno';
 
   @override
-  String get chatContactReasonFollower => 'Te sigue';
+  String get chatContactReasonFollowing => 'Lo seguís';
 
   @override
   String get chatContactsError =>
@@ -10490,7 +10490,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get chatBlockedComposerNotice =>
-      'Para escribirle, esta persona tiene que seguirte.';
+      'Bloqueaste a esta persona. Desbloqueala para escribirle.';
 
   @override
   String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';

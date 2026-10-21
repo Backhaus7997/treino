@@ -16,9 +16,9 @@ import '../../workout/application/session_providers.dart'
 /// `paused` cuentan (pausar es un hold temporal, no un corte). Se consulta de
 /// los DOS lados porque el usuario puede ser el PF o el alumno.
 ///
-/// Errores → `false`: si no se puede confirmar el vínculo, el botón queda como
-/// estaba (sujeto a que el otro lo siga) en vez de prometer un chat que las
-/// rules podrían rebotar.
+/// Errores → `false`: si no se puede confirmar el vínculo, el botón queda
+/// sujeto a las otras salidas (follow o perfil público) en vez de prometer un
+/// chat que las rules podrían rebotar.
 final _activeLinkWithProvider =
     FutureProvider.autoDispose.family<bool, String>((ref, otherUid) async {
   final uid = ref.watch(currentUidProvider);
@@ -36,12 +36,12 @@ final _activeLinkWithProvider =
       );
 });
 
-/// ¿Puedo abrir un chat con [targetUid] SIN que esa persona me siga?
+/// ¿Puedo abrir un chat con [targetUid] por algo que NO sea el follow ni el
+/// perfil público?
 ///
-/// El MENSAJE del perfil público se habilitaba sólo si el otro me seguía (la
-/// rama social de `chatCreateOk`). Pero esa regla tiene otras dos salidas que
-/// el botón ignoraba, y por eso el PF veía a su propio alumno con MENSAJE gris
-/// y un chat ya abierto (#1476):
+/// Son las otras dos salidas de `chatCreateOk`, que el botón MENSAJE del
+/// perfil ignoraba al principio (por eso el PF veía a su propio alumno con
+/// MENSAJE gris y un chat ya abierto, #1476):
 ///
 /// - **ya hay un chat** entre los dos: abrirlo es `getOrCreate`, que lo
 ///   devuelve tal cual, sin crear nada ni pasar por ninguna regla de creación;
@@ -51,8 +51,8 @@ final _activeLinkWithProvider =
 /// El chat se lee de `chatsForCurrentUserProvider`, el mismo stream que ya usa
 /// la lista de chats y los badges, así que no abre ningún listener nuevo.
 ///
-/// Mientras carga cualquiera de los dos devuelve `false`; el botón se
-/// habilita apenas llega el dato.
+/// Mientras carga cualquiera de los dos devuelve `false`; el botón aparece
+/// apenas llega el dato.
 final chatViaRelationshipProvider =
     Provider.autoDispose.family<bool, String>((ref, targetUid) {
   final uid = ref.watch(currentUidProvider);

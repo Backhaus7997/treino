@@ -91,7 +91,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Sin mensajes todavía'), findsOneWidget);
-      expect(find.textContaining('a quienes te siguen'), findsOneWidget);
+      expect(find.textContaining('a quienes seguís'), findsOneWidget);
     });
 
     testWidgets('sin chats pero con contactos: sección, sin estado vacío', (
@@ -102,7 +102,7 @@ void main() {
           const ChatListScreen(),
           contacts: const AsyncData([
             ChatContact(uid: 'pf', reason: ChatContactReason.coach),
-            ChatContact(uid: 'lu', reason: ChatContactReason.follower),
+            ChatContact(uid: 'lu', reason: ChatContactReason.following),
           ]),
           overrides: [
             currentUidProvider.overrideWith((_) => 'aaa'),
@@ -123,7 +123,7 @@ void main() {
       expect(find.text('Coach Joe'), findsOneWidget);
       expect(find.text('Tu PF'), findsOneWidget);
       expect(find.text('Lucia'), findsOneWidget);
-      expect(find.text('Te sigue'), findsOneWidget);
+      expect(find.text('Lo seguís'), findsOneWidget);
     });
 
     testWidgets('contactos debajo de los chats existentes', (tester) async {
@@ -131,7 +131,7 @@ void main() {
         _wrap(
           const ChatListScreen(),
           contacts: const AsyncData([
-            ChatContact(uid: 'lu', reason: ChatContactReason.follower),
+            ChatContact(uid: 'lu', reason: ChatContactReason.following),
           ]),
           overrides: [
             currentUidProvider.overrideWith((_) => 'aaa'),

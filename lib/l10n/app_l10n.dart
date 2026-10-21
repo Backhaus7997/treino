@@ -3953,7 +3953,7 @@ abstract class AppL10n {
   /// No description provided for @chatListEmptyBody.
   ///
   /// In es_AR, this message translates to:
-  /// **'Le podés escribir a tu PF y a quienes te siguen. Cuando alguien empiece a seguirte, lo vas a ver acá.'**
+  /// **'Le podés escribir a tu PF y a quienes seguís, y a cualquier perfil público desde su perfil. Cuando sigas a alguien, lo vas a ver acá.'**
   String get chatListEmptyBody;
 
   /// No description provided for @chatListError.
@@ -3986,11 +3986,11 @@ abstract class AppL10n {
   /// **'Tu alumno'**
   String get chatContactReasonAthlete;
 
-  /// No description provided for @chatContactReasonFollower.
+  /// No description provided for @chatContactReasonFollowing.
   ///
   /// In es_AR, this message translates to:
-  /// **'Te sigue'**
-  String get chatContactReasonFollower;
+  /// **'Lo seguís'**
+  String get chatContactReasonFollowing;
 
   /// No description provided for @chatContactsError.
   ///
@@ -8007,10 +8007,10 @@ abstract class AppL10n {
   /// **'Todavía no hay posts de quienes seguís'**
   String get feedEmptyFollowing;
 
-  /// Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021).
+  /// Aviso persistente sobre el composer cuando el usuario bloqueó al otro miembro del chat.
   ///
   /// In es_AR, this message translates to:
-  /// **'Para escribirle, esta persona tiene que seguirte.'**
+  /// **'Bloqueaste a esta persona. Desbloqueala para escribirle.'**
   String get chatBlockedComposerNotice;
 
   /// Semantics del composer deshabilitado por falta de permiso.

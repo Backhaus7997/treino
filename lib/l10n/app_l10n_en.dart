@@ -2185,7 +2185,7 @@ class AppL10nEn extends AppL10n {
   String get chatContactReasonAthlete => '';
 
   @override
-  String get chatContactReasonFollower => '';
+  String get chatContactReasonFollowing => '';
 
   @override
   String get chatContactsError => '';
@@ -4564,7 +4564,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get chatBlockedComposerNotice =>
-      'To message them, this person needs to follow you.';
+      'You blocked this person. Unblock them to send a message.';
 
   @override
   String get chatBlockedComposerHintA11y => 'You can\'t write in this chat';

@@ -579,7 +579,7 @@
   "chatContactsSectionTitle": "",
   "chatContactReasonCoach": "",
   "chatContactReasonAthlete": "",
-  "chatContactReasonFollower": "",
+  "chatContactReasonFollowing": "",
   "chatContactsError": "",
   "chatContactOpenError": "",
   "chatRelativeJustNow": "",
@@ -1744,9 +1744,9 @@
   "@feedEmptyFollowing": {
     "description": "Estado vacío del feed SEGUIDORES."
   },
-  "chatBlockedComposerNotice": "To message them, this person needs to follow you.",
+  "chatBlockedComposerNotice": "You blocked this person. Unblock them to send a message.",
   "@chatBlockedComposerNotice": {
-    "description": "Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021)."
+    "description": "Aviso persistente sobre el composer cuando el usuario bloqueó al otro miembro del chat."
   },
   "chatBlockedComposerHintA11y": "You can't write in this chat",
   "@chatBlockedComposerHintA11y": {

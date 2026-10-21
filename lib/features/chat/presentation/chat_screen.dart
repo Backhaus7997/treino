@@ -14,10 +14,9 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../core/moderation/moderation_guard.dart';
 import '../../../l10n/app_l10n.dart';
-import '../../feed/application/follow_providers.dart';
-import '../../feed/domain/follow.dart';
-import '../../feed/domain/follow_status.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
+import '../../moderation/application/moderation_providers.dart'
+    show blockedUidsProvider;
 import '../../moderation/domain/report_target_kind.dart';
 import '../../moderation/presentation/moderation_actions.dart';
 import '../../paywall/application/athlete_entitlement_provider.dart'
@@ -273,61 +272,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
     final currentUid = ref.watch(currentUidProvider);
 
-    // REQ-FOLLOW-012 — ESPEJO EXACTO de `senderMayPost` en las rules.
+    // Espejo de `senderMayPost` en las rules: en un chat existente escriben
+    // los dos miembros SIN requisito de follow (cambio de producto del
+    // 2026-10-21, que reemplazó a REQ-FOLLOW-012). Lo único que corta la
+    // escritura es un bloqueo.
     //
-    // Escribir lo habilita la arista ENTRANTE: el otro tiene que seguirme a
-    // mí. Es al revés de lo que sugiere la intuición, y es la decisión de
-    // producto: dejar de seguir a alguien le saca a ESA persona la escritura
-    // hacia vos, con una sola acción.
+    // Del bloqueo sólo se ve una mitad: los que bloqueé YO. Si el otro me
+    // bloqueó, las rules no me dejan leerlo; el envío rebota con un
+    // permission-denied recuperable, que es mejor que adivinar.
     //
-    // La rama del Coach va PRIMERO, igual que en las rules. Y no es
-    // decorativa: `athlete_coach_view.dart` y `athlete_detail_screen.dart`
-    // empujan `/coach/chat/...`, que renderiza ESTA pantalla, así que sin este
-    // escape el entrenador perdería el composer aunque el servidor se lo
-    // permita.
-    //
-    // Mientras carga se asume que SÍ puede escribir. Un falso positivo
-    // momentáneo termina en un `permission-denied` recuperable; un falso
-    // negativo le tapa el composer a alguien que sí puede, en cada apertura
-    // de chat.
-    //
-    // Eso es lo que este comentario prometía y lo que el código hacía al
-    // revés. `valueOrNull` sobre un `AsyncLoading` da null, así que
-    // `isCoachChat` daba false, `chat?.isInquiry == true` daba false y
-    // `incomingEdge?.status` daba null: los tres términos en false y el
-    // composer gris con el cartel de "esta persona tiene que seguirte" en
-    // CADA entrada al chat. La única escapatoria era `currentUid == null`,
-    // que es justo el caso que no le importa a nadie.
-    //
-    // Y no era un edge case de cold start: los dos providers son
-    // `autoDispose` sin `keepAlive`, así que salir de la pantalla los
-    // destruye y cada `ChatScreen` nuevo vuelve a arrancar en `AsyncLoading`.
-    final chatAsync = ref.watch(chatByIdProvider(widget.chatId));
-    final chat = chatAsync.valueOrNull;
-    final isCoachChat = chat?.linkId != null;
-    final edgeAsync = currentUid == null
-        ? null
-        : ref.watch(followEdgeProvider(
-            Follow.edgeId(widget.otherUid, currentUid),
-          ));
-    final incomingEdge = edgeAsync?.valueOrNull;
-    // "Ya sé la respuesta", no "la respuesta es que no". `hasValue` es false
-    // mientras carga Y ante un error sin valor previo: en los dos casos no
-    // sabemos, y no saber no puede leerse como una negativa.
-    final gateResuelto = chatAsync.hasValue && (edgeAsync?.hasValue ?? true);
-    // Las TRES ramas por las que escapa `senderMayPost` en las reglas
-    // (`firestore.rules`): vínculo, pre-consulta, y arista social aceptada.
-    //
-    // La pre-consulta faltaba, y la asimetría siempre cae para el mismo lado:
-    // la app quedaba MÁS ESTRICTA QUE EL SERVIDOR y le tapaba el composer a
-    // alguien a quien Firestore le habría aceptado el mensaje. Justo el caso
-    // que motiva la feature — consultarle algo a un entrenador ANTES de
-    // pedirle el vínculo—, que sin escribir no existe.
-    final canWrite = !gateResuelto ||
-        isCoachChat ||
-        chat?.isInquiry == true ||
-        incomingEdge?.status == FollowStatus.accepted ||
-        currentUid == null;
+    // Mientras carga se asume que SÍ puede escribir: un falso positivo
+    // momentáneo termina en un error recuperable; un falso negativo le tapa el
+    // composer a alguien que sí puede, en cada apertura de chat.
+    final iBlockedThem = currentUid != null &&
+        (ref.watch(blockedUidsProvider(currentUid)).valueOrNull ?? const [])
+            .contains(widget.otherUid);
+    final canWrite = !iBlockedThem;
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
     final mediaSend = ref.watch(chatMediaSendControllerProvider(widget.chatId));
 

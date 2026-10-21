@@ -21,8 +21,8 @@ enum ChatContactReason {
   /// Vínculo vigente y el otro es el alumno.
   athlete,
 
-  /// El otro me sigue con la arista aceptada.
-  follower,
+  /// Lo sigo con la arista aceptada.
+  following,
 }
 
 /// Alguien a quien el usuario actual le puede abrir un chat y que todavía no
@@ -60,25 +60,27 @@ const chatEnablingLinkStatuses = {
 ///
 /// - **Rama `linkId`**: hay un `trainer_links` con [selfUid] y el otro como
 ///   `trainerId`/`athleteId` y estado en [chatEnablingLinkStatuses].
-/// - **Rama social**: `followAccepted(other, me)`, o sea que la arista
-///   `follows/{otro}_{yo}` está aceptada. Es DIRECCIONAL: habilita a quien
-///   ME SIGUE ([followerUids]), no a quien sigo yo. Mostrar a los que sigo
-///   prometería chats que el `create` rechaza con permission-denied.
+/// - **Rama social**: `followAccepted(me, other)`, o sea que la arista
+///   `follows/{yo}_{otro}` está aceptada: a quien SIGO ([followingUids]). Con
+///   perfil privado eso ya implica que me aceptó; una solicitud pendiente no
+///   llega en esa lista.
 ///
-/// La tercera rama (pre-consulta, `kind == 'inquiry'`) queda afuera a
-/// propósito: habilita a TODO PF publicado, así que no es una lista de
-/// contactos sino el discovery de la tab Coach (AGENTS.md §5).
+/// Quedan afuera a propósito dos cosas que las rules también habilitan:
+/// - un perfil PÚBLICO que no sigo: se le escribe desde su perfil (botón
+///   MENSAJE), pero listarlos sería listar a toda la red;
+/// - la pre-consulta (`kind == 'inquiry'`): habilita a TODO PF publicado, así
+///   que es el discovery de la tab Coach (AGENTS.md §5), no una lista de
+///   contactos.
 ///
 /// Se excluyen:
-/// - [blockedUids]: el `create` del chat no mira bloqueos, pero
-///   `senderMayPost` sí (`notBlocked`), así que el primer mensaje rebotaría.
+/// - [blockedUids]: `chatCreateOk` y `senderMayPost` exigen `notBlocked`.
 ///   Del lado inverso (el otro me bloqueó) no hace falta nada: no puedo leer
 ///   sus bloqueos, pero `removeFollowEdgesOnBlock` borra las dos aristas.
 /// - [chatPartnerUids]: ya hay un chat en la lista; se muestra el chat.
 List<ChatContact> chatContactsFrom({
   required String selfUid,
   required Iterable<TrainerLink> links,
-  required Iterable<String> followerUids,
+  required Iterable<String> followingUids,
   required Iterable<String> blockedUids,
   required Iterable<String> chatPartnerUids,
 }) {
@@ -86,7 +88,7 @@ List<ChatContact> chatContactsFrom({
   final seen = <String>{};
   final coaches = <ChatContact>[];
   final athletes = <ChatContact>[];
-  final followers = <ChatContact>[];
+  final following = <ChatContact>[];
 
   for (final link in links) {
     if (!chatEnablingLinkStatuses.contains(link.status)) continue;
@@ -105,11 +107,11 @@ List<ChatContact> chatContactsFrom({
     (reason == ChatContactReason.coach ? coaches : athletes)
         .add(ChatContact(uid: other, reason: reason));
   }
-  for (final uid in followerUids) {
+  for (final uid in followingUids) {
     if (excluded.contains(uid) || !seen.add(uid)) continue;
-    followers.add(ChatContact(uid: uid, reason: ChatContactReason.follower));
+    following.add(ChatContact(uid: uid, reason: ChatContactReason.following));
   }
-  return [...coaches, ...athletes, ...followers];
+  return [...coaches, ...athletes, ...following];
 }
 
 /// Vínculos vigentes donde el usuario actual es el alumno, en vivo.
@@ -132,18 +134,19 @@ final chatContactLinksAsTrainerProvider =
       .watchForTrainer(uid, statuses: chatEnablingLinkStatuses);
 });
 
-/// Quienes siguen al usuario actual con la arista aceptada, en vivo.
-final chatContactFollowersProvider =
+/// A quiénes sigue el usuario actual con la arista aceptada, en vivo.
+final chatContactFollowingProvider =
     StreamProvider.autoDispose<List<String>>((ref) {
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return Stream.value(const []);
-  return ref.watch(followRepositoryProvider).watchFollowersOf(uid);
+  return ref.watch(followRepositoryProvider).watchFollowingOf(uid);
 });
 
 /// Contactos a los que el usuario actual le puede escribir y que no tienen
 /// chat en la lista. Ver [chatContactsFrom] para el criterio.
 ///
-/// Reactivo: cada fuente es un stream, así que un follow que se acepta o un
+/// Reactivo: cada fuente es un stream, así que seguir a alguien (o que acepte
+/// la solicitud), o un
 /// vínculo que se activa agrega al contacto, y un unfollow, un bloqueo o un
 /// vínculo terminado lo saca, sin recargar la pantalla.
 ///
@@ -160,11 +163,11 @@ final chatContactsProvider =
 
   final asAthlete = ref.watch(chatContactLinksAsAthleteProvider);
   final asTrainer = ref.watch(chatContactLinksAsTrainerProvider);
-  final followers = ref.watch(chatContactFollowersProvider);
+  final following = ref.watch(chatContactFollowingProvider);
   final chats = ref.watch(chatsForCurrentUserProvider);
   final blocked = ref.watch(blockedUidsProvider(uid));
 
-  final sources = <AsyncValue<Object?>>[asAthlete, asTrainer, followers, chats];
+  final sources = <AsyncValue<Object?>>[asAthlete, asTrainer, following, chats];
   for (final source in sources) {
     if (source.hasError) {
       return AsyncError(source.error!, source.stackTrace ?? StackTrace.empty);
@@ -178,7 +181,7 @@ final chatContactsProvider =
     chatContactsFrom(
       selfUid: uid,
       links: [...asAthlete.requireValue, ...asTrainer.requireValue],
-      followerUids: followers.requireValue,
+      followingUids: following.requireValue,
       blockedUids: blocked.valueOrNull ?? const [],
       chatPartnerUids: chats.requireValue.expand((c) => c.members),
     ),

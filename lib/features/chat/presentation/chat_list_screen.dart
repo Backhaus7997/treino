@@ -259,7 +259,7 @@ void _invalidateContacts(WidgetRef ref) {
   ref
     ..invalidate(chatContactLinksAsAthleteProvider)
     ..invalidate(chatContactLinksAsTrainerProvider)
-    ..invalidate(chatContactFollowersProvider);
+    ..invalidate(chatContactFollowingProvider);
 }
 
 class _Loading extends StatelessWidget {
@@ -336,7 +336,7 @@ class _ContactRowState extends ConsumerState<_ContactRow> {
     final reason = switch (widget.contact.reason) {
       ChatContactReason.coach => l10n.chatContactReasonCoach,
       ChatContactReason.athlete => l10n.chatContactReasonAthlete,
-      ChatContactReason.follower => l10n.chatContactReasonFollower,
+      ChatContactReason.following => l10n.chatContactReasonFollowing,
     };
 
     return pubAsync.when(
