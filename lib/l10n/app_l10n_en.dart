@@ -2194,6 +2194,41 @@ class AppL10nEn extends AppL10n {
   String get chatContactOpenError => '';
 
   @override
+  String get chatActionArchive => '';
+
+  @override
+  String get chatActionUnarchive => '';
+
+  @override
+  String get chatActionDelete => '';
+
+  @override
+  String get chatActionUndo => '';
+
+  @override
+  String get chatArchivedToast => '';
+
+  @override
+  String get chatUnarchivedToast => '';
+
+  @override
+  String get chatDeletedToast => '';
+
+  @override
+  String get chatActionError => '';
+
+  @override
+  String get chatDeleteConfirmTitle => '';
+
+  @override
+  String get chatDeleteConfirmBody => '';
+
+  @override
+  String chatArchivedSectionTitle(int count) {
+    return '$count';
+  }
+
+  @override
   String get chatRelativeJustNow => '';
 
   @override

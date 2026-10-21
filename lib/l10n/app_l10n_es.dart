@@ -2237,6 +2237,43 @@ class AppL10nEs extends AppL10n {
       'No pudimos abrir el chat. Probá de nuevo.';
 
   @override
+  String get chatActionArchive => 'Archivar';
+
+  @override
+  String get chatActionUnarchive => 'Desarchivar';
+
+  @override
+  String get chatActionDelete => 'Eliminar chat';
+
+  @override
+  String get chatActionUndo => 'Deshacer';
+
+  @override
+  String get chatArchivedToast => 'Chat archivado';
+
+  @override
+  String get chatUnarchivedToast => 'Chat desarchivado';
+
+  @override
+  String get chatDeletedToast => 'Chat eliminado';
+
+  @override
+  String get chatActionError =>
+      'No pudimos actualizar el chat. Probá de nuevo.';
+
+  @override
+  String get chatDeleteConfirmTitle => '¿Eliminar el chat?';
+
+  @override
+  String get chatDeleteConfirmBody =>
+      'Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.';
+
+  @override
+  String chatArchivedSectionTitle(int count) {
+    return 'Archivados · $count';
+  }
+
+  @override
   String get chatRelativeJustNow => 'recién';
 
   @override
@@ -8083,6 +8120,43 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get chatContactOpenError =>
       'No pudimos abrir el chat. Probá de nuevo.';
+
+  @override
+  String get chatActionArchive => 'Archivar';
+
+  @override
+  String get chatActionUnarchive => 'Desarchivar';
+
+  @override
+  String get chatActionDelete => 'Eliminar chat';
+
+  @override
+  String get chatActionUndo => 'Deshacer';
+
+  @override
+  String get chatArchivedToast => 'Chat archivado';
+
+  @override
+  String get chatUnarchivedToast => 'Chat desarchivado';
+
+  @override
+  String get chatDeletedToast => 'Chat eliminado';
+
+  @override
+  String get chatActionError =>
+      'No pudimos actualizar el chat. Probá de nuevo.';
+
+  @override
+  String get chatDeleteConfirmTitle => '¿Eliminar el chat?';
+
+  @override
+  String get chatDeleteConfirmBody =>
+      'Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.';
+
+  @override
+  String chatArchivedSectionTitle(int count) {
+    return 'Archivados · $count';
+  }
 
   @override
   String get chatRelativeJustNow => 'recién';

@@ -214,6 +214,27 @@ class ChatRepository {
           .doc(chatId)
           .update({'lastRead.$uid': FieldValue.serverTimestamp()}).boundedWrite;
 
+  // ─── archive / unarchive / hideForUser ──────────────────────────────────
+  //
+  // Estado POR MIEMBRO (ver `Chat.archivedAt` / `Chat.hiddenBefore`): cada uno
+  // escribe sólo su clave con dotted-path, igual que [markAsRead]. Las rules
+  // pinean el valor a `request.time`, por eso va serverTimestamp.
+
+  Future<void> archive({required String chatId, required String uid}) => _chats
+      .doc(chatId)
+      .update({'archivedAt.$uid': FieldValue.serverTimestamp()}).boundedWrite;
+
+  Future<void> unarchive({required String chatId, required String uid}) =>
+      _chats
+          .doc(chatId)
+          .update({'archivedAt.$uid': FieldValue.delete()}).boundedWrite;
+
+  /// "Eliminar" para [uid]: saca el chat de su lista y le oculta el historial
+  /// anterior. El otro miembro no ve ningún cambio.
+  Future<void> hideForUser({required String chatId, required String uid}) =>
+      _chats.doc(chatId).update(
+          {'hiddenBefore.$uid': FieldValue.serverTimestamp()}).boundedWrite;
+
   // ─── watchChatsForUser ──────────────────────────────────────────────────
   //
   // Stream de chats donde el uid es miembro, ordenados por lastMessageAt
@@ -248,8 +269,25 @@ class ChatRepository {
     // serverTimestamp todavía no resolvió localmente; en ese caso el get()
     // posterior ya tiene el valor real.
     if (data['createdAt'] == null) return null;
-    return Chat.fromJson({...data, 'chatId': snap.id});
+    return Chat.fromJson({
+      ...data,
+      for (final key in _perMemberStampKeys)
+        if (data[key] is Map) key: _estimatePending(data[key]! as Map),
+      'chatId': snap.id,
+    });
   }
+
+  static const _perMemberStampKeys = ['lastRead', 'archivedAt', 'hiddenBefore'];
+
+  /// Una entrada `uid → serverTimestamp` que todavía no confirmó el servidor
+  /// llega como `null` en el snapshot local, y `TimestampMapConverter` la
+  /// rompería. Se estima con el reloj local (lo que hace
+  /// `ServerTimestampBehavior.estimate`): archivar o eliminar se ve al
+  /// instante en vez de rebotar hasta que vuelve el commit.
+  static Map<String, Object?> _estimatePending(Map<Object?, Object?> stamps) =>
+      {
+        for (final e in stamps.entries) '${e.key}': e.value ?? Timestamp.now(),
+      };
 
   /// Variante one-shot de [_chatFromDoc] que NUNCA devuelve null.
   ///

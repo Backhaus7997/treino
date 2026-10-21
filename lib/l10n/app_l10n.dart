@@ -4004,6 +4004,72 @@ abstract class AppL10n {
   /// **'No pudimos abrir el chat. Probá de nuevo.'**
   String get chatContactOpenError;
 
+  /// No description provided for @chatActionArchive.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Archivar'**
+  String get chatActionArchive;
+
+  /// No description provided for @chatActionUnarchive.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Desarchivar'**
+  String get chatActionUnarchive;
+
+  /// No description provided for @chatActionDelete.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar chat'**
+  String get chatActionDelete;
+
+  /// No description provided for @chatActionUndo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Deshacer'**
+  String get chatActionUndo;
+
+  /// No description provided for @chatArchivedToast.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Chat archivado'**
+  String get chatArchivedToast;
+
+  /// No description provided for @chatUnarchivedToast.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Chat desarchivado'**
+  String get chatUnarchivedToast;
+
+  /// No description provided for @chatDeletedToast.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Chat eliminado'**
+  String get chatDeletedToast;
+
+  /// No description provided for @chatActionError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos actualizar el chat. Probá de nuevo.'**
+  String get chatActionError;
+
+  /// No description provided for @chatDeleteConfirmTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar el chat?'**
+  String get chatDeleteConfirmTitle;
+
+  /// No description provided for @chatDeleteConfirmBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.'**
+  String get chatDeleteConfirmBody;
+
+  /// No description provided for @chatArchivedSectionTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Archivados · {count}'**
+  String chatArchivedSectionTitle(int count);
+
   /// No description provided for @chatRelativeJustNow.
   ///
   /// In es_AR, this message translates to:

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/tokens.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -14,8 +15,15 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../../core/widgets/treino_toast.dart';
 import '../application/chat_contacts_providers.dart';
+import '../../../core/widgets/treino_confirm_dialog.dart';
 import '../application/chat_providers.dart'
-    show chatForOtherUidProvider, chatsForCurrentUserProvider, chatHasUnread;
+    show
+        archivedChatsProvider,
+        chatForOtherUidProvider,
+        chatHasUnread,
+        chatRepositoryProvider,
+        chatsForCurrentUserProvider,
+        inboxChatsProvider;
 import '../domain/chat.dart';
 
 /// Pantalla que lista todos los chats del usuario actual.
@@ -29,7 +37,8 @@ class ChatListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final chatsAsync = ref.watch(chatsForCurrentUserProvider);
+    final chatsAsync = ref.watch(inboxChatsProvider);
+    final archived = ref.watch(archivedChatsProvider).valueOrNull ?? const [];
     final currentUid = ref.watch(currentUidProvider);
     final contactsAsync = ref.watch(chatContactsProvider);
 
@@ -83,7 +92,9 @@ class ChatListScreen extends ConsumerWidget {
           ),
         ),
         body: TreinoStateSwitcher(
-          childKey: ValueKey(_bodyState(chatsAsync, contactsAsync)),
+          childKey: ValueKey(
+            archived.isEmpty ? _bodyState(chatsAsync, contactsAsync) : 'data',
+          ),
           child: chatsAsync.when(
             loading: () => const _Loading(),
             error: (_, __) => _ErrorState(
@@ -91,7 +102,7 @@ class ChatListScreen extends ConsumerWidget {
             ),
             data: (chats) {
               final contacts = contactsAsync.valueOrNull ?? const [];
-              if (chats.isEmpty) {
+              if (chats.isEmpty && archived.isEmpty) {
                 // Sin chats, la pantalla depende de los contactos: mientras
                 // cargan no se puede afirmar "no hay a quién escribirle".
                 if (contactsAsync.isLoading) return const _Loading();
@@ -106,7 +117,14 @@ class ChatListScreen extends ConsumerWidget {
               // filas visibles. Cada fila escucha su perfil público, así que
               // armarlas todas de una abría un listener por seguido y por
               // chat al entrar a la pantalla.
+              final archivedOpen = ref.watch(_archivedOpenProvider);
               final entries = <_Entry>[
+                if (archived.isNotEmpty) ...[
+                  _ArchivedHeaderEntry(archived.length),
+                  if (archivedOpen)
+                    for (final chat in archived)
+                      _ChatEntry(chat, archived: true),
+                ],
                 for (final chat in chats) _ChatEntry(chat),
                 if (contacts.isNotEmpty) ...[
                   _HeaderEntry(l10n.chatContactsSectionTitle),
@@ -123,10 +141,16 @@ class ChatListScreen extends ConsumerWidget {
                   // que el `separatorBuilder` de antes.
                   final divided = i > 0 &&
                       entries[i - 1].runtimeType == entry.runtimeType &&
-                      entry is! _HeaderEntry;
+                      entry is! _HeaderEntry &&
+                      entry is! _ArchivedHeaderEntry;
                   final Widget row = switch (entry) {
-                    _ChatEntry(:final chat) =>
-                      _ChatRow(chat: chat, currentUid: currentUid ?? ''),
+                    _ChatEntry(:final chat, :final archived) => _ChatRow(
+                        chat: chat,
+                        currentUid: currentUid ?? '',
+                        archived: archived,
+                      ),
+                    _ArchivedHeaderEntry(:final count) =>
+                      _ArchivedHeader(count: count, open: archivedOpen),
                     _ContactEntry(:final contact) =>
                       _ContactRow(contact: contact),
                     _HeaderEntry(:final label) => _SectionHeader(label: label),
@@ -165,8 +189,16 @@ sealed class _Entry {
 }
 
 final class _ChatEntry extends _Entry {
-  const _ChatEntry(this.chat);
+  const _ChatEntry(this.chat, {this.archived = false});
   final Chat chat;
+
+  /// Fila de Archivados: el long-press ofrece desarchivar.
+  final bool archived;
+}
+
+final class _ArchivedHeaderEntry extends _Entry {
+  const _ArchivedHeaderEntry(this.count);
+  final int count;
 }
 
 final class _ContactEntry extends _Entry {
@@ -185,10 +217,17 @@ final class _NoticeEntry extends _Entry {
 }
 
 class _ChatRow extends ConsumerWidget {
-  const _ChatRow({required this.chat, required this.currentUid});
+  const _ChatRow({
+    required this.chat,
+    required this.currentUid,
+    this.archived = false,
+  });
 
   final Chat chat;
   final String currentUid;
+
+  /// Fila de la sección Archivados: el long-press ofrece desarchivar.
+  final bool archived;
 
   String _otherUidOf(Chat c, String selfUid) {
     return c.members.firstWhere((m) => m != selfUid, orElse: () => '');
@@ -203,6 +242,15 @@ class _ChatRow extends ConsumerWidget {
     final hasUnread = currentUid.isNotEmpty && chatHasUnread(chat, currentUid);
 
     return InkWell(
+      onLongPress: currentUid.isEmpty
+          ? null
+          : () => _showChatActions(
+                context,
+                ref,
+                chat: chat,
+                uid: currentUid,
+                archived: archived,
+              ),
       onTap: () {
         // Open the chat via the top-level go_router route so it renders
         // full-screen (no nav bar) with a proper background — the same route
@@ -300,6 +348,179 @@ String _bodyState(
   final c = contacts.valueOrNull;
   if (c == null) return 'loading';
   return c.isEmpty ? 'empty' : 'data';
+}
+
+/// Acciones de un chat por long-press: mismo look que el menú de moderación
+/// (`showModerationMenu`), la otra acción por long-press de esta feature.
+///
+/// Las dos son POR USUARIO (`Chat.archivedAt` / `Chat.hiddenBefore`): no
+/// cambian nada de lo que ve el otro participante.
+Future<void> _showChatActions(
+  BuildContext context,
+  WidgetRef ref, {
+  required Chat chat,
+  required String uid,
+  required bool archived,
+}) async {
+  final palette = AppPalette.of(context);
+  final l10n = AppL10n.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final repo = ref.read(chatRepositoryProvider);
+
+  Future<void> run(
+    Future<void> Function() action, {
+    required String done,
+    Future<void> Function()? undo,
+  }) async {
+    try {
+      await action();
+      showTreinoToastOn(
+        messenger,
+        done,
+        type: TreinoToastType.success,
+        action: undo == null
+            ? null
+            : TreinoToastAction(
+                label: l10n.chatActionUndo,
+                onPressed: () => undo().catchError((Object _) {}),
+              ),
+      );
+    } catch (_) {
+      showTreinoToastOn(messenger, l10n.chatActionError,
+          type: TreinoToastType.error);
+    }
+  }
+
+  Widget tile({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool danger = false,
+  }) {
+    final color = danger ? palette.dangerText : palette.textPrimary;
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(
+        label,
+        style: GoogleFonts.barlow(
+          fontWeight: FontWeight.w400,
+          fontSize: AppTextSize.body,
+          color: color,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  await showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    backgroundColor: palette.bgCard,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          tile(
+            icon: TreinoIcon.archive,
+            label: archived ? l10n.chatActionUnarchive : l10n.chatActionArchive,
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              if (archived) {
+                run(
+                  () => repo.unarchive(chatId: chat.chatId, uid: uid),
+                  done: l10n.chatUnarchivedToast,
+                );
+              } else {
+                run(
+                  () => repo.archive(chatId: chat.chatId, uid: uid),
+                  done: l10n.chatArchivedToast,
+                  undo: () => repo.unarchive(chatId: chat.chatId, uid: uid),
+                );
+              }
+            },
+          ),
+          tile(
+            icon: TreinoIcon.trash,
+            label: l10n.chatActionDelete,
+            danger: true,
+            onTap: () async {
+              Navigator.of(sheetContext).pop();
+              final confirmed = await showTreinoConfirmDialog(
+                context,
+                title: l10n.chatDeleteConfirmTitle,
+                body: l10n.chatDeleteConfirmBody,
+                confirmLabel: l10n.commonDelete,
+              );
+              if (!confirmed) return;
+              await run(
+                () => repo.hideForUser(chatId: chat.chatId, uid: uid),
+                done: l10n.chatDeletedToast,
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Si «Archivados» está desplegada. Vive mientras la pantalla está montada.
+final _archivedOpenProvider = StateProvider.autoDispose<bool>((_) => false);
+
+/// Encabezado «Archivados · N», plegado por defecto: arriba de todo para que
+/// se encuentre, sin empujar la bandeja hacia abajo. Las filas archivadas son
+/// entradas más de la lista plana, así que también se arman de a una.
+class _ArchivedHeader extends ConsumerWidget {
+  const _ArchivedHeader({required this.count, required this.open});
+
+  final int count;
+  final bool open;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () =>
+              ref.read(_archivedOpenProvider.notifier).update((v) => !v),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 48,
+                  child: Icon(TreinoIcon.archive, color: palette.textMuted),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    l10n.chatArchivedSectionTitle(count),
+                    style: TextStyle(
+                      color: palette.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                Icon(
+                  open ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+                  color: palette.textMuted,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+        Divider(height: 1, color: palette.border),
+      ],
+    );
+  }
 }
 
 void _invalidateContacts(WidgetRef ref) {
