@@ -2952,9 +2952,6 @@ class AppL10nEs extends AppL10n {
   String get routineEditorDayNameLabel => 'NOMBRE DEL DÍA';
 
   @override
-  String get routineEditorSaveDayNameA11y => 'Guardar nombre del día';
-
-  @override
   String get athleteDetailEditPlanA11y => 'Editar plan';
 
   @override
@@ -8783,9 +8780,6 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorDayNameLabel => 'NOMBRE DEL DÍA';
-
-  @override
-  String get routineEditorSaveDayNameA11y => 'Guardar nombre del día';
 
   @override
   String get athleteDetailEditPlanA11y => 'Editar plan';
