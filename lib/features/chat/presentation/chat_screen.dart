@@ -269,7 +269,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final messagesAsync = ref.watch(messagesProvider(widget.chatId));
+    // Sin lo que el usuario eliminó para sí (Chat.hiddenBefore).
+    final messagesAsync = ref.watch(visibleMessagesProvider(widget.chatId));
     final currentUid = ref.watch(currentUidProvider);
 
     // Espejo de `senderMayPost` en las rules: en un chat existente escriben

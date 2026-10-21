@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/chat/application/chat_contacts_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/chat/data/chat_repository.dart';
 import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/chat/presentation/chat_list_screen.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -38,6 +41,7 @@ Chat _chat({
   DateTime? lastMessageAt,
   String? lastMessageSenderId,
   Map<String, DateTime>? lastRead,
+  Map<String, DateTime>? archivedAt,
 }) =>
     Chat(
       chatId: chatId,
@@ -47,6 +51,7 @@ Chat _chat({
       lastMessageAt: lastMessageAt,
       lastMessageSenderId: lastMessageSenderId,
       lastRead: lastRead,
+      archivedAt: archivedAt,
     );
 
 UserPublicProfile _pub(String uid, String name) => UserPublicProfile(
@@ -435,6 +440,153 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(expected), findsOneWidget);
+    });
+
+    group('archivar / eliminar', () {
+      final last = DateTime.utc(2026, 10, 1, 10);
+      late FakeFirebaseFirestore firestore;
+
+      setUp(() async {
+        firestore = FakeFirebaseFirestore();
+        await firestore.collection('chats').doc('aaa_bbb').set({
+          'chatId': 'aaa_bbb',
+          'members': ['aaa', 'bbb'],
+          'createdAt': Timestamp.fromDate(DateTime.utc(2026, 9, 1)),
+          'lastMessageAt': Timestamp.fromDate(last),
+        });
+      });
+
+      Future<Map<String, Object?>> chatDoc() async =>
+          (await firestore.collection('chats').doc('aaa_bbb').get()).data()!;
+
+      Future<void> pumpList(WidgetTester tester, List<Chat> chats) async {
+        await tester.pumpWidget(
+          _wrap(
+            const ChatListScreen(),
+            overrides: [
+              currentUidProvider.overrideWith((_) => 'aaa'),
+              chatsForCurrentUserProvider
+                  .overrideWith((ref) => Stream.value(chats)),
+              chatRepositoryProvider
+                  .overrideWithValue(ChatRepository(firestore: firestore)),
+              userPublicProfileProvider('bbb')
+                  .overrideWith((_) => Stream.value(_pub('bbb', 'Vale'))),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('long-press → Archivar escribe sólo mi entrada', (
+        tester,
+      ) async {
+        await pumpList(tester, [
+          _chat(lastMessageText: 'hola', lastMessageAt: last),
+        ]);
+
+        await tester.longPress(find.text('Vale'));
+        await tester.pumpAndSettle();
+        expect(find.text('Eliminar chat'), findsOneWidget);
+
+        await tester.tap(find.text('Archivar'));
+        await tester.runAsync(() => pumpEventQueue());
+        await tester.pumpAndSettle();
+
+        expect(((await chatDoc())['archivedAt']! as Map).keys, ['aaa']);
+        expect(find.text('Chat archivado'), findsOneWidget);
+      });
+
+      testWidgets('Eliminar pide confirmación; cancelar no escribe nada', (
+        tester,
+      ) async {
+        await pumpList(tester, [
+          _chat(lastMessageText: 'hola', lastMessageAt: last),
+        ]);
+
+        await tester.longPress(find.text('Vale'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Eliminar chat'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('¿Eliminar el chat?'), findsOneWidget);
+        expect(find.textContaining('sólo para vos'), findsOneWidget);
+        await tester.tap(find.text('Cancelar'));
+        await tester.pumpAndSettle();
+        expect((await chatDoc()).containsKey('hiddenBefore'), isFalse);
+
+        await tester.longPress(find.text('Vale'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Eliminar chat'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Eliminar'));
+        await tester.runAsync(() => pumpEventQueue());
+        await tester.pumpAndSettle();
+        expect(((await chatDoc())['hiddenBefore']! as Map).keys, ['aaa']);
+      });
+
+      testWidgets(
+          '200 archivados desplegados: sólo se arman las filas visibles',
+          (tester) async {
+        // Codex (#1608): desplegar un archivo grande montaba todas las filas, y
+        // cada una abre el listener de su perfil.
+        var profileReads = 0;
+        await tester.pumpWidget(
+          _wrap(
+            const ChatListScreen(),
+            overrides: [
+              currentUidProvider.overrideWith((_) => 'aaa'),
+              chatsForCurrentUserProvider.overrideWith(
+                (ref) => Stream.value([
+                  for (var i = 0; i < 200; i++)
+                    _chat(
+                      chatId: 'aaa_u$i',
+                      members: ['aaa', 'u$i'],
+                      lastMessageText: 'hola',
+                      lastMessageAt: last,
+                      archivedAt: {'aaa': last.add(const Duration(minutes: 1))},
+                    ),
+                ]),
+              ),
+              userPublicProfileProvider.overrideWith((ref, uid) {
+                profileReads++;
+                return Stream.value(_pub(uid, 'Persona $uid'));
+              }),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(profileReads, 0);
+
+        await tester.tap(find.text('Archivados · 200'));
+        await tester.pumpAndSettle();
+        expect(find.text('Persona u0'), findsOneWidget);
+        expect(profileReads, lessThan(40));
+      });
+
+      testWidgets('Archivados: plegado con el conteo, se despliega al tocar', (
+        tester,
+      ) async {
+        await pumpList(tester, [
+          _chat(
+            lastMessageText: 'hola',
+            lastMessageAt: last,
+            archivedAt: {'aaa': last.add(const Duration(minutes: 1))},
+          ),
+        ]);
+
+        // Con el único chat archivado no es el estado vacío.
+        expect(find.text('Sin mensajes todavía'), findsNothing);
+        expect(find.text('Archivados · 1'), findsOneWidget);
+        expect(find.text('Vale'), findsNothing);
+
+        await tester.tap(find.text('Archivados · 1'));
+        await tester.pumpAndSettle();
+        expect(find.text('Vale'), findsOneWidget);
+
+        await tester.longPress(find.text('Vale'));
+        await tester.pumpAndSettle();
+        expect(find.text('Desarchivar'), findsOneWidget);
+      });
     });
   });
 }

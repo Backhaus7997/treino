@@ -42,12 +42,38 @@ class Chat with _$Chat {
     /// `linkId`, y lo tienen pineado inmutable en `chats/update`. Acá sólo se
     /// lee — la validez la garantiza el servidor al crear el doc.
     String? kind,
+
+    /// Archivado POR MIEMBRO: `uid → cuándo lo archivó`. Esconde el chat de la
+    /// lista principal de ese uid hasta que llega un mensaje posterior
+    /// ([isArchivedFor]). Desarchivar borra la clave. Cada miembro sólo puede
+    /// escribir la suya (`ownStampOk` en `firestore.rules`).
+    @TimestampMapConverter() Map<String, DateTime>? archivedAt,
+
+    /// "Eliminar" POR MIEMBRO: `uid → desde cuándo ve el historial`. Oculta
+    /// el chat y los mensajes anteriores sólo para ese uid; si llega un
+    /// mensaje nuevo, el chat vuelve desde ahí ([isHiddenFor]). No borra nada
+    /// del otro participante: los mensajes son inmutables.
+    @TimestampMapConverter() Map<String, DateTime>? hiddenBefore,
   }) = _Chat;
 
   const Chat._();
 
   /// Chat de pre-consulta (#637): sin vínculo formal todavía.
   bool get isInquiry => kind == inquiryKind;
+
+  /// Archivado por [uid] y sin mensajes desde entonces.
+  bool isArchivedFor(String uid) => _stampCovers(archivedAt?[uid]);
+
+  /// Eliminado por [uid] y sin mensajes desde entonces.
+  bool isHiddenFor(String uid) => _stampCovers(hiddenBefore?[uid]);
+
+  /// Un mensaje posterior a la estampa la vence: así el chat "vuelve solo"
+  /// sin que nadie tenga que escribir la entrada de otro miembro.
+  bool _stampCovers(DateTime? stamp) {
+    if (stamp == null) return false;
+    final last = lastMessageAt;
+    return last == null || !last.isAfter(stamp);
+  }
 
   /// Valor de [kind] para la pre-consulta. Tiene que coincidir EXACTAMENTE con
   /// el literal de `chatCreateOk` en `firestore.rules` — si divergen, el CTA

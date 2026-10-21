@@ -76,7 +76,8 @@ const chatEnablingLinkStatuses = {
 /// - [blockedUids]: `chatCreateOk` y `senderMayPost` exigen `notBlocked`.
 ///   Del lado inverso (el otro me bloqueó) no hace falta nada: no puedo leer
 ///   sus bloqueos, pero `removeFollowEdgesOnBlock` borra las dos aristas.
-/// - [chatPartnerUids]: ya hay un chat en la lista; se muestra el chat.
+/// - [chatPartnerUids]: ya hay un chat en la lista (o en Archivados); se
+///   muestra el chat.
 List<ChatContact> chatContactsFrom({
   required String selfUid,
   required Iterable<TrainerLink> links,
@@ -182,7 +183,11 @@ final chatContactsProvider =
       links: [...asAthlete.requireValue, ...asTrainer.requireValue],
       followingUids: following.requireValue,
       blockedUids: blocked.valueOrNull ?? const [],
-      chatPartnerUids: chats.requireValue.expand((c) => c.members),
+      // Un chat eliminado no cuenta como "ya tiene chat": la persona vuelve a
+      // aparecer acá, y tocarla reabre ese chat sin el historial borrado.
+      chatPartnerUids: chats.requireValue
+          .where((c) => !c.isHiddenFor(uid))
+          .expand((c) => c.members),
     ),
   );
 });
