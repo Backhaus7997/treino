@@ -58,8 +58,8 @@ void main() {
       final l10n = await _pumpAndGetL10n(tester);
       expect(
         l10n.chatListEmptyBody,
-        'Cuando tengas un vínculo activo con un PF, '
-        'vas a poder chatear desde acá.',
+        'Le podés escribir a tu PF y a quienes seguís, y a cualquier perfil '
+        'público desde su perfil. Cuando sigas a alguien, lo vas a ver acá.',
       );
     });
 

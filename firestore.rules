@@ -2797,17 +2797,32 @@ service cloud.firestore {
       // relationship. Sin este gate cualquier autenticado podía abrir un chat
       // con —y escribirle a— cualquiera.
       //
-      // REQ-FOLLOW-012 / LD-08 / ADR-FOLLOW-005 — la rama social pasó a ser
-      // DIRECCIONAL: abrir un chat es poder mandar el primer mensaje, así que
-      // lo que habilita es que el DESTINATARIO siga a quien lo abre
-      // (`follows/{otro}_{yo}` aceptada). Reemplaza al `exists`+`get` sobre
-      // `friendships/{chatId}`, que era simétrico por construcción — el doc id
-      // de `friendships` es el par ordenado, o sea el MISMO documento para las
-      // dos direcciones.
+      // ── RAMA SOCIAL (cambio de producto 2026-10-21, PR #1607) ────────────
       //
-      // Costo sin cambios: un lookup direccional cuesta exactamente lo mismo
-      // (`exists`+`get` = 2) que el simétrico que reemplaza. El peor caso
-      // (social falla → se evalúa trainer) sigue en ≤6 sobre el techo de 10.
+      // Reemplaza a REQ-FOLLOW-012 / ADR-FOLLOW-005, que la hacían DIRECCIONAL
+      // al revés: habilitaba a quien el destinatario seguía
+      // (`followAccepted(otro, yo)`), o sea que yo sólo podía escribirle a mis
+      // SEGUIDORES. Producto lo dio vuelta. Abrir un chat social pide UNA de:
+      //
+      //   · `followAccepted(yo, otro)` — lo sigo y la arista está aceptada. Con
+      //     perfil privado eso significa que el otro me aceptó.
+      //   · el perfil del otro es PÚBLICO (`userPublicProfiles/{otro}
+      //     .isProfilePublic`, el toggle de Perfil → Privacidad). Es la misma
+      //     fuente y el mismo default (`true` para perfiles anteriores al
+      //     campo) que usa el auto-accept del `create` de `follows`.
+      //
+      // Una solicitud PENDIENTE a un perfil privado no alcanza: la arista no
+      // está aceptada y el perfil no es público.
+      //
+      // `followAccepted` va primero: si lo sigo, el `get()` del perfil no se
+      // paga. Un `get()` sobre un perfil inexistente (cuenta borrada) revienta
+      // la evaluación y deniega, que es lo correcto.
+      //
+      // Una vez creado el chat, los DOS escriben sin requisito de follow (ver
+      // `senderMayPost`): el que recibe responde aunque no siga al otro.
+      //
+      // `notBlocked()` envuelve las TRES ramas: un bloqueo, en cualquier
+      // dirección, gana sobre vínculo, consulta y follow.
       //
       // `members[0] < members[1]` y `chatId == members[0]+'_'+members[1]` ya los
       // garantiza el propio `allow create` de abajo, y `members` es inmutable en
@@ -2818,22 +2833,17 @@ service cloud.firestore {
       // confía), y SEC-002 garantiza que un link activo fue aceptado por el
       // trainer, así que ninguna de las dos partes puede fraguar uno.
       //
-      // ⚠ LAS DOS RAMAS SON EXCLUYENTES, NO UN `||` — y eso es de SEGURIDAD, no
-      // de estilo. Con `followAccepted(...) || ('linkId' in data && ...)`, un
-      // chat social hacía true la primera rama y el `linkId` del payload
-      // **nunca se validaba**: quedaba persistido un linkId inventado. Como
-      // `senderMayPost` (abajo) escapa por la mera PRESENCIA de la clave, eso
-      // le regalaba al que lo plantó escritura permanente, sobreviviendo al
-      // unfollow. O sea: el gate direccional entero quedaba decorativo, que es
-      // exactamente lo que REQ-FOLLOW-012 dice que no puede pasar.
+      // ⚠ LAS RAMAS SON EXCLUYENTES (ternario), NO UN `||`. Con
+      // `social || ('linkId' in data && ...)`, un chat social hacía true la
+      // primera rama y el `linkId` del payload **nunca se validaba**: quedaba
+      // persistido un linkId inventado, y la UI trataría ese chat como de
+      // Coach. La invariante que se sostiene es: **un doc de chat sólo lleva
+      // `linkId` si nombra un link válido**, y `kind == 'inquiry'` sólo si el
+      // otro es un PF publicado. Se paga en la escritura (acá y en los pins del
+      // `update`).
       //
-      // Con el ternario, la INVARIANTE que sostiene a `senderMayPost` es:
-      // **un doc de chat sólo lleva `linkId` si nombra un link válido.** Se
-      // paga en la escritura (acá y en el pin del `update`), no en cada
-      // mensaje, así que el chat del Coach sigue costando 1 sola llamada.
-      //
-      // Efecto lateral bueno: el peor caso de `chats/create` baja de ≤6 a 4,
-      // porque ya no se evalúan las dos ramas en cadena.
+      // Presupuesto: peor caso 6 llamadas (rama Coach: 2 de `notBlocked` + 4),
+      // la social 5 y la de consulta 5, sobre el techo de 10.
       //
       // ── TERCERA RAMA: chat de PRE-CONSULTA (#637) ────────────────────────
       //
@@ -2843,10 +2853,9 @@ service cloud.firestore {
       // el producto obligaba a elegir antes de poder preguntar: pedirle vínculo
       // al primer coach dejaba a los otros dos inalcanzables.
       //
-      // La rama social NO sirve para este caso y no es cuestión de reusarla:
-      // es direccional a propósito (REQ-FOLLOW-012 / ADR-FOLLOW-005) y la
-      // dirección que habilita es la contraria — exigiría que el PF siga al
-      // atleta ANTES de que el atleta pueda preguntarle. Nadie hace eso.
+      // La rama social no alcanza para este caso: sólo cubre a un PF con perfil
+      // público o al que el atleta ya sigue, y la consulta existe justamente
+      // para un PF publicado en discovery, siga o no el atleta su perfil.
       //
       // Por eso una rama propia, y —igual que las otras dos— EXCLUYENTE: es un
       // ternario anidado, no un `|| esConsulta` al final. Un `||` reabriría
@@ -2919,7 +2928,7 @@ service cloud.firestore {
       function chatCreateOk(members, data) {
         let me = request.auth.uid;
         let other = members[0] == me ? members[1] : members[0];
-        return ('linkId' in data) ? (
+        return notBlocked(me, other) && (('linkId' in data) ? (
           exists(/databases/$(database)/documents/trainer_links/$(data.linkId))
           // QA H8: 'paused' cuenta como vínculo vigente para chatear (pausar es
           // un hold temporal, no un corte). Espeja el filtro cliente en
@@ -2931,48 +2940,28 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/trainerPublicProfiles/$(other))
           && get(/databases/$(database)/documents/users/$(other)).data.role == 'trainer'
           && get(/databases/$(database)/documents/trainerPublicProfiles/$(other)).data.get('acceptsInquiries', true) == true
-        ) : followAccepted(other, me);
+        ) : (
+          followAccepted(me, other)
+          || get(/databases/$(database)/documents/userPublicProfiles/$(other))
+               .data.get('isProfilePublic', true) == true
+        ));
       }
 
       // Mismo permiso que `senderMayPost`, pero sobre un chat que YA existe, así
-      // que sale de `resource.data` y NO paga el `get()` del chat. Igual que
-      // allá, `'linkId' in resource.data` va primero para que el Coach no pague
-      // ninguna llamada de acceso — y acá esa clave ya es confiable, porque
-      // `chatCreateOk` la valida al crear y el `update` la tiene pineada.
+      // que sale de `resource.data` y NO paga el `get()` del chat: miembro (lo
+      // chequea el `allow update`) y sin bloqueo. Desde el cambio de producto
+      // del 2026-10-21 escribir en un chat existente no pide follow en ninguna
+      // dirección, así que tampoco el preview. Costo: 2 llamadas.
       //
-      // Costo: 0 llamadas en un chat de Coach, 2 en uno social, y sólo cuando el
-      // update toca algo más que `lastRead`.
-      //
-      // #637: `kind == 'inquiry'` escapa por la MISMA vía y por el mismo
-      // motivo. Acá el `||` es legítimo —a diferencia del `create`— porque los
-      // dos primeros términos ya no son payload sin validar: son hechos que
-      // `chatCreateOk` verificó al crear el doc y que el `update` de abajo
-      // tiene pineados. Es una disyunción de hechos confiables, no una
-      // validación. Costo: 2 llamadas (las de `notBlocked`) para un chat de
-      // Coach o de consulta, 4 para uno social, que además paga
-      // `followAccepted`.
-      //
-      // `notBlocked()` va AFUERA de la disyunción, igual que en
-      // `senderMayPost()` de `messages`: un bloqueo corta la escritura sin
-      // importar POR QUÉ rama se habilitaba (Coach, consulta o follow).
-      //
-      // Adentro NO alcanza, y era el agujero: las dos primeras ramas devuelven
-      // true INCONDICIONALMENTE para un chat con `linkId` o `kind == 'inquiry'`,
-      // así que el bloqueado no lograba escribir el mensaje —ese gate sí tenía
-      // `notBlocked`— pero sí `lastMessageText` en el doc padre, que es el
+      // Sin este gate el bloqueado no lograba escribir el mensaje —ese gate sí
+      // tiene `notBlocked`— pero sí `lastMessageText` en el doc padre, que es el
       // texto que la otra persona ve en su lista de chats, con badge de
-      // no-leído. O sea, exactamente el "«No te puede escribir» sería falso"
-      // que REQ-FOLLOW-012 escribe treinta líneas más abajo.
+      // no-leído.
       function chatWriterOk(uid) {
         let other = resource.data.members[0] == uid
           ? resource.data.members[1]
           : resource.data.members[0];
-        return notBlocked(uid, other)
-            && (
-                 'linkId' in resource.data
-                 || resource.data.get('kind', '') == 'inquiry'
-                 || followAccepted(other, uid)
-               );
+        return notBlocked(uid, other);
       }
 
       // ⚠️  QA-SEC-010 — el disyunto `resource == null` está ACOTADO al par que
@@ -3014,11 +3003,11 @@ service cloud.firestore {
       // createdAt remain immutable. get('lastRead', {}) is null-safe for
       // legacy docs that predate the field.
       //
-      // ⚠ `linkId` PINEADO: es la segunda mitad de la invariante que sostiene a
-      // `senderMayPost`. Sin este pin, esta regla —que no tiene allowlist de
-      // claves— dejaba que cualquier miembro le agregara `linkId` a un chat
-      // social con un update de una línea, y se auto-otorgara escritura
-      // permanente que sobrevive al unfollow. El idioma `get(...,null)` hace
+      // ⚠ `linkId` PINEADO: segunda mitad de la invariante "un chat sólo lleva
+      // `linkId` si nombra un link válido" (ver `chatCreateOk`). Sin este pin,
+      // esta regla —que no tiene allowlist de claves— dejaba que cualquier
+      // miembro le agregara un `linkId` inventado a un chat social, y la app
+      // lo trataría como chat de Coach. El idioma `get(...,null)` hace
       // que "ausente en los dos lados" matchee, así que los chats sociales
       // (que no tienen la clave) no se ven afectados, y además impide BORRAR
       // el linkId de un chat de Coach.
@@ -3032,9 +3021,9 @@ service cloud.firestore {
                     // rama de consulta (#637), por el mismo motivo que
                     // `linkId`. Sin el pin, esta regla (que no tiene allowlist
                     // de claves) dejaría convertir un chat social en consulta
-                    // con un update de una línea, saltándose el gate de follow
-                    // y auto-otorgándose escritura permanente que sobrevive al
-                    // unfollow. Y en la otra dirección impide BORRAR la marca
+                    // con un update de una línea, y la marca dejaría de decir
+                    // que el otro es un PF publicado. Y en la otra dirección
+                    // impide BORRAR la marca
                     // para que una consulta se haga pasar por chat social.
                     // La escalada consulta→Coach ya la corta el pin de
                     // `linkId`: a un chat existente no se le puede agregar.
@@ -3047,19 +3036,19 @@ service cloud.firestore {
                               .affectedKeys()
                               .hasOnly([request.auth.uid])
                        )
-                    // REQ-FOLLOW-012 — el PREVIEW sigue al mismo permiso que el
-                    // mensaje. Sin esto el gate de `messages/create` se rodea
-                    // por el costado: el lado bloqueado no logra escribir el
-                    // mensaje, pero sí `lastMessageText`, que es el texto que la
-                    // otra persona ve en su lista de chats, con badge de
-                    // no-leído. "No te puede escribir" sería falso.
+                    // El PREVIEW sigue al mismo permiso que el mensaje
+                    // (`chatWriterOk`: sin bloqueo). Sin esto el gate de
+                    // `messages/create` se rodea por el costado: el lado
+                    // bloqueado no logra escribir el mensaje, pero sí
+                    // `lastMessageText`, que es el texto que la otra persona ve
+                    // en su lista de chats, con badge de no-leído.
                     //
                     // Es una ALLOWLIST, no una lista de campos de preview
                     // enumerados: cualquier campo que se agregue mañana al doc
                     // queda denegado por defecto en vez de colarse.
                     //
                     // `lastRead` queda AFUERA de la restricción a propósito
-                    // (design §3.3.4): el lado sin escritura tiene que poder
+                    // (design §3.3.4): el lado bloqueado tiene que poder
                     // marcar como leído, o el badge de no-leídos se le clava
                     // para siempre. Ese caso no paga ninguna llamada de acceso.
                     && (
@@ -3073,49 +3062,26 @@ service cloud.firestore {
       // Messages sub-collection. Mensajes inmutables en MVP — sin edit/delete.
       // read/create gated por members del chat parent.
       match /messages/{messageId} {
-        // REQ-FOLLOW-012 — GATE NUEVO. Hoy esta subcolección gateaba SÓLO por
-        // membresía, o sea que el permiso se evaluaba una única vez, al crear el
-        // chat: eliminar la relación NO cortaba un chat que ya existía. La
-        // asimetría que pide la decisión del dueño es DENTRO del mismo chat
-        // (uno escribe, el otro no), y una regla que corre una sola vez no puede
-        // producir dos permisos distintos para el mismo documento. Por eso el
-        // gate se evalúa por mensaje.
+        // Postear en un chat existente: miembro y sin bloqueo. Nada más.
         //
-        // ABSORBE el check de membresía en vez de sumarse a él: reusa el mismo
-        // `get(chats/{chatId})` que la regla vieja ya hacía para sacar
-        // `members`. Por eso el costo no se duplica.
+        // Hasta el 2026-10-21 (REQ-FOLLOW-012) acá se exigía que el OTRO
+        // siguiera al que escribe, por mensaje, para que dejar de seguir le
+        // cortara la escritura a esa persona. Producto lo reemplazó: el que
+        // recibe un chat responde aunque no siga al que lo abrió, y el control
+        // de quién puede INICIAR vive en `chatCreateOk`. Lo que corta una
+        // conversación ya abierta es el bloqueo.
         //
-        // Orden de las ramas DELIBERADO: `'linkId' in chat` va PRIMERO para que
-        // un chat de Coach no pague ninguna llamada de acceso extra (1, igual
-        // que hoy) y quede exactamente como está —membresía, sin re-verificar
-        // que el link siga activo—, porque apretar el Coach no es parte de este
-        // change. Un chat social paga 3 sobre el techo de 10.
-        //
-        // #637: la marca de consulta escapa igual que `linkId` y por el mismo
-        // motivo — `chatCreateOk` ya verificó al crear que el destinatario es
-        // un PF publicado, y el pin del `update` no deja plantarla después. Un
-        // chat de consulta paga 1 llamada, igual que uno de Coach. Los DOS
-        // miembros pueden postear: el atleta pregunta y el PF contesta, que es
-        // el punto entero de la feature.
+        // Absorbe el check de membresía: reusa el mismo `get(chats/{chatId})`
+        // para sacar `members`. Costo: 3 llamadas (1 get + 2 de `notBlocked`).
         function senderMayPost(uid) {
           let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
           let other = chat.members[0] == uid ? chat.members[1] : chat.members[0];
-          // notBlocked() afuera del paréntesis: un bloqueo corta el mensaje
-          // sin importar POR QUÉ rama se habilitaba (Coach, consulta o
-          // follow) — moderación va antes que cualquier motivo de contacto
-          // (change `moderacion-reporte-y-bloqueo`).
-          return uid in chat.members
-              && notBlocked(uid, other)
-              && (
-                   'linkId' in chat
-                   || chat.get('kind', '') == 'inquiry'
-                   || followAccepted(other, uid)
-                 );
+          return uid in chat.members && notBlocked(uid, other);
         }
 
-        // Lectura: membresía, SIN CAMBIOS. El lado que perdió la escritura
-        // conserva la conversación entera — bloquear también la lectura sería
-        // borrarle historia que ya recibió.
+        // Lectura: membresía, SIN CAMBIOS. El lado bloqueado conserva la
+        // conversación entera — bloquear también la lectura sería borrarle
+        // historia que ya recibió.
         allow read: if request.auth != null
                     && request.auth.uid in
                         get(/databases/$(database)/documents/chats/$(chatId)).data.members;

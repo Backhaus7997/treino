@@ -3953,7 +3953,7 @@ abstract class AppL10n {
   /// No description provided for @chatListEmptyBody.
   ///
   /// In es_AR, this message translates to:
-  /// **'Cuando tengas un vínculo activo con un PF, vas a poder chatear desde acá.'**
+  /// **'Le podés escribir a tu PF y a quienes seguís, y a cualquier perfil público desde su perfil. Cuando sigas a alguien, lo vas a ver acá.'**
   String get chatListEmptyBody;
 
   /// No description provided for @chatListError.
@@ -3967,6 +3967,42 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Reintentar'**
   String get chatListRetryLabel;
+
+  /// No description provided for @chatContactsSectionTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Escribile a…'**
+  String get chatContactsSectionTitle;
+
+  /// No description provided for @chatContactReasonCoach.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF'**
+  String get chatContactReasonCoach;
+
+  /// No description provided for @chatContactReasonAthlete.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu alumno'**
+  String get chatContactReasonAthlete;
+
+  /// No description provided for @chatContactReasonFollowing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Lo seguís'**
+  String get chatContactReasonFollowing;
+
+  /// No description provided for @chatContactsError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar a quién le podés escribir.'**
+  String get chatContactsError;
+
+  /// No description provided for @chatContactOpenError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir el chat. Probá de nuevo.'**
+  String get chatContactOpenError;
 
   /// No description provided for @chatRelativeJustNow.
   ///
@@ -7977,10 +8013,10 @@ abstract class AppL10n {
   /// **'Todavía no hay posts de quienes seguís'**
   String get feedEmptyFollowing;
 
-  /// Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021).
+  /// Aviso persistente sobre el composer cuando el usuario bloqueó al otro miembro del chat.
   ///
   /// In es_AR, this message translates to:
-  /// **'Para escribirle, esta persona tiene que seguirte.'**
+  /// **'Bloqueaste a esta persona. Desbloqueala para escribirle.'**
   String get chatBlockedComposerNotice;
 
   /// Semantics del composer deshabilitado por falta de permiso.

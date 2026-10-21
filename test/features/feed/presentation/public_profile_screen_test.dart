@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show Tristate;
 
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
@@ -291,130 +290,102 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // MENSAJE — REQ-FOLLOW-012 / SCENARIO-845.
+  // MENSAJE — espejo de `chatCreateOk` (cambio de producto del 2026-10-21).
   //
-  // La elegibilidad es la arista ENTRANTE: le puedo escribir a alguien sólo si
-  // esa persona ME SIGUE. Es el espejo literal de `chatCreateOk` en las rules —
-  // abrir un chat es poder mandar el primer mensaje.
-  //
-  // NO es el OR de las dos direcciones. El OR era el espejo de la regla vieja,
-  // cuando `friendships` tenía un doc por par y las dos direcciones eran el
-  // mismo hecho. Si el cliente y las rules no coinciden exactamente, el UX
-  // miente en una dirección o en la otra: o el botón está habilitado y el envío
-  // rebota con permission-denied, o está gris cuando el servidor sí lo permite.
+  // El botón aparece SÓLO si las rules me dejarían abrir el chat: lo sigo con
+  // la arista aceptada, o su perfil es público, o ya hay chat o vínculo
+  // vigente. Un bloqueo mío gana sobre todo. Si no aparece, SEGUIR ocupa todo
+  // el ancho; un botón gris prometería algo que no existe.
   // ---------------------------------------------------------------------------
-  group('PublicProfileScreen — gate del botón MENSAJE', () {
-    /// Lee el nodo semántico del pill MENSAJE. Se afirma sobre `enabled`,
-    /// NUNCA sobre anchos de texto: en este repo `google_fonts` no carga en
-    /// tests y todo se mide con una fallback más ancha.
-    bool messageButtonSemanticEnabled(WidgetTester tester) {
-      final finder = find.bySemanticsLabel('Mensaje');
-      if (finder.evaluate().isEmpty) return false;
-      final node = tester.getSemantics(finder);
-      return node.flagsCollection.isEnabled == Tristate.isTrue;
+  group('PublicProfileScreen — cuándo aparece MENSAJE', () {
+    Future<void> pumpView(
+      WidgetTester tester,
+      PublicProfileView view, {
+      FakeFirebaseFirestore? firestore,
+    }) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(view),
+        firestore: firestore,
+      ));
+      await tester.pumpAndSettle();
     }
 
-    testWidgets('sin ninguna arista → MENSAJE deshabilitado', (tester) async {
-      await tester.pumpWidget(_wrap(
-        child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(_view()),
-      ));
-      await tester.pumpAndSettle();
-
+    testWidgets('lo sigo (aceptado) y es público → aparece', (tester) async {
+      await pumpView(tester, _view(isPublic: true, outgoingFollow: outgoing()));
       expect(find.text('MENSAJE'), findsOneWidget);
-      expect(messageButtonSemanticEnabled(tester), isFalse);
     });
 
-    testWidgets('entrante pending → MENSAJE deshabilitado (todavía no aceptó)',
+    testWidgets('privado y me aceptó (lo sigo) → aparece', (tester) async {
+      await pumpView(
+          tester, _view(isPublic: false, outgoingFollow: outgoing()));
+      expect(find.text('MENSAJE'), findsOneWidget);
+    });
+
+    testWidgets('privado con mi solicitud pendiente → NO aparece',
         (tester) async {
-      await tester.pumpWidget(_wrap(
-        child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(
-          _view(incomingFollow: incoming(FollowStatus.pending)),
-        ),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(messageButtonSemanticEnabled(tester), isFalse);
+      await pumpView(
+        tester,
+        _view(isPublic: false, outgoingFollow: outgoing(FollowStatus.pending)),
+      );
+      expect(find.text('MENSAJE'), findsNothing);
+      expect(find.byType(PublicProfileFollowButton), findsOneWidget);
     });
 
-    // SCENARIO-845 — EL DISCRIMINADOR.
-    testWidgets('lo sigo pero NO me sigue → MENSAJE DESHABILITADO',
+    testWidgets('privado sin relación → NO aparece', (tester) async {
+      await pumpView(tester, _view(isPublic: false));
+      expect(find.text('MENSAJE'), findsNothing);
+    });
+
+    testWidgets('público y no lo sigo → aparece', (tester) async {
+      await pumpView(tester, _view(isPublic: true));
+      expect(find.text('MENSAJE'), findsOneWidget);
+    });
+
+    testWidgets('privado que sólo ME sigue → NO aparece (dirección vieja)',
         (tester) async {
-      // Si esto se implementara con la arista saliente (o con el OR de las
-      // dos), este test se pone rojo. Es el caso donde el servidor deniega:
-      // `chatCreateOk` exige `followAccepted(otro, yo)`, y acá `otro` no me
-      // sigue.
-      await tester.pumpWidget(_wrap(
-        child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(
-          _view(outgoingFollow: outgoing(), incomingFollow: null),
-        ),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(messageButtonSemanticEnabled(tester), isFalse,
-          reason:
-              'seguirlo no me habilita a escribirle: él tiene que seguirme');
+      await pumpView(
+          tester, _view(isPublic: false, incomingFollow: incoming()));
+      expect(find.text('MENSAJE'), findsNothing);
     });
 
-    // SCENARIO-845 — el espejo.
-    testWidgets('me sigue aunque yo no lo siga → MENSAJE HABILITADO',
+    testWidgets('si lo bloqueé no aparece, aunque sea público y lo siga',
         (tester) async {
-      await tester.pumpWidget(_wrap(
-        child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(
-          _view(outgoingFollow: null, incomingFollow: incoming()),
-        ),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(messageButtonSemanticEnabled(tester), isTrue,
-          reason:
-              'su arista entrante alcanza: puedo mandarle el primer mensaje');
-    });
-
-    testWidgets('par mutuo → MENSAJE habilitado', (tester) async {
-      await tester.pumpWidget(_wrap(
-        child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(
-          _view(outgoingFollow: outgoing(), incomingFollow: incoming()),
-        ),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(messageButtonSemanticEnabled(tester), isTrue);
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('blocks').doc('viewer_target').set({
+        'id': 'viewer_target',
+        'blockerUid': 'viewer',
+        'blockedUid': 'target',
+        'members': ['viewer', 'target'],
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+      });
+      await pumpView(
+        tester,
+        _view(isPublic: true, outgoingFollow: outgoing()),
+        firestore: firestore,
+      );
+      expect(find.text('MENSAJE'), findsNothing);
     });
 
     testWidgets('isSelf → MENSAJE row is not rendered at all (own profile)',
         (tester) async {
-      await tester.pumpWidget(_wrap(
-        child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(_view(isSelf: true)),
-      ));
-      await tester.pumpAndSettle();
-
+      await pumpView(tester, _view(isSelf: true));
       expect(find.text('MENSAJE'), findsNothing);
       expect(find.text('SEGUIR'), findsNothing);
     });
   });
 
   // ---------------------------------------------------------------------------
-  // #1476 — MENSAJE también se habilita por CHAT EXISTENTE o VÍNCULO vigente.
+  // #1476 — MENSAJE también aparece por CHAT EXISTENTE o VÍNCULO vigente.
   //
-  // La rama social de `chatCreateOk` (el otro me sigue) no es la única: la rama
-  // `linkId` no depende de ningún follow, y un chat que ya existe se abre sin
-  // pasar por la regla de creación. El PF veía a su propio alumno, con el chat
-  // abierto, con MENSAJE gris.
+  // La rama `linkId` no depende de ningún follow, y un chat que ya existe se
+  // abre sin pasar por la regla de creación. El PF veía a su propio alumno, con
+  // el chat abierto, sin poder escribirle. Los casos van sobre un perfil
+  // PRIVADO sin aristas, para que la única salida sea el chat o el vínculo.
   // ---------------------------------------------------------------------------
   group('PublicProfileScreen — MENSAJE por chat existente o vínculo (#1476)',
       () {
-    bool messageEnabled(WidgetTester tester) {
-      final finder = find.bySemanticsLabel('Mensaje');
-      if (finder.evaluate().isEmpty) return false;
-      return tester.getSemantics(finder).flagsCollection.isEnabled ==
-          Tristate.isTrue;
-    }
+    bool messageShown() => find.text('MENSAJE').evaluate().isNotEmpty;
 
     Future<void> pumpProfile(
       WidgetTester tester,
@@ -422,8 +393,7 @@ void main() {
     ) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
-        // Sin ninguna arista: la única salida es el chat o el vínculo.
-        view: AsyncData(_view()),
+        view: AsyncData(_view(isPublic: false)),
         firestore: firestore,
       ));
       await tester.pumpAndSettle();
@@ -443,9 +413,7 @@ void main() {
           'requestedAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
         });
 
-    testWidgets('chat ya abierto entre los dos → MENSAJE habilitado',
-        (tester) async {
-      final semantics = tester.ensureSemantics();
+    testWidgets('chat ya abierto entre los dos → aparece', (tester) async {
       final firestore = FakeFirebaseFirestore();
       await firestore.collection('chats').doc('target_viewer').set({
         'chatId': 'target_viewer',
@@ -455,13 +423,10 @@ void main() {
       });
 
       await pumpProfile(tester, firestore);
-
-      expect(messageEnabled(tester), isTrue);
-      semantics.dispose();
+      expect(messageShown(), isTrue);
     });
 
-    testWidgets('chat con OTRA persona no habilita MENSAJE', (tester) async {
-      final semantics = tester.ensureSemantics();
+    testWidgets('chat con OTRA persona no lo hace aparecer', (tester) async {
       final firestore = FakeFirebaseFirestore();
       await firestore.collection('chats').doc('other_viewer').set({
         'chatId': 'other_viewer',
@@ -471,118 +436,43 @@ void main() {
       });
 
       await pumpProfile(tester, firestore);
-
-      expect(messageEnabled(tester), isFalse);
-      semantics.dispose();
+      expect(messageShown(), isFalse);
     });
 
-    testWidgets('soy el PF y es mi alumno (vínculo activo) → habilitado',
+    testWidgets('soy el PF y es mi alumno (vínculo activo) → aparece',
         (tester) async {
-      final semantics = tester.ensureSemantics();
       final firestore = FakeFirebaseFirestore();
-      await seedLink(
-        firestore,
-        trainerId: 'viewer',
-        athleteId: 'target',
-        status: 'active',
-      );
-
+      await seedLink(firestore,
+          trainerId: 'viewer', athleteId: 'target', status: 'active');
       await pumpProfile(tester, firestore);
-
-      expect(messageEnabled(tester), isTrue);
-      semantics.dispose();
+      expect(messageShown(), isTrue);
     });
 
-    testWidgets('soy el alumno y es mi PF (vínculo pausado) → habilitado',
+    testWidgets('soy el alumno y es mi PF (vínculo pausado) → aparece',
         (tester) async {
-      final semantics = tester.ensureSemantics();
       final firestore = FakeFirebaseFirestore();
-      await seedLink(
-        firestore,
-        trainerId: 'target',
-        athleteId: 'viewer',
-        status: 'paused',
-      );
-
+      await seedLink(firestore,
+          trainerId: 'target', athleteId: 'viewer', status: 'paused');
       await pumpProfile(tester, firestore);
-
-      expect(messageEnabled(tester), isTrue);
-      semantics.dispose();
+      expect(messageShown(), isTrue);
     });
 
     for (final status in ['pending', 'terminated']) {
-      testWidgets('vínculo $status NO habilita MENSAJE', (tester) async {
-        final semantics = tester.ensureSemantics();
+      testWidgets('vínculo $status no lo hace aparecer', (tester) async {
         final firestore = FakeFirebaseFirestore();
-        await seedLink(
-          firestore,
-          trainerId: 'viewer',
-          athleteId: 'target',
-          status: status,
-        );
-
+        await seedLink(firestore,
+            trainerId: 'viewer', athleteId: 'target', status: status);
         await pumpProfile(tester, firestore);
-
-        expect(messageEnabled(tester), isFalse);
-        semantics.dispose();
+        expect(messageShown(), isFalse);
       });
     }
 
-    testWidgets('vínculo con OTRO alumno no habilita MENSAJE', (tester) async {
-      final semantics = tester.ensureSemantics();
+    testWidgets('vínculo con OTRO alumno no lo hace aparecer', (tester) async {
       final firestore = FakeFirebaseFirestore();
-      await seedLink(
-        firestore,
-        trainerId: 'viewer',
-        athleteId: 'someone-else',
-        status: 'active',
-      );
-
+      await seedLink(firestore,
+          trainerId: 'viewer', athleteId: 'someone-else', status: 'active');
       await pumpProfile(tester, firestore);
-
-      expect(messageEnabled(tester), isFalse);
-      semantics.dispose();
-    });
-
-    testWidgets('deshabilitado: tocar MENSAJE explica por qué con un toast',
-        (tester) async {
-      await pumpProfile(tester, FakeFirebaseFirestore());
-
-      await tester.tap(find.text('MENSAJE'));
-      await tester.pump();
-
-      // Es el toast del kit (`showTreinoToast`, #1560), no un SnackBar a mano:
-      // lleva el ícono de tipo `info` junto al mensaje.
-      final toast = find.byType(SnackBar);
-      expect(toast, findsOneWidget);
-      expect(
-        find.descendant(
-          of: toast,
-          matching:
-              find.text('Para escribirle, esta persona tiene que seguirte.'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: toast,
-          matching: find.byIcon(TreinoIcon.infoCircle),
-        ),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('deshabilitado: la etiqueta a11y explica por qué',
-        (tester) async {
-      final semantics = tester.ensureSemantics();
-      await pumpProfile(tester, FakeFirebaseFirestore());
-
-      expect(
-        find.bySemanticsLabel(RegExp('esta persona tiene que seguirte')),
-        findsOneWidget,
-      );
-      expect(find.bySemanticsLabel(RegExp('próximamente')), findsNothing);
-      semantics.dispose();
+      expect(messageShown(), isFalse);
     });
   });
 

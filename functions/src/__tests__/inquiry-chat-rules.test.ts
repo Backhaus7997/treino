@@ -322,7 +322,8 @@ describe("chats/create — las tres ramas siguen siendo excluyentes (#637)", () 
   });
 
   it("un chat social legítimo sigue funcionando (regresión de la rama 2)", async () => {
-    await seedEdge(TRAINER, ATHLETE); // el destinatario sigue a quien abre
+    // Desde el 2026-10-21 lo habilita que quien abre SIGA al destinatario.
+    await seedEdge(ATHLETE, TRAINER);
     await assertSucceeds(openPlainChat(ATHLETE, TRAINER));
   });
 });
@@ -356,9 +357,11 @@ describe("chats/update — kind pineado, sin escalada (#637)", () => {
     await assertSucceeds(updateChat(ATHLETE, TRAINER, previewPatch(ATHLETE)));
   });
 
-  it("DENIEGA el update de preview en un chat social sin follow (no aflojamos nada)", async () => {
+  it("un chat social existente acepta el preview sin follow (cambio 2026-10-21)", async () => {
+    // Abierto el chat, los dos escriben sin requisito de follow; lo único que
+    // corta el preview es un bloqueo (chat-relationship-rules.test.ts).
     await seedChat(ATHLETE, TRAINER);
-    await assertFails(updateChat(ATHLETE, TRAINER, previewPatch(ATHLETE)));
+    await assertSucceeds(updateChat(ATHLETE, TRAINER, previewPatch(ATHLETE)));
   });
 });
 
@@ -391,9 +394,9 @@ describe("chats/messages — la consulta habilita la conversación (#637)", () =
     );
   });
 
-  it("un chat social sin follow sigue sin poder mandar mensajes (regresión)", async () => {
+  it("un chat social existente sin follow deja mandar mensajes (cambio 2026-10-21)", async () => {
     await seedChat(ATHLETE, TRAINER);
-    await assertFails(sendMessage(ATHLETE, TRAINER));
+    await assertSucceeds(sendMessage(ATHLETE, TRAINER));
   });
 });
 

@@ -13,16 +13,13 @@ import 'package:treino/features/chat/domain/media_type.dart';
 import 'package:treino/features/chat/domain/message.dart';
 import 'package:treino/features/chat/presentation/chat_image_bubble.dart';
 import 'package:treino/features/chat/presentation/chat_screen.dart';
+import 'package:treino/features/moderation/application/moderation_providers.dart';
 import 'package:treino/features/chat/presentation/chat_video_bubble.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
-
-import 'package:treino/features/feed/application/follow_providers.dart';
-import 'package:treino/features/feed/domain/follow.dart';
-import 'package:treino/features/feed/domain/follow_status.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
 
@@ -97,9 +94,9 @@ Message _mediaMsg({
 
 /// Siembra la arista ENTRANTE `follows/{otro}_{yo}` aceptada.
 ///
-/// Desde REQ-FOLLOW-021 el composer sólo se habilita si el OTRO me sigue, así
-/// que cualquier test que ejercite el ENVÍO necesita esta precondición — igual
-/// que la necesita el usuario real.
+/// Desde el cambio de producto del 2026-10-21 el composer ya no depende de
+/// ningún follow (sólo de un bloqueo); los tests de envío la siguen sembrando
+/// para ejercitar un par real, no porque haga falta.
 Future<void> _seedIncomingFollow(
   FakeFirebaseFirestore firestore, {
   String other = 'bbb',
@@ -515,24 +512,19 @@ void main() {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Composer bloqueado — REQ-FOLLOW-021 / SCENARIO-843/844.
-  //
-  // Desde el flip de rules hay usuarios que NO PUEDEN ENVIAR en un chat que se
-  // ve completamente normal. Sin esta UI el modo de falla es un
-  // `permission-denied` crudo DESPUÉS de escribir el mensaje — la peor forma
-  // posible de comunicar una decisión de producto.
-  //
-  // El permiso lo da la arista ENTRANTE (`follows/{otro}_{yo}` aceptada), o sea
-  // el espejo exacto de `senderMayPost` en las rules. Si cliente y servidor no
-  // coinciden, o el usuario escribe y rebota, o ve gris algo que sí puede
-  // hacer.
+  // Permiso de escritura: espejo de `senderMayPost` en las rules. Desde el
+  // cambio de producto del 2026-10-21, en un chat existente escriben los dos
+  // miembros sin requisito de follow; lo único que corta es un bloqueo. Si
+  // cliente y servidor no coinciden, o el usuario escribe y rebota, o ve gris
+  // algo que sí puede hacer.
   // ─────────────────────────────────────────────────────────────────────────
   group('ChatScreen — composer y permiso de escritura', () {
-    /// Siembra el chat y, opcionalmente, la arista entrante y un `linkId`.
+    /// Siembra el chat y, opcionalmente, un `linkId`, la marca de consulta o
+    /// un bloqueo MÍO sobre el otro (`blocks/aaa_bbb`).
     Future<FakeFirebaseFirestore> seed({
-      Follow? incomingEdge,
       String? linkId,
       bool inquiry = false,
+      bool iBlockedThem = false,
     }) async {
       final fake = FakeFirebaseFirestore();
       await fake.collection('chats').doc('aaa_bbb').set({
@@ -542,24 +534,17 @@ void main() {
         if (linkId != null) 'linkId': linkId,
         if (inquiry) 'kind': 'inquiry',
       });
-      if (incomingEdge != null) {
-        await fake
-            .collection('follows')
-            .doc(incomingEdge.id)
-            .set({...incomingEdge.toJson(), 'createdAt': Timestamp.now()});
+      if (iBlockedThem) {
+        await fake.collection('blocks').doc('aaa_bbb').set({
+          'id': 'aaa_bbb',
+          'blockerUid': 'aaa',
+          'blockedUid': 'bbb',
+          'members': ['aaa', 'bbb'],
+          'createdAt': Timestamp.now(),
+        });
       }
       return fake;
     }
-
-    /// `follows/bbb_aaa` — el OTRO me sigue a mí. Es la que habilita escribir.
-    Follow incoming(FollowStatus status) => Follow(
-          id: Follow.edgeId('bbb', 'aaa'),
-          followerUid: 'bbb',
-          followeeUid: 'aaa',
-          status: status,
-          members: const ['bbb', 'aaa'],
-          createdAt: DateTime.utc(2026, 1, 1),
-        );
 
     Future<void> pump(WidgetTester tester, FakeFirebaseFirestore fake) async {
       await tester.pumpWidget(_wrap(
@@ -584,94 +569,48 @@ void main() {
     bool composerEnabled(WidgetTester tester) =>
         tester.widget<TextField>(find.byType(TextField)).enabled ?? true;
 
-    // SCENARIO-843
-    testWidgets('sin arista entrante → composer bloqueado y aviso visible',
+    testWidgets('sin ninguna arista → HABILITADO: responde sin seguirlo',
         (tester) async {
       await pump(tester, await seed());
 
-      // El campo SIGUE visible, apagado: si desapareciera, la pantalla se
-      // vería rota sin explicación. El aviso dice por qué.
-      expect(find.byType(TextField), findsOneWidget);
-      expect(composerEnabled(tester), isFalse);
-      expect(find.textContaining('tiene que seguirte'), findsOneWidget);
+      expect(composerEnabled(tester), isTrue);
+      expect(find.textContaining('Bloqueaste'), findsNothing);
     });
 
-    // SCENARIO-843 — la mitad que no se toca.
-    testWidgets('el historial se sigue viendo con el composer bloqueado',
+    testWidgets('lo bloqueé → composer apagado y el aviso dice por qué',
         (tester) async {
-      await pump(tester, await seed());
+      await pump(tester, await seed(iBlockedThem: true));
+
+      // El campo SIGUE visible, apagado: si desapareciera, la pantalla se
+      // vería rota sin explicación.
+      expect(find.byType(TextField), findsOneWidget);
+      expect(composerEnabled(tester), isFalse);
+      expect(find.textContaining('Bloqueaste a esta persona'), findsOneWidget);
+    });
+
+    testWidgets('el historial se sigue viendo con el composer apagado',
+        (tester) async {
+      await pump(tester, await seed(iBlockedThem: true));
 
       // Bloquear la escritura NO puede esconder lo que ya se recibió.
       expect(find.text('mensaje previo'), findsOneWidget);
     });
 
-    testWidgets('arista entrante pending → sigue bloqueado', (tester) async {
-      await pump(
-          tester, await seed(incomingEdge: incoming(FollowStatus.pending)));
-
-      expect(composerEnabled(tester), isFalse);
-    });
-
-    // SCENARIO-844
-    testWidgets('arista entrante aceptada → composer habilitado, sin aviso',
-        (tester) async {
-      await pump(
-          tester, await seed(incomingEdge: incoming(FollowStatus.accepted)));
-
-      expect(composerEnabled(tester), isTrue);
-      expect(find.textContaining('tiene que seguirte'), findsNothing);
-    });
-
-    // EL QUE PROTEGE AL COACH.
-    //
-    // El plan asumía que los chats de Coach no pasan por esta pantalla. Es
-    // FALSO: `athlete_coach_view.dart:593` (atleta → su PF) y
-    // `athlete_detail_screen.dart:309` (PF → su alumno) los dos empujan
-    // `/coach/chat/...`, que renderiza ChatScreen. Gatear sólo por la arista
-    // le sacaría el chat al entrenador, aunque el servidor se lo permita
-    // (`senderMayPost` escapa por `'linkId' in chat`).
     testWidgets('chat de Coach con linkId y CERO aristas → HABILITADO',
         (tester) async {
       await pump(tester, await seed(linkId: 'link-1'));
-
       expect(composerEnabled(tester), isTrue);
-      expect(find.textContaining('tiene que seguirte'), findsNothing);
     });
 
-    // EL QUE PROTEGE LA PRE-CONSULTA.
-    //
-    // `senderMayPost` escapa por TRES ramas: `'linkId' in chat`,
-    // `chat.get('kind','') == 'inquiry'` y `followAccepted`. La pantalla sólo
-    // miraba dos. O sea que la app era MÁS ESTRICTA QUE EL SERVIDOR: le tapaba
-    // el composer a alguien a quien Firestore le habría aceptado el mensaje.
-    //
-    // El caso es el que motiva la feature: alguien que quiere consultarle algo
-    // a un entrenador ANTES de pedirle el vínculo. Si no puede escribir, la
-    // pre-consulta no existe.
     testWidgets('chat de pre-consulta con CERO aristas → HABILITADO',
         (tester) async {
       await pump(tester, await seed(inquiry: true));
-
       expect(composerEnabled(tester), isTrue);
-      expect(find.textContaining('tiene que seguirte'), findsNothing);
     });
 
-    // EL FRAME QUE NINGÚN TEST MIRABA.
-    //
-    // Todos los de arriba pasan por `pump()`, que termina en `pumpAndSettle`:
-    // observan el estado YA RESUELTO. El bug vivía en el anterior. Con los dos
-    // streams en `AsyncLoading`, `valueOrNull` daba null en los tres términos
-    // del OR y `canWrite` quedaba en false: composer gris y el cartel de "esta
-    // persona tiene que seguirte" en CADA apertura de chat, diciendo un motivo
-    // que ni siquiera se había evaluado.
-    //
-    // Y no es cold start: `chatByIdProvider` y `followEdgeProvider` son
-    // `autoDispose` sin `keepAlive`, así que salir de la pantalla los destruye
-    // y volver a entrar arranca de cero.
-    //
-    // Sin el `!gateResuelto`, este test falla: composer deshabilitado y aviso
-    // presente. Verificado rompiéndolo a propósito.
-    testWidgets('mientras los dos streams cargan → HABILITADO y sin aviso',
+    // El frame de carga: con los bloqueos todavía sin llegar, no saber no
+    // puede leerse como "bloqueado".
+    testWidgets('mientras los bloqueos cargan → HABILITADO y sin aviso',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
@@ -685,18 +624,13 @@ void main() {
           userPublicProfileProvider('bbb').overrideWith(
             (_) => Stream.value(_pub('bbb', 'Coach Joe')),
           ),
-          // Streams que no emiten nunca: los dos providers quedan en
-          // AsyncLoading, que es el estado de cada entrada al chat.
-          chatByIdProvider('aaa_bbb').overrideWith((_) => const Stream.empty()),
-          followEdgeProvider(Follow.edgeId('bbb', 'aaa'))
-              .overrideWith((_) => const Stream.empty()),
+          blockedUidsProvider('aaa').overrideWith((_) => const Stream.empty()),
         ],
       ));
-      // pump() a secas, NO pumpAndSettle: el punto es mirar el frame de carga.
       await tester.pump();
 
       expect(composerEnabled(tester), isTrue);
-      expect(find.textContaining('tiene que seguirte'), findsNothing);
+      expect(find.textContaining('Bloqueaste'), findsNothing);
     });
   });
 

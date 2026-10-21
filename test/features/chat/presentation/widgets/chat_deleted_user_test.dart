@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/chat/application/chat_contacts_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -41,6 +42,7 @@ void main() {
       overrides: [
         authStateChangesProvider.overrideWith((_) => const Stream.empty()),
         currentUidProvider.overrideWithValue(currentUid),
+        chatContactsProvider.overrideWith((_) => const AsyncData([])),
         chatsForCurrentUserProvider
             .overrideWith((_) => Stream.value([fakeChat])),
         userPublicProfileProvider(deletedUid).overrideWith(

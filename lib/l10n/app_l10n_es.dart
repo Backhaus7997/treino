@@ -2208,13 +2208,33 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get chatListEmptyBody =>
-      'Cuando tengas un vínculo activo con un PF, vas a poder chatear desde acá.';
+      'Le podés escribir a tu PF y a quienes seguís, y a cualquier perfil público desde su perfil. Cuando sigas a alguien, lo vas a ver acá.';
 
   @override
   String get chatListError => 'No pudimos cargar tus mensajes.';
 
   @override
   String get chatListRetryLabel => 'Reintentar';
+
+  @override
+  String get chatContactsSectionTitle => 'Escribile a…';
+
+  @override
+  String get chatContactReasonCoach => 'Tu PF';
+
+  @override
+  String get chatContactReasonAthlete => 'Tu alumno';
+
+  @override
+  String get chatContactReasonFollowing => 'Lo seguís';
+
+  @override
+  String get chatContactsError =>
+      'No pudimos cargar a quién le podés escribir.';
+
+  @override
+  String get chatContactOpenError =>
+      'No pudimos abrir el chat. Probá de nuevo.';
 
   @override
   String get chatRelativeJustNow => 'recién';
@@ -4631,7 +4651,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get chatBlockedComposerNotice =>
-      'Para escribirle, esta persona tiene que seguirte.';
+      'Bloqueaste a esta persona. Desbloqueala para escribirle.';
 
   @override
   String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
@@ -8036,13 +8056,33 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get chatListEmptyBody =>
-      'Cuando tengas un vínculo activo con un PF, vas a poder chatear desde acá.';
+      'Le podés escribir a tu PF y a quienes seguís, y a cualquier perfil público desde su perfil. Cuando sigas a alguien, lo vas a ver acá.';
 
   @override
   String get chatListError => 'No pudimos cargar tus mensajes.';
 
   @override
   String get chatListRetryLabel => 'Reintentar';
+
+  @override
+  String get chatContactsSectionTitle => 'Escribile a…';
+
+  @override
+  String get chatContactReasonCoach => 'Tu PF';
+
+  @override
+  String get chatContactReasonAthlete => 'Tu alumno';
+
+  @override
+  String get chatContactReasonFollowing => 'Lo seguís';
+
+  @override
+  String get chatContactsError =>
+      'No pudimos cargar a quién le podés escribir.';
+
+  @override
+  String get chatContactOpenError =>
+      'No pudimos abrir el chat. Probá de nuevo.';
 
   @override
   String get chatRelativeJustNow => 'recién';
@@ -10456,7 +10496,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get chatBlockedComposerNotice =>
-      'Para escribirle, esta persona tiene que seguirte.';
+      'Bloqueaste a esta persona. Desbloqueala para escribirle.';
 
   @override
   String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';

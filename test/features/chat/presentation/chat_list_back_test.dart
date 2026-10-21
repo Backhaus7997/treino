@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/chat/application/chat_contacts_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/chat/presentation/chat_list_screen.dart';
@@ -30,6 +31,7 @@ Future<void> _pump(WidgetTester tester, GoRouter router) async {
     ProviderScope(
       overrides: [
         currentUidProvider.overrideWith((_) => 'aaa'),
+        chatContactsProvider.overrideWith((_) => const AsyncData([])),
         chatsForCurrentUserProvider.overrideWith(
           (ref) => Stream.value(const <Chat>[]),
         ),
