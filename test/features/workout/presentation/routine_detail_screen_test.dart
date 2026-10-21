@@ -676,7 +676,8 @@ void main() {
       // Desde que la acción flota (TreinoFloatingBottomAction) la lista
       // corre por debajo y se desvanece contra el botón. La garantía que
       // importa no es estructural sino de comportamiento: scrolleando hasta
-      // el final, el ÚLTIMO ejercicio termina por encima del botón. Es lo que
+      // el final, el ÚLTIMO ejercicio termina por encima del degradé (entero a
+      // la vista, no a medio desvanecer) y del botón. Es lo que
       // rompería un alto reservado fijo a texto grande — el riesgo que
       // anotaba #641.
       Future<Rect> lastRowAtEnd(WidgetTester tester) async {
@@ -685,6 +686,9 @@ void main() {
         await tester.pumpAndSettle();
         return tester.getRect(find.byType(ExerciseSlotRow).last);
       }
+
+      Rect scrim(WidgetTester tester) =>
+          tester.getRect(find.byKey(const Key('treino-floating-action-scrim')));
 
       testWidgets(
         'la lista pasa por debajo del botón y, al final, el último ejercicio '
@@ -702,8 +706,9 @@ void main() {
           final last = await lastRowAtEnd(tester);
           expect(
             last.bottom,
-            lessThanOrEqualTo(action.top),
-            reason: 'el último ejercicio $last queda tapado por $action',
+            lessThanOrEqualTo(scrim(tester).top),
+            reason: 'el último ejercicio $last queda debajo del degradé '
+                '${scrim(tester)}: a medio desvanecer o tapado por el botón',
           );
         },
       );
@@ -726,7 +731,7 @@ void main() {
           final last = await lastRowAtEnd(tester);
           expect(
             last.bottom,
-            lessThanOrEqualTo(actionRect.top),
+            lessThanOrEqualTo(scrim(tester).top),
             reason: 'un alto reservado fijo dejaría el último ejercicio '
                 'debajo del botón agrandado',
           );
