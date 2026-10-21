@@ -10,9 +10,17 @@ import '../../features/profile/application/user_providers.dart';
 import '../../features/profile/domain/user_profile.dart';
 
 /// Listenable que dispara el redirect del go_router cuando cambia cualquiera
-/// de los cuatro providers que el redirect lee:
+/// de los providers que el redirect lee:
 ///
 /// - `authStateChangesProvider` — sign in / sign out.
+/// - `authNotifierProvider`, SOLO cuando deja de cargar. Es lo que leen los
+///   dos redirects (`authRedirect` y `coachHubRedirect`), y mientras carga se
+///   abstienen (`return null`). El notifier se reconstruye con cada emisión de
+///   auth (`ref.watch(authStateChangesProvider.future)`), así que el refresh
+///   de esa emisión lo encuentra en `AsyncLoading` y el redirect no hace nada.
+///   Sin este listener nadie lo volvía a evaluar cuando el notifier llegaba a
+///   `AsyncData(null)`: «Cerrar sesión» en «Confirmá tu mail» del Coach Hub
+///   cerraba la sesión y dejaba la pantalla ahí, sin usuario.
 /// - `userProfileProvider` — el UserProfile pasa de loading → loaded, o se
 ///   actualiza (ej. después de completar ProfileSetup, displayName deja de
 ///   ser null). Sin este segundo listener, el redirect post-signup no se
@@ -41,6 +49,13 @@ class RouterRefreshNotifier extends ChangeNotifier {
       (prev, next) => _scheduleNotify(),
       fireImmediately: false,
     );
+    _authNotifierSub = ref.listen<AsyncValue<User?>>(
+      authNotifierProvider,
+      (prev, next) {
+        if ((prev?.isLoading ?? false) && !next.isLoading) _scheduleNotify();
+      },
+      fireImmediately: false,
+    );
     _profileSub = ref.listen<AsyncValue<UserProfile?>>(
       userProfileProvider,
       (prev, next) => _scheduleNotify(),
@@ -59,6 +74,7 @@ class RouterRefreshNotifier extends ChangeNotifier {
   }
 
   late final ProviderSubscription<AsyncValue<User?>> _authSub;
+  late final ProviderSubscription<AsyncValue<User?>> _authNotifierSub;
   late final ProviderSubscription<AsyncValue<UserProfile?>> _profileSub;
   late final ProviderSubscription<AsyncValue<bool>> _emailGateSub;
   late final ProviderSubscription<AsyncValue<bool>> _pendingWritesSub;
@@ -80,6 +96,7 @@ class RouterRefreshNotifier extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _authSub.close();
+    _authNotifierSub.close();
     _profileSub.close();
     _emailGateSub.close();
     _pendingWritesSub.close();
