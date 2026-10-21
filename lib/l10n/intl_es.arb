@@ -411,6 +411,8 @@
   "sessionPlayerTimerStartA11y": "Iniciar temporizador",
   "sessionPlayerRemoveSetA11y": "Eliminar serie",
   "routineEditorDeleteDayA11y": "Eliminar día",
+  "routineEditorDayNameLabel": "NOMBRE DEL DÍA",
+  "routineEditorSaveDayNameA11y": "Guardar nombre del día",
   "athleteDetailEditPlanA11y": "Editar plan",
   "athleteDetailDeletePlanA11y": "Eliminar plan",
   "coachMapDisabledOnlineA11y": "Mapa, no disponible en modo Online",

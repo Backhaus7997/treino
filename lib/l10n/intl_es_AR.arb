@@ -2176,6 +2176,14 @@
   "@routineEditorEditDayNameA11y": {
     "description": "Tooltip + Semantics label for the icon-only pencil button next to each day's title in the routine editor. Tap turns the title into an inline TextField."
   },
+  "routineEditorDayNameLabel": "NOMBRE DEL DÍA",
+  "@routineEditorDayNameLabel": {
+    "description": "Section label above the inline day-name field in the routine editor. Same style as the routine NOMBRE label."
+  },
+  "routineEditorSaveDayNameA11y": "Guardar nombre del día",
+  "@routineEditorSaveDayNameA11y": {
+    "description": "Tooltip + Semantics label for the check button that confirms the inline day-name edit."
+  },
   "athleteDetailEditPlanA11y": "Editar plan",
   "@athleteDetailEditPlanA11y": {
     "description": "Accessibility label for the edit-plan icon button in the athlete detail plan card (finding 5)."

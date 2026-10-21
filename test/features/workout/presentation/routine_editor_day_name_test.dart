@@ -219,5 +219,67 @@ void main() {
         expect(_nombreEnCabecera(tester), 'Día 1');
       },
     );
+
+    testWidgets(
+      'el campo lleva el label NOMBRE DEL DÍA y el check confirma el nombre',
+      (tester) async {
+        await _pumpEditor(
+          tester,
+          mode: const SelfCreating(),
+          overrides: _overrides(),
+        );
+
+        await tester.tap(find.byKey(_firstDayPencilKey));
+        await tester.pumpAndSettle();
+
+        expect(find.text('NOMBRE DEL DÍA'), findsOneWidget);
+        // El target del check respeta los 44 px mínimos de iOS.
+        final check = find.byKey(const Key('day_name_commit_button_1'));
+        expect(tester.getSize(check).height, greaterThanOrEqualTo(44));
+        expect(tester.getSize(check).width, greaterThanOrEqualTo(44));
+        // Y el campo entero también: era una barra de ~20 px.
+        expect(
+          tester.getSize(find.byKey(_editingFieldKey)).height,
+          greaterThanOrEqualTo(44),
+        );
+
+        await tester.enterText(find.byKey(_editingFieldKey), 'Piernas');
+        await tester.tap(check);
+        await tester.pumpAndSettle();
+
+        expect(_nombreEnCabecera(tester), 'Piernas');
+        expect(find.byKey(_editingFieldKey), findsNothing);
+        expect(find.text('NOMBRE DEL DÍA'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'un nombre largo no desborda en una pantalla chica',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        await _pumpEditor(
+          tester,
+          mode: const SelfCreating(),
+          overrides: _overrides(),
+        );
+
+        await tester.tap(find.byKey(_firstDayPencilKey));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(_editingFieldKey),
+          'Tren superior con énfasis en espalda y bíceps',
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(
+          find.byKey(const Key('day_name_commit_button_1')).hitTestable(),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }

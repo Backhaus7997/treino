@@ -5186,6 +5186,18 @@ abstract class AppL10n {
   /// **'Editar nombre del día'**
   String get routineEditorEditDayNameA11y;
 
+  /// Section label above the inline day-name field in the routine editor. Same style as the routine NOMBRE label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOMBRE DEL DÍA'**
+  String get routineEditorDayNameLabel;
+
+  /// Tooltip + Semantics label for the check button that confirms the inline day-name edit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Guardar nombre del día'**
+  String get routineEditorSaveDayNameA11y;
+
   /// Accessibility label for the edit-plan icon button in the athlete detail plan card (finding 5).
   ///
   /// In es_AR, this message translates to:
