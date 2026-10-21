@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
@@ -20,46 +19,6 @@ void main() {
   // mueren con "Binding has not yet been initialized" antes de la primera
   // aserción.
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  for (final entry in <(String, ThemeData)>[
-    ('oscuro', AppTheme.dark()),
-    ('claro', AppTheme.light()),
-  ]) {
-    testWidgets('TreinoDropdown usa tokens en tema ${entry.$1}',
-        (tester) async {
-      await tester.pumpWidget(
-        _harness(
-          theme: entry.$2,
-          child: TreinoDropdown<String>(
-            initialValue: 'uno',
-            items: const [
-              DropdownMenuItem(value: 'uno', child: Text('Uno')),
-              DropdownMenuItem(value: 'dos', child: Text('Dos')),
-            ],
-            onChanged: (_) {},
-          ),
-        ),
-      );
-
-      final context = tester.element(find.byType(TreinoDropdown<String>));
-      final palette = AppPalette.of(context);
-      final field = tester.widget<DropdownButtonFormField<String>>(
-        find.byType(DropdownButtonFormField<String>),
-      );
-      final button = tester.widget<DropdownButton<String>>(
-        find.byType(DropdownButton<String>),
-      );
-
-      expect(button.dropdownColor, TreinoCardTokens.background(context));
-      expect(button.borderRadius, BorderRadius.circular(AppRadius.md));
-      expect(button.style?.fontFamily, AppFonts.barlow);
-      expect(field.decoration.fillColor, palette.bgCard);
-      expect(
-        (field.decoration.enabledBorder as OutlineInputBorder).borderRadius,
-        BorderRadius.circular(AppRadius.sm),
-      );
-    });
-  }
 
   testWidgets('TreinoPopupMenuButton tokeniza superficie y esquinas',
       (tester) async {

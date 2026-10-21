@@ -34,6 +34,7 @@ import '../../../../coach/presentation/agenda_formatters.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../../../../core/widgets/treino_select.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
 
@@ -551,29 +552,31 @@ class _AthleteDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return TreinoDropdown<String>(
-      initialValue: selectedId,
-      hint: Text(
-        'Seleccioná un alumno', // i18n
-        style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
-      ),
-      decoration: InputDecoration(
-        fillColor: palette.bg,
-      ),
-      items: links.map((link) {
-        final profileAsync =
-            ref.watch(userPublicProfileProvider(link.athleteId));
-        final rawName = profileAsync.valueOrNull?.displayName ?? '';
-        final showName = rawName.isEmpty || _looksLikeUid(rawName)
-            ? 'Alumno (${link.athleteId.substring(0, 6)})' // i18n
-            : rawName;
-        return DropdownMenuItem<String>(
-          value: link.athleteId,
-          child: Text(showName),
-        );
-      }).toList(),
+    return TreinoSelectField<String>(
+      value: selectedId,
+      hint: 'Seleccioná un alumno', // i18n
+      sheetTitle: 'Alumno', // i18n
+      decoration: InputDecoration(fillColor: palette.bg),
+      options: [
+        for (final link in links)
+          TreinoSelectOption(
+            value: link.athleteId,
+            label: _nombre(link, ref),
+          ),
+      ],
       onChanged: onChanged,
     );
+  }
+
+  String _nombre(TrainerLink link, WidgetRef ref) {
+    final rawName = ref
+            .watch(userPublicProfileProvider(link.athleteId))
+            .valueOrNull
+            ?.displayName ??
+        '';
+    return rawName.isEmpty || _looksLikeUid(rawName)
+        ? 'Alumno (${link.athleteId.substring(0, 6)})' // i18n
+        : rawName;
   }
 
   bool _looksLikeUid(String s) {

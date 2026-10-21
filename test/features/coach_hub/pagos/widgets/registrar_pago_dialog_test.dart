@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart'
     show trainerLinksStreamProvider;
@@ -126,7 +127,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Registrar pago'), findsOneWidget); // i18n title
-      expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+      expect(find.byType(TreinoSelectField<String>), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Monto (ARS)'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Concepto'), findsOneWidget);
       expect(find.text('Cobrado'), findsOneWidget); // i18n
@@ -199,7 +200,7 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ana Activa').last);
       await tester.pumpAndSettle();
@@ -262,7 +263,7 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ana Activa').last);
       await tester.pumpAndSettle();
@@ -302,7 +303,7 @@ void main() {
       expect(
           find.text('No tenés alumnos vinculados.'), // i18n
           findsOneWidget);
-      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      expect(find.byType(TreinoSelectField<String>), findsNothing);
 
       await tester.tap(find.text('Registrar')); // i18n
       await tester.pumpAndSettle();
@@ -330,7 +331,7 @@ void main() {
           .pumpWidget(_wrapDialog(links: mixedLinks, profiles: mixedProfiles));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
 
       expect(find.text('Alumno Activo'), findsOneWidget);
@@ -376,7 +377,7 @@ void main() {
 
       // No dropdown, no "Alumno" label — the caller already knows the
       // athlete, so the picker block isn't rendered at all.
-      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      expect(find.byType(TreinoSelectField<String>), findsNothing);
       expect(find.text('Alumno'), findsNothing);
 
       await tester.enterText(
@@ -439,7 +440,7 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ana Activa').last);
       await tester.pumpAndSettle();
@@ -504,7 +505,7 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ana Activa').last);
       await tester.pumpAndSettle();
