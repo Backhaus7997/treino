@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/application/email_gate_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -31,6 +32,22 @@ Stream<bool> _silentGate(Ref ref) => Completer<bool>().future.asStream();
 /// notificaciones de más al conteo exacto de los tests de auth.
 Stream<bool> _silentPending(Ref ref) => Completer<bool>().future.asStream();
 
+/// `AuthNotifier` fijo. El real se reconstruye con cada emisión de auth
+/// (loading → data), y su salida de loading es un refresh más: los tests que
+/// cuentan exacto las emisiones del stream lo silencian.
+class _SilentAuthNotifier extends AuthNotifier {
+  @override
+  Future<User?> build() => Completer<User?>().future;
+}
+
+/// `AuthNotifier` que el test mueve a mano, para ver qué transiciones avisan.
+class _ManualAuthNotifier extends AuthNotifier {
+  @override
+  Future<User?> build() async => null;
+
+  void poner(AsyncValue<User?> valor) => state = valor;
+}
+
 void main() {
   group('RouterRefreshNotifier (via routerRefreshNotifierProvider)', () {
     test('notifyListeners fires once per auth stream emission', () async {
@@ -40,6 +57,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           authStateChangesProvider.overrideWith((_) => controller.stream),
+          authNotifierProvider.overrideWith(_SilentAuthNotifier.new),
           userProfileProvider.overrideWith(_silentProfile),
           emailGateEnabledProvider.overrideWith(_silentGate),
           userProfileHasPendingWritesProvider.overrideWith(_silentPending),
@@ -169,6 +187,49 @@ void main() {
       expect(callCount, baseline + 2);
     });
 
+    // Los dos redirects leen `authNotifierProvider` y se abstienen mientras
+    // carga. El refresh de una emisión de auth lo encuentra reconstruyéndose, así
+    // que la salida de loading tiene que volver a disparar el redirect: sin eso,
+    // «Cerrar sesión» en «Confirmá tu mail» del Coach Hub dejaba la pantalla
+    // ahí, sin usuario.
+    test('notifyListeners fires when authNotifierProvider leaves loading',
+        () async {
+      final container = ProviderContainer(
+        overrides: [
+          authStateChangesProvider
+              .overrideWith((_) => Stream<User?>.value(null)),
+          authNotifierProvider.overrideWith(_ManualAuthNotifier.new),
+          userProfileProvider.overrideWith(_silentProfile),
+          emailGateEnabledProvider.overrideWith(_silentGate),
+          userProfileHasPendingWritesProvider.overrideWith(_silentPending),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(routerRefreshNotifierProvider);
+      await container.read(authNotifierProvider.future);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      int callCount = 0;
+      notifier.addListener(() => callCount++);
+      final auth =
+          container.read(authNotifierProvider.notifier) as _ManualAuthNotifier;
+
+      // Entrar en loading no avisa: el redirect no haría nada con eso.
+      auth.poner(const AsyncLoading());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(callCount, 0);
+
+      auth.poner(const AsyncData(null));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(callCount, 1);
+
+      // De data a data no es una salida de loading: eso ya lo avisa el stream.
+      auth.poner(AsyncData(MockUser()));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(callCount, 1);
+    });
+
     test(
         'after container dispose, additional emissions do NOT call notifyListeners',
         () async {
@@ -177,6 +238,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           authStateChangesProvider.overrideWith((_) => controller.stream),
+          authNotifierProvider.overrideWith(_SilentAuthNotifier.new),
           userProfileProvider.overrideWith(_silentProfile),
           emailGateEnabledProvider.overrideWith(_silentGate),
           userProfileHasPendingWritesProvider.overrideWith(_silentPending),
