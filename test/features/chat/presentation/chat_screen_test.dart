@@ -21,9 +21,6 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-import 'package:treino/features/feed/application/follow_providers.dart';
-import 'package:treino/features/feed/domain/follow.dart';
-import 'package:treino/features/feed/domain/follow_status.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
 

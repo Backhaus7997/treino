@@ -146,9 +146,8 @@ final chatContactFollowingProvider =
 /// chat en la lista. Ver [chatContactsFrom] para el criterio.
 ///
 /// Reactivo: cada fuente es un stream, así que seguir a alguien (o que acepte
-/// la solicitud), o un
-/// vínculo que se activa agrega al contacto, y un unfollow, un bloqueo o un
-/// vínculo terminado lo saca, sin recargar la pantalla.
+/// la solicitud) o un vínculo que se activa agrega al contacto, y un unfollow,
+/// un bloqueo o un vínculo terminado lo saca, sin recargar la pantalla.
 ///
 /// Mientras CUALQUIER fuente carga devuelve loading, y si alguna falla,
 /// error: una fuente que todavía no llegó no es "no tenés contactos" (ver la
