@@ -35,6 +35,7 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/abrir_chat_con_alumno.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_display_name_provider.dart';
 import 'package:treino/features/gyms/domain/gym.dart' show hasRealGym;
@@ -6183,20 +6184,19 @@ class _NuevaEntradaSeguimientoDialogState
                   ),
                 ),
                 const SizedBox(height: 16),
-                TreinoDropdown<FollowUpTag>(
-                  initialValue: _tag,
-                  onChanged: (v) {
-                    if (v != null) setState(() => _tag = v);
-                  },
+                TreinoSelectField<FollowUpTag>(
+                  value: _tag,
+                  sheetTitle: 'Categoría', // i18n: Fase W2
+                  onChanged: (v) => setState(() => _tag = v),
                   decoration: InputDecoration(
                     labelText: 'Categoría', // i18n: Fase W2
                     labelStyle: TextStyle(color: palette.textMuted),
                   ),
-                  items: [
+                  options: [
                     for (final t in FollowUpTag.values)
-                      DropdownMenuItem(
+                      TreinoSelectOption(
                         value: t,
-                        child: Text(_TagChip._labelAndColor(t, palette).$1),
+                        label: _TagChip._labelAndColor(t, palette).$1,
                       ),
                   ],
                 ),

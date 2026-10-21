@@ -33,6 +33,7 @@ import '../../../../../core/utils/kg_format.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
+import '../../../../../core/widgets/treino_select.dart';
 import '../../../../coach/application/blocked_athletes_providers.dart';
 import '../../../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../../../../coach/presentation/template_limit_gate.dart';
@@ -4616,36 +4617,42 @@ class _SetTypeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typed = type != SetType.normal;
-    return TreinoPopupMenuButton<SetType>(
-      tooltip: 'Tipo de serie', // i18n
-      padding: EdgeInsets.zero,
-      initialValue: type,
-      onSelected: onChanged,
-      itemBuilder: (_) => [
-        for (final (value, text) in _options)
-          PopupMenuItem<SetType>(
-            value: value,
-            child: Text(text),
+    return Tooltip(
+      message: 'Tipo de serie', // i18n
+      child: InkWell(
+        key: const Key('set_type_chip'),
+        borderRadius: BorderRadius.circular(6),
+        onTap: () async {
+          final picked = await showTreinoSelect<SetType>(
+            context,
+            title: 'Tipo de serie', // i18n
+            selected: type,
+            options: [
+              for (final (value, text) in _options)
+                TreinoSelectOption(value: value, label: text),
+            ],
+          );
+          if (picked != null && context.mounted) onChanged(picked.value);
+        },
+        child: Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: typed ? palette.accent.withValues(alpha: 0.16) : null,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: typed ? palette.accent : palette.border,
+              width: 1,
+            ),
           ),
-      ],
-      child: Container(
-        width: 26,
-        height: 26,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: typed ? palette.accent.withValues(alpha: 0.16) : null,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: typed ? palette.accent : palette.border,
-            width: 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.barlowCondensed(
-            color: typed ? palette.accent : palette.textMuted,
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
+          child: Text(
+            label,
+            style: GoogleFonts.barlowCondensed(
+              color: typed ? palette.accent : palette.textMuted,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
           ),
         ),
       ),

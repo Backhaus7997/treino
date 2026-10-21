@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
@@ -285,7 +286,7 @@ void main() {
       );
 
       // Abre el dropdown
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
 
       // El activo debe estar en el dropdown
@@ -311,7 +312,7 @@ void main() {
       );
 
       // Seleccionar el alumno en el dropdown
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -352,7 +353,7 @@ void main() {
         analytics: analytics,
       );
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -386,7 +387,7 @@ void main() {
         analytics: analytics,
       );
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -411,7 +412,7 @@ void main() {
       );
 
       // Seleccionar alumno
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -464,7 +465,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Seleccionar alumno
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -525,7 +526,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Seleccionar alumno
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -645,7 +646,7 @@ void main() {
       );
 
       // Seleccionar alumno
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -709,7 +710,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('abrir'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();

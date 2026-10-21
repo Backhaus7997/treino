@@ -18,9 +18,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// `lib/core/widgets/treino_select.dart`: hoja del kit en teléfono, menú
 /// anclado en pantallas anchas.
 ///
-/// EL ESTADO AL CONGELAR: 10 dropdowns en 6 archivos. La app mobile ya está
-/// migrada; queda `TreinoDropdown` del Coach Hub, que se va en el PR
-/// siguiente. El techo sólo baja.
+/// EL ESTADO AL CONGELAR: 10 dropdowns en 6 archivos. La migración los llevó
+/// a CERO —junto con los dos `PopupMenuButton` que hacían de selector (período
+/// de progresión y de Pagos) y el chip de tipo de serie del editor web—. Este
+/// guard es lo que impide que vuelvan.
 ///
 /// QUÉ **NO** PROHÍBE, y por qué:
 ///   - `PopupMenuButton` / `TreinoPopupMenuButton`. Casi todos son menús de
@@ -44,15 +45,14 @@ void main() {
       r'|DropdownMenuFormField|DropdownMenu)\s*(<[^;{}]*?>)?\(',
     );
 
-    /// Registro de deuda, no licencia. Lo que queda es el Coach Hub web, que
-    /// se migra en el PR siguiente de la cadena.
-    const allowlist = <String>{
-      'features/coach_hub/presentation/widgets/treino_dropdown.dart',
-    };
-    const allowlistCeiling = 1;
+    /// Registro de deuda, no licencia. Vacío: la migración terminó. Si
+    /// mañana aparece un caso legítimo, entra con su razón escrita y el
+    /// techo sube UNA vez, no cada vez.
+    const allowlist = <String>{};
+    const allowlistCeiling = 0;
 
     /// Techo de ocurrencias en `lib/`. Sólo baja.
-    const deudaCeiling = 1;
+    const deudaCeiling = 0;
 
     late List<String> offenders;
     late List<String> staleEntries;
@@ -175,6 +175,7 @@ void main() {
         containsAll(<String>[
           'core/widgets/treino_select.dart',
           'features/workout/presentation/custom_exercise_editor_screen.dart',
+          'features/coach_hub/presentation/sections/pagos/pagos_web_screen.dart',
         ]),
       );
     });
