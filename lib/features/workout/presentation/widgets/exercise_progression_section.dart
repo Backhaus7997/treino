@@ -17,6 +17,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../core/widgets/treino_select.dart';
 import '../../../insights/domain/chart_period.dart';
 import '../../application/exercise_filter.dart' show matchesAllTokens;
 import '../../application/exercise_progression_providers.dart';
@@ -495,7 +496,7 @@ class _ProgressionChartLoader extends ConsumerWidget {
 
 /// [AD7] Hevy-style period selector pill — tap to pick [ChartPeriod.last30d]
 /// (default) / [ChartPeriod.thisWeek] / [ChartPeriod.month].
-class ChartPeriodSelector extends StatelessWidget {
+class ChartPeriodSelector extends StatefulWidget {
   const ChartPeriodSelector({
     super.key,
     required this.selected,
@@ -524,67 +525,83 @@ class ChartPeriodSelector extends StatelessWidget {
   final void Function(ChartPeriod)? onLockedTap;
 
   @override
+  State<ChartPeriodSelector> createState() => _ChartPeriodSelectorState();
+}
+
+class _ChartPeriodSelectorState extends State<ChartPeriodSelector> {
+  @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    return PopupMenuButton<ChartPeriod>(
-      initialValue: selected,
-      // El bloqueado NO pasa por `onSelect`: si pasara, el período quedaría
-      // seleccionado y el gráfico mostraría el año igual. Se desvía antes.
-      onSelected: (p) =>
-          lockedPeriods.contains(p) ? onLockedTap?.call(p) : onSelect(p),
-      itemBuilder: (context) => ChartPeriod.values.map((p) {
-        final locked = lockedPeriods.contains(p);
-        return PopupMenuItem<ChartPeriod>(
-          // `enabled` queda en true a propósito aunque esté bloqueado: un item
-          // deshabilitado no emite `onSelected`, y entonces el tap no abriría
-          // la hoja que explica por qué. Un candado que no dice nada al
-          // tocarlo es peor que no tener candado.
-          value: p,
-          child: Row(
-            children: [
-              if (locked) ...[
-                Icon(TreinoIcon.lock, size: 12, color: palette.textMuted),
-                const SizedBox(width: AppSpacing.s8),
-              ],
-              Text(
-                labels.labelFor(p),
-                style: GoogleFonts.barlow(
-                  fontSize: 13,
-                  fontWeight: p == selected ? FontWeight.w700 : FontWeight.w400,
-                  color: locked
-                      ? palette.textMuted
-                      : (p == selected ? palette.accent : palette.textPrimary),
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: palette.bgCard,
+    return Semantics(
+      button: true,
+      label: widget.labels.labelFor(widget.selected),
+      excludeSemantics: true,
+      onTap: () => _abrir(),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: palette.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              labels.labelFor(selected),
-              style: GoogleFonts.barlow(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: palette.textPrimary,
-              ),
+          onTap: () => _abrir(),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: palette.border),
             ),
-            const SizedBox(width: 4),
-            Icon(TreinoIcon.chevronDown, size: 14, color: palette.textMuted),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.labels.labelFor(widget.selected),
+                  style: GoogleFonts.barlow(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: palette.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(TreinoIcon.chevronDown,
+                    size: 14, color: palette.textMuted),
+              ],
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _abrir() async {
+    final picked = await showTreinoSelect<ChartPeriod>(
+      context,
+      title: 'Período', // i18n
+      selected: widget.selected,
+      options: [
+        for (final p in ChartPeriod.values)
+          TreinoSelectOption(
+            value: p,
+            label: widget.labels.labelFor(p),
+            // Bloqueado se DIBUJA (con candado y atenuado) y sigue tocable:
+            // el tap abre la hoja que explica por qué. Un candado que no dice
+            // nada al tocarlo es peor que no tener candado.
+            trailingIcon:
+                widget.lockedPeriods.contains(p) ? TreinoIcon.lock : null,
+            muted: widget.lockedPeriods.contains(p),
+          ),
+      ],
+    );
+    // El selector pudo desmontarse con la hoja abierta (cambio de tab, el
+    // stream que quita la fila): no se le avisa a un padre muerto.
+    if (picked == null || !context.mounted) return;
+    // El bloqueado NO pasa por `onSelect`: si pasara, el período quedaría
+    // seleccionado y el gráfico mostraría el año igual. Se desvía antes.
+    final p = picked.value;
+    if (widget.lockedPeriods.contains(p)) {
+      widget.onLockedTap?.call(p);
+    } else {
+      widget.onSelect(p);
+    }
   }
 }
 

@@ -9,10 +9,10 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../../../core/telemetry/non_fatal.dart';
 import '../../../../core/utils/app_clock.dart';
-import '../../../../core/widgets/aligned_dropdown_menu.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../core/widgets/treino_select.dart';
 import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
@@ -1408,46 +1408,31 @@ class _AthleteDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return AlignedDropdownMenu(
-        child: DropdownButtonFormField<String>(
-      initialValue: selectedId,
-      hint: Text(
-        'Seleccioná un alumno',
-        style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
-      ),
-      dropdownColor: palette.bgCard,
-      style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: palette.bg,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.accent, width: 1.5),
-        ),
-      ),
-      items: links.map((link) {
-        final profileAsync = ref.watch(
-          userPublicProfileProvider(link.athleteId),
-        );
-        final rawName = profileAsync.valueOrNull?.displayName ?? '';
-        final showName = rawName.isEmpty || _looksLikeUid(rawName)
-            ? 'Alumno (${link.athleteId.substring(0, 6)})'
-            : rawName;
-        return DropdownMenuItem<String>(
-          value: link.athleteId,
-          child: Text(showName),
-        );
-      }).toList(),
+    return TreinoSelectField<String>(
+      value: selectedId,
+      hint: 'Seleccioná un alumno',
+      sheetTitle: 'Alumno',
+      decoration: InputDecoration(fillColor: palette.bg),
+      options: [
+        for (final link in links)
+          TreinoSelectOption(
+            value: link.athleteId,
+            label: _nombre(link, ref),
+          ),
+      ],
       onChanged: onChanged,
-    ));
+    );
+  }
+
+  String _nombre(TrainerLink link, WidgetRef ref) {
+    final rawName = ref
+            .watch(userPublicProfileProvider(link.athleteId))
+            .valueOrNull
+            ?.displayName ??
+        '';
+    return rawName.isEmpty || _looksLikeUid(rawName)
+        ? 'Alumno (${link.athleteId.substring(0, 6)})'
+        : rawName;
   }
 }
 

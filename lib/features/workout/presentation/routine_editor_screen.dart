@@ -18,6 +18,7 @@ import '../../../core/utils/firestore_error.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_select.dart';
 import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/template_limit_gate.dart';
@@ -803,14 +804,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                   _SectionLabel(
                       label: l10n.routineEditorLevelSection, palette: palette),
                   const SizedBox(height: 4),
-                  _LevelDropdown(
+                  _LevelSelect(
                     value: _level,
-                    palette: palette,
+                    title: l10n.routineEditorLevelSection,
                     onChanged: (v) {
-                      if (v != null) {
-                        _markDirty();
-                        setState(() => _level = v);
-                      }
+                      _markDirty();
+                      setState(() => _level = v);
                     },
                   ),
                 ],
@@ -6624,47 +6623,29 @@ class _SetRowState extends State<_SetRow> {
 /// exists to remove. Deloads and top-set back-offs move down, not up.
 /// [steppedWeightKg] clamps at zero, so "abajo" bottoms out at an empty
 /// field and never at a negative load.
-// ── Level dropdown ────────────────────────────────────────────────────────────
+// ── Level select ──────────────────────────────────────────────────────────────
 
-class _LevelDropdown extends StatelessWidget {
-  const _LevelDropdown({
+class _LevelSelect extends StatelessWidget {
+  const _LevelSelect({
     required this.value,
-    required this.palette,
+    required this.title,
     required this.onChanged,
   });
 
   final ExperienceLevel value;
-  final AppPalette palette;
-  final void Function(ExperienceLevel?) onChanged;
+  final String title;
+  final void Function(ExperienceLevel) onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: palette.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<ExperienceLevel>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: palette.bgCard,
-          style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 14),
-          items: ExperienceLevel.values
-              .map((l) => DropdownMenuItem(
-                    value: l,
-                    child: Text(
-                      l.displayNameEs,
-                      style: GoogleFonts.barlow(
-                          color: palette.textPrimary, fontSize: 14),
-                    ),
-                  ))
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
+    return TreinoSelectField<ExperienceLevel>(
+      value: value,
+      sheetTitle: title,
+      options: [
+        for (final l in ExperienceLevel.values)
+          TreinoSelectOption(value: l, label: l.displayNameEs),
+      ],
+      onChanged: onChanged,
     );
   }
 }

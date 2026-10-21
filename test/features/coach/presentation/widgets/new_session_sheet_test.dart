@@ -26,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/firestore_write.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
@@ -219,7 +220,7 @@ List<Override> _overrides({
 /// Selects the (only) active athlete in the dropdown. The sheet requires an
 /// athlete before the submit button becomes enabled.
 Future<void> _selectAthlete(WidgetTester tester, String displayName) async {
-  await tester.tap(find.byType(DropdownButtonFormField<String>));
+  await tester.tap(find.byType(TreinoSelectField<String>));
   await tester.pumpAndSettle();
   await tester.tap(find.text(displayName).last);
   await tester.pumpAndSettle();
@@ -897,9 +898,11 @@ void main() {
     });
   });
 
-  // ── #1491: el menú del selector de alumno queda alineado con el campo ─────
+  // ── #1491: el selector de alumno no desborda la pantalla ────────────────
+  // El menú de Material tocaba los dos bordes del celular. Ahora es la hoja
+  // del kit: ocupa el ancho de la pantalla a propósito y marca al elegido.
   group('Selector de alumno (#1491)', () {
-    testWidgets('el menú mide lo que el campo y arranca en su borde izquierdo',
+    testWidgets('abre la hoja de Treino y el alumno elegido queda en el campo',
         (tester) async {
       _useTallViewport(tester);
       await tester.pumpWidget(_wrap(
@@ -911,21 +914,20 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      final campo =
-          tester.getRect(find.byType(DropdownButtonFormField<String>));
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
-      final menu = tester.getRect(
-        find.byWidgetPredicate(
-          (w) => w.runtimeType.toString().startsWith('_DropdownMenu<'),
-        ),
-      );
+      expect(find.byKey(const Key('treino_select_title')), findsOneWidget);
 
-      // Sin `alignedDropdown` Flutter infla el menú 16 px a la izquierda y 24
-      // a la derecha del campo: en el celular toca los dos bordes de la
-      // pantalla.
-      expect(menu.left, campo.left);
-      expect(menu.right, campo.right);
+      await tester.tap(find.text('Carlos Pérez').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('treino_select_title')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(TreinoSelectField<String>),
+          matching: find.text('Carlos Pérez'),
+        ),
+        findsOneWidget,
+      );
     });
   });
 
