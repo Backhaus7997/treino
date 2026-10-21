@@ -2964,6 +2964,40 @@ service cloud.firestore {
         return notBlocked(uid, other);
       }
 
+      // ── Archivar y eliminar, POR MIEMBRO ─────────────────────────────────
+      //
+      // Archivar y eliminar un chat son decisiones de UNA persona sobre SU
+      // bandeja: nunca tocan el historial ni la bandeja del otro. Por eso no
+      // hay `delete` (sigue en `false`) ni se borran mensajes, que además son
+      // inmutables. Cada miembro estampa su propia entrada en dos mapas del
+      // doc del chat:
+      //
+      //   · `archivedAt.{uid}` — lo esconde de la lista principal hasta que
+      //     llegue un mensaje posterior (`lastMessageAt > archivedAt.{uid}`).
+      //     Desarchivar es borrar la clave.
+      //   · `hiddenBefore.{uid}` — "eliminar": lo saca de la lista y oculta,
+      //     sólo para ese uid, los mensajes anteriores. Si el otro vuelve a
+      //     escribir, el chat reaparece desde ese mensaje. No se puede borrar
+      //     la clave: des-eliminar devolvería un historial que el usuario
+      //     pidió no ver, y no hay UI que lo pida.
+      //
+      // Mismo molde que `lastRead` (REQ-CHATUNREAD-008): cada miembro toca
+      // SÓLO su clave, así nadie archiva ni le borra el chat al otro.
+      //
+      // El valor va pineado a `request.time` (el cliente manda
+      // serverTimestamp): con un reloj del teléfono atrasado, "eliminar"
+      // podía quedar ANTES del último mensaje y no esconder nada, y con uno
+      // adelantado se comía en silencio los mensajes que llegaran después.
+      function ownStampOk(field, removable) {
+        let me = request.auth.uid;
+        let after = request.resource.data.get(field, {});
+        let changed = after.diff(resource.data.get(field, {})).affectedKeys();
+        return changed.hasOnly([me])
+            && (!changed.hasAny([me])
+                || (me in after && after[me] == request.time)
+                || (removable && !(me in after)));
+      }
+
       // ⚠️  QA-SEC-010 — el disyunto `resource == null` está ACOTADO al par que
       // codifica el doc id. Hace falta para que `getOrCreate()` pregunte "¿ya
       // existe este chat?" sin comerse un permission-denied, pero sin acote era
@@ -3051,9 +3085,16 @@ service cloud.firestore {
                     // (design §3.3.4): el lado bloqueado tiene que poder
                     // marcar como leído, o el badge de no-leídos se le clava
                     // para siempre. Ese caso no paga ninguna llamada de acceso.
+                    && ownStampOk('archivedAt', true)
+                    && ownStampOk('hiddenBefore', false)
                     && (
+                         // Archivar/eliminar quedan del lado SIN permiso de
+                         // escritura, igual que `lastRead`: a quien dejaron de
+                         // seguir o bloquearon tiene que poder sacarse el chat
+                         // de encima. No cambian nada que el otro vea.
                          request.resource.data.diff(resource.data)
-                           .affectedKeys().hasOnly(['lastRead'])
+                           .affectedKeys()
+                           .hasOnly(['lastRead', 'archivedAt', 'hiddenBefore'])
                          || chatWriterOk(request.auth.uid)
                        );
 
