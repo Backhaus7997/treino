@@ -299,12 +299,12 @@ void main() {
     });
 
     testWidgets(
-        'SCENARIO-108 (video-first): unplayable videoUrl keeps the photo hero '
-        '— no play overlay, no VIDEO body section, no hole', (tester) async {
-      // Only Firebase Storage / parseable YouTube URLs put the video in the
-      // hero. A legacy URL like this one is unplayable → the hero stays the
-      // photo strip exactly like a video-less exercise (graceful for the
-      // athlete; the coach surfaces still expose the broken URL).
+        'SCENARIO-108: unplayable videoUrl keeps the photo card — no play '
+        'overlay, no VIDEO section, no hole', (tester) async {
+      // Only Firebase Storage / parseable YouTube URLs are playable. A legacy
+      // URL like this one renders the photo exactly like a video-less
+      // exercise (graceful for the athlete; the coach surfaces still expose
+      // the broken URL).
       await tester.pumpWidget(_wrapWithOverrides(
         const ExerciseDetailScreen(exerciseId: 'bench-press'),
         [
@@ -609,11 +609,15 @@ void main() {
     });
   });
 
-  group('ExerciseDetailScreen — video-first (pedido 2026-07-28)', () {
+  // Orden pedido en device (2026-10-21): encabezado → TÉCNICA → VIDEO →
+  // PROGRESIÓN → HISTORIAL. El video era un hero de borde a borde y, con la
+  // status bar y la flecha encima, quedaba tapado mientras se reproducía.
+  group('ExerciseDetailScreen — video debajo de la técnica (#1559)', () {
+    double dyOf(WidgetTester tester, Finder f) => tester.getTopLeft(f).dy;
+
     testWidgets(
-        'playable video: hero shows poster + play overlay (NO autoplay), body '
-        'order is TÉCNICA → PROGRESIÓN → HISTORIAL with no VIDEO section',
-        (tester) async {
+        'video reproducible: encabezado → TÉCNICA → VIDEO (poster + play, '
+        'SIN autoplay) → PROGRESIÓN → HISTORIAL', (tester) async {
       _useTallViewport(tester);
       await tester.pumpWidget(_wrapWithOverrides(
         const ExerciseDetailScreen(exerciseId: 'bench-press'),
@@ -631,16 +635,69 @@ void main() {
       expect(find.byType(ExerciseAssetImage), findsOneWidget);
       expect(find.byType(VideoPlayOverlay), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      // The video lives in the hero now — VIDEO stopped being a body section.
-      expect(find.text('VIDEO'), findsNothing);
 
-      final playDy = tester.getTopLeft(find.byType(VideoPlayOverlay)).dy;
-      final tecnicaDy = tester.getTopLeft(find.text('TÉCNICA')).dy;
-      final progresionDy = tester.getTopLeft(find.text('PROGRESIÓN')).dy;
-      final historialDy = tester.getTopLeft(find.text('HISTORIAL')).dy;
-      expect(playDy, lessThan(tecnicaDy));
-      expect(tecnicaDy, lessThan(progresionDy));
+      final titleDy = dyOf(tester, find.text('BENCH PRESS'));
+      final tecnicaDy = dyOf(tester, find.text('TÉCNICA'));
+      final videoDy = dyOf(tester, find.text('VIDEO'));
+      final cardDy = dyOf(tester, find.byKey(const Key('exercise-video-card')));
+      final progresionDy = dyOf(tester, find.text('PROGRESIÓN'));
+      final historialDy = dyOf(tester, find.text('HISTORIAL'));
+      expect(titleDy, lessThan(tecnicaDy));
+      expect(tecnicaDy, lessThan(videoDy));
+      expect(videoDy, lessThan(cardDy));
+      expect(cardDy, lessThan(progresionDy));
       expect(progresionDy, lessThan(historialDy));
+    });
+
+    testWidgets(
+        'nada tapa la media: arranca debajo de la barra superior y del '
+        'título, con esquinas redondeadas y relación 16:9 hasta conocer la '
+        'del video', (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.padding = const FakeViewPadding(top: 59);
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        [
+          exerciseByIdProvider('bench-press').overrideWith(
+            (ref) async => _makeExercise(
+              videoUrl: _kStorageUrl,
+              techniqueInstructions: const ['Cue 1'],
+            ),
+          ),
+        ],
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('exercise-video-card')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      // Volver arriba: en offset 0 la barra no está y sólo flota la flecha.
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(0);
+      await tester.pump();
+
+      final card = tester.getRect(find.byKey(const Key('exercise-video-card')));
+      final back = tester.getRect(find.byKey(const Key('treino-top-bar-back')));
+      expect(card.top, greaterThan(back.bottom));
+      expect(
+        card.top,
+        greaterThan(tester.getRect(find.text('BENCH PRESS')).bottom),
+      );
+      expect(card.width / card.height, closeTo(16 / 9, 0.01));
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('exercise-video-card')),
+          matching: find.byType(ClipRRect),
+        ),
+        findsOneWidget,
+      );
+      // Sin foto debajo de la barra, la barra no pone scrim de hero.
+      expect(find.byKey(const Key('treino-top-bar-hero-scrim')), findsNothing);
     });
 
     testWidgets(
@@ -658,17 +715,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.byType(CircularProgressIndicator), findsNothing);
 
-      // The overlay sits over the hero's tap surface — tapping through it
-      // starts the lazy init. Controller init never completes in the test
-      // environment, freezing the strip in its loading state.
+      // Controller init never completes in the test environment, freezing
+      // the card in its loading state.
       await tester.tap(find.byType(VideoPlayOverlay));
       await tester.pump();
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.byType(TreinoShimmer), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('YouTube URL: hero shows the poster + play overlay too',
+    testWidgets('YouTube URL: la tarjeta muestra el poster + play también',
         (tester) async {
+      _useTallViewport(tester);
       await tester.pumpWidget(_wrapWithOverrides(
         const ExerciseDetailScreen(exerciseId: 'bench-press'),
         [
@@ -681,7 +738,7 @@ void main() {
       ));
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.byType(VideoPlayOverlay), findsOneWidget);
-      expect(find.text('VIDEO'), findsNothing);
+      expect(find.text('VIDEO'), findsOneWidget);
     });
 
     // Lo que estampan los scripts de Storage contra el emulador (#1444) y lo
@@ -691,8 +748,9 @@ void main() {
         '?alt=media&token=t';
 
     testWidgets(
-        'URL del emulador SIN USE_EMULATOR: hero de foto, sin play — igual que '
-        'en un build normal', (tester) async {
+        'URL del emulador SIN USE_EMULATOR: foto, sin play — igual que en un '
+        'build normal', (tester) async {
+      _useTallViewport(tester);
       await tester.pumpWidget(_wrapWithOverrides(
         const ExerciseDetailScreen(exerciseId: 'bench-press'),
         [
@@ -707,10 +765,11 @@ void main() {
       expect(find.byType(VideoPlayOverlay), findsNothing);
     });
 
-    testWidgets('URL del emulador CON USE_EMULATOR: el video va al hero',
+    testWidgets('URL del emulador CON USE_EMULATOR: se puede reproducir',
         (tester) async {
       debugUsaEmuladoresOverride = true;
       addTearDown(() => debugUsaEmuladoresOverride = null);
+      _useTallViewport(tester);
       await tester.pumpWidget(_wrapWithOverrides(
         const ExerciseDetailScreen(exerciseId: 'bench-press'),
         [
@@ -725,8 +784,8 @@ void main() {
     });
 
     testWidgets(
-        'no video: photo hero exactly like before — no play overlay, no VIDEO '
-        'section, section order intact', (tester) async {
+        'sin video: la foto va en el lugar del video, sin play ni sección '
+        'VIDEO', (tester) async {
       _useTallViewport(tester);
       await tester.pumpWidget(_wrapWithOverrides(
         const ExerciseDetailScreen(exerciseId: 'bench-press'),
@@ -743,16 +802,44 @@ void main() {
       expect(find.byType(VideoPlayOverlay), findsNothing);
       expect(find.text('VIDEO'), findsNothing);
 
-      final tecnicaDy = tester.getTopLeft(find.text('TÉCNICA')).dy;
-      final progresionDy = tester.getTopLeft(find.text('PROGRESIÓN')).dy;
-      final historialDy = tester.getTopLeft(find.text('HISTORIAL')).dy;
-      expect(tecnicaDy, lessThan(progresionDy));
-      expect(progresionDy, lessThan(historialDy));
+      final tecnicaDy = dyOf(tester, find.text('TÉCNICA'));
+      final photoDy = dyOf(tester, find.byType(ExerciseAssetImage));
+      final progresionDy = dyOf(tester, find.text('PROGRESIÓN'));
+      expect(tecnicaDy, lessThan(photoDy));
+      expect(photoDy, lessThan(progresionDy));
     });
 
     testWidgets(
-        'custom exercise: compact header keeps the VIDEO slot as the FIRST '
-        'body section (video-first order for trainers too)', (tester) async {
+        'sin media ni asset del grupo: placeholder del tema en vez de un hueco',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        [
+          exerciseByIdProvider('bench-press').overrideWith(
+            (ref) async => _makeExercise(
+              id: 'zz-sin-asset',
+              muscleGroup: 'zzz-desconocido',
+            ),
+          ),
+        ],
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      // Cada asset que falta falla asíncrono antes de que el errorBuilder
+      // pase al siguiente candidato: hay que drenar la cadena entera.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump();
+      }
+
+      expect(
+        find.byKey(const Key('exercise-media-fallback')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'custom exercise: el slot de VIDEO del PF va después de TÉCNICA, como '
+        'el resto', (tester) async {
       _useTallViewport(tester);
       await tester.pumpWidget(_wrapWithOverrides(
         const ExerciseDetailScreen(exerciseId: 'bench-press'),
@@ -768,15 +855,50 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       await tester.pump(const Duration(milliseconds: 50));
 
-      // No photo hero for custom → the inline player card hosts the video.
+      // Sin foto para los custom → el player inline aloja el video.
       expect(find.byType(FirebaseStorageVideoPlayer), findsOneWidget);
+      expect(find.byType(ExerciseAssetImage), findsNothing);
       expect(find.text('VIDEO'), findsOneWidget);
 
-      final videoDy = tester.getTopLeft(find.text('VIDEO')).dy;
-      final tecnicaDy = tester.getTopLeft(find.text('TÉCNICA')).dy;
-      final progresionDy = tester.getTopLeft(find.text('PROGRESIÓN')).dy;
-      expect(videoDy, lessThan(tecnicaDy));
-      expect(tecnicaDy, lessThan(progresionDy));
+      final tecnicaDy = dyOf(tester, find.text('TÉCNICA'));
+      final videoDy = dyOf(tester, find.text('VIDEO'));
+      final progresionDy = dyOf(tester, find.text('PROGRESIÓN'));
+      expect(tecnicaDy, lessThan(videoDy));
+      expect(videoDy, lessThan(progresionDy));
+    });
+
+    testWidgets(
+        'abierto con push imperativo (player, picker del PF): el degradé del '
+        'tema corre detrás de la status bar y el título queda debajo de la '
+        'flecha', (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.padding = const FakeViewPadding(top: 59);
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_wrapWithOverrides(
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () =>
+                ExerciseDetailScreen.push(context, exerciseId: 'bench-press'),
+            child: const Text('abrir'),
+          ),
+        ),
+        [
+          exerciseByIdProvider('bench-press')
+              .overrideWith((ref) async => _makeExercise()),
+        ],
+      ));
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      // Sin franja: el fondo del tema arranca en el borde físico.
+      expect(tester.getRect(find.byType(AppBackground)).top, 0);
+      final back = tester.getRect(find.byKey(const Key('treino-top-bar-back')));
+      expect(back.top, greaterThanOrEqualTo(59));
+      expect(
+        tester.getRect(find.text('BENCH PRESS')).top,
+        greaterThan(back.bottom),
+      );
     });
   });
 }

@@ -1,10 +1,12 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../app/theme/app_theme.dart';
 import '../../app/theme/tokens/tokens.dart';
 import '../../l10n/app_l10n.dart';
 import 'treino_icon.dart';
@@ -67,6 +69,14 @@ abstract final class TreinoTopBarMetrics {
 
   /// Fracción de su propio alto desde la que sube el título al aparecer.
   static const double titleEnterSlide = 0.4;
+
+  /// Opacidad máxima (arriba del todo) del scrim que oscurece la status bar
+  /// y la flecha cuando la barra flota sobre una foto/video.
+  static const double heroScrimAlpha = 0.5;
+
+  /// Cuánto se extiende el scrim por debajo de la barra, para que el
+  /// degradé muera sobre la foto en vez de cortar en el borde del botón.
+  static const double heroScrimTail = 40;
 }
 
 /// Acción de la barra superior (editar, seguir, menú…): un [IconButton] de
@@ -253,38 +263,86 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
           ]
         : const <Shadow>[];
 
-    return Stack(
-      children: [
-        // Fondo: translúcido + desenfoque + borde inferior. Baja desde arriba
-        // mientras aparece: se lee como una barra que entra, no como un fondo
-        // que se enciende en el lugar.
-        if (visible)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Opacity(
-                key: const Key('treino-top-bar-surface'),
-                opacity: eased,
-                child: FractionalTranslation(
-                  key: const Key('treino-top-bar-surface-slide'),
-                  translation: reduce
-                      ? Offset.zero
-                      : Offset(
-                          0,
-                          -TreinoTopBarMetrics.enterSlide * (1 - eased),
-                        ),
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(
-                        sigmaX: TreinoTopBarMetrics.blurSigma,
-                        sigmaY: TreinoTopBarMetrics.blurSigma,
-                      ),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: palette.bgCard.withValues(
-                            alpha: TreinoTopBarMetrics.surfaceAlpha,
+    // Sobre foto, mientras la barra no está: íconos claros en la status bar
+    // (el scrim de abajo los garantiza en las dos paletas). Con la barra
+    // puesta, los del tema — la superficie es `bgCard`, clara en light.
+    final overlayStyle = widget.overHero && !collapsed
+        ? SystemUiOverlayStyle.light
+        : AppTheme.systemOverlayStyleFor(Theme.of(context).brightness);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Scrim fijo a la PANTALLA, no al hero (#1559): con el hero de borde
+          // a borde la status bar queda sobre la foto, y un scrim que viajara
+          // con el hero dejaría el reloj sobre foto pelada a mitad de scroll.
+          // Se va a medida que entra la barra, que trae su propio fondo.
+          if (widget.overHero && eased < 1)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: top +
+                  TreinoTopBarMetrics.barHeight +
+                  TreinoTopBarMetrics.heroScrimTail,
+              child: IgnorePointer(
+                child: Opacity(
+                  key: const Key('treino-top-bar-hero-scrim'),
+                  opacity: 1 - eased,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          palette.scrimDark.withValues(
+                            alpha: TreinoTopBarMetrics.heroScrimAlpha,
                           ),
-                          border: Border(
-                            bottom: BorderSide(color: palette.border),
+                          palette.scrimDark.withValues(
+                            alpha: TreinoTopBarMetrics.heroScrimAlpha * 0.4,
+                          ),
+                          palette.scrimDark.withValues(alpha: 0),
+                        ],
+                        stops: const [0, 0.55, 1],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // Fondo: translúcido + desenfoque + borde inferior. Baja desde arriba
+          // mientras aparece: se lee como una barra que entra, no como un fondo
+          // que se enciende en el lugar.
+          if (visible)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Opacity(
+                  key: const Key('treino-top-bar-surface'),
+                  opacity: eased,
+                  child: FractionalTranslation(
+                    key: const Key('treino-top-bar-surface-slide'),
+                    translation: reduce
+                        ? Offset.zero
+                        : Offset(
+                            0,
+                            -TreinoTopBarMetrics.enterSlide * (1 - eased),
+                          ),
+                    child: ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(
+                          sigmaX: TreinoTopBarMetrics.blurSigma,
+                          sigmaY: TreinoTopBarMetrics.blurSigma,
+                        ),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: palette.bgCard.withValues(
+                              alpha: TreinoTopBarMetrics.surfaceAlpha,
+                            ),
+                            border: Border(
+                              bottom: BorderSide(color: palette.border),
+                            ),
                           ),
                         ),
                       ),
@@ -293,108 +351,108 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
                 ),
               ),
             ),
-          ),
-        Positioned(
-          top: top + TreinoTopBarMetrics.topInset,
-          left: 0,
-          right: 0,
-          height: TreinoTopBarMetrics.buttonSize,
-          child: IconTheme(
-            data: IconThemeData(color: iconColor, shadows: shadows),
-            child: IconButtonTheme(
-              data: IconButtonThemeData(
-                style: IconButton.styleFrom(foregroundColor: iconColor),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: TreinoTopBarMetrics.sideInset,
+          Positioned(
+            top: top + TreinoTopBarMetrics.topInset,
+            left: 0,
+            right: 0,
+            height: TreinoTopBarMetrics.buttonSize,
+            child: IconTheme(
+              data: IconThemeData(color: iconColor, shadows: shadows),
+              child: IconButtonTheme(
+                data: IconButtonThemeData(
+                  style: IconButton.styleFrom(foregroundColor: iconColor),
                 ),
-                // NavigationToolbar (el layout del AppBar de Flutter) centra
-                // el título según lo que MIDEN de verdad la flecha y las
-                // acciones. Contar las entradas de [actions] reservaba lugar
-                // para las que son `SizedBox.shrink()` y cortaba el título
-                // (Codex, #1596).
-                child: NavigationToolbar(
-                  middleSpacing: TreinoTopBarMetrics.clearance,
-                  // Con la barra oculta la flecha lleva la burbuja del resto
-                  // de la app (círculo de 44 con borde fino, como
-                  // AuthCircleBackButton) más un relleno suave para que se
-                  // lea sobre una foto. Se desvanece a medida que entra la
-                  // barra: con fondo detrás ya no hace falta.
-                  leading: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      if (eased < 1)
-                        IgnorePointer(
-                          child: Opacity(
-                            key: const Key('treino-top-bar-back-bubble'),
-                            opacity: 1 - eased,
-                            child: Container(
-                              width: TreinoTopBarMetrics.bubbleSize,
-                              height: TreinoTopBarMetrics.bubbleSize,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: palette.bgCard.withValues(
-                                  alpha: TreinoTopBarMetrics.bubbleAlpha,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TreinoTopBarMetrics.sideInset,
+                  ),
+                  // NavigationToolbar (el layout del AppBar de Flutter) centra
+                  // el título según lo que MIDEN de verdad la flecha y las
+                  // acciones. Contar las entradas de [actions] reservaba lugar
+                  // para las que son `SizedBox.shrink()` y cortaba el título
+                  // (Codex, #1596).
+                  child: NavigationToolbar(
+                    middleSpacing: TreinoTopBarMetrics.clearance,
+                    // Con la barra oculta la flecha lleva la burbuja del resto
+                    // de la app (círculo de 44 con borde fino, como
+                    // AuthCircleBackButton) más un relleno suave para que se
+                    // lea sobre una foto. Se desvanece a medida que entra la
+                    // barra: con fondo detrás ya no hace falta.
+                    leading: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (eased < 1)
+                          IgnorePointer(
+                            child: Opacity(
+                              key: const Key('treino-top-bar-back-bubble'),
+                              opacity: 1 - eased,
+                              child: Container(
+                                width: TreinoTopBarMetrics.bubbleSize,
+                                height: TreinoTopBarMetrics.bubbleSize,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: palette.bgCard.withValues(
+                                    alpha: TreinoTopBarMetrics.bubbleAlpha,
+                                  ),
+                                  border: Border.all(color: palette.border),
                                 ),
-                                border: Border.all(color: palette.border),
                               ),
                             ),
                           ),
+                        TreinoTopBarAction(
+                          buttonKey: const Key('treino-top-bar-back'),
+                          icon: TreinoIcon.back,
+                          tooltip: l10n.commonBack,
+                          onPressed: widget.onBack,
                         ),
-                      TreinoTopBarAction(
-                        buttonKey: const Key('treino-top-bar-back'),
-                        icon: TreinoIcon.back,
-                        tooltip: l10n.commonBack,
-                        onPressed: widget.onBack,
-                      ),
-                    ],
-                  ),
-                  middle: visible && title != null && title.isNotEmpty
-                      ? IgnorePointer(
-                          child: ExcludeSemantics(
-                            excluding: !collapsed,
-                            child: Opacity(
-                              key: const Key('treino-top-bar-title'),
-                              opacity: eased,
-                              // El título sube un poco al entrar: acompaña al
-                              // grande que está saliendo por arriba.
-                              child: FractionalTranslation(
-                                translation: reduce
-                                    ? Offset.zero
-                                    : Offset(
-                                        0,
-                                        TreinoTopBarMetrics.titleEnterSlide *
-                                            (1 - eased),
+                      ],
+                    ),
+                    middle: visible && title != null && title.isNotEmpty
+                        ? IgnorePointer(
+                            child: ExcludeSemantics(
+                              excluding: !collapsed,
+                              child: Opacity(
+                                key: const Key('treino-top-bar-title'),
+                                opacity: eased,
+                                // El título sube un poco al entrar: acompaña al
+                                // grande que está saliendo por arriba.
+                                child: FractionalTranslation(
+                                  translation: reduce
+                                      ? Offset.zero
+                                      : Offset(
+                                          0,
+                                          TreinoTopBarMetrics.titleEnterSlide *
+                                              (1 - eased),
+                                        ),
+                                  child: Center(
+                                    child: Text(
+                                      title.toUpperCase(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.barlowCondensed(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: AppTextSize.title,
+                                        letterSpacing: 0.5,
+                                        color: palette.textPrimary,
                                       ),
-                                child: Center(
-                                  child: Text(
-                                    title.toUpperCase(),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.barlowCondensed(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: AppTextSize.title,
-                                      letterSpacing: 0.5,
-                                      color: palette.textPrimary,
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        )
-                      : null,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: widget.actions,
+                          )
+                        : null,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: widget.actions,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
