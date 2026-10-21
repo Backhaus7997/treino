@@ -13,8 +13,9 @@
  * los revisores de Play / App Store) que no tienen que aparecerle a un usuario
  * real, pero que tienen que seguir pudiendo iniciar sesión y usar todo.
  *
- * Qué escribe: SOLO `hiddenFromDiscovery` (bool), con `merge`, en cada uno de
- * los dos docs QUE EXISTA. Nada más. El cliente filtra los listados con ese
+ * Qué escribe: SOLO `hiddenFromDiscovery` (bool), en cada uno de los dos docs
+ * QUE EXISTA, en un solo `WriteBatch` (quedan los dos o ninguno). Nada más.
+ * El cliente filtra los listados con ese
  * campo; abrir el perfil por uid (link, chat, pantallas propias) sigue andando.
  * Reversible: correlo de nuevo con `--hidden=false`.
  *
@@ -56,11 +57,11 @@ const { contraEmuladorDe, projectIdObjetivo } = require('./lib/target_project');
 const { inicializarAdmin, proyectoDe } = require('./lib/admin');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore } = require('firebase-admin/firestore');
+const { getSecurityRules } = require('firebase-admin/security-rules');
 
 const FLAGS_VALIDAS = ['--uid', '--email', '--hidden', '--apply'];
 const CAMPO = 'hiddenFromDiscovery';
 const COLECCIONES = ['trainerPublicProfiles', 'userPublicProfiles'];
-const RULES_API = 'https://firebaserules.googleapis.com/v1';
 
 function parseArgs(argv) {
   const out = { uid: null, email: null, hidden: null, apply: false };
@@ -103,22 +104,29 @@ function reglasDePerfilesConocenElCampo(fuente) {
   return bloque.includes(`'${CAMPO}'`);
 }
 
-/** Fuente del ruleset de Firestore DESPLEGADO en [projectId]. Tira si no la puede leer. */
-async function fuenteDeReglasDesplegadas(credential, projectId, { fetchImpl = fetch } = {}) {
-  const { access_token: token } = await credential.getAccessToken();
-  const headers = { Authorization: `Bearer ${token}` };
+/**
+ * Fuente del ruleset de Firestore DESPLEGADO en el proyecto de [app]. Tira si
+ * no la puede leer. Va por el SDK de Admin (`getSecurityRules`) y no por un
+ * `fetch` armado a mano con el token de la credencial: mismo resultado, sin
+ * manejar el token acá.
+ */
+async function fuenteDeReglasDesplegadas(app, { reglasDe = getSecurityRules } = {}) {
+  const ruleset = await reglasDe(app).getFirestoreRuleset();
+  return (ruleset.source ?? []).map((f) => f.content ?? '').join('\n');
+}
 
-  const release = await fetchImpl(
-    `${RULES_API}/projects/${projectId}/releases/cloud.firestore`,
-    { headers },
-  );
-  if (!release.ok) throw new Error(`release de cloud.firestore: HTTP ${release.status}`);
-  const { rulesetName } = await release.json();
-
-  const ruleset = await fetchImpl(`${RULES_API}/${rulesetName}`, { headers });
-  if (!ruleset.ok) throw new Error(`ruleset ${rulesetName}: HTTP ${ruleset.status}`);
-  const { source } = await ruleset.json();
-  return (source?.files ?? []).map((f) => f.content ?? '').join('\n');
+/**
+ * Escribe [hidden] en todos los [existentes] en UN SOLO `WriteBatch`: o quedan
+ * todos o ninguno. Escritos de a uno, un corte entre los dos dejaba la cuenta
+ * oculta del directorio y visible en la búsqueda (o al revés).
+ *
+ * `update` y no `set` con merge: si un doc se borró después de leerlo, el
+ * batch entero falla en vez de fabricar un perfil fantasma sin `uid`.
+ */
+async function aplicarVisibilidad(db, existentes, hidden) {
+  const batch = db.batch();
+  for (const { ref } of existentes) batch.update(ref, { [CAMPO]: hidden });
+  await batch.commit();
 }
 
 async function main() {
@@ -185,7 +193,7 @@ async function main() {
   if (tocaPerfiles && contexto?.modo !== 'emulador') {
     let conocen;
     try {
-      const fuente = await fuenteDeReglasDesplegadas(app.options.credential, proyecto);
+      const fuente = await fuenteDeReglasDesplegadas(app);
       conocen = reglasDePerfilesConocenElCampo(fuente);
     } catch (err) {
       console.error(
@@ -205,8 +213,8 @@ async function main() {
     console.log(`✓ Las reglas desplegadas ya conocen '${CAMPO}' en userPublicProfiles.`);
   }
 
-  for (const { coleccion, ref } of existentes) {
-    await ref.set({ [CAMPO]: args.hidden }, { merge: true });
+  await aplicarVisibilidad(db, existentes, args.hidden);
+  for (const { coleccion } of existentes) {
     console.log(`✓ ${coleccion}/${uid}.${CAMPO} = ${args.hidden}`);
   }
 }
@@ -218,4 +226,9 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, reglasDePerfilesConocenElCampo };
+module.exports = {
+  parseArgs,
+  reglasDePerfilesConocenElCampo,
+  fuenteDeReglasDesplegadas,
+  aplicarVisibilidad,
+};

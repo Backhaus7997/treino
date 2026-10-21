@@ -17,8 +17,74 @@ const assert = require('node:assert');
 const { readFileSync } = require('fs');
 const path = require('path');
 
-const { parseArgs, reglasDePerfilesConocenElCampo } =
-  require('../set_trainer_discovery_visibility');
+const {
+  parseArgs,
+  reglasDePerfilesConocenElCampo,
+  fuenteDeReglasDesplegadas,
+  aplicarVisibilidad,
+} = require('../set_trainer_discovery_visibility');
+
+/** Un ref que revienta si alguien le escribe directo, fuera del batch. */
+const refFalso = (path) => ({
+  path,
+  set: () => { throw new Error(`escritura suelta en ${path}`); },
+  update: () => { throw new Error(`escritura suelta en ${path}`); },
+});
+
+/** db falsa: registra lo que se encola y si se hizo commit. */
+function dbFalsa({ commitFalla = false } = {}) {
+  const estado = { batches: 0, encolados: [], commits: 0 };
+  return {
+    estado,
+    batch() {
+      estado.batches++;
+      return {
+        update(ref, data) { estado.encolados.push({ path: ref.path, data }); },
+        set() { throw new Error('set en el batch: tiene que ser update'); },
+        async commit() {
+          if (commitFalla) throw new Error('commit rechazado');
+          estado.commits++;
+        },
+      };
+    },
+  };
+}
+
+const LOS_DOS = [
+  { coleccion: 'trainerPublicProfiles', ref: refFalso('trainerPublicProfiles/u') },
+  { coleccion: 'userPublicProfiles', ref: refFalso('userPublicProfiles/u') },
+];
+
+test('aplicarVisibilidad: las dos colecciones en UN batch y un commit', async () => {
+  const db = dbFalsa();
+  await aplicarVisibilidad(db, LOS_DOS, true);
+
+  assert.strictEqual(db.estado.batches, 1);
+  assert.strictEqual(db.estado.commits, 1);
+  assert.deepStrictEqual(db.estado.encolados, [
+    { path: 'trainerPublicProfiles/u', data: { hiddenFromDiscovery: true } },
+    { path: 'userPublicProfiles/u', data: { hiddenFromDiscovery: true } },
+  ]);
+});
+
+test('aplicarVisibilidad: si el commit falla, propaga y no escribe por fuera', async () => {
+  const db = dbFalsa({ commitFalla: true });
+  await assert.rejects(aplicarVisibilidad(db, LOS_DOS, false), /commit rechazado/);
+  assert.strictEqual(db.estado.commits, 0);
+});
+
+test('fuenteDeReglasDesplegadas: junta los archivos del ruleset del SDK', async () => {
+  const app = {};
+  const reglasDe = (a) => {
+    assert.strictEqual(a, app);
+    return {
+      getFirestoreRuleset: async () => ({
+        source: [{ name: 'a.rules', content: 'uno' }, { name: 'b.rules', content: 'dos' }],
+      }),
+    };
+  };
+  assert.strictEqual(await fuenteDeReglasDesplegadas(app, { reglasDe }), 'uno\ndos');
+});
 
 const REGLAS = readFileSync(path.resolve(__dirname, '../../firestore.rules'), 'utf8');
 
