@@ -576,6 +576,12 @@
   "chatListEmptyBody": "",
   "chatListError": "",
   "chatListRetryLabel": "",
+  "chatContactsSectionTitle": "",
+  "chatContactReasonCoach": "",
+  "chatContactReasonAthlete": "",
+  "chatContactReasonFollower": "",
+  "chatContactsError": "",
+  "chatContactOpenError": "",
   "chatRelativeJustNow": "",
   "chatRelativeMinutes": "",
   "@chatRelativeMinutes": {

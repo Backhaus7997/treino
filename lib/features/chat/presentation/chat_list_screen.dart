@@ -12,8 +12,10 @@ import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../../core/widgets/treino_toast.dart';
+import '../application/chat_contacts_providers.dart';
 import '../application/chat_providers.dart'
-    show chatsForCurrentUserProvider, chatHasUnread;
+    show chatForOtherUidProvider, chatsForCurrentUserProvider, chatHasUnread;
 import '../domain/chat.dart';
 
 /// Pantalla que lista todos los chats del usuario actual.
@@ -29,6 +31,7 @@ class ChatListScreen extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final chatsAsync = ref.watch(chatsForCurrentUserProvider);
     final currentUid = ref.watch(currentUidProvider);
+    final contactsAsync = ref.watch(chatContactsProvider);
 
     // Lo normal es que haya algo debajo: el header del Feed empuja la bandeja,
     // y una notificación de chat arma Feed → Mensajes → chat
@@ -80,28 +83,49 @@ class ChatListScreen extends ConsumerWidget {
           ),
         ),
         body: TreinoStateSwitcher(
-          childKey: ValueKey(
-            chatsAsync.when(
-              data: (_) => 'data',
-              loading: () => 'loading',
-              error: (_, __) => 'error',
-            ),
-          ),
+          childKey: ValueKey(_bodyState(chatsAsync, contactsAsync)),
           child: chatsAsync.when(
-            loading: () =>
-                Center(child: CircularProgressIndicator(color: palette.accent)),
+            loading: () => const _Loading(),
             error: (_, __) => _ErrorState(
               onRetry: () => ref.invalidate(chatsForCurrentUserProvider),
             ),
             data: (chats) {
-              if (chats.isEmpty) return const _EmptyState();
-              return ListView.separated(
+              final contacts = contactsAsync.valueOrNull ?? const [];
+              if (chats.isEmpty) {
+                // Sin chats, la pantalla depende de los contactos: mientras
+                // cargan no se puede afirmar "no hay a quién escribirle".
+                if (contactsAsync.isLoading) return const _Loading();
+                if (contactsAsync.hasError) {
+                  return _ErrorState(
+                    onRetry: () => _invalidateContacts(ref),
+                  );
+                }
+                if (contacts.isEmpty) return const _EmptyState();
+              }
+              return ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: chats.length,
-                separatorBuilder: (_, __) =>
-                    Divider(height: 1, color: palette.border, indent: 76),
-                itemBuilder: (_, i) =>
+                children: [
+                  for (var i = 0; i < chats.length; i++) ...[
+                    if (i > 0)
+                      Divider(height: 1, color: palette.border, indent: 76),
                     _ChatRow(chat: chats[i], currentUid: currentUid ?? ''),
+                  ],
+                  if (contacts.isNotEmpty) ...[
+                    _SectionHeader(label: l10n.chatContactsSectionTitle),
+                    for (var i = 0; i < contacts.length; i++) ...[
+                      if (i > 0)
+                        Divider(height: 1, color: palette.border, indent: 76),
+                      _ContactRow(contact: contacts[i]),
+                    ],
+                  ] else if (contactsAsync.hasError)
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        l10n.chatContactsError,
+                        style: TextStyle(color: palette.textMuted),
+                      ),
+                    ),
+                ],
               );
             },
           ),
@@ -211,6 +235,176 @@ class _ChatRow extends ConsumerWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+/// Qué rama del body se está pintando, para que [TreinoStateSwitcher] haga
+/// el fade sólo cuando cambia de verdad (no en cada emisión del stream).
+String _bodyState(
+  AsyncValue<List<Chat>> chats,
+  AsyncValue<List<ChatContact>> contacts,
+) {
+  if (chats.hasError) return 'error';
+  final list = chats.valueOrNull;
+  if (list == null) return 'loading';
+  if (list.isNotEmpty) return 'data';
+  if (contacts.hasError) return 'error';
+  final c = contacts.valueOrNull;
+  if (c == null) return 'loading';
+  return c.isEmpty ? 'empty' : 'data';
+}
+
+void _invalidateContacts(WidgetRef ref) {
+  ref
+    ..invalidate(chatContactLinksAsAthleteProvider)
+    ..invalidate(chatContactLinksAsTrainerProvider)
+    ..invalidate(chatContactFollowersProvider);
+}
+
+class _Loading extends StatelessWidget {
+  const _Loading();
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: CircularProgressIndicator(color: AppPalette.of(context).accent),
+      );
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: Text(
+        label.toUpperCase(),
+        style: GoogleFonts.barlowCondensed(
+          color: palette.textMuted,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+/// Fila de alguien a quien le podés escribir y todavía no tiene chat. El tap
+/// resuelve el chat con `getOrCreate` (lo crea si hace falta) y lo abre por la
+/// misma ruta que [_ChatRow].
+class _ContactRow extends ConsumerStatefulWidget {
+  const _ContactRow({required this.contact});
+
+  final ChatContact contact;
+
+  @override
+  ConsumerState<_ContactRow> createState() => _ContactRowState();
+}
+
+class _ContactRowState extends ConsumerState<_ContactRow> {
+  bool _opening = false;
+
+  Future<void> _open() async {
+    if (_opening) return;
+    // Router y messenger se capturan ANTES del await: la fila se va de la
+    // lista apenas el chat aparece en el stream, y su context muere con ella.
+    final router = GoRouter.maybeOf(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final errorText = AppL10n.of(context).chatContactOpenError;
+    final uid = widget.contact.uid;
+    setState(() => _opening = true);
+    try {
+      final chat = await ref.read(chatForOtherUidProvider(uid).future);
+      await router?.push('/coach/chat/${chat.chatId}?other=$uid');
+    } catch (_) {
+      showTreinoToastOn(messenger, errorText, type: TreinoToastType.error);
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final pubAsync = ref.watch(userPublicProfileProvider(widget.contact.uid));
+    final reason = switch (widget.contact.reason) {
+      ChatContactReason.coach => l10n.chatContactReasonCoach,
+      ChatContactReason.athlete => l10n.chatContactReasonAthlete,
+      ChatContactReason.follower => l10n.chatContactReasonFollower,
+    };
+
+    return pubAsync.when(
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: _RowSkeleton(palette: palette),
+      ),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: _RowSkeleton(palette: palette, shimmer: false),
+      ),
+      data: (pub) {
+        // Cuenta borrada: no hay a quién escribirle.
+        if (pub == null) return const SizedBox.shrink();
+        final name = pub.displayName ?? l10n.chatListDeletedUser;
+        return InkWell(
+          onTap: _open,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              children: [
+                PostAvatar(
+                  authorDisplayName: name,
+                  authorAvatarUrl: pub.avatarUrl,
+                  size: 48,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          color: palette.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        reason,
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _opening
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.accent,
+                        ),
+                      )
+                    : Icon(TreinoIcon.chat, color: palette.accent, size: 20),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

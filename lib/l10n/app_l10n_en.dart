@@ -2176,6 +2176,24 @@ class AppL10nEn extends AppL10n {
   String get chatListRetryLabel => '';
 
   @override
+  String get chatContactsSectionTitle => '';
+
+  @override
+  String get chatContactReasonCoach => '';
+
+  @override
+  String get chatContactReasonAthlete => '';
+
+  @override
+  String get chatContactReasonFollower => '';
+
+  @override
+  String get chatContactsError => '';
+
+  @override
+  String get chatContactOpenError => '';
+
+  @override
   String get chatRelativeJustNow => '';
 
   @override

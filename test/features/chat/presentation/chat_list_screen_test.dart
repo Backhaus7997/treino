@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/features/chat/application/chat_contacts_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/chat/presentation/chat_list_screen.dart';
@@ -11,9 +12,16 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
+Widget _wrap(
+  Widget child, {
+  List<Override> overrides = const [],
+  AsyncValue<List<ChatContact>> contacts = const AsyncData([]),
+}) =>
     ProviderScope(
-      overrides: overrides,
+      overrides: [
+        chatContactsProvider.overrideWith((_) => contacts),
+        ...overrides,
+      ],
       child: MaterialApp(
         theme: AppTheme.dark(),
         locale: const Locale('es', 'AR'),
@@ -83,7 +91,95 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Sin mensajes todavía'), findsOneWidget);
-      expect(find.textContaining('vínculo activo con un PF'), findsOneWidget);
+      expect(find.textContaining('a quienes te siguen'), findsOneWidget);
+    });
+
+    testWidgets('sin chats pero con contactos: sección, sin estado vacío', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const ChatListScreen(),
+          contacts: const AsyncData([
+            ChatContact(uid: 'pf', reason: ChatContactReason.coach),
+            ChatContact(uid: 'lu', reason: ChatContactReason.follower),
+          ]),
+          overrides: [
+            currentUidProvider.overrideWith((_) => 'aaa'),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream.value(const <Chat>[]),
+            ),
+            userPublicProfileProvider('pf')
+                .overrideWith((_) => Stream.value(_pub('pf', 'Coach Joe'))),
+            userPublicProfileProvider('lu')
+                .overrideWith((_) => Stream.value(_pub('lu', 'Lucia'))),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sin mensajes todavía'), findsNothing);
+      expect(find.text('ESCRIBILE A…'), findsOneWidget);
+      expect(find.text('Coach Joe'), findsOneWidget);
+      expect(find.text('Tu PF'), findsOneWidget);
+      expect(find.text('Lucia'), findsOneWidget);
+      expect(find.text('Te sigue'), findsOneWidget);
+    });
+
+    testWidgets('contactos debajo de los chats existentes', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const ChatListScreen(),
+          contacts: const AsyncData([
+            ChatContact(uid: 'lu', reason: ChatContactReason.follower),
+          ]),
+          overrides: [
+            currentUidProvider.overrideWith((_) => 'aaa'),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream.value([
+                _chat(
+                  lastMessageText: 'hola',
+                  lastMessageAt: DateTime.now(),
+                  lastMessageSenderId: 'bbb',
+                ),
+              ]),
+            ),
+            userPublicProfileProvider('bbb')
+                .overrideWith((_) => Stream.value(_pub('bbb', 'Vale'))),
+            userPublicProfileProvider('lu')
+                .overrideWith((_) => Stream.value(_pub('lu', 'Lucia'))),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final chatY = tester.getTopLeft(find.text('Vale')).dy;
+      final headerY = tester.getTopLeft(find.text('ESCRIBILE A…')).dy;
+      final contactY = tester.getTopLeft(find.text('Lucia')).dy;
+      expect(chatY, lessThan(headerY));
+      expect(headerY, lessThan(contactY));
+    });
+
+    testWidgets('sin chats y contactos cargando: no afirma el estado vacío', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const ChatListScreen(),
+          contacts: const AsyncLoading(),
+          overrides: [
+            currentUidProvider.overrideWith((_) => 'aaa'),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream.value(const <Chat>[]),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('Sin mensajes todavía'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
     testWidgets('lista de chats — muestra nombre del otro miembro + preview', (

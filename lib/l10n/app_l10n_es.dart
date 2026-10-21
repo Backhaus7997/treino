@@ -2208,13 +2208,33 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get chatListEmptyBody =>
-      'Cuando tengas un vínculo activo con un PF, vas a poder chatear desde acá.';
+      'Le podés escribir a tu PF y a quienes te siguen. Cuando alguien empiece a seguirte, lo vas a ver acá.';
 
   @override
   String get chatListError => 'No pudimos cargar tus mensajes.';
 
   @override
   String get chatListRetryLabel => 'Reintentar';
+
+  @override
+  String get chatContactsSectionTitle => 'Escribile a…';
+
+  @override
+  String get chatContactReasonCoach => 'Tu PF';
+
+  @override
+  String get chatContactReasonAthlete => 'Tu alumno';
+
+  @override
+  String get chatContactReasonFollower => 'Te sigue';
+
+  @override
+  String get chatContactsError =>
+      'No pudimos cargar a quién le podés escribir.';
+
+  @override
+  String get chatContactOpenError =>
+      'No pudimos abrir el chat. Probá de nuevo.';
 
   @override
   String get chatRelativeJustNow => 'recién';
@@ -8033,13 +8053,33 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get chatListEmptyBody =>
-      'Cuando tengas un vínculo activo con un PF, vas a poder chatear desde acá.';
+      'Le podés escribir a tu PF y a quienes te siguen. Cuando alguien empiece a seguirte, lo vas a ver acá.';
 
   @override
   String get chatListError => 'No pudimos cargar tus mensajes.';
 
   @override
   String get chatListRetryLabel => 'Reintentar';
+
+  @override
+  String get chatContactsSectionTitle => 'Escribile a…';
+
+  @override
+  String get chatContactReasonCoach => 'Tu PF';
+
+  @override
+  String get chatContactReasonAthlete => 'Tu alumno';
+
+  @override
+  String get chatContactReasonFollower => 'Te sigue';
+
+  @override
+  String get chatContactsError =>
+      'No pudimos cargar a quién le podés escribir.';
+
+  @override
+  String get chatContactOpenError =>
+      'No pudimos abrir el chat. Probá de nuevo.';
 
   @override
   String get chatRelativeJustNow => 'recién';
