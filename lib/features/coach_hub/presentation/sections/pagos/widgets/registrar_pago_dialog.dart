@@ -27,6 +27,7 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart'
     show userPublicProfilesBatchProvider;
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 
 import 'thousands_input_formatter.dart';
@@ -68,6 +69,9 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
   PaymentStatus _status = PaymentStatus.paid;
   DateTime? _dueDate;
   String? _error;
+
+  static String _nombreDe(String? name) =>
+      (name == null || name.isEmpty) ? 'Alumno' : name; // i18n
 
   @override
   void dispose() {
@@ -216,7 +220,7 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
             if (_error != null) ...[
               const SizedBox(height: 10),
               Text(_error!,
-                  style: TextStyle(color: palette.danger, fontSize: 12)),
+                  style: TextStyle(color: palette.dangerText, fontSize: 12)),
             ],
           ],
         ),
@@ -257,7 +261,7 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
         ),
       ),
       error: (_, __) => Text('No pudimos cargar los alumnos.', // i18n
-          style: TextStyle(color: palette.danger, fontSize: 13)),
+          style: TextStyle(color: palette.dangerText, fontSize: 13)),
       data: (links) {
         final seen = <String>{};
         final athletes = <TrainerLink>[];
@@ -279,8 +283,7 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
             ref.watch(userPublicProfilesBatchProvider(batchKey));
         final profiles = profilesAsync.valueOrNull ?? const {};
 
-        // Guard contra el assert de DropdownButtonFormField ("exactly one
-        // item with value") si el stream re-emite y el alumno seleccionado
+        // Guard por si el stream re-emite y el alumno seleccionado
         // dejó de estar en la lista filtrada (p.ej. pasó a paused/terminated
         // entre re-emisiones). Usamos un valor local para el picker — nunca
         // seteamos state durante build — y sincronizamos `_selectedAthleteId`
@@ -296,19 +299,18 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
           });
         }
 
-        return TreinoDropdown<String>(
-          initialValue: validSelection,
+        return TreinoSelectField<String>(
+          value: validSelection,
+          hint: 'Elegí un alumno', // i18n
+          sheetTitle: 'Alumno', // i18n
           decoration: deco('Alumno', 'Elegí un alumno'), // i18n
-          hint: Text('Elegí un alumno', // i18n
-              style: TextStyle(color: palette.textMuted)),
-          items: athletes.map((l) {
-            final name = profiles[l.athleteId]?.displayName;
-            final label = (name == null || name.isEmpty) ? 'Alumno' : name;
-            return DropdownMenuItem<String>(
-              value: l.athleteId,
-              child: Text(label, overflow: TextOverflow.ellipsis),
-            );
-          }).toList(),
+          options: [
+            for (final l in athletes)
+              TreinoSelectOption(
+                value: l.athleteId,
+                label: _nombreDe(profiles[l.athleteId]?.displayName),
+              ),
+          ],
           onChanged: (id) => setState(() => _selectedAthleteId = id),
         );
       },

@@ -18,6 +18,8 @@ import '../../../core/utils/firestore_error.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_select.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/template_limit_gate.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
@@ -35,6 +37,8 @@ import '../domain/custom_exercise.dart' show CustomExercise;
 import '../application/exercise_filter.dart'
     show customToExercise, exerciseMatchesFilters;
 import '../application/exercise_providers.dart' show exercisesProvider;
+import '../application/assigned_routine_providers.dart'
+    show assignedRoutinesByTrainerProvider;
 import '../application/routine_providers.dart'
     show invalidateRoutineById, routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
@@ -800,14 +804,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                   _SectionLabel(
                       label: l10n.routineEditorLevelSection, palette: palette),
                   const SizedBox(height: 4),
-                  _LevelDropdown(
+                  _LevelSelect(
                     value: _level,
-                    palette: palette,
+                    title: l10n.routineEditorLevelSection,
                     onChanged: (v) {
-                      if (v != null) {
-                        _markDirty();
-                        setState(() => _level = v);
-                      }
+                      _markDirty();
+                      setState(() => _level = v);
                     },
                   ),
                 ],
@@ -850,7 +852,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           key: const Key('invalid_week_hint'),
           style: GoogleFonts.barlow(
             fontSize: 11,
-            color: palette.danger,
+            color: palette.dangerText,
           ),
         ),
       ],
@@ -2124,7 +2126,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             SimpleDialogOption(
               onPressed: () => Navigator.of(ctx).pop(_DeleteScope.allWeeks),
               child: Text(l10n.routineEditorScopeAllWeeks,
-                  style: TextStyle(color: palette.danger)),
+                  style: TextStyle(color: palette.dangerText)),
             ),
           ],
         );
@@ -2223,11 +2225,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final isDuplicate = day.slots
         .any((s) => !identical(s, slot) && s.exercise?.id == newExercise.id);
     if (isDuplicate) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppL10n.of(context).routineEditorDuplicateExercise),
-        ),
-      );
+      showTreinoToast(
+          context, AppL10n.of(context).routineEditorDuplicateExercise);
       return;
     }
     _markDirty();
@@ -2274,10 +2273,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final nuevos = picked.where((e) => !presentes.contains(e.id)).toList();
     if (nuevos.isEmpty) {
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        // ignore: use_build_context_synchronously
-        SnackBar(content: Text(AppL10n.of(context).routineEditorAddNothingNew)),
-      );
+      showTreinoToast(context, AppL10n.of(context).routineEditorAddNothingNew);
       return;
     }
 
@@ -2547,9 +2543,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // Ninguno era nuevo: decirlo. Antes esto era un `return` mudo adentro del
     // setState y el botón parecía roto.
     if (nuevos.isEmpty) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorAddNothingNew)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorAddNothingNew,
+          type: TreinoToastType.info);
       return;
     }
 
@@ -2563,9 +2558,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // ejercicio adentro miente sobre lo que es.
     final esSuperserie = nuevos.length >= 2;
     if (!esSuperserie) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorSupersetNeedsTwo)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorSupersetNeedsTwo,
+          type: TreinoToastType.info);
     }
 
     setState(() {
@@ -2757,9 +2751,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
     final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
     if (nuevos.isEmpty) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorAddNothingNew)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorAddNothingNew,
+          type: TreinoToastType.info);
       return;
     }
 
@@ -2819,6 +2812,23 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     }).toList();
   }
 
+  /// Tira el cache de PLANES ASIGNADOS del par PF/alumno.
+  ///
+  /// `assignedRoutinesByTrainerProvider` es un `FutureProvider` one-shot: sin
+  /// esto el detalle de alumno que quedó debajo del editor sigue diciendo
+  /// «Todavía no le asignaste planes.» después de «Plan creado y asignado.»
+  /// (#1486). Va por el container y no por `ref` porque corre después del
+  /// await, cuando la pantalla puede ya no estar montada.
+  static void _invalidateAssignedList(
+    ProviderContainer container, {
+    required String trainerId,
+    required String athleteId,
+  }) {
+    container.invalidate(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerId, athleteId: athleteId),
+    ));
+  }
+
   Future<void> _submit() async {
     if (_submitting) return;
 
@@ -2830,9 +2840,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final l10n = AppL10n.of(context);
       final error = _firstValidationError(l10n);
       if (error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
-        );
+        showTreinoToast(context, error.message, type: TreinoToastType.error);
         // Expand and scroll to the day the error points at (name errors carry
         // no day — nothing to scroll to).
         final day = error.day;
@@ -2920,10 +2928,11 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           );
           await repo.updateAssigned(uid: uid, draft: draft);
           invalidateRoutineById(container, planId);
+          _invalidateAssignedList(container,
+              trainerId: uid, athleteId: athleteId);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachUpdatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case TrainerAssigning(:final athleteId, existingPlanId: null):
@@ -2949,15 +2958,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           // `routine_created` sí se queda: lleva un `source` que sólo conoce
           // esta pantalla.
           await repo.createAssigned(routine);
+          _invalidateAssignedList(container,
+              trainerId: uid, athleteId: athleteId);
           analytics.logRoutineCreated(
             source: analyticsSource,
             daysCount: days.length,
             weeksCount: _numWeeks,
           );
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachCreatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachCreatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case TrainerTemplating(existingTemplateId: final templateId?):
@@ -2978,9 +2988,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateTemplate(uid: uid, draft: draft);
           invalidateRoutineById(container, templateId);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachUpdatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case TrainerTemplating(existingTemplateId: null):
@@ -3016,9 +3025,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             weeksCount: _numWeeks,
           );
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.coachCreatePlanSuccess)),
-          );
+          showTreinoToast(context, l10n.coachCreatePlanSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         // Both athlete CREATE paths share one exit, and that is the whole
@@ -3052,9 +3060,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           }
           if (userRoutines.length >= kMaxOwnRoutines) {
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.workoutSelfEditorCapReached)),
-            );
+            showTreinoToast(context, l10n.workoutSelfEditorCapReached,
+                type: TreinoToastType.error);
             // No save happened — re-arm the unsaved-changes guard.
             _isDirty = true;
             setState(() => _submitting = false);
@@ -3129,9 +3136,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             }
           }
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.workoutSelfEditorSuccess)),
-          );
+          showTreinoToast(context, l10n.workoutSelfEditorSuccess,
+              type: TreinoToastType.success);
           context.pop();
 
         case SelfCreating(existingRoutineId: final existingId?):
@@ -3157,9 +3163,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateUserOwned(uid: uid, draft: draft);
           invalidateRoutineById(container, existingId);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.workoutSelfEditorUpdateSuccess)),
-          );
+          showTreinoToast(context, l10n.workoutSelfEditorUpdateSuccess,
+              type: TreinoToastType.success);
           context.pop();
       }
     } catch (e) {
@@ -3202,9 +3207,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 : l10n.workoutSelfEditorError,
         };
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorText)),
-      );
+      showTreinoToast(context, errorText, type: TreinoToastType.error);
       // The save failed — the user stays on screen with unsaved changes, so
       // re-arm the guard cleared at the top of _submit.
       _isDirty = true;
@@ -3590,10 +3593,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                               TextField(
                                 key: const Key('editor_name_field'),
                                 controller: _nameController,
-                                style: GoogleFonts.barlow(
-                                  color: palette.textPrimary,
-                                  fontSize: 13,
-                                ),
+                                style: _editorFieldTextStyle(palette),
                                 decoration: _inputDecoration(
                                   palette,
                                   hint: _isTrainerMode
@@ -3619,10 +3619,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                 TextField(
                                   key: const Key('editor_split_field'),
                                   controller: _splitController,
-                                  style: GoogleFonts.barlow(
-                                    color: palette.textPrimary,
-                                    fontSize: 13,
-                                  ),
+                                  style: _editorFieldTextStyle(palette),
                                   decoration: _inputDecoration(
                                     palette,
                                     hint: l10n.routineEditorSplitHint,
@@ -3802,15 +3799,18 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 // tiene en pantalla.
                 final primerDia =
                     problemas.map((p) => p.dia).whereType<_EditableDay>();
-                return EditorFooterBar(
-                  summary: _resumenPie(l10n),
-                  problems: visibles,
-                  submitLabel: _submitLabelFor(widget.mode, l10n),
-                  submitting: _submitting,
-                  onSubmit: () => _submit(),
-                  onGoToProblem: primerDia.isEmpty
-                      ? null
-                      : () => _irAlDia(primerDia.first),
+                return _PieSinTeclado(
+                  builder: (acceptsTaps) => EditorFooterBar(
+                    summary: _resumenPie(l10n),
+                    problems: visibles,
+                    submitLabel: _submitLabelFor(widget.mode, l10n),
+                    submitting: _submitting,
+                    acceptsTaps: acceptsTaps,
+                    onSubmit: () => _submit(),
+                    onGoToProblem: primerDia.isEmpty
+                        ? null
+                        : () => _irAlDia(primerDia.first),
+                  ),
                 );
               }),
             ],
@@ -3820,27 +3820,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     }
   }
 
-  InputDecoration _inputDecoration(AppPalette palette, {String? hint}) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
-      filled: true,
-      fillColor: palette.bgCard,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: palette.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: palette.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: palette.accent),
-      ),
-    );
-  }
+  InputDecoration _inputDecoration(AppPalette palette, {String? hint}) =>
+      _editorFieldDecoration(palette, hint: hint);
 }
 
 // ── Week tab bar ──────────────────────────────────────────────────────────────
@@ -4331,11 +4312,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   // Reads/writes widget.day.expanded so the collapse survives the ListView
   // recycling the tile off-screen.
 
-  /// True while the inline TextField is replacing the Text label. Local to the
-  /// tile — does NOT survive the tile being recycled off-screen by the
-  /// ListView (acceptable: the only state that would be lost is "user mid-
-  /// typing while scrolling away", which is not a real flow).
-  bool _editingName = false;
+  /// El campo NOMBRE DEL DÍA, siempre visible. Guarda en cada tecla —la
+  /// pestaña se actualiza mientras escribís— y al perder el foco normaliza:
+  /// vacío vuelve a «Día N» y los espacios de los bordes se van.
   late final TextEditingController _nameController;
   late final FocusNode _nameFocus;
 
@@ -4344,22 +4323,19 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     super.initState();
     _nameController = TextEditingController(text: widget.day.name);
     _nameFocus = FocusNode();
-    // Commit on blur: matches Hevy-style editors where tap-elsewhere persists
-    // the edit (instead of discarding it like a modal Cancel).
     _nameFocus.addListener(() {
-      if (!_nameFocus.hasFocus && _editingName) {
-        _commitName();
-      }
+      if (!_nameFocus.hasFocus) _normalizarNombre();
     });
   }
 
   @override
   void didUpdateWidget(_DayExpansionTile oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Parent re-numbered the day (e.g. another day was deleted) and pushed a
-    // fresh default name. Sync the controller so the inline TextField reflects
-    // the new label next time the user taps edit.
-    if (!_editingName && widget.day.name != _nameController.text) {
+    // El padre renumeró el día (se borró otro) o cambió de pestaña: el campo
+    // tiene que mostrar el nombre nuevo. Con foco NO: vaciar el campo mientras
+    // escribís hace que el padre ponga «Día N», y sincronizar acá te lo
+    // escribiría encima en la tecla siguiente.
+    if (!_nameFocus.hasFocus && widget.day.name != _nameController.text) {
       _nameController.text = widget.day.name;
     }
   }
@@ -4377,23 +4353,13 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     super.dispose();
   }
 
-  void _startEditing() {
-    _nameController.text = widget.day.name;
-    setState(() => _editingName = true);
-    // Schedule focus AFTER the TextField is in the tree.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _nameFocus.requestFocus();
-      _nameController.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _nameController.text.length,
-      );
-    });
-  }
-
-  void _commitName() {
-    if (!_editingName) return;
+  /// Al soltar el foco el campo pasa a mostrar lo que quedó guardado: el
+  /// padre ya recortó los espacios y repuso «Día N» si quedó vacío.
+  void _normalizarNombre() {
     widget.onNameChanged(_nameController.text);
-    setState(() => _editingName = false);
+    if (_nameController.text != widget.day.name) {
+      _nameController.text = widget.day.name;
+    }
   }
 
   /// The nearest slot BEFORE [slotIndex] that can act as a copy source: it must
@@ -4892,89 +4858,40 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           // Fila de acciones del día: el atajo a la izquierda, y
           // renombrar/borrar a la derecha, donde antes había una
           // cabecera entera para lo mismo.
-          if (_editingName)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('day_name_editing_field'),
-                      controller: _nameController,
-                      focusNode: _nameFocus,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _commitName(),
-                      onTap: () {},
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        color: palette.textPrimary,
-                      ),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                        border: InputBorder.none,
-                        hintText:
-                            l10n.routineEditorDayName(widget.day.dayNumber),
-                        hintStyle: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    key: Key('day_name_commit_button_${widget.day.dayNumber}'),
-                    icon: Icon(TreinoIcon.check,
-                        size: 18, color: palette.accentText),
-                    tooltip: l10n.routineEditorEditDayNameA11y,
-                    onPressed: _commitName,
-                    constraints:
-                        const BoxConstraints(minWidth: 48, minHeight: 48),
-                    padding: EdgeInsets.zero,
-                  ),
-                ],
-              ),
-            )
-          else
-            Row(
-              children: [
-                if (widget.onQuickSearch != null && widget.onQuickAdd != null)
-                  QuickEntryToggle(
-                    active: _quickEntryOpen,
-                    onTap: () => setState(() {
-                      if (_quickEntryOpen) {
-                        _cerrarEntradaRapida();
-                      } else {
-                        _quickEntryOpen = true;
-                      }
-                    }),
-                  ),
-                const Spacer(),
+          _DayNameField(
+            dayNumber: widget.day.dayNumber,
+            controller: _nameController,
+            focusNode: _nameFocus,
+            palette: palette,
+            onChanged: widget.onNameChanged,
+          ),
+          Row(
+            children: [
+              if (widget.onQuickSearch != null && widget.onQuickAdd != null)
+                QuickEntryToggle(
+                  active: _quickEntryOpen,
+                  onTap: () => setState(() {
+                    if (_quickEntryOpen) {
+                      _cerrarEntradaRapida();
+                    } else {
+                      _quickEntryOpen = true;
+                    }
+                  }),
+                ),
+              const Spacer(),
+              if (widget.onRemoveDay != null)
                 IconButton(
-                  key: Key('day_name_edit_button_${widget.day.dayNumber}'),
-                  icon:
-                      Icon(TreinoIcon.edit, size: 16, color: palette.textMuted),
-                  tooltip: l10n.routineEditorEditDayNameA11y,
-                  onPressed: _startEditing,
+                  key: Key('day_remove_button_${widget.day.dayNumber}'),
+                  icon: Icon(TreinoIcon.trash,
+                      size: 18, color: palette.textMuted),
+                  tooltip: l10n.routineEditorDeleteDayA11y,
+                  onPressed: widget.onRemoveDay,
                   constraints:
                       const BoxConstraints(minWidth: 48, minHeight: 48),
                   padding: EdgeInsets.zero,
                 ),
-                if (widget.onRemoveDay != null)
-                  IconButton(
-                    key: Key('day_remove_button_${widget.day.dayNumber}'),
-                    icon: Icon(TreinoIcon.trash,
-                        size: 18, color: palette.textMuted),
-                    tooltip: l10n.routineEditorDeleteDayA11y,
-                    onPressed: widget.onRemoveDay,
-                    constraints:
-                        const BoxConstraints(minWidth: 48, minHeight: 48),
-                    padding: EdgeInsets.zero,
-                  ),
-              ],
-            ),
+            ],
+          ),
           if (widget.onQuickSearch != null && widget.onQuickAdd != null) ...[
             if (_quickEntryOpen) ...[
               const SizedBox(height: AppSpacing.s8),
@@ -5718,10 +5635,13 @@ class _SlotEditorState extends State<_SlotEditor> {
       final values = sets.map((s) => s.distanceMeters).toList();
       final first = values.isEmpty ? null : values.first;
       final uniform = first != null && values.every((v) => v == first);
-      final target = uniform ? '${formatWeightKg(first)} m' : '—';
+      final target = uniform
+          ? '${formatWeightDisplay(first, AppL10n.of(context).localeName)} m'
+          : '—';
       return '${sets.length} × $target';
     }
     return resumenDePrescripcion(
+      localeName: AppL10n.of(context).localeName,
       modo: slot.exerciseMode,
       sets: [
         for (final set in sets)
@@ -5854,31 +5774,22 @@ class _SetTableState extends State<_SetTable> {
         relativeOffset.dx + 120,
         0,
       ),
-      color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
           value: ExerciseMode.reps,
           child: Text(
             l10n.routineEditorMeasureReps,
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
         PopupMenuItem(
           value: ExerciseMode.duration,
           child: Text(
             l10n.routineEditorMeasureTime,
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: ExerciseMode.distance,
-          child: Text(
-            'Distancia',
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
-          ),
+          child: Text('Distancia'),
         ),
       ],
     );
@@ -5922,9 +5833,8 @@ class _SetTableState extends State<_SetTable> {
       // El texto dice "este set" y no "el primer set": desde #867 la fuente es
       // la celda enfocada, y mandar al usuario a cargar la primera fila lo
       // dejaba corrigiendo un valor que no es el que se va a replicar.
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorFillColumnEmpty)),
-      );
+      showTreinoToastOn(messenger, l10n.routineEditorFillColumnEmpty,
+          type: TreinoToastType.info);
       return;
     }
 
@@ -5934,24 +5844,17 @@ class _SetTableState extends State<_SetTable> {
     setState(() => _applyWeights(List<double?>.filled(sets.length, source)));
     widget.onChanged();
 
-    messenger.showSnackBar(
-      SnackBar(
-        // `persist: false` A MANO. `SnackBar` hace
-        // `persist = persist ?? action != null`: con acción es eterno por
-        // default, así que este cartel se quedaba hasta recargar. Es el
-        // gemelo del que el PF reportó en el editor web.
-        persist: false,
-        duration: const Duration(seconds: 6),
-        content: Text(l10n.routineEditorFillKgApplied),
-        action: SnackBarAction(
-          key: const Key('fill_kg_undo_action'),
-          label: l10n.routineEditorFillKgUndo,
-          onPressed: () {
-            if (!mounted) return;
-            setState(() => _applyWeights(previous));
-            widget.onChanged();
-          },
-        ),
+    showTreinoToastOn(
+      messenger,
+      l10n.routineEditorFillKgApplied,
+      type: TreinoToastType.success,
+      action: TreinoToastAction(
+        label: l10n.routineEditorFillKgUndo,
+        onPressed: () {
+          if (!mounted) return;
+          setState(() => _applyWeights(previous));
+          widget.onChanged();
+        },
       ),
     );
   }
@@ -6463,7 +6366,10 @@ class _SetRowState extends State<_SetRow> {
                 : l10n.routineEditorFieldReps,
       ),
       stepAmount: esKg ? kKgStepsKg.first : 1,
-      stepLabel: esKg ? formatWeightKg(kKgStepsKg.first) : '1',
+      stepLabel: esKg
+          ? formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName)
+          : '1',
       canDecrease: esKg
           ? (_currentKg ?? 0) > 0
           : esDistancia
@@ -6475,14 +6381,14 @@ class _SetRowState extends State<_SetRow> {
               ? _stepDistance(delta)
               : _stepReps(campo, delta),
       stepIncreaseLabel: esKg
-          ? l10n
-              .routineEditorKgStepIncreaseA11y(formatWeightKg(kKgStepsKg.first))
+          ? l10n.routineEditorKgStepIncreaseA11y(formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName))
           : esDistancia
               ? 'Aumentar distancia en 1 metro'
               : l10n.routineEditorRepsStepIncreaseA11y('1'),
       stepDecreaseLabel: esKg
-          ? l10n
-              .routineEditorKgStepDecreaseA11y(formatWeightKg(kKgStepsKg.first))
+          ? l10n.routineEditorKgStepDecreaseA11y(formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName))
           : esDistancia
               ? 'Reducir distancia en 1 metro'
               : l10n.routineEditorRepsStepDecreaseA11y('1'),
@@ -6509,7 +6415,6 @@ class _SetRowState extends State<_SetRow> {
         offset.dx + 160,
         0,
       ),
-      color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
             value: SetType.normal,
@@ -6718,47 +6623,29 @@ class _SetRowState extends State<_SetRow> {
 /// exists to remove. Deloads and top-set back-offs move down, not up.
 /// [steppedWeightKg] clamps at zero, so "abajo" bottoms out at an empty
 /// field and never at a negative load.
-// ── Level dropdown ────────────────────────────────────────────────────────────
+// ── Level select ──────────────────────────────────────────────────────────────
 
-class _LevelDropdown extends StatelessWidget {
-  const _LevelDropdown({
+class _LevelSelect extends StatelessWidget {
+  const _LevelSelect({
     required this.value,
-    required this.palette,
+    required this.title,
     required this.onChanged,
   });
 
   final ExperienceLevel value;
-  final AppPalette palette;
-  final void Function(ExperienceLevel?) onChanged;
+  final String title;
+  final void Function(ExperienceLevel) onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: palette.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<ExperienceLevel>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: palette.bgCard,
-          style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 14),
-          items: ExperienceLevel.values
-              .map((l) => DropdownMenuItem(
-                    value: l,
-                    child: Text(
-                      l.displayNameEs,
-                      style: GoogleFonts.barlow(
-                          color: palette.textPrimary, fontSize: 14),
-                    ),
-                  ))
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
+    return TreinoSelectField<ExperienceLevel>(
+      value: value,
+      sheetTitle: title,
+      options: [
+        for (final l in ExperienceLevel.values)
+          TreinoSelectOption(value: l, label: l.displayNameEs),
+      ],
+      onChanged: onChanged,
     );
   }
 }
@@ -7201,6 +7088,97 @@ class RoutineEditorTestBridge {
 
 // ── Section label ─────────────────────────────────────────────────────────────
 
+/// Texto de los campos del formulario del editor (NOMBRE, SPLIT, NOMBRE DEL
+/// DÍA). Compartido para que no se separen.
+TextStyle _editorFieldTextStyle(AppPalette palette) => GoogleFonts.barlow(
+      color: palette.textPrimary,
+      fontSize: 13,
+    );
+
+/// Decoración de los campos del formulario del editor. Vive afuera del State
+/// de la pantalla para que [_DayNameField], que está en otro widget, use la
+/// misma y no una copia que se desincronice.
+InputDecoration _editorFieldDecoration(AppPalette palette, {String? hint}) {
+  return InputDecoration(
+    hintText: hint,
+    hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+    filled: true,
+    fillColor: palette.bgCard,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: palette.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: palette.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: palette.accent),
+    ),
+  );
+}
+
+/// Campo NOMBRE DEL DÍA del editor de rutina, siempre visible.
+///
+/// Hasta la revisión en device del 21/10 renombrar era un modo aparte: lápiz
+/// en la fila de acciones → aparecía un campo → check para confirmar. El
+/// lápiz no decía que renombraba el día y el check se leía como un ícono
+/// roto, así que el nombre del día pasó a ser un campo más del formulario,
+/// con la decoración EXACTA del campo NOMBRE de la rutina
+/// ([_editorFieldDecoration]): mismo alto, fondo, borde, tipografía y
+/// placeholder.
+///
+/// No contradice la revisión del 31/08, que sacó la cabecera del día: aquella
+/// repetía el nombre como TÍTULO de solo lectura a 200 px de la pestaña. Esto
+/// es el único lugar donde se edita; la pestaña sigue siendo la única que lo
+/// muestra.
+class _DayNameField extends StatelessWidget {
+  const _DayNameField({
+    required this.dayNumber,
+    required this.controller,
+    required this.focusNode,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final int dayNumber;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final AppPalette palette;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionLabel(
+          label: l10n.routineEditorDayNameLabel,
+          palette: palette,
+        ),
+        const SizedBox(height: AppSpacing.hairline),
+        TextField(
+          key: const Key('day_name_field'),
+          controller: controller,
+          focusNode: focusNode,
+          maxLines: 1,
+          textCapitalization: TextCapitalization.sentences,
+          textInputAction: TextInputAction.done,
+          style: _editorFieldTextStyle(palette),
+          decoration: _editorFieldDecoration(
+            palette,
+            hint: l10n.routineEditorDayName(dayNumber),
+          ),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+}
+
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel({required this.label, required this.palette});
 
@@ -7294,5 +7272,80 @@ class _ShareOnProfileTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// El pie del editor (aviso + guardar) se esconde mientras el teclado está
+/// abierto, y cuando vuelve ignora los taps un momento (#1487).
+///
+/// Con el teclado arriba el pie subía pegado a él: tapaba las sugerencias de
+/// la entrada rápida y, al cerrarlo, ASIGNAR PLAN quedaba justo donde estaba
+/// el ✓ del teclado — un tap de más asignaba el plan sin querer.
+class _PieSinTeclado extends StatefulWidget {
+  const _PieSinTeclado({required this.builder});
+
+  /// Arma el pie; recibe si acepta taps todavía.
+  final Widget Function(bool acceptsTaps) builder;
+
+  @override
+  State<_PieSinTeclado> createState() => _PieSinTecladoState();
+}
+
+class _PieSinTecladoState extends State<_PieSinTeclado>
+    with WidgetsBindingObserver {
+  /// Cuánto tiempo el pie recién vuelto no acepta taps: lo que tarda un
+  /// segundo toque involuntario, no lo que tarda alguien en decidir guardar.
+  static const _resguardo = Duration(milliseconds: 500);
+
+  bool _hayTeclado = false;
+  bool _enResguardo = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _hayTeclado = _tecladoAbierto();
+  }
+
+  /// `View` y no `MediaQuery`: dentro del body de un Scaffold el inset del
+  /// teclado ya viene consumido (el Scaffold achica el body) y vale 0 siempre.
+  bool _tecladoAbierto() => View.of(context).viewInsets.bottom > 0;
+
+  /// El teclado cambia las métricas de la ventana, no las dependencias de este
+  /// widget: sin el observer nada lo reconstruye al abrirse o cerrarse.
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    final abierto = _tecladoAbierto();
+    if (abierto == _hayTeclado) return;
+    setState(() {
+      if (_hayTeclado && !abierto) {
+        _enResguardo = true;
+        _timer?.cancel();
+        _timer = Timer(_resguardo, () {
+          if (mounted) setState(() => _enResguardo = false);
+        });
+      }
+      _hayTeclado = abierto;
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hayTeclado) return const SizedBox.shrink();
+    return widget.builder(!_enResguardo);
   }
 }

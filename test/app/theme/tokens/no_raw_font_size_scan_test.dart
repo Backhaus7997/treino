@@ -67,7 +67,7 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo: cada migración lo baja.
-    const allowlistCeiling = 248;
+    const allowlistCeiling = 247;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
     const rawFontSizeDebtCeiling = 1681;
@@ -81,7 +81,6 @@ void main() {
       'features/auth/presentation/legal/legal_document_screen.dart',
       'features/auth/presentation/login_screen.dart',
       'features/auth/presentation/profile_unavailable_screen.dart',
-      'features/auth/presentation/register_screen.dart',
       'features/auth/presentation/splash_screen.dart',
       'features/auth/presentation/welcome_screen.dart',
       'features/auth/presentation/widgets/auth_input.dart',
@@ -107,7 +106,6 @@ void main() {
       'features/coach/presentation/trainers_list_screen.dart',
       'features/coach/presentation/widgets/appointment_detail_sheet.dart',
       'features/coach/presentation/widgets/athlete_picker_sheet.dart',
-      'features/coach/presentation/widgets/day_slots_sheet.dart',
       'features/coach/presentation/widgets/day_timeline.dart',
       'features/coach/presentation/widgets/equipment_filter_sheet.dart',
       'features/coach/presentation/widgets/exercise_picker_sheet.dart',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
@@ -51,6 +52,8 @@ class PublicProfileFollowButton extends ConsumerStatefulWidget {
     required this.viewerUid,
     required this.targetUid,
     this.targetIsPublic = false,
+    this.targetDisplayName,
+    this.compact = false,
   });
 
   /// `follows/{viewer}_{target}` — ¿yo lo sigo? Es la que gobierna este pill.
@@ -67,6 +70,21 @@ class PublicProfileFollowButton extends ConsumerStatefulWidget {
   /// When `false` (default) the edge is created as `pending` and the target
   /// must approve. See [FollowRepository.follow].
   final bool targetIsPublic;
+
+  /// Nombre a mostrar en la hoja de dejar de seguir / cancelar solicitud.
+  ///
+  /// Si el caller ya lo tiene, que lo pase: sin él la hoja lo busca con
+  /// `ref.read(userPublicProfileProvider)`, que sólo devuelve dato si ALGUIEN
+  /// más ya cargó ese perfil. En el perfil público alguien lo hace
+  /// (`publicProfileViewProvider`); en una tarjeta de sugerencias no, y la hoja
+  /// decía "¿Dejar de seguir a Usuario anónimo?" (#1533).
+  final String? targetDisplayName;
+
+  /// Variante para tarjetas angostas (carrusel de sugerencias): el pill ocupa
+  /// todo el ancho que le da el padre, con menos padding, sin ícono, y el label
+  /// se achica en vez de desbordar ("SOLICITUD ENVIADA" no entra en una
+  /// tarjeta de ~100px).
+  final bool compact;
 
   @override
   ConsumerState<PublicProfileFollowButton> createState() =>
@@ -93,6 +111,7 @@ class _PublicProfileFollowButtonState
         return _FollowPill(
           label: 'SIGUIENDO',
           style: _FollowPillStyle.outlined,
+          compact: widget.compact,
           leadingIcon: TreinoIcon.check,
           semanticsLabel: AppL10n.of(context).feedFollowButtonFollowingA11y,
           onTap: () => _showUnfriendSheet(outgoing),
@@ -108,6 +127,7 @@ class _PublicProfileFollowButtonState
       return _FollowPill(
         label: 'SOLICITUD ENVIADA',
         style: _FollowPillStyle.outlinedMuted,
+        compact: widget.compact,
         semanticsLabel: AppL10n.of(context).feedFollowButtonRequestedA11y,
         onTap: () => _showUnfriendSheet(
           outgoing,
@@ -121,6 +141,7 @@ class _PublicProfileFollowButtonState
       return _FollowPill(
         label: 'ACEPTAR',
         style: _FollowPillStyle.mintFilled,
+        compact: widget.compact,
         busy: _busy,
         semanticsLabel: AppL10n.of(context).feedFollowButtonAcceptA11y,
         onTap: _busy ? null : () => _onAccept(repo, incoming),
@@ -132,6 +153,7 @@ class _PublicProfileFollowButtonState
     return _FollowPill(
       label: 'SEGUIR',
       style: _FollowPillStyle.mintFilled,
+      compact: widget.compact,
       busy: _busy,
       semanticsLabel: AppL10n.of(context).feedFollowButtonFollowA11y,
       onTap: _busy ? null : () => _onRequest(repo),
@@ -177,16 +199,13 @@ class _PublicProfileFollowButtonState
       if (widget.targetIsPublic) {
         container.invalidate(myFollowingFeedProvider);
       }
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(successMessage)));
+      showTreinoToastOn(messenger, successMessage,
+          type: TreinoToastType.success);
     } catch (_) {
       // The pill stays as SEGUIR (the stream won't emit on failure); tell the
       // user the request did not go through so they can retry instead of
       // assuming it succeeded.
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(errorMessage)));
+      showTreinoToastOn(messenger, errorMessage, type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -213,15 +232,12 @@ class _PublicProfileFollowButtonState
       // explicitly — Riverpod does NOT auto-cascade to providers with no
       // active listener at the moment (ADR-FPS-006).
       container.invalidate(myFollowingFeedProvider);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(successMessage)));
+      showTreinoToastOn(messenger, successMessage,
+          type: TreinoToastType.success);
     } catch (_) {
       // On failure the feed is NOT invalidated and the pill stays as ACEPTAR;
       // surface the error so the user can retry instead of silently swallowing.
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(errorMessage)));
+      showTreinoToastOn(messenger, errorMessage, type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -229,8 +245,9 @@ class _PublicProfileFollowButtonState
 
   /// Opens the unfriend confirmation bottom sheet.
   ///
-  /// Resolves the display name from [userPublicProfileProvider] with a fallback
-  /// of "Usuario anónimo". On ELIMINAR, calls [FollowRepository.deleteEdge]
+  /// Resolves the display name from [PublicProfileFollowButton.targetDisplayName],
+  /// then [userPublicProfileProvider], with a fallback of "Usuario anónimo".
+  /// On ELIMINAR, calls [FollowRepository.deleteEdge]
   /// sobre la arista SALIENTE — **nunca toca la inversa**: dejar de seguir
   /// corta un solo sentido, y si el otro me sigue eso queda intacto.
   /// Stream providers self-update — sólo [myFollowingFeedProvider] necesita
@@ -241,8 +258,9 @@ class _PublicProfileFollowButtonState
   }) async {
     final palette = AppPalette.of(context);
     final profileAsync = ref.read(userPublicProfileProvider(widget.targetUid));
-    final friendDisplayName =
-        profileAsync.valueOrNull?.displayName ?? 'Usuario anónimo';
+    final friendDisplayName = widget.targetDisplayName ??
+        profileAsync.valueOrNull?.displayName ??
+        'Usuario anónimo';
 
     final repo = ref.read(followRepositoryProvider);
     // Capture the root container + messenger + copy BEFORE awaiting the sheet:
@@ -278,9 +296,8 @@ class _PublicProfileFollowButtonState
           } catch (_) {
             // La arista sigue viva (el delete no commiteó);
             // surface the failure so the user can retry instead of swallowing.
-            messenger
-              ..hideCurrentSnackBar()
-              ..showSnackBar(SnackBar(content: Text(errorMessage)));
+            showTreinoToastOn(messenger, errorMessage,
+                type: TreinoToastType.error);
           }
         },
       ),
@@ -298,11 +315,15 @@ class _FollowPill extends StatelessWidget {
     required this.semanticsLabel,
     this.leadingIcon,
     this.busy = false,
+    this.compact = false,
   });
 
   final String label;
   final _FollowPillStyle style;
   final VoidCallback? onTap;
+
+  /// Ver [PublicProfileFollowButton.compact].
+  final bool compact;
 
   /// Lo que anuncia el lector de pantalla. Distinto por estado — el label
   /// visible es una sola palabra y no dice qué pasa al tocar.
@@ -325,7 +346,7 @@ class _FollowPill extends StatelessWidget {
     switch (style) {
       case _FollowPillStyle.mintFilled:
         bg = palette.accent;
-        textColor = palette.bg;
+        textColor = TreinoButtonTokens.ink;
         borderColor = palette.accent;
         break;
       case _FollowPillStyle.outlined:
@@ -340,17 +361,29 @@ class _FollowPill extends StatelessWidget {
         break;
     }
 
+    final text = Text(
+      label,
+      style: GoogleFonts.barlowCondensed(
+        fontWeight: FontWeight.w700,
+        fontSize: 13,
+        letterSpacing: 1.0,
+        color: textColor,
+      ),
+    );
+
     final pill = TreinoTappable(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        padding: compact
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
+            : const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: borderColor, width: 1),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: compact ? MainAxisSize.max : MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (busy) ...[
@@ -363,19 +396,16 @@ class _FollowPill extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-            ] else if (leadingIcon != null) ...[
+            ] else if (leadingIcon != null && !compact) ...[
               Icon(leadingIcon, size: 14, color: textColor),
               const SizedBox(width: 8),
             ],
-            Text(
-              label,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                letterSpacing: 1.0,
-                color: textColor,
-              ),
-            ),
+            // Compacto: el ancho lo manda la tarjeta, no el label. Sin el
+            // FittedBox, "SOLICITUD ENVIADA" desbordaría la fila.
+            if (compact)
+              Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: text))
+            else
+              text,
           ],
         ),
       ),

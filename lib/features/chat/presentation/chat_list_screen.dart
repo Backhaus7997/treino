@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/tokens.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -12,8 +13,17 @@ import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../../core/widgets/treino_toast.dart';
+import '../application/chat_contacts_providers.dart';
+import '../../../core/widgets/treino_confirm_dialog.dart';
 import '../application/chat_providers.dart'
-    show chatsForCurrentUserProvider, chatHasUnread;
+    show
+        archivedChatsProvider,
+        chatForOtherUidProvider,
+        chatHasUnread,
+        chatRepositoryProvider,
+        chatsForCurrentUserProvider,
+        inboxChatsProvider;
 import '../domain/chat.dart';
 
 /// Pantalla que lista todos los chats del usuario actual.
@@ -27,8 +37,10 @@ class ChatListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final chatsAsync = ref.watch(chatsForCurrentUserProvider);
+    final chatsAsync = ref.watch(inboxChatsProvider);
+    final archived = ref.watch(archivedChatsProvider).valueOrNull ?? const [];
     final currentUid = ref.watch(currentUidProvider);
+    final contactsAsync = ref.watch(chatContactsProvider);
 
     // Lo normal es que haya algo debajo: el header del Feed empuja la bandeja,
     // y una notificación de chat arma Feed → Mensajes → chat
@@ -81,27 +93,85 @@ class ChatListScreen extends ConsumerWidget {
         ),
         body: TreinoStateSwitcher(
           childKey: ValueKey(
-            chatsAsync.when(
-              data: (_) => 'data',
-              loading: () => 'loading',
-              error: (_, __) => 'error',
-            ),
+            archived.isEmpty ? _bodyState(chatsAsync, contactsAsync) : 'data',
           ),
           child: chatsAsync.when(
-            loading: () =>
-                Center(child: CircularProgressIndicator(color: palette.accent)),
+            loading: () => const _Loading(),
             error: (_, __) => _ErrorState(
               onRetry: () => ref.invalidate(chatsForCurrentUserProvider),
             ),
             data: (chats) {
-              if (chats.isEmpty) return const _EmptyState();
-              return ListView.separated(
+              final contacts = contactsAsync.valueOrNull ?? const [];
+              if (chats.isEmpty && archived.isEmpty) {
+                // Sin chats, la pantalla depende de los contactos: mientras
+                // cargan no se puede afirmar "no hay a quién escribirle".
+                if (contactsAsync.isLoading) return const _Loading();
+                if (contactsAsync.hasError) {
+                  return _ErrorState(
+                    onRetry: () => _invalidateContacts(ref),
+                  );
+                }
+                if (contacts.isEmpty) return const _EmptyState();
+              }
+              // Lista PLANA de entradas con un builder: sólo se montan las
+              // filas visibles. Cada fila escucha su perfil público, así que
+              // armarlas todas de una abría un listener por seguido y por
+              // chat al entrar a la pantalla.
+              final archivedOpen = ref.watch(_archivedOpenProvider);
+              final entries = <_Entry>[
+                if (archived.isNotEmpty) ...[
+                  _ArchivedHeaderEntry(archived.length),
+                  if (archivedOpen)
+                    for (final chat in archived)
+                      _ChatEntry(chat, archived: true),
+                ],
+                for (final chat in chats) _ChatEntry(chat),
+                if (contacts.isNotEmpty) ...[
+                  _HeaderEntry(l10n.chatContactsSectionTitle),
+                  for (final contact in contacts) _ContactEntry(contact),
+                ] else if (contactsAsync.hasError)
+                  _NoticeEntry(l10n.chatContactsError),
+              ];
+              return ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: chats.length,
-                separatorBuilder: (_, __) =>
-                    Divider(height: 1, color: palette.border, indent: 76),
-                itemBuilder: (_, i) =>
-                    _ChatRow(chat: chats[i], currentUid: currentUid ?? ''),
+                itemCount: entries.length,
+                itemBuilder: (_, i) {
+                  final entry = entries[i];
+                  // Divisor entre filas consecutivas del mismo tipo, igual
+                  // que el `separatorBuilder` de antes.
+                  final divided = i > 0 &&
+                      entries[i - 1].runtimeType == entry.runtimeType &&
+                      entry is! _HeaderEntry &&
+                      entry is! _ArchivedHeaderEntry;
+                  final Widget row = switch (entry) {
+                    _ChatEntry(:final chat, :final archived) => _ChatRow(
+                        chat: chat,
+                        currentUid: currentUid ?? '',
+                        archived: archived,
+                      ),
+                    _ArchivedHeaderEntry(:final count) =>
+                      _ArchivedHeader(count: count, open: archivedOpen),
+                    _ContactEntry(:final contact) =>
+                      _ContactRow(contact: contact),
+                    _HeaderEntry(:final label) => _SectionHeader(label: label),
+                    _NoticeEntry(:final text) => Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text(
+                          text,
+                          style: TextStyle(color: palette.textMuted),
+                        ),
+                      ),
+                  };
+                  if (!divided) return row;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Divider(height: 1, color: palette.border, indent: 76),
+                      row,
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -113,11 +183,51 @@ class ChatListScreen extends ConsumerWidget {
 
 // ── Private widgets ────────────────────────────────────────────────────────
 
+/// Una fila de la lista plana de [ChatListScreen].
+sealed class _Entry {
+  const _Entry();
+}
+
+final class _ChatEntry extends _Entry {
+  const _ChatEntry(this.chat, {this.archived = false});
+  final Chat chat;
+
+  /// Fila de Archivados: el long-press ofrece desarchivar.
+  final bool archived;
+}
+
+final class _ArchivedHeaderEntry extends _Entry {
+  const _ArchivedHeaderEntry(this.count);
+  final int count;
+}
+
+final class _ContactEntry extends _Entry {
+  const _ContactEntry(this.contact);
+  final ChatContact contact;
+}
+
+final class _HeaderEntry extends _Entry {
+  const _HeaderEntry(this.label);
+  final String label;
+}
+
+final class _NoticeEntry extends _Entry {
+  const _NoticeEntry(this.text);
+  final String text;
+}
+
 class _ChatRow extends ConsumerWidget {
-  const _ChatRow({required this.chat, required this.currentUid});
+  const _ChatRow({
+    required this.chat,
+    required this.currentUid,
+    this.archived = false,
+  });
 
   final Chat chat;
   final String currentUid;
+
+  /// Fila de la sección Archivados: el long-press ofrece desarchivar.
+  final bool archived;
 
   String _otherUidOf(Chat c, String selfUid) {
     return c.members.firstWhere((m) => m != selfUid, orElse: () => '');
@@ -132,6 +242,15 @@ class _ChatRow extends ConsumerWidget {
     final hasUnread = currentUid.isNotEmpty && chatHasUnread(chat, currentUid);
 
     return InkWell(
+      onLongPress: currentUid.isEmpty
+          ? null
+          : () => _showChatActions(
+                context,
+                ref,
+                chat: chat,
+                uid: currentUid,
+                archived: archived,
+              ),
       onTap: () {
         // Open the chat via the top-level go_router route so it renders
         // full-screen (no nav bar) with a proper background — the same route
@@ -211,6 +330,349 @@ class _ChatRow extends ConsumerWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+/// Qué rama del body se está pintando, para que [TreinoStateSwitcher] haga
+/// el fade sólo cuando cambia de verdad (no en cada emisión del stream).
+String _bodyState(
+  AsyncValue<List<Chat>> chats,
+  AsyncValue<List<ChatContact>> contacts,
+) {
+  if (chats.hasError) return 'error';
+  final list = chats.valueOrNull;
+  if (list == null) return 'loading';
+  if (list.isNotEmpty) return 'data';
+  if (contacts.hasError) return 'error';
+  final c = contacts.valueOrNull;
+  if (c == null) return 'loading';
+  return c.isEmpty ? 'empty' : 'data';
+}
+
+/// Acciones de un chat por long-press: mismo look que el menú de moderación
+/// (`showModerationMenu`), la otra acción por long-press de esta feature.
+///
+/// Las dos son POR USUARIO (`Chat.archivedAt` / `Chat.hiddenBefore`): no
+/// cambian nada de lo que ve el otro participante.
+Future<void> _showChatActions(
+  BuildContext context,
+  WidgetRef ref, {
+  required Chat chat,
+  required String uid,
+  required bool archived,
+}) async {
+  final palette = AppPalette.of(context);
+  final l10n = AppL10n.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final repo = ref.read(chatRepositoryProvider);
+
+  Future<void> run(
+    Future<void> Function() action, {
+    required String done,
+    Future<void> Function()? undo,
+  }) async {
+    try {
+      await action();
+      showTreinoToastOn(
+        messenger,
+        done,
+        type: TreinoToastType.success,
+        action: undo == null
+            ? null
+            : TreinoToastAction(
+                label: l10n.chatActionUndo,
+                onPressed: () => undo().catchError((Object _) {}),
+              ),
+      );
+    } catch (_) {
+      showTreinoToastOn(messenger, l10n.chatActionError,
+          type: TreinoToastType.error);
+    }
+  }
+
+  Widget tile({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool danger = false,
+  }) {
+    final color = danger ? palette.dangerText : palette.textPrimary;
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(
+        label,
+        style: GoogleFonts.barlow(
+          fontWeight: FontWeight.w400,
+          fontSize: AppTextSize.body,
+          color: color,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  await showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    backgroundColor: palette.bgCard,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          tile(
+            icon: TreinoIcon.archive,
+            label: archived ? l10n.chatActionUnarchive : l10n.chatActionArchive,
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              if (archived) {
+                run(
+                  () => repo.unarchive(chatId: chat.chatId, uid: uid),
+                  done: l10n.chatUnarchivedToast,
+                );
+              } else {
+                run(
+                  () => repo.archive(chatId: chat.chatId, uid: uid),
+                  done: l10n.chatArchivedToast,
+                  undo: () => repo.unarchive(chatId: chat.chatId, uid: uid),
+                );
+              }
+            },
+          ),
+          tile(
+            icon: TreinoIcon.trash,
+            label: l10n.chatActionDelete,
+            danger: true,
+            onTap: () async {
+              Navigator.of(sheetContext).pop();
+              final confirmed = await showTreinoConfirmDialog(
+                context,
+                title: l10n.chatDeleteConfirmTitle,
+                body: l10n.chatDeleteConfirmBody,
+                confirmLabel: l10n.commonDelete,
+              );
+              if (!confirmed) return;
+              await run(
+                () => repo.hideForUser(chatId: chat.chatId, uid: uid),
+                done: l10n.chatDeletedToast,
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Si «Archivados» está desplegada. Vive mientras la pantalla está montada.
+final _archivedOpenProvider = StateProvider.autoDispose<bool>((_) => false);
+
+/// Encabezado «Archivados · N», plegado por defecto: arriba de todo para que
+/// se encuentre, sin empujar la bandeja hacia abajo. Las filas archivadas son
+/// entradas más de la lista plana, así que también se arman de a una.
+class _ArchivedHeader extends ConsumerWidget {
+  const _ArchivedHeader({required this.count, required this.open});
+
+  final int count;
+  final bool open;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () =>
+              ref.read(_archivedOpenProvider.notifier).update((v) => !v),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 48,
+                  child: Icon(TreinoIcon.archive, color: palette.textMuted),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    l10n.chatArchivedSectionTitle(count),
+                    style: TextStyle(
+                      color: palette.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                Icon(
+                  open ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+                  color: palette.textMuted,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+        Divider(height: 1, color: palette.border),
+      ],
+    );
+  }
+}
+
+void _invalidateContacts(WidgetRef ref) {
+  ref
+    ..invalidate(chatContactLinksAsAthleteProvider)
+    ..invalidate(chatContactLinksAsTrainerProvider)
+    ..invalidate(chatContactFollowingProvider);
+}
+
+class _Loading extends StatelessWidget {
+  const _Loading();
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: CircularProgressIndicator(color: AppPalette.of(context).accent),
+      );
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: Text(
+        label.toUpperCase(),
+        style: GoogleFonts.barlowCondensed(
+          color: palette.textMuted,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+/// Fila de alguien a quien le podés escribir y todavía no tiene chat. El tap
+/// resuelve el chat con `getOrCreate` (lo crea si hace falta) y lo abre por la
+/// misma ruta que [_ChatRow].
+class _ContactRow extends ConsumerStatefulWidget {
+  const _ContactRow({required this.contact});
+
+  final ChatContact contact;
+
+  @override
+  ConsumerState<_ContactRow> createState() => _ContactRowState();
+}
+
+class _ContactRowState extends ConsumerState<_ContactRow> {
+  bool _opening = false;
+
+  Future<void> _open() async {
+    if (_opening) return;
+    // Router y messenger se capturan ANTES del await: la fila se va de la
+    // lista apenas el chat aparece en el stream, y su context muere con ella.
+    final router = GoRouter.maybeOf(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final errorText = AppL10n.of(context).chatContactOpenError;
+    final uid = widget.contact.uid;
+    setState(() => _opening = true);
+    try {
+      final chat = await ref.read(chatForOtherUidProvider(uid).future);
+      await router?.push('/coach/chat/${chat.chatId}?other=$uid');
+    } catch (_) {
+      showTreinoToastOn(messenger, errorText, type: TreinoToastType.error);
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final pubAsync = ref.watch(userPublicProfileProvider(widget.contact.uid));
+    final reason = switch (widget.contact.reason) {
+      ChatContactReason.coach => l10n.chatContactReasonCoach,
+      ChatContactReason.athlete => l10n.chatContactReasonAthlete,
+      ChatContactReason.following => l10n.chatContactReasonFollowing,
+    };
+
+    return pubAsync.when(
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: _RowSkeleton(palette: palette),
+      ),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: _RowSkeleton(palette: palette, shimmer: false),
+      ),
+      data: (pub) {
+        // Cuenta borrada: no hay a quién escribirle.
+        if (pub == null) return const SizedBox.shrink();
+        final name = pub.displayName ?? l10n.chatListDeletedUser;
+        return InkWell(
+          onTap: _open,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              children: [
+                PostAvatar(
+                  authorDisplayName: name,
+                  authorAvatarUrl: pub.avatarUrl,
+                  size: 48,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          color: palette.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        reason,
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _opening
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.accent,
+                        ),
+                      )
+                    : Icon(TreinoIcon.chat, color: palette.accent, size: 20),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

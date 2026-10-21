@@ -21,6 +21,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_shimmer.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -280,6 +283,16 @@ void main() {
       expect(find.text('CREAR RUTINA').hitTestable(), findsOneWidget);
     });
 
+    // #1514: el heading iba en `titleMedium` (Barlow regular).
+    testWidgets('#1514: MIS RUTINAS va en Barlow Condensed 700',
+        (tester) async {
+      await _pumpSection(tester);
+      await tester.pumpAndSettle();
+      final style = tester.widget<Text>(find.text('MIS RUTINAS')).style!;
+      expect(style.fontFamily, contains('BarlowCondensed'));
+      expect(style.fontWeight, FontWeight.w700);
+    });
+
     testWidgets('empty state renders motivational message + CTA enabled',
         (tester) async {
       await _pumpSection(tester);
@@ -513,7 +526,8 @@ void main() {
       expect(find.textContaining('máximo'), findsOneWidget);
     });
 
-    testWidgets('loading state renders a spinner', (tester) async {
+    testWidgets('loading state renders a skeleton, not a spinner',
+        (tester) async {
       final completer = Completer<List<Routine>>();
       await _pumpSection(
         tester,
@@ -524,10 +538,52 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(TreinoShimmer), findsOneWidget);
+      expect(find.byType(TreinoStateSwitcher), findsOneWidget);
 
       // Resolve to avoid resource leak warnings.
       completer.complete(const []);
+      await tester.pumpAndSettle();
+
+      // Tras resolver, el skeleton se reemplaza (cross-fade) por el estado
+      // vacío y ya no queda shimmer montado.
+      expect(find.byType(TreinoShimmer), findsNothing);
+    });
+
+    // Codex en #1601: los 3 skeletons miden más que un estado vacío; sin
+    // AnimatedSize lo de abajo subía de golpe al terminar el fundido.
+    testWidgets('al resolver a algo más bajo, la altura se achica de a poco',
+        (tester) async {
+      final completer = Completer<List<Routine>>();
+      await _pumpSection(
+        tester,
+        extraOverrides: [
+          assignedRoutinesProvider('athlete-1')
+              .overrideWith((ref) => completer.future),
+        ],
+      );
+      await tester.pump();
+      final size = find.byType(AnimatedSize);
+      final alto = tester.getSize(size).height;
+
+      completer.complete(const []);
+      // Frame a frame (16 ms) hasta que todo se asiente: ningún frame puede
+      // comerse más de la mitad de la diferencia total de alto.
+      final alturas = <double>[alto];
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        alturas.add(tester.getSize(size).height);
+      }
+      final fin = alturas.last;
+      expect(fin, lessThan(alto));
+      var mayorSalto = 0.0;
+      for (var i = 1; i < alturas.length; i++) {
+        final salto = alturas[i - 1] - alturas[i];
+        if (salto > mayorSalto) mayorSalto = salto;
+      }
+      expect(mayorSalto, lessThan((alto - fin) / 2),
+          reason: 'alturas por frame: $alturas');
     });
 
     testWidgets(
@@ -608,6 +664,19 @@ void main() {
         activeRoutineId: 'plan-1',
       );
       await tester.pumpAndSettle();
+
+      // La card usa TreinoTappable (press feedback), no un InkWell.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('routine_card_plan-1')),
+          matching: find.byType(AnimatedScale),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget(find.byKey(const Key('routine_card_plan-1'))),
+        isA<TreinoTappable>(),
+      );
 
       await tester.tap(find.byKey(const Key('routine_card_plan-1')));
       await tester.pumpAndSettle();

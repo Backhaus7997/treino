@@ -337,7 +337,14 @@ class _NotificationItem extends ConsumerWidget {
       button: true,
       label: semanticsLabel,
       child: TreinoTappable(
-        onTap: () => goDeepLink(context, notification.deepLink),
+        // `sobreLaPilaActual`: desde acá el chat se apila sobre la lista, así
+        // «atrás» vuelve a Notificaciones (#1468). El stack Feed → Mensajes es
+        // sólo para el push en frío.
+        onTap: () => goDeepLink(
+          context,
+          notification.deepLink,
+          sobreLaPilaActual: true,
+        ),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -438,7 +445,7 @@ class _NotificationError extends StatelessWidget {
           const SizedBox(height: 12),
           TextButton(
             onPressed: onRetry,
-            style: TextButton.styleFrom(foregroundColor: palette.accent),
+            style: TextButton.styleFrom(foregroundColor: palette.accentText),
             child: Text(l10n.coachRetryLabel),
           ),
         ],

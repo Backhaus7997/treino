@@ -8,6 +8,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../coach/application/trainer_link_providers.dart';
@@ -38,6 +39,7 @@ import 'widgets/esta_semana_card.dart';
 import 'widgets/home_cta_button.dart';
 import 'widgets/home_header.dart';
 import '../coach/presentation/widgets/invite_gate.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Role-aware home screen.
 ///
@@ -125,17 +127,29 @@ class _AthleteHome extends ConsumerWidget {
     // so PublicProfileScreen's back affordance — `canPop() ? pop() : go('/feed')`
     // — pops back to Home instead of falling through to the feed. The
     // `/home/profile/:uid` twin keeps INICIO highlighted (see router.dart).
-    final Widget headerOrSkeleton = profileAsync.when(
-      data: (profile) => HomeHeader(
-        profile: profile,
-        accion: const NotificationBell(),
-        onAvatarTap: profile == null
-            ? null
-            : () => context.push('/home/profile/${profile.uid}'),
+    // TreinoStateSwitcher: skeleton → header con cross-fade, sin salto. Keys
+    // distintas por estado; `skipLoadingOnReload` evita volver al skeleton (y
+    // re-fadear) cuando el perfil se recarga con un dato ya en pantalla.
+    final Widget headerOrSkeleton = TreinoStateSwitcher(
+      child: profileAsync.when(
+        skipLoadingOnReload: true,
+        data: (profile) => HomeHeader(
+          key: const ValueKey('home_header_data'),
+          profile: profile,
+          accion: const NotificationBell(),
+          onAvatarTap: profile == null
+              ? null
+              : () => context.push('/home/profile/${profile.uid}'),
+        ),
+        loading: () => const _HomeHeaderSkeleton(
+          key: ValueKey('home_header_loading'),
+        ),
+        error: (_, __) => const HomeHeader(
+          key: ValueKey('home_header_error'),
+          profile: null,
+          accion: NotificationBell(),
+        ),
       ),
-      loading: () => const _HomeHeaderSkeleton(),
-      error: (_, __) =>
-          const HomeHeader(profile: null, accion: NotificationBell()),
     );
 
     // Gate the hero "Empezar" card behind real routine data so a brand-new
@@ -198,9 +212,18 @@ class _AthleteHome extends ConsumerWidget {
             const SizedBox(height: 20),
             TreinoFadeSlideIn(
               delay: AppMotion.stagger(1),
-              child: hasNoRoutine
-                  ? _AthleteFirstRunCard(estadoDelVinculo: estadoDelVinculo)
-                  : const EmpezarEntrenamientoCard(),
+              // Cross-fade entre la card de primer arranque y la de empezar:
+              // pasa de una a otra cuando las consultas de rutinas resuelven.
+              child: TreinoStateSwitcher(
+                child: hasNoRoutine
+                    ? _AthleteFirstRunCard(
+                        key: const ValueKey('home_hero_first_run'),
+                        estadoDelVinculo: estadoDelVinculo,
+                      )
+                    : const EmpezarEntrenamientoCard(
+                        key: ValueKey('home_hero_empezar'),
+                      ),
+              ),
             ),
             const SizedBox(height: 12),
             TreinoFadeSlideIn(
@@ -329,7 +352,7 @@ _EstadoDelVinculo _estadoDelVinculo(AsyncValue<TrainerLink?> async) {
 /// no tiene ninguno. Ocultar un botón y afirmar un hecho son decisiones
 /// distintas — ver [_EstadoDelVinculo].
 class _AthleteFirstRunCard extends StatelessWidget {
-  const _AthleteFirstRunCard({required this.estadoDelVinculo});
+  const _AthleteFirstRunCard({super.key, required this.estadoDelVinculo});
 
   /// Lo que se sabe del vínculo con un PF. Ver [_estadoDelVinculo].
   final _EstadoDelVinculo estadoDelVinculo;
@@ -579,10 +602,10 @@ Widget _resumeModal(
           Navigator.of(dialogCtx, rootNavigator: true).pop();
         }
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppL10n.of(context).workoutDiscardError),
-            ),
+          showTreinoToast(
+            context,
+            AppL10n.of(context).workoutDiscardError,
+            type: TreinoToastType.error,
           );
         }
         return;
@@ -615,7 +638,7 @@ double _sumVolume(List<SetLog> logs) =>
 /// Private placeholder that occupies the same 56 px height as [HomeHeader]
 /// during [AsyncLoading], preventing a layout jump (REQ-HOME-PROVIDER-003).
 class _HomeHeaderSkeleton extends StatelessWidget {
-  const _HomeHeaderSkeleton();
+  const _HomeHeaderSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {

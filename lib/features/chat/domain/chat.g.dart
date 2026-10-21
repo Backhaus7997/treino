@@ -21,6 +21,12 @@ _$ChatImpl _$$ChatImplFromJson(Map<String, dynamic> json) => _$ChatImpl(
               json['lastRead'], const TimestampMapConverter().fromJson),
       linkId: json['linkId'] as String?,
       kind: json['kind'] as String?,
+      archivedAt:
+          _$JsonConverterFromJson<Map<String, Object?>, Map<String, DateTime>>(
+              json['archivedAt'], const TimestampMapConverter().fromJson),
+      hiddenBefore:
+          _$JsonConverterFromJson<Map<String, Object?>, Map<String, DateTime>>(
+              json['hiddenBefore'], const TimestampMapConverter().fromJson),
     );
 
 Map<String, dynamic> _$$ChatImplToJson(_$ChatImpl instance) =>
@@ -37,6 +43,12 @@ Map<String, dynamic> _$$ChatImplToJson(_$ChatImpl instance) =>
               instance.lastRead, const TimestampMapConverter().toJson),
       'linkId': instance.linkId,
       'kind': instance.kind,
+      'archivedAt':
+          _$JsonConverterToJson<Map<String, Object?>, Map<String, DateTime>>(
+              instance.archivedAt, const TimestampMapConverter().toJson),
+      'hiddenBefore':
+          _$JsonConverterToJson<Map<String, Object?>, Map<String, DateTime>>(
+              instance.hiddenBefore, const TimestampMapConverter().toJson),
     };
 
 Value? _$JsonConverterFromJson<Json, Value>(

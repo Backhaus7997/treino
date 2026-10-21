@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart' show AppSpacing;
@@ -34,10 +35,18 @@ import '../../../../l10n/app_l10n.dart';
 /// el CTA de consulta: preguntarle a un entrenador no es cambiarse de
 /// entrenador.
 class TrainerContactCtaStub extends ConsumerStatefulWidget {
-  const TrainerContactCtaStub({super.key, required this.trainerId});
+  const TrainerContactCtaStub({
+    super.key,
+    required this.trainerId,
+    this.preview = false,
+  });
 
   /// uid del PF a quien se le pide el vínculo.
   final String trainerId;
+
+  /// Vista previa del propio PF (#1498): el botón se ve pero no actúa. Nadie
+  /// se pide vínculo a sí mismo (`_onPressed` ya lo corta en silencio).
+  final bool preview;
 
   @override
   ConsumerState<TrainerContactCtaStub> createState() =>
@@ -65,17 +74,18 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
       ref.invalidate(currentAthleteLinkProvider);
       ref.invalidate(currentAthleteLinkAnyStatusProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Solicitud enviada. Te avisamos cuando el PF responda.'),
-          ),
+        showTreinoToast(
+          context,
+          'Solicitud enviada. Te avisamos cuando el PF responda.',
+          type: TreinoToastType.success,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No pudimos enviar la solicitud: $e')),
+        showTreinoToast(
+          context,
+          'No pudimos enviar la solicitud: $e',
+          type: TreinoToastType.error,
         );
       }
     } finally {
@@ -99,7 +109,10 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
     final hasActiveOrPending = existingLink != null &&
         (existingLink.status == TrainerLinkStatus.pending ||
             existingLink.status == TrainerLinkStatus.active);
-    final disabled = _submitting || !linkAsync.hasValue || hasActiveOrPending;
+    final disabled = widget.preview ||
+        _submitting ||
+        !linkAsync.hasValue ||
+        hasActiveOrPending;
 
     // El atleta está bloqueado porque ya tiene un vínculo con OTRO PF: no
     // dejamos un botón disabled sin explicación. Mostramos una línea de ayuda
@@ -115,7 +128,7 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
     final button = OutlinedButton(
       onPressed: disabled ? null : _onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: palette.accent,
+        foregroundColor: palette.accentText,
         side: BorderSide(
           color: disabled ? palette.border : palette.accent,
         ),

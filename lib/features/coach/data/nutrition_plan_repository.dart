@@ -2,14 +2,16 @@ import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/utils/firestore_snapshots.dart';
 import '../../../core/utils/firestore_write.dart';
 import '../domain/nutrition_plan.dart';
 
-/// Repository of PF-authored nutrition plans (Coach Hub web).
+/// Repository of PF-authored nutrition plans.
 ///
 /// - Firestore doc at `nutrition_plans/{trainerId}_{athleteId}`. Single plan
 ///   per pair — every save overwrites the previous version.
-/// - Trainer-only in rules (see `firestore.rules`).
+/// - Only the PF writes; the PF and the athlete of the pair read (see
+///   `firestore.rules`). The athlete's app reads it read-only.
 /// - No composite index needed (queried by doc id).
 class NutritionPlanRepository {
   NutritionPlanRepository({required FirebaseFirestore firestore})
@@ -23,16 +25,27 @@ class NutritionPlanRepository {
   String _docId(String trainerId, String athleteId) =>
       '${trainerId}_$athleteId';
 
-  /// Watch reactivo del plan del par PF↔alumno. Emite `null` cuando el doc
-  /// no existe todavía.
+  /// Watch reactivo del plan del par PF↔alumno.
+  ///
+  /// Emite `null` sólo cuando el SERVIDOR confirma que el doc no existe
+  /// (#1581): con la caché fría la primera snapshot llega vacía y desde la
+  /// caché, y eso es «todavía no sé». Emitirla como `null` arrancaba los
+  /// editores de los presets con GUARDAR habilitado, y un guardado pisaba el
+  /// plan real. Ver `snapshotsSinCacheVacia`. `distinct()` porque con
+  /// `includeMetadataChanges` también llegan las snapshots que sólo cambian la
+  /// metadata.
+  ///
+  /// Un doc que existe y no parsea emite [NutritionPlanIlegible], no `null`.
   Stream<NutritionPlan?> watch(String trainerId, String athleteId) {
     return _collection
         .doc(_docId(trainerId, athleteId))
-        .snapshots()
-        .map(_fromDoc);
+        .snapshotsSinCacheVacia()
+        .map(_fromDoc)
+        .distinct();
   }
 
-  /// One-shot fetch. Devuelve `null` si no existe.
+  /// One-shot fetch. Devuelve `null` si no existe; un doc que no parsea tira
+  /// [NutritionPlanIlegible].
   Future<NutritionPlan?> get(String trainerId, String athleteId) async {
     final snap = await _collection.doc(_docId(trainerId, athleteId)).get();
     return _fromDoc(snap);
@@ -62,7 +75,24 @@ class NutritionPlanRepository {
         error: e,
         stackTrace: st,
       );
-      return null;
+      // NO `null`: el doc existe. Ver [NutritionPlanIlegible].
+      Error.throwWithStackTrace(NutritionPlanIlegible(snap.id, e), st);
     }
   }
+}
+
+/// El doc del plan existe pero no se pudo leer como [NutritionPlan] (#1581).
+///
+/// Es un error y no un `null` a propósito: `null` significa «el alumno no
+/// tiene plan», y con eso los editores arrancan de los presets con GUARDAR
+/// habilitado — un guardado ahí pisa el plan que existe y no se pudo leer.
+/// Como error, cada pantalla cae en su estado de «no pudimos cargar».
+class NutritionPlanIlegible implements Exception {
+  const NutritionPlanIlegible(this.docId, this.cause);
+
+  final String docId;
+  final Object cause;
+
+  @override
+  String toString() => 'NutritionPlanIlegible($docId): $cause';
 }

@@ -175,7 +175,7 @@ class _DurationTextFieldState extends State<DurationTextField> {
             style: GoogleFonts.barlow(
               fontSize: esCampoAncho ? 16 : 17,
               fontWeight: FontWeight.w600,
-              color: widget.hasError ? palette.danger : palette.textPrimary,
+              color: widget.hasError ? palette.dangerText : palette.textPrimary,
             ),
             decoration: setCellDecoration(
               palette: palette,

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, FirebaseFirestore;
 
+import '../../../core/utils/firestore_snapshots.dart';
 import '../domain/trainer_public_profile.dart';
 import '../domain/trainer_specialty.dart';
 
@@ -113,6 +114,33 @@ class TrainerPublicProfileRepository {
     if (!snap.exists || data == null) return null;
     return TrainerPublicProfile.fromJson(data);
   }
+
+  /// Igual que [getById] pero EN VIVO: emite cada vez que el documento cambia.
+  ///
+  /// Existe para quien mira el perfil público de un PF que él mismo edita (la
+  /// vista previa del PF, #1498). Una lectura puntual se queda con lo que había
+  /// al abrir —o con lo que el SDK tenía en caché— y no se entera del guardado:
+  /// el PF cargaba un dato y la vista previa seguía mostrando el viejo hasta
+  /// reiniciar la app. Un listener, en cambio, ve de inmediato su propia
+  /// escritura local y después la confirmación del servidor.
+  ///
+  /// Emite `null` cuando el documento no existe, pero SÓLO si lo confirmó el
+  /// servidor: con la caché fría la primera snapshot de un doc que no está
+  /// llega vacía antes de que conteste el servidor, y mostrarla como un hecho
+  /// pintaría «perfil no encontrado» en un PF que sí tiene perfil (ver
+  /// [snapshotsSinCacheVacia]).
+  ///
+  /// NO filtra `hiddenFromDiscovery`, igual que [getById].
+  Stream<TrainerPublicProfile?> watchById(String uid) =>
+      _col.doc(uid).snapshotsSinCacheVacia().map((snap) {
+        final data = snap.data();
+        if (!snap.exists || data == null) return null;
+        return TrainerPublicProfile.fromJson(data);
+      })
+          // `includeMetadataChanges` también emite los cambios que sólo tocan la
+          // metadata (`hasPendingWrites`, `isFromCache`): con los mismos datos no
+          // hay nada que repintar.
+          .distinct();
 
   /// Multi-location query (Fase 6 Etapa 0).
   ///

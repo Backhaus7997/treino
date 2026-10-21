@@ -8,6 +8,7 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 import 'keep_students_screen.dart';
 import 'plan_limit_paywall.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Pantalla PREVIEW de dev/smoke para las pantallas del paywall que se
 /// disparan desde el backend (PR4/PR5), que aún no existe. Sin item de
@@ -136,8 +137,10 @@ class KeepStudentsPreview extends StatelessWidget {
       students: students,
       initialSelection: const {'a1', 'a2'}, // default: 2 más recientes
       onConfirm: (kept) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Preview: conservás ${kept.join(", ")}')),
+        showTreinoToast(
+          context,
+          'Preview: conservás ${kept.join(", ")}',
+          type: TreinoToastType.info,
         );
       },
     );

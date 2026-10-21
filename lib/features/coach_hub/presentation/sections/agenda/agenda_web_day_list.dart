@@ -15,7 +15,6 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
-import '../../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
@@ -31,6 +30,7 @@ import 'batch_cobrar_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ─── AgendaWebDayList ─────────────────────────────────────────────────────────
 
@@ -146,23 +146,12 @@ class _AgendaWebDayListState extends ConsumerState<AgendaWebDayList> {
       // (appointment_detail_dialog.dart): el cobro de 1 turno mostraba el
       // check, el cobro en lote (mismo string "Turno cobrado.") no —
       // misma acción, feedback distinto sin razón.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  selected.length == 1
-                      ? 'Turno cobrado.' // i18n
-                      : '${selected.length} turnos cobrados.', // i18n
-                ),
-              ),
-            ],
-          ),
-        ),
+      showTreinoToast(
+        context,
+        selected.length == 1
+            ? 'Turno cobrado.' // i18n
+            : '${selected.length} turnos cobrados.', // i18n
+        type: TreinoToastType.success,
       );
     }
   }

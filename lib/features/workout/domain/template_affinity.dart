@@ -1,20 +1,38 @@
 import 'muscle_group.dart';
 import 'routine.dart';
+import 'routine_day_duration.dart';
 import 'template_preferences.dart';
+import 'template_search.dart';
 
 /// Afinidad entre una plantilla y lo que el atleta respondió en el
 /// mini-onboarding de PLANTILLAS (#635 PR#3).
 ///
-/// ## Ordena, NUNCA excluye
+/// ## Todo lo que el atleta elige FILTRA
 ///
-/// El catálogo del sistema son 7 plantillas. Cruzar cuatro dimensiones sobre 7
-/// ítems da vacío en la mayoría de las combinaciones: *2 días · 30 min ·
-/// deporte · tren superior* no matchea ninguna, porque el mínimo del catálogo
-/// son 3 días y 45 minutos. Un filtro duro dejaría la grilla en cero y el
-/// atleta sin saber por qué.
+/// Decisión de producto (owner, 2026-10, #1561 y después): cada respuesta del
+/// cuestionario es filtro duro, y la grilla muestra SÓLO lo que cumple todas a
+/// la vez (más el nivel y el texto). Antes objetivo y zonas sólo ordenaban y
+/// los minutos tenían ±15: con "30 min" aparecían plantillas de 45.
 ///
-/// Por eso esto devuelve un puntaje para ORDENAR. Toda plantilla sigue
-/// visible; lo que cambia es cuál se ve primero.
+///   * Días por semana: coincidencia EXACTA con `days.length`.
+///   * Minutos: "tengo hasta X" → la plantilla dura X o menos ([minutesOf]).
+///     `75` es "75 o más": con 75+ minutos entra cualquiera, así que no filtra.
+///   * Objetivo: la plantilla declara AL MENOS uno de los elegidos.
+///   * Zonas: la plantilla dedica al menos [TemplateSearch.minMuscleShare] de
+///     sus ejercicios a AL MENOS una de las elegidas — la misma vara que usa
+///     la búsqueda por músculo, para que "trabaja glúteos" signifique lo mismo
+///     al buscar y al filtrar.
+///   * Sin dato NO pasa: si la plantilla no declara objetivos, días o
+///     ejercicios, no se puede afirmar que cumpla, y el atleta pidió ver sólo
+///     lo que cumple. (Antes "sin dato" pasaba siempre.)
+///
+/// Cruzar cuatro dimensiones puede vaciar la grilla; el estado vacío de
+/// PlantillasTab nombra la que la vació y ofrece "Ver todas", que levanta las
+/// cuatro ([matchesHardFilters]).
+///
+/// El filtro lo aplica `filteredUnifiedTemplatesProvider`; lo que sobrevive se
+/// ordena con [score], que sigue premiando más coincidencias dentro de lo que
+/// ya pasó.
 ///
 /// ## "Sin dato" es NEUTRO, y esa es la decisión central
 ///
@@ -49,6 +67,100 @@ abstract final class TemplateAffinity {
   /// Puntaje de una dimensión sin dato suficiente para opinar.
   static const double neutral = 0.5;
 
+  /// True si las preferencias traen algo que FILTRA: cualquier respuesta del
+  /// cuestionario salvo "75 o más", que no excluye nada.
+  static bool hasHardFilters(TemplatePreferences preferences) =>
+      (preferences.daysPerWeek ?? 0) > 0 ||
+      _minutesCap(preferences) != null ||
+      preferences.goals.isNotEmpty ||
+      preferences.priorityGroups.isNotEmpty;
+
+  /// Filtro duro: ¿la plantilla cumple TODO lo elegido? Las cuatro reglas
+  /// están separadas para que el estado vacío pueda culpar a la correcta.
+  static bool matchesHardFilters(
+    Routine routine,
+    TemplatePreferences preferences,
+  ) =>
+      matchesDays(routine, preferences) &&
+      matchesMinutes(routine, preferences) &&
+      matchesGoals(routine, preferences) &&
+      matchesZones(routine, preferences);
+
+  /// Días: `days.length == daysPerWeek`. Sin preferencia de días ⇒ pasa.
+  static bool matchesDays(Routine routine, TemplatePreferences preferences) {
+    final wanted = preferences.daysPerWeek;
+    if (wanted == null || wanted <= 0) return true;
+    return routine.days.length == wanted;
+  }
+
+  /// Minutos, "tengo hasta X": [minutesOf] ≤ X. Con "75 o más" o sin
+  /// preferencia ⇒ pasa. Sin duración estimable ⇒ no pasa.
+  static bool matchesMinutes(
+    Routine routine,
+    TemplatePreferences preferences,
+  ) {
+    final cap = _minutesCap(preferences);
+    if (cap == null) return true;
+    final minutes = minutesOf(routine);
+    return minutes != null && minutes <= cap;
+  }
+
+  /// Objetivo: la plantilla declara al menos uno de los elegidos. Sin
+  /// objetivos elegidos ⇒ pasa.
+  static bool matchesGoals(Routine routine, TemplatePreferences preferences) {
+    final wanted = preferences.goals;
+    if (wanted.isEmpty) return true;
+    return routine.goals.any(wanted.contains);
+  }
+
+  /// Zonas: al menos una de las elegidas ocupa ≥
+  /// [TemplateSearch.minMuscleShare] de los ejercicios (sobre TODOS los
+  /// slots, como la búsqueda). Sin zonas elegidas ⇒ pasa.
+  static bool matchesZones(Routine routine, TemplatePreferences preferences) {
+    final wanted = preferences.priorityGroups;
+    if (wanted.isEmpty) return true;
+    var total = 0;
+    final counts = <MuscleGroup, int>{};
+    for (final day in routine.days) {
+      for (final slot in day.slots) {
+        total++;
+        final group = MuscleGroup.fromKey(slot.muscleGroup);
+        if (group != null) counts[group] = (counts[group] ?? 0) + 1;
+      }
+    }
+    if (total == 0) return false;
+    return wanted.any(
+      (z) => (counts[z] ?? 0) / total >= TemplateSearch.minMuscleShare,
+    );
+  }
+
+  /// Tope de minutos en efecto, o `null` si no hay ("75 o más" o sin
+  /// respuesta).
+  static int? _minutesCap(TemplatePreferences preferences) {
+    final wanted = preferences.minutesPerSession;
+    if (wanted == null || wanted <= 0 || isOpenEndedMinutes(wanted)) {
+      return null;
+    }
+    return wanted;
+  }
+
+  /// Minutos por sesión de [routine] con los que se filtra y se ordena: el
+  /// `estimatedMinutesPerDay` cargado y, si no hay, la estimación de sus
+  /// series ([estimateRoutineSessionMinutes], #1562). Las plantillas de
+  /// comunidad/PF casi nunca traen el campo; sin este respaldo el filtro de
+  /// minutos no las tocaba nunca. `null` sólo si no hay nada que estimar.
+  static int? minutesOf(Routine routine) {
+    final minutes = estimateRoutineSessionMinutes(routine).minutes;
+    return (minutes == null || minutes <= 0) ? null : minutes;
+  }
+
+  /// True si [minutes] es la opción "75 MIN O MÁS" del cuestionario, que no
+  /// tiene techo.
+  static bool isOpenEndedMinutes(int minutes) => minutes >= _minutosOMas;
+
+  /// Valor de la opción "75 MIN O MÁS" del cuestionario.
+  static const int _minutosOMas = 75;
+
   /// Afinidad total en `[0, 1]`. Más alto = se muestra antes.
   ///
   /// Con preferencias vacías todas las plantillas dan [neutral], así que el
@@ -79,8 +191,8 @@ abstract final class TemplateAffinity {
     return gap >= 3 ? 0 : 1 - (gap / 3);
   }
 
-  /// Minutos por sesión. Nullable en el modelo, así que la ausencia es
-  /// esperable y neutra.
+  /// Minutos por sesión, de [minutesOf] (cargados o estimados de las series).
+  /// Sin nada que estimar la ausencia es esperable y neutra.
   ///
   /// La tolerancia asimétrica es a propósito: **pasarse de tiempo penaliza más
   /// que sobrar**. Quien dice "tengo 30 minutos" tiene 30; una sesión de 60 no
@@ -88,9 +200,15 @@ abstract final class TemplateAffinity {
   /// termina antes.
   static double _minutesScore(Routine routine, int? wanted) {
     if (wanted == null || wanted <= 0) return neutral;
-    final minutes = routine.estimatedMinutesPerDay;
-    if (minutes == null || minutes <= 0) return neutral;
+    // Misma fuente que el filtro ([minutesOf]): ordenar con un dato y filtrar
+    // con otro dejaría arriba una plantilla que el filtro debió sacar.
+    final minutes = minutesOf(routine);
+    if (minutes == null) return neutral;
     final diff = minutes - wanted;
+    // "75 o más" no tiene techo, igual que en [matchesMinutes]: pasarse no es
+    // desajuste. Sin esto el filtro dejaba entrar una de 100 min y el orden
+    // la hundía debajo de una de 70.
+    if (diff >= 0 && isOpenEndedMinutes(wanted)) return 1;
     // 20 min de margen cuando la sesión es más corta, 10 cuando es más larga.
     final tolerance = diff <= 0 ? 20 : 10;
     final gap = diff.abs() / tolerance;

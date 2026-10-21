@@ -15,17 +15,25 @@ enum NutricionFiltro { todos, conPlan, sinPlan }
 
 /// Una fila del overview: el [TrainerLink] activo con el alumno más el
 /// estado de su [NutritionPlan] (`null` si todavía no tiene uno armado, o
-/// mientras el stream sigue en [planLoading]).
+/// mientras el stream sigue en [planLoading], o si [planError]).
+///
+/// [planError]: la lectura falló y no hay un valor previo — por ejemplo un doc
+/// que existe y no parsea (`NutritionPlanIlegible`, #1581). Es «no sé», no
+/// «no tiene plan»: contarlo como «Sin plan» le decía al PF que le faltaba un
+/// plan que el alumno tiene.
 typedef NutricionEntry = ({
   TrainerLink link,
   NutritionPlan? plan,
   bool planLoading,
+  bool planError,
 });
 
 /// Predicado puro — determina si [entry] pertenece a [filtro]:
 /// - Todos: siempre `true`.
 /// - Con plan: `entry.plan != null`.
 /// - Sin plan: `entry.plan == null`.
+/// - Con [NutricionEntry.planError] no entra en ninguno de los dos (#1581),
+///   igual que mientras carga.
 ///
 /// Mientras `entry.planLoading` es `true`, `entry.plan` todavía es `null`
 /// (el stream no resolvió su primer valor) — por diseño esto excluye la
@@ -37,8 +45,10 @@ typedef NutricionEntry = ({
 bool matchesNutricionFiltro(NutricionEntry entry, NutricionFiltro filtro) =>
     switch (filtro) {
       NutricionFiltro.todos => true,
-      NutricionFiltro.conPlan => !entry.planLoading && entry.plan != null,
-      NutricionFiltro.sinPlan => !entry.planLoading && entry.plan == null,
+      NutricionFiltro.conPlan =>
+        !entry.planLoading && !entry.planError && entry.plan != null,
+      NutricionFiltro.sinPlan =>
+        !entry.planLoading && !entry.planError && entry.plan == null,
     };
 
 /// Overview cross-alumno de Nutrición: combina los vínculos `active` del PF
@@ -74,6 +84,9 @@ final nutricionEntriesProvider =
         link: l,
         plan: planAsync.valueOrNull,
         planLoading: planAsync.isLoading,
+        // hasValue-first, como el resto del archivo: un error con un plan ya
+        // leído sigue mostrando ese plan.
+        planError: !planAsync.hasValue && planAsync.hasError,
       );
     }
 

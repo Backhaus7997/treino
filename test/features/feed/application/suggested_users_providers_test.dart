@@ -114,6 +114,20 @@ void main() {
     expect(result.map((profile) => profile.uid), ['available']);
   });
 
+  test('no sugiere cuentas internas (hiddenFromDiscovery)', () async {
+    await seedProfile(uid: 'soporte');
+    await firestore
+        .collection('userPublicProfiles')
+        .doc('soporte')
+        .update({'hiddenFromDiscovery': true});
+    await seedProfile(uid: 'available');
+
+    final result =
+        await buildContainer().read(suggestedUsersProvider('gym-a').future);
+
+    expect(result.map((profile) => profile.uid), ['available']);
+  });
+
   test('excludes the current user from same-gym suggestions', () async {
     await seedProfile(uid: 'me');
     await seedProfile(uid: 'candidate');

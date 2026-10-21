@@ -31,6 +31,7 @@ import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
 import '../features/coach/presentation/trainer_dashboard_tab.dart'
     show RecentActivityScreen;
+import '../features/coach/presentation/trainer_nutrition_plan_editor_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -86,6 +87,7 @@ import '../features/profile_setup/presentation/birth_date_gate_screen.dart';
 import '../features/profile_setup/domain/profile_setup_validators.dart';
 import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
+import '../core/widgets/motion/treino_tab_fade_in.dart';
 import 'theme/app_background.dart';
 import 'theme/app_motion.dart';
 import '../features/coach/application/pending_invite_providers.dart';
@@ -459,18 +461,25 @@ GoRouter buildRouter({
         path: '/welcome',
         pageBuilder: (_, __) => _noAnim(const WelcomeScreen()),
       ),
-      // Auth routes — full screen, NO bottom bar
+      // Auth routes — full screen, NO bottom bar.
+      //
+      // `builder` (no `pageBuilder` + `_noAnim`): se llega siempre con `push`
+      // (bienvenida → login → registro / olvidé la contraseña), así que tienen
+      // que comportarse como cualquier pantalla apilada. En iOS eso es
+      // CupertinoPageRoute: slide nativo y deslizar desde el borde izquierdo
+      // para volver. Con `_noAnim` el gesto no existía y la única salida era
+      // la flecha.
       GoRoute(
         path: '/login',
-        pageBuilder: (_, __) => _noAnim(const LoginScreen()),
+        builder: (_, __) => const LoginScreen(),
       ),
       GoRoute(
         path: '/register',
-        pageBuilder: (_, __) => _noAnim(const RegisterScreen()),
+        builder: (_, __) => const RegisterScreen(),
       ),
       GoRoute(
         path: '/forgot-password',
-        pageBuilder: (_, __) => _noAnim(const ForgotPasswordScreen()),
+        builder: (_, __) => const ForgotPasswordScreen(),
       ),
 
       // ProfileSetup — fullscreen post-signup flow. No bottom bar.
@@ -665,19 +674,18 @@ GoRouter buildRouter({
         builder: (_, __) => _withBg(const ChatListScreen()),
       ),
       GoRoute(
-        // Trainer custom exercise library — list + create/edit form. Both are
-        // bare Columns (no Scaffold of their own) → wrap in _immersive.
-        path: '/profile/my-exercises',
-        builder: (_, __) => _immersive(const MyExercisesScreen()),
-        routes: [
-          GoRoute(
-            path: ':exId',
-            builder: (context, state) {
-              final exId = state.pathParameters['exId'];
-              return _immersive(CustomExerciseEditorScreen(exerciseId: exId));
-            },
-          ),
-        ],
+        // Editor de un ejercicio propio (crear = `new`, editar = `:exId`).
+        // Es un formulario con CTA fijo al pie y confirmación de descarte, así
+        // que sigue inmersivo (sin nav bar) y fuera del shell — bare Column sin
+        // Scaffold → _immersive. La LISTA (`/profile/my-exercises`) vive en el
+        // shell, con el resto de las subpantallas de Perfil (#1502): se empuja
+        // a esta ruta out-of-shell desde la lista, que es el sentido seguro
+        // (el inverso es el que aterriza en blanco, #399/#410).
+        path: '/profile/my-exercises/:exId',
+        builder: (context, state) {
+          final exId = state.pathParameters['exId'];
+          return _immersive(CustomExerciseEditorScreen(exerciseId: exId));
+        },
       ),
 
       GoRoute(
@@ -696,11 +704,13 @@ GoRouter buildRouter({
 
       GoRoute(
         // Athlete detail (coach) — full-screen, MENSAJE/CREAR PLAN sit at the
-        // bottom with no nav bar. Bare Column (no Scaffold) → wrap in _immersive.
+        // bottom with no nav bar. Trae su propio Scaffold (no `_immersive`).
         path: '/coach/athlete/:athleteId',
         builder: (context, state) {
           final athleteId = state.pathParameters['athleteId']!;
-          return _immersive(AthleteDetailScreen(athleteId: athleteId));
+          // Scaffold propio: los botones van en su bottomNavigationBar para
+          // que los SnackBar no los tapen (#1484).
+          return AthleteDetailScreen(athleteId: athleteId);
         },
       ),
       GoRoute(
@@ -715,7 +725,7 @@ GoRouter buildRouter({
         builder: (context, state) {
           final athleteId = state.pathParameters['athleteId']!;
           final routineId = state.pathParameters['routineId']!;
-          return _immersive(RoutineDetailScreen(
+          return _immersiveEdgeToEdge(RoutineDetailScreen(
             routineId: routineId,
             coachAthleteId: athleteId,
           ));
@@ -740,6 +750,17 @@ GoRouter buildRouter({
           state.pageKey,
           SessionHistoryScreen(
             coachAthleteId: state.pathParameters['athleteId']!,
+          ),
+        ),
+      ),
+      GoRoute(
+        // Editor mobile del plan nutricional del alumno, para el PF (#1538).
+        // Top-level como su origen `/coach/athlete/:id` (#399, #410). Pantalla
+        // sin Scaffold propio → `_immersive`, como la ficha.
+        path: '/coach/athlete/:athleteId/nutricion',
+        builder: (_, state) => _immersive(
+          TrainerNutritionPlanEditorScreen(
+            athleteId: state.pathParameters['athleteId']!,
           ),
         ),
       ),
@@ -784,7 +805,7 @@ GoRouter buildRouter({
           final exerciseId = state.pathParameters['exerciseId']!;
           final ownerId = state.uri.queryParameters['ownerId'];
           final exerciseName = state.uri.queryParameters['name'];
-          return _immersive(ExerciseDetailScreen(
+          return _immersiveEdgeToEdge(ExerciseDetailScreen(
             exerciseId: exerciseId,
             ownerId: ownerId,
             exerciseName: exerciseName,
@@ -887,8 +908,8 @@ GoRouter buildRouter({
           ),
         ),
         routes: [
-          // Tab roots use pageBuilder + _noAnim (instant transition, no
-          // swipe-back — they are the bottom-nav destinations).
+          // Tab roots use pageBuilder + _tabFade (cross-fade corto, sin
+          // swipe-back — son los destinos de la barra inferior).
           //
           // SHELL SUB-ROUTES use `builder` → CupertinoPageRoute on iOS, which
           // gives the native slide + edge swipe-back gesture. RoutineDetail /
@@ -915,8 +936,11 @@ GoRouter buildRouter({
             // `?tab=plantillas` deep-links to the PLANTILLAS page; unknown
             // values fall back to page 0 inside the screen (mirrors /feed
             // and /coach `?tab=` forwarding).
-            pageBuilder: (_, state) => _noAnim(
-              WorkoutScreen(initialTab: state.uri.queryParameters['tab']),
+            pageBuilder: (_, state) => _tabFade(
+              'workout',
+              _shellTab(
+                WorkoutScreen(initialTab: state.uri.queryParameters['tab']),
+              ),
             ),
             routes: [
               GoRoute(
@@ -931,7 +955,7 @@ GoRouter buildRouter({
                       int.tryParse(state.uri.queryParameters['day'] ?? '');
                   final initialWeek =
                       int.tryParse(state.uri.queryParameters['week'] ?? '');
-                  return _withBg(RoutineDetailScreen(
+                  return _withBgEdgeToEdge(RoutineDetailScreen(
                     routineId: routineId,
                     initialDayNumber: initialDay,
                     initialWeekIndex: initialWeek,
@@ -950,7 +974,7 @@ GoRouter buildRouter({
                   // can do a name/alias fallback when `exerciseId` drifted
                   // from the catalogue (Spanish-slug seeds, dedup'd generics).
                   final exerciseName = state.uri.queryParameters['name'];
-                  return _withBg(ExerciseDetailScreen(
+                  return _withBgEdgeToEdge(ExerciseDetailScreen(
                     exerciseId: exerciseId,
                     ownerId: ownerId,
                     exerciseName: exerciseName,
@@ -969,7 +993,7 @@ GoRouter buildRouter({
             // relocated here from the Entrenar tab.
             pageBuilder: (_, state) {
               final tab = state.uri.queryParameters['tab'];
-              return _noAnim(FeedScreen(initialTab: tab));
+              return _tabFade('feed', _shellTab(FeedScreen(initialTab: tab)));
             },
             routes: [
               GoRoute(
@@ -990,7 +1014,7 @@ GoRouter buildRouter({
                 path: 'profile/:uid',
                 builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return _withBg(PublicProfileScreen(targetUid: uid));
+                  return _withBgEdgeToEdge(PublicProfileScreen(targetUid: uid));
                 },
                 routes: [_followListRoute],
               ),
@@ -1016,7 +1040,8 @@ GoRouter buildRouter({
           ),
           GoRoute(
             path: '/home',
-            pageBuilder: (_, __) => _noAnim(const HomeScreen()),
+            pageBuilder: (_, __) =>
+                _tabFade('home', _shellTab(const HomeScreen())),
             routes: [
               // Centro de notificaciones. Vive bajo /home y no bajo /feed
               // porque la campana se movió a la pantalla principal: el
@@ -1045,7 +1070,7 @@ GoRouter buildRouter({
                 path: 'profile/:uid',
                 builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return _withBg(PublicProfileScreen(targetUid: uid));
+                  return _withBgEdgeToEdge(PublicProfileScreen(targetUid: uid));
                 },
                 routes: [_followListRoute],
               ),
@@ -1055,14 +1080,15 @@ GoRouter buildRouter({
             path: '/coach',
             pageBuilder: (context, state) {
               final tab = state.uri.queryParameters['tab'];
-              return _noAnim(CoachScreen(initialTab: tab));
+              return _tabFade('coach', _shellTab(CoachScreen(initialTab: tab)));
             },
             routes: [
               GoRoute(
                 path: 'trainer/:uid',
                 builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return _withBg(TrainerPublicProfileScreen(uid: uid));
+                  return _withBgEdgeToEdge(
+                      TrainerPublicProfileScreen(uid: uid));
                 },
               ),
               // athlete detail + 1-1 chat moved to top-level immersive routes
@@ -1099,7 +1125,8 @@ GoRouter buildRouter({
           ),
           GoRoute(
             path: '/profile',
-            pageBuilder: (_, __) => _noAnim(const ProfileScreen()),
+            pageBuilder: (_, __) =>
+                _tabFade('profile', _shellTab(const ProfileScreen())),
             routes: [
               // Existing — Fase 3 Etapa 6
               GoRoute(
@@ -1173,6 +1200,23 @@ GoRouter buildRouter({
                   return _withBg(AvailabilityEditorScreen(trainerId: uid));
                 },
               ),
+              // Vista previa del perfil público del PF, abierta desde VER PREVIEW
+              // en TrainerProfileView. Gemela de /coach/trainer/:uid registrada
+              // bajo la rama ORIGEN: _ShellScaffold deriva el tab resaltado del
+              // prefijo del path, así que bajo /coach la barra saltaba a COACH
+              // aunque el PF viniera de PERFIL — y el pop vuelve a /profile
+              // (patrón del #387, igual que availability-editor de arriba).
+              // `preview: true` marca la pantalla como vista previa y apaga los
+              // CTAs (#1498).
+              GoRoute(
+                path: 'trainer-preview/:uid',
+                builder: (context, state) {
+                  final uid = state.pathParameters['uid']!;
+                  return _withBgEdgeToEdge(
+                    TrainerPublicProfileScreen(uid: uid, preview: true),
+                  );
+                },
+              ),
               // /profile/settings GoRoute REMOVED 2026-05-28 — PR#4 pivot.
               // Sign-out and eliminar-cuenta tiles now live directly in
               // ProfileScreen body. Settings surface deferred to future SDD.
@@ -1184,8 +1228,15 @@ GoRouter buildRouter({
               // CTA on the PERFIL PÚBLICO card. A future subscribe flow can
               // reintroduce a multi-tier catalog if needed.
 
-              // Trainer custom exercise library moved to the top-level
-              // immersive route /profile/my-exercises (no bottom nav bar).
+              // Biblioteca de ejercicios propios. Había salido del shell como
+              // ruta inmersiva (sin nav bar) y el QA (#1502) pidió que tenga
+              // la barra inferior como el resto de las subpantallas de
+              // Perfil: vuelve al shell. El editor
+              // (`/profile/my-exercises/:exId`) sigue siendo top-level.
+              GoRoute(
+                path: 'my-exercises',
+                builder: (_, __) => _withBg(const MyExercisesScreen()),
+              ),
             ],
           ),
         ],
@@ -1196,6 +1247,28 @@ GoRouter buildRouter({
 
 CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
       child: child,
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+      transitionsBuilder: (_, __, ___, child) => child,
+    );
+
+/// Página de los roots de tab (barra inferior): sin transición de ruta (la
+/// página del shell, el splash y los gates siguen en [_noAnim] — ver el
+/// comentario del ShellRoute) pero con un fade-in corto del contenido.
+///
+/// Dos trampas, las dos medidas:
+///  * El fade NO puede ser un `transitionsBuilder`: go_router no anima el
+///    reemplazo de páginas dentro del ShellRoute, la animación llega en 1.0.
+///    Ver [TreinoTabFadeIn].
+///  * La [Page] necesita una `key` por tab. Sin key, Navigator ve dos
+///    `CustomTransitionPage` del mismo tipo y las trata como la MISMA ruta
+///    actualizada en el lugar: el State del fade se reusa y no hay remount, o
+///    sea, no hay fade al cambiar de tab. `?tab=` sobre el mismo tab conserva
+///    la key y sigue actualizando en el lugar (no re-fadea).
+CustomTransitionPage<void> _tabFade(String tab, Widget child) =>
+    CustomTransitionPage(
+      key: ValueKey('tab-root-$tab'),
+      child: TreinoTabFadeIn(child: child),
       transitionDuration: Duration.zero,
       reverseTransitionDuration: Duration.zero,
       transitionsBuilder: (_, __, ___, child) => child,
@@ -1261,7 +1334,22 @@ class _ReportPageRoute extends CupertinoPageRoute<void> {
 ///
 /// Use INSIDE the ShellRoute branches' GoRoute builders only; top-level
 /// routes (outside the shell) own their own Scaffold + background.
-Widget _withBg(Widget child) => AppBackground(child: child);
+///
+/// Consume el inset superior (la status bar) porque `_ShellScaffold` ya no lo
+/// hace por todo el navigator: ver [_withBgEdgeToEdge].
+Widget _withBg(Widget child) =>
+    AppBackground(child: SafeArea(bottom: false, child: child));
+
+/// Como [_withBg] pero SIN consumir el inset superior: la pantalla se pinta
+/// desde el borde físico, bajo la status bar. Sólo para las que montan
+/// `TreinoCollapsingTopBar`, que reservan ese inset ellas mismas
+/// (`TreinoTopBarMetrics.reservedHeightOf`) y extienden su hero y el fondo
+/// de la barra hasta arriba (#1559).
+Widget _withBgEdgeToEdge(Widget child) =>
+    AppBackground(child: SafeArea(top: false, bottom: false, child: child));
+
+/// Raíz de un tab del shell: consume el inset superior (ver [_withBg]).
+Widget _shellTab(Widget child) => SafeArea(bottom: false, child: child);
 
 /// Listas de SEGUIDORES / SEGUIDOS, colgada de `profile/:uid`.
 ///
@@ -1292,6 +1380,13 @@ final GoRoute _followListRoute = GoRoute(
 Widget _immersive(Widget child) => Scaffold(
       backgroundColor: Colors.transparent,
       body: AppBackground(child: SafeArea(child: child)),
+    );
+
+/// [_immersive] sin consumir el inset superior, para las pantallas con
+/// `TreinoCollapsingTopBar` fuera del shell (ver [_withBgEdgeToEdge]).
+Widget _immersiveEdgeToEdge(Widget child) => Scaffold(
+      backgroundColor: Colors.transparent,
+      body: AppBackground(child: SafeArea(top: false, child: child)),
     );
 
 /// Resuelve el uid actual y monta [MonthlyReportScreen] (AD6/PR5a).
@@ -1613,11 +1708,13 @@ class _ShellScaffold extends ConsumerStatefulWidget {
   ConsumerState<_ShellScaffold> createState() => _ShellScaffoldState();
 }
 
-class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
-  /// Cuánto scroll vertical acumulado hace falta para cambiar de estado.
-  /// Chico dispara con el temblor del dedo; grande se siente trabado.
-  static const double _collapseThreshold = 20;
-  static const double _expandThreshold = 12;
+class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
+    with SingleTickerProviderStateMixin {
+  /// Cuántos px de scroll lleva pasar de barra entera a compacta (y al
+  /// revés). La barra SIGUE AL DEDO dentro de ese tramo: scrollear despacio
+  /// la compacta despacio, frenar a mitad la deja a mitad. Al soltar se
+  /// asienta del lado más cercano.
+  static const double _collapseRange = 64;
 
   /// Zona muerta arriba de todo: dentro de ella la barra siempre está
   /// expandida, sin importar el gesto. Evita que un micro-scroll al tope deje
@@ -1628,20 +1725,36 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
   /// se reconstruye la barra. Con `setState` se reconstruiría también el body
   /// —o sea la pantalla entera— en medio de un scroll, que es exactamente el
   /// momento en el que menos se puede pagar (`docs/performance.md`).
-  final ValueNotifier<bool> _navCollapsed = ValueNotifier(false);
+  ///
+  /// Es un [AnimationController] (y no un `ValueNotifier`) porque además de
+  /// seguir al scroll tiene que poder animarse solo: al soltar se asienta, y
+  /// al volver al tope o cambiar de tab vuelve a 1. 1 = entera, 0 = compacta.
+  late final AnimationController _nav = AnimationController(
+    vsync: this,
+    value: 1,
+  );
 
   @override
   void dispose() {
-    _navCollapsed.dispose();
+    _nav.dispose();
     super.dispose();
+  }
+
+  /// Lleva la barra a [target] animando (o de una si se pidió reducir
+  /// movimiento).
+  void _settleNav(double target) {
+    if (_nav.value == target && !_nav.isAnimating) return;
+    _nav.animateTo(
+      target,
+      duration: AppMotion.resolve(context, AppMotion.fast),
+      curve: AppMotion.standard,
+    );
   }
 
   int get _currentIndex {
     final i = _kTabs.indexWhere((t) => widget.location.startsWith(t));
     return i < 0 ? 2 : i;
   }
-
-  double _dragAccumulator = 0;
 
   /// Escucha el scroll de CUALQUIER pantalla del shell.
   ///
@@ -1656,6 +1769,14 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
   /// barra, que es justo lo que nadie pidió.
   bool _handleScroll(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
+    // Al soltar (y cuando termina la inercia) la barra no puede quedar a
+    // medias: se asienta del lado que esté más cerca.
+    if (notification is ScrollEndNotification) {
+      if (_nav.value > 0 && _nav.value < 1) {
+        _settleNav(_nav.value < 0.5 ? 0 : 1);
+      }
+      return false;
+    }
     if (notification is! ScrollUpdateNotification) return false;
 
     final delta = notification.scrollDelta;
@@ -1663,8 +1784,7 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
 
     final metrics = notification.metrics;
     if (metrics.pixels <= metrics.minScrollExtent + _topRevealZone) {
-      _dragAccumulator = 0;
-      _navCollapsed.value = false;
+      _settleNav(1);
       return false;
     }
 
@@ -1675,23 +1795,12 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
     // 20 px en pleno rebote, y la última fila queda pegada al vidrio: se
     // sentía trabado justo al llegar abajo. Mientras la posición está fuera
     // de rango, la barra se queda como está.
-    if (metrics.pixels > metrics.maxScrollExtent) {
-      _dragAccumulator = 0;
-      return false;
-    }
+    if (metrics.pixels > metrics.maxScrollExtent) return false;
 
-    // Cambiar de dirección resetea: la intención nueva no arrastra el saldo
-    // de la anterior.
-    if (delta.isNegative != _dragAccumulator.isNegative) _dragAccumulator = 0;
-    _dragAccumulator += delta;
-
-    if (_dragAccumulator >= _collapseThreshold) {
-      _dragAccumulator = 0;
-      _navCollapsed.value = true;
-    } else if (_dragAccumulator <= -_expandThreshold) {
-      _dragAccumulator = 0;
-      _navCollapsed.value = false;
-    }
+    // Sigue al dedo: cada px de scroll mueve la barra 1/_collapseRange. Si
+    // estaba asentándose, el dedo manda y la animación se corta.
+    if (_nav.isAnimating) _nav.stop();
+    _nav.value = (_nav.value - delta / _collapseRange).clamp(0.0, 1.0);
     return false;
   }
 
@@ -1712,16 +1821,22 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
       body: NotificationListener<ScrollNotification>(
         onNotification: _handleScroll,
         child: AppBackground(
-          child: SafeArea(bottom: false, child: widget.child),
+          // top: false — el inset superior lo consume cada PÁGINA
+          // (`_shellTab`, `_withBg`), no el navigator entero. Si lo consumiera
+          // acá, el Overlay del navigator recorta a esos límites y ninguna
+          // pantalla podría pintar bajo la status bar: las de barra colapsable
+          // (`_withBgEdgeToEdge`) quedaban con una franja suelta arriba.
+          child: SafeArea(top: false, bottom: false, child: widget.child),
         ),
       ),
-      bottomNavigationBar: ValueListenableBuilder<bool>(
-        valueListenable: _navCollapsed,
-        builder: (context, collapsed, _) => TreinoBottomBar(
+      bottomNavigationBar: AnimatedBuilder(
+        animation: _nav,
+        builder: (context, _) => TreinoBottomBar(
           currentIndex: _currentIndex,
           coachUnreadCount: coachUnreadCount,
           feedUnreadCount: feedUnreadCount,
-          collapsed: collapsed,
+          collapsed: _nav.value < 0.5,
+          expansion: _nav.value,
           onTap: (i) {
             // Pop any open popup (modal bottom sheet, dialog) on the SHELL
             // navigator so it animates closed when the user switches tabs —
@@ -1738,8 +1853,7 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
                 .popUntil((route) => route is! PopupRoute);
             // Cambiar de tab arranca de cero: la pantalla nueva se ve desde
             // arriba, así que la barra tiene que estar entera.
-            _dragAccumulator = 0;
-            _navCollapsed.value = false;
+            _nav.value = 1;
             context.go(_kTabs[i]);
           },
         ),

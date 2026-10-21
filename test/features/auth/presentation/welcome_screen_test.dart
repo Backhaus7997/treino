@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/auth/presentation/welcome_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
 import 'package:treino/features/auth/presentation/widgets/terms_notice_text.dart';
+import 'package:treino/features/auth/presentation/widgets/trainer_inquiry_card.dart';
 import 'package:treino/core/widgets/treino_logo.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -25,8 +27,10 @@ GoRouter _makeRouter(Widget home) => GoRouter(
       ],
     );
 
-Widget _buildApp() {
-  const screen = WelcomeScreen();
+Future<bool> _noAbre(Uri _) async => false;
+
+Widget _buildApp({Future<bool> Function(Uri url) abrirUrl = _noAbre}) {
+  final screen = WelcomeScreen(abrirUrl: abrirUrl);
   final router = _makeRouter(screen);
   return ProviderScope(
     child: MaterialApp.router(
@@ -151,41 +155,66 @@ void main() {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(AuthPillButton));
+    await tester.tap(find.widgetWithText(AuthPillButton, 'EMPEZAR'));
     await tester.pumpAndSettle();
 
     expect(find.text('REGISTER'), findsOneWidget);
   });
 
   // ---------------------------------------------------------------------------
-  // B03: Google and Apple buttons are disabled with tooltip "Próximamente"
+  // Spotify layout: la bienvenida muestra SOLO los dos pills. Google/Apple y su
+  // leyenda legal viven en Login y Registro.
   // ---------------------------------------------------------------------------
-  testWidgets('Google and Apple AuthSecondaryButtons are present',
+  testWidgets('muestra exactamente dos pills y nada de Google/Apple',
       (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.byType(AuthSecondaryButton), findsNWidgets(2));
+    expect(find.byType(AuthPillButton), findsNWidgets(2));
+    expect(find.widgetWithText(AuthPillButton, 'EMPEZAR'), findsOneWidget);
+    expect(
+        find.widgetWithText(AuthPillButton, 'INICIAR SESIÓN'), findsOneWidget);
+    expect(find.byType(AuthSecondaryButton), findsNothing);
+    expect(find.textContaining('Google'), findsNothing);
+    expect(find.textContaining('Apple'), findsNothing);
   });
 
-  testWidgets('Google and Apple buttons are both wired to AuthNotifier',
-      (tester) async {
+  testWidgets(
+      'el aviso de Términos y Privacidad va debajo de la tarjeta de '
+      'entrenador, sin nombrar a Google/Apple', (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    // Find each AuthSecondaryButton and inspect its onPressed.
-    final secondary = tester
-        .widgetList<AuthSecondaryButton>(find.byType(AuthSecondaryButton))
-        .toList();
-    expect(secondary, hasLength(2));
+    final aviso = find.byType(TermsNoticeText);
+    expect(aviso, findsOneWidget);
+    expect(tester.widget<TermsNoticeText>(aviso).lead,
+        TermsNoticeText.leadGeneric);
+    expect(
+      tester.getRect(aviso).top,
+      greaterThan(tester.getRect(find.byType(TrainerInquiryCard)).bottom),
+    );
+  });
 
-    // First in the Row is Google, second is Apple.
-    expect(secondary[0].label, 'GOOGLE');
-    expect(secondary[0].onPressed, isNotNull,
-        reason: 'Google must be wired to AuthNotifier.signInWithGoogle');
-    expect(secondary[1].label, 'APPLE');
-    expect(secondary[1].onPressed, isNotNull,
-        reason: 'Apple must be wired to AuthNotifier.signInWithApple');
+  testWidgets(
+      'INICIAR SESIÓN es un pill invertido a 12 px de EMPEZAR, sin pregunta '
+      'en el medio, y la tarjeta de entrenador va debajo', (tester) async {
+    await tester.pumpWidget(_buildApp());
+    await tester.pumpAndSettle();
+
+    final empezar =
+        tester.getRect(find.widgetWithText(AuthPillButton, 'EMPEZAR'));
+    final signIn = tester.getRect(find.byKey(const Key('welcome-sign-in')));
+    final tarjeta = tester.getRect(find.byType(TrainerInquiryCard));
+
+    expect(find.text('¿Ya tenés cuenta?'), findsNothing);
+    expect(signIn.top - empezar.bottom, 12);
+    // Mismo tamaño que EMPEZAR: es un botón, no un link.
+    expect(signIn.height, empezar.height);
+    expect(signIn.width, empezar.width);
+    expect(tarjeta.top, greaterThan(signIn.bottom));
+    final button =
+        tester.widget<AuthPillButton>(find.byKey(const Key('welcome-sign-in')));
+    expect(button.outlined, isTrue);
   });
 
   // ---------------------------------------------------------------------------
@@ -195,20 +224,87 @@ void main() {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Iniciar sesión'));
+    await tester.tap(find.text('INICIAR SESIÓN'));
     await tester.pumpAndSettle();
 
     expect(find.text('LOGIN'), findsOneWidget);
   });
 
   // ---------------------------------------------------------------------------
-  // QA-AUTH-001 (issue #434): Terms notice below the social buttons
+  // «Quiero ser entrenador»: los PF no tienen alta self-service (los crea el
+  // equipo por Admin SDK), así que el acceso lleva al mismo contacto por mail
+  // que el Coach Hub, no a un registro.
   // ---------------------------------------------------------------------------
-  testWidgets('renders the TermsNoticeText legend below the social buttons',
-      (tester) async {
+  testWidgets(
+      'muestra el acceso «Quiero ser entrenador» con la misma tarjeta '
+      'que Login y Registro', (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.byType(TermsNoticeText), findsOneWidget);
+    final cta = find.byType(TrainerInquiryCard);
+    expect(cta, findsOneWidget);
+    expect(find.text('¿Sos entrenador?'), findsOneWidget);
+    expect(find.text('Pedí tu alta al equipo TREINO'), findsOneWidget);
+    expect(
+      find
+          .ancestor(of: cta, matching: find.byType(Semantics))
+          .evaluate()
+          .any((e) => (e.widget as Semantics).properties.button == true),
+      isTrue,
+      reason: 'el lector de pantalla tiene que anunciarlo como botón',
+    );
+  });
+
+  testWidgets('tocarlo abre el mail al equipo con el asunto del Coach Hub',
+      (tester) async {
+    final abiertas = <Uri>[];
+    await tester.pumpWidget(_buildApp(abrirUrl: (url) async {
+      abiertas.add(url);
+      return true;
+    }));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byType(TrainerInquiryCard));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(TrainerInquiryCard));
+    await tester.pumpAndSettle();
+
+    expect(abiertas, hasLength(1));
+    final url = abiertas.single;
+    expect(url.scheme, 'mailto');
+    expect(url.path, kLegalContactEmail);
+    expect(url.query, 'subject=Quiero%20ser%20entrenador%20en%20TREINO');
+    expect(find.byType(SnackBar), findsNothing);
+    // Abre el mail directo: no el diálogo que la tarjeta muestra en Login.
+    expect(find.byType(AlertDialog), findsNothing);
+  });
+
+  testWidgets('sin cliente de mail avisa y deja la dirección a la vista',
+      (tester) async {
+    await tester.pumpWidget(_buildApp(abrirUrl: (_) async => false));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byType(TrainerInquiryCard));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(TrainerInquiryCard));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.textContaining(kLegalContactEmail), findsOneWidget);
+  });
+
+  testWidgets('si la plataforma lanza al abrir el mail, también avisa',
+      (tester) async {
+    await tester.pumpWidget(
+        _buildApp(abrirUrl: (_) async => throw Exception('sin handler')));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byType(TrainerInquiryCard));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(TrainerInquiryCard));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining(kLegalContactEmail), findsOneWidget);
   });
 }

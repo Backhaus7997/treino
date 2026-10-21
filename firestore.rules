@@ -23,11 +23,6 @@ service cloud.firestore {
       return v == null || (v is number && v >= minV && v <= maxV);
     }
 
-    // Optional number that must be strictly positive, capped at maxV.
-    function optPositiveNum(v, maxV) {
-      return v == null || (v is number && v > 0 && v <= maxV);
-    }
-
     // Optional string no longer than maxLen.
     function optStrMaxLen(v, maxLen) {
       return v == null || (v is string && v.size() <= maxLen);
@@ -1927,8 +1922,18 @@ service cloud.firestore {
     // gymId, gymName, workoutsCount, racha, rachaUpdatedAt, followersCount,
     // followingCount, sharedTemplatesWithAthletes, rankingOptIn,
     // isProfilePublic, lifetimeVolumeKg, bestSquatKg, bestBenchKg,
-    // bestDeadliftKg, squatRank, benchRank, deadliftRank).
+    // bestDeadliftKg, squatRank, benchRank, deadliftRank, searchPrefixes).
     // REQ-UPP-014, REQ-UPP-015. GAP-1, GAP-2, GAP-3 from design Section C.
+    //
+    // searchPrefixes (#1478) son los prefijos plegados de cada palabra del
+    // nombre ("Martín López" → ma, mar, …, martin, lo, …, lopez), con los que
+    // la búsqueda de usuarios pregunta por `array-contains`. Los escribe SÓLO
+    // `functions/src/profile/user-search-prefixes.ts`: el cliente no puede
+    // crearlos, cambiarlos ni borrarlos. Si pudiera, cualquiera se cargaría
+    // "messi" para aparecer en las búsquedas de otro. Mismo trato que los
+    // rangos de abajo, y el mismo ⚠️: está en el `hasOnly` de update porque la
+    // CF lo escribe en el doc; sin eso todo update del dueño falla. Reglas
+    // ANTES que la función.
     //
     // squatRank / benchRank / deadliftRank (enteros 0..8, o null) son los
     // rangos de levantamiento que la pestaña Rankings dibuja como insignia.
@@ -2026,8 +2031,15 @@ service cloud.firestore {
                          'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg',
-                         'squatRank', 'benchRank', 'deadliftRank'
+                         'squatRank', 'benchRank', 'deadliftRank',
+                         'searchPrefixes', 'hiddenFromDiscovery'
                        ])
+                    // hiddenFromDiscovery: saca a una cuenta interna de la
+                    // búsqueda, las sugerencias y los rankings. Lo fija sólo
+                    // un admin (scripts/set_trainer_discovery_visibility.js,
+                    // Admin SDK). Un create no puede ocultarse solo: ausente
+                    // o `false`, igual que en trainerPublicProfiles.
+                    && request.resource.data.get('hiddenFromDiscovery', false) == false
                     // Sello de frescura de `rachaSemanas`, siempre derivado
                     // por UserPublicProfileRepository.updateCounters (server
                     // timestamp) — timestamp cuando está presente.
@@ -2063,6 +2075,9 @@ service cloud.firestore {
                         || request.resource.data.benchRank == null)
                     && (!('deadliftRank' in request.resource.data)
                         || request.resource.data.deadliftRank == null)
+                    // searchPrefixes (#1478): lo deriva la CF del nombre. Un
+                    // create no puede traerlo, ni vacío.
+                    && !('searchPrefixes' in request.resource.data)
                     && (!('rankingOptIn' in request.resource.data)
                         || request.resource.data.rankingOptIn is bool);
 
@@ -2088,8 +2103,15 @@ service cloud.firestore {
                          'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg',
-                         'squatRank', 'benchRank', 'deadliftRank'
+                         'squatRank', 'benchRank', 'deadliftRank',
+                         'searchPrefixes', 'hiddenFromDiscovery'
                        ])
+                    // hiddenFromDiscovery: flag de admin. El dueño no lo puede
+                    // poner, sacar ni cambiar; sí re-presentar el valor
+                    // guardado (un set con merge lo trae en el doc resultante).
+                    // Tiene que estar en el hasOnly de arriba: si no, una
+                    // cuenta oculta no podría actualizar más su perfil.
+                    && unchanged(request.resource.data, resource.data, 'hiddenFromDiscovery')
                     // Sello de frescura de `rachaSemanas` — timestamp cuando
                     // está presente. El disyunto `unchanged` es el del #849:
                     // sin él, el chequeo de TIPO valida el DOCUMENTO y no la
@@ -2199,6 +2221,14 @@ service cloud.firestore {
                         || (request.resource.data.get('rankingOptIn', true) == false
                             && resource.data.get('rankingOptIn', false) == true
                             && request.resource.data.deadliftRank == null))
+                    // searchPrefixes (#1478): sólo la CF. El dueño puede
+                    // re-presentar lo guardado (el merge lo trae en cada
+                    // escritura parcial) y nada más: ni cambiarlo, ni
+                    // crearlo, ni borrarlo. Por eso compara con `get` de los
+                    // dos lados en vez de `!(… in …) ||`: ese disyunto dejaría
+                    // borrarlo con FieldValue.delete().
+                    && request.resource.data.get('searchPrefixes', null)
+                       == resource.data.get('searchPrefixes', null)
                     // Type/Range Validation (AD-8): cotas de defensa en
                     // profundidad detrás del pin de arriba. Una escritura
                     // FRESCA ya fue rechazada por el pin salvo que iguale el
@@ -2767,17 +2797,32 @@ service cloud.firestore {
       // relationship. Sin este gate cualquier autenticado podía abrir un chat
       // con —y escribirle a— cualquiera.
       //
-      // REQ-FOLLOW-012 / LD-08 / ADR-FOLLOW-005 — la rama social pasó a ser
-      // DIRECCIONAL: abrir un chat es poder mandar el primer mensaje, así que
-      // lo que habilita es que el DESTINATARIO siga a quien lo abre
-      // (`follows/{otro}_{yo}` aceptada). Reemplaza al `exists`+`get` sobre
-      // `friendships/{chatId}`, que era simétrico por construcción — el doc id
-      // de `friendships` es el par ordenado, o sea el MISMO documento para las
-      // dos direcciones.
+      // ── RAMA SOCIAL (cambio de producto 2026-10-21, PR #1607) ────────────
       //
-      // Costo sin cambios: un lookup direccional cuesta exactamente lo mismo
-      // (`exists`+`get` = 2) que el simétrico que reemplaza. El peor caso
-      // (social falla → se evalúa trainer) sigue en ≤6 sobre el techo de 10.
+      // Reemplaza a REQ-FOLLOW-012 / ADR-FOLLOW-005, que la hacían DIRECCIONAL
+      // al revés: habilitaba a quien el destinatario seguía
+      // (`followAccepted(otro, yo)`), o sea que yo sólo podía escribirle a mis
+      // SEGUIDORES. Producto lo dio vuelta. Abrir un chat social pide UNA de:
+      //
+      //   · `followAccepted(yo, otro)` — lo sigo y la arista está aceptada. Con
+      //     perfil privado eso significa que el otro me aceptó.
+      //   · el perfil del otro es PÚBLICO (`userPublicProfiles/{otro}
+      //     .isProfilePublic`, el toggle de Perfil → Privacidad). Es la misma
+      //     fuente y el mismo default (`true` para perfiles anteriores al
+      //     campo) que usa el auto-accept del `create` de `follows`.
+      //
+      // Una solicitud PENDIENTE a un perfil privado no alcanza: la arista no
+      // está aceptada y el perfil no es público.
+      //
+      // `followAccepted` va primero: si lo sigo, el `get()` del perfil no se
+      // paga. Un `get()` sobre un perfil inexistente (cuenta borrada) revienta
+      // la evaluación y deniega, que es lo correcto.
+      //
+      // Una vez creado el chat, los DOS escriben sin requisito de follow (ver
+      // `senderMayPost`): el que recibe responde aunque no siga al otro.
+      //
+      // `notBlocked()` envuelve las TRES ramas: un bloqueo, en cualquier
+      // dirección, gana sobre vínculo, consulta y follow.
       //
       // `members[0] < members[1]` y `chatId == members[0]+'_'+members[1]` ya los
       // garantiza el propio `allow create` de abajo, y `members` es inmutable en
@@ -2788,22 +2833,17 @@ service cloud.firestore {
       // confía), y SEC-002 garantiza que un link activo fue aceptado por el
       // trainer, así que ninguna de las dos partes puede fraguar uno.
       //
-      // ⚠ LAS DOS RAMAS SON EXCLUYENTES, NO UN `||` — y eso es de SEGURIDAD, no
-      // de estilo. Con `followAccepted(...) || ('linkId' in data && ...)`, un
-      // chat social hacía true la primera rama y el `linkId` del payload
-      // **nunca se validaba**: quedaba persistido un linkId inventado. Como
-      // `senderMayPost` (abajo) escapa por la mera PRESENCIA de la clave, eso
-      // le regalaba al que lo plantó escritura permanente, sobreviviendo al
-      // unfollow. O sea: el gate direccional entero quedaba decorativo, que es
-      // exactamente lo que REQ-FOLLOW-012 dice que no puede pasar.
+      // ⚠ LAS RAMAS SON EXCLUYENTES (ternario), NO UN `||`. Con
+      // `social || ('linkId' in data && ...)`, un chat social hacía true la
+      // primera rama y el `linkId` del payload **nunca se validaba**: quedaba
+      // persistido un linkId inventado, y la UI trataría ese chat como de
+      // Coach. La invariante que se sostiene es: **un doc de chat sólo lleva
+      // `linkId` si nombra un link válido**, y `kind == 'inquiry'` sólo si el
+      // otro es un PF publicado. Se paga en la escritura (acá y en los pins del
+      // `update`).
       //
-      // Con el ternario, la INVARIANTE que sostiene a `senderMayPost` es:
-      // **un doc de chat sólo lleva `linkId` si nombra un link válido.** Se
-      // paga en la escritura (acá y en el pin del `update`), no en cada
-      // mensaje, así que el chat del Coach sigue costando 1 sola llamada.
-      //
-      // Efecto lateral bueno: el peor caso de `chats/create` baja de ≤6 a 4,
-      // porque ya no se evalúan las dos ramas en cadena.
+      // Presupuesto: peor caso 6 llamadas (rama Coach: 2 de `notBlocked` + 4),
+      // la social 5 y la de consulta 5, sobre el techo de 10.
       //
       // ── TERCERA RAMA: chat de PRE-CONSULTA (#637) ────────────────────────
       //
@@ -2813,10 +2853,9 @@ service cloud.firestore {
       // el producto obligaba a elegir antes de poder preguntar: pedirle vínculo
       // al primer coach dejaba a los otros dos inalcanzables.
       //
-      // La rama social NO sirve para este caso y no es cuestión de reusarla:
-      // es direccional a propósito (REQ-FOLLOW-012 / ADR-FOLLOW-005) y la
-      // dirección que habilita es la contraria — exigiría que el PF siga al
-      // atleta ANTES de que el atleta pueda preguntarle. Nadie hace eso.
+      // La rama social no alcanza para este caso: sólo cubre a un PF con perfil
+      // público o al que el atleta ya sigue, y la consulta existe justamente
+      // para un PF publicado en discovery, siga o no el atleta su perfil.
       //
       // Por eso una rama propia, y —igual que las otras dos— EXCLUYENTE: es un
       // ternario anidado, no un `|| esConsulta` al final. Un `||` reabriría
@@ -2889,7 +2928,7 @@ service cloud.firestore {
       function chatCreateOk(members, data) {
         let me = request.auth.uid;
         let other = members[0] == me ? members[1] : members[0];
-        return ('linkId' in data) ? (
+        return notBlocked(me, other) && (('linkId' in data) ? (
           exists(/databases/$(database)/documents/trainer_links/$(data.linkId))
           // QA H8: 'paused' cuenta como vínculo vigente para chatear (pausar es
           // un hold temporal, no un corte). Espeja el filtro cliente en
@@ -2901,48 +2940,62 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/trainerPublicProfiles/$(other))
           && get(/databases/$(database)/documents/users/$(other)).data.role == 'trainer'
           && get(/databases/$(database)/documents/trainerPublicProfiles/$(other)).data.get('acceptsInquiries', true) == true
-        ) : followAccepted(other, me);
+        ) : (
+          followAccepted(me, other)
+          || get(/databases/$(database)/documents/userPublicProfiles/$(other))
+               .data.get('isProfilePublic', true) == true
+        ));
       }
 
       // Mismo permiso que `senderMayPost`, pero sobre un chat que YA existe, así
-      // que sale de `resource.data` y NO paga el `get()` del chat. Igual que
-      // allá, `'linkId' in resource.data` va primero para que el Coach no pague
-      // ninguna llamada de acceso — y acá esa clave ya es confiable, porque
-      // `chatCreateOk` la valida al crear y el `update` la tiene pineada.
+      // que sale de `resource.data` y NO paga el `get()` del chat: miembro (lo
+      // chequea el `allow update`) y sin bloqueo. Desde el cambio de producto
+      // del 2026-10-21 escribir en un chat existente no pide follow en ninguna
+      // dirección, así que tampoco el preview. Costo: 2 llamadas.
       //
-      // Costo: 0 llamadas en un chat de Coach, 2 en uno social, y sólo cuando el
-      // update toca algo más que `lastRead`.
-      //
-      // #637: `kind == 'inquiry'` escapa por la MISMA vía y por el mismo
-      // motivo. Acá el `||` es legítimo —a diferencia del `create`— porque los
-      // dos primeros términos ya no son payload sin validar: son hechos que
-      // `chatCreateOk` verificó al crear el doc y que el `update` de abajo
-      // tiene pineados. Es una disyunción de hechos confiables, no una
-      // validación. Costo: 2 llamadas (las de `notBlocked`) para un chat de
-      // Coach o de consulta, 4 para uno social, que además paga
-      // `followAccepted`.
-      //
-      // `notBlocked()` va AFUERA de la disyunción, igual que en
-      // `senderMayPost()` de `messages`: un bloqueo corta la escritura sin
-      // importar POR QUÉ rama se habilitaba (Coach, consulta o follow).
-      //
-      // Adentro NO alcanza, y era el agujero: las dos primeras ramas devuelven
-      // true INCONDICIONALMENTE para un chat con `linkId` o `kind == 'inquiry'`,
-      // así que el bloqueado no lograba escribir el mensaje —ese gate sí tenía
-      // `notBlocked`— pero sí `lastMessageText` en el doc padre, que es el
+      // Sin este gate el bloqueado no lograba escribir el mensaje —ese gate sí
+      // tiene `notBlocked`— pero sí `lastMessageText` en el doc padre, que es el
       // texto que la otra persona ve en su lista de chats, con badge de
-      // no-leído. O sea, exactamente el "«No te puede escribir» sería falso"
-      // que REQ-FOLLOW-012 escribe treinta líneas más abajo.
+      // no-leído.
       function chatWriterOk(uid) {
         let other = resource.data.members[0] == uid
           ? resource.data.members[1]
           : resource.data.members[0];
-        return notBlocked(uid, other)
-            && (
-                 'linkId' in resource.data
-                 || resource.data.get('kind', '') == 'inquiry'
-                 || followAccepted(other, uid)
-               );
+        return notBlocked(uid, other);
+      }
+
+      // ── Archivar y eliminar, POR MIEMBRO ─────────────────────────────────
+      //
+      // Archivar y eliminar un chat son decisiones de UNA persona sobre SU
+      // bandeja: nunca tocan el historial ni la bandeja del otro. Por eso no
+      // hay `delete` (sigue en `false`) ni se borran mensajes, que además son
+      // inmutables. Cada miembro estampa su propia entrada en dos mapas del
+      // doc del chat:
+      //
+      //   · `archivedAt.{uid}` — lo esconde de la lista principal hasta que
+      //     llegue un mensaje posterior (`lastMessageAt > archivedAt.{uid}`).
+      //     Desarchivar es borrar la clave.
+      //   · `hiddenBefore.{uid}` — "eliminar": lo saca de la lista y oculta,
+      //     sólo para ese uid, los mensajes anteriores. Si el otro vuelve a
+      //     escribir, el chat reaparece desde ese mensaje. No se puede borrar
+      //     la clave: des-eliminar devolvería un historial que el usuario
+      //     pidió no ver, y no hay UI que lo pida.
+      //
+      // Mismo molde que `lastRead` (REQ-CHATUNREAD-008): cada miembro toca
+      // SÓLO su clave, así nadie archiva ni le borra el chat al otro.
+      //
+      // El valor va pineado a `request.time` (el cliente manda
+      // serverTimestamp): con un reloj del teléfono atrasado, "eliminar"
+      // podía quedar ANTES del último mensaje y no esconder nada, y con uno
+      // adelantado se comía en silencio los mensajes que llegaran después.
+      function ownStampOk(field, removable) {
+        let me = request.auth.uid;
+        let after = request.resource.data.get(field, {});
+        let changed = after.diff(resource.data.get(field, {})).affectedKeys();
+        return changed.hasOnly([me])
+            && (!changed.hasAny([me])
+                || (me in after && after[me] == request.time)
+                || (removable && !(me in after)));
       }
 
       // ⚠️  QA-SEC-010 — el disyunto `resource == null` está ACOTADO al par que
@@ -2984,11 +3037,11 @@ service cloud.firestore {
       // createdAt remain immutable. get('lastRead', {}) is null-safe for
       // legacy docs that predate the field.
       //
-      // ⚠ `linkId` PINEADO: es la segunda mitad de la invariante que sostiene a
-      // `senderMayPost`. Sin este pin, esta regla —que no tiene allowlist de
-      // claves— dejaba que cualquier miembro le agregara `linkId` a un chat
-      // social con un update de una línea, y se auto-otorgara escritura
-      // permanente que sobrevive al unfollow. El idioma `get(...,null)` hace
+      // ⚠ `linkId` PINEADO: segunda mitad de la invariante "un chat sólo lleva
+      // `linkId` si nombra un link válido" (ver `chatCreateOk`). Sin este pin,
+      // esta regla —que no tiene allowlist de claves— dejaba que cualquier
+      // miembro le agregara un `linkId` inventado a un chat social, y la app
+      // lo trataría como chat de Coach. El idioma `get(...,null)` hace
       // que "ausente en los dos lados" matchee, así que los chats sociales
       // (que no tienen la clave) no se ven afectados, y además impide BORRAR
       // el linkId de un chat de Coach.
@@ -3002,9 +3055,9 @@ service cloud.firestore {
                     // rama de consulta (#637), por el mismo motivo que
                     // `linkId`. Sin el pin, esta regla (que no tiene allowlist
                     // de claves) dejaría convertir un chat social en consulta
-                    // con un update de una línea, saltándose el gate de follow
-                    // y auto-otorgándose escritura permanente que sobrevive al
-                    // unfollow. Y en la otra dirección impide BORRAR la marca
+                    // con un update de una línea, y la marca dejaría de decir
+                    // que el otro es un PF publicado. Y en la otra dirección
+                    // impide BORRAR la marca
                     // para que una consulta se haga pasar por chat social.
                     // La escalada consulta→Coach ya la corta el pin de
                     // `linkId`: a un chat existente no se le puede agregar.
@@ -3017,24 +3070,31 @@ service cloud.firestore {
                               .affectedKeys()
                               .hasOnly([request.auth.uid])
                        )
-                    // REQ-FOLLOW-012 — el PREVIEW sigue al mismo permiso que el
-                    // mensaje. Sin esto el gate de `messages/create` se rodea
-                    // por el costado: el lado bloqueado no logra escribir el
-                    // mensaje, pero sí `lastMessageText`, que es el texto que la
-                    // otra persona ve en su lista de chats, con badge de
-                    // no-leído. "No te puede escribir" sería falso.
+                    // El PREVIEW sigue al mismo permiso que el mensaje
+                    // (`chatWriterOk`: sin bloqueo). Sin esto el gate de
+                    // `messages/create` se rodea por el costado: el lado
+                    // bloqueado no logra escribir el mensaje, pero sí
+                    // `lastMessageText`, que es el texto que la otra persona ve
+                    // en su lista de chats, con badge de no-leído.
                     //
                     // Es una ALLOWLIST, no una lista de campos de preview
                     // enumerados: cualquier campo que se agregue mañana al doc
                     // queda denegado por defecto en vez de colarse.
                     //
                     // `lastRead` queda AFUERA de la restricción a propósito
-                    // (design §3.3.4): el lado sin escritura tiene que poder
+                    // (design §3.3.4): el lado bloqueado tiene que poder
                     // marcar como leído, o el badge de no-leídos se le clava
                     // para siempre. Ese caso no paga ninguna llamada de acceso.
+                    && ownStampOk('archivedAt', true)
+                    && ownStampOk('hiddenBefore', false)
                     && (
+                         // Archivar/eliminar quedan afuera de `chatWriterOk`,
+                         // igual que `lastRead`: un chat con un bloqueo de por
+                         // medio también tiene que poder sacarse de la bandeja.
+                         // No cambian nada que el otro vea.
                          request.resource.data.diff(resource.data)
-                           .affectedKeys().hasOnly(['lastRead'])
+                           .affectedKeys()
+                           .hasOnly(['lastRead', 'archivedAt', 'hiddenBefore'])
                          || chatWriterOk(request.auth.uid)
                        );
 
@@ -3043,49 +3103,26 @@ service cloud.firestore {
       // Messages sub-collection. Mensajes inmutables en MVP — sin edit/delete.
       // read/create gated por members del chat parent.
       match /messages/{messageId} {
-        // REQ-FOLLOW-012 — GATE NUEVO. Hoy esta subcolección gateaba SÓLO por
-        // membresía, o sea que el permiso se evaluaba una única vez, al crear el
-        // chat: eliminar la relación NO cortaba un chat que ya existía. La
-        // asimetría que pide la decisión del dueño es DENTRO del mismo chat
-        // (uno escribe, el otro no), y una regla que corre una sola vez no puede
-        // producir dos permisos distintos para el mismo documento. Por eso el
-        // gate se evalúa por mensaje.
+        // Postear en un chat existente: miembro y sin bloqueo. Nada más.
         //
-        // ABSORBE el check de membresía en vez de sumarse a él: reusa el mismo
-        // `get(chats/{chatId})` que la regla vieja ya hacía para sacar
-        // `members`. Por eso el costo no se duplica.
+        // Hasta el 2026-10-21 (REQ-FOLLOW-012) acá se exigía que el OTRO
+        // siguiera al que escribe, por mensaje, para que dejar de seguir le
+        // cortara la escritura a esa persona. Producto lo reemplazó: el que
+        // recibe un chat responde aunque no siga al que lo abrió, y el control
+        // de quién puede INICIAR vive en `chatCreateOk`. Lo que corta una
+        // conversación ya abierta es el bloqueo.
         //
-        // Orden de las ramas DELIBERADO: `'linkId' in chat` va PRIMERO para que
-        // un chat de Coach no pague ninguna llamada de acceso extra (1, igual
-        // que hoy) y quede exactamente como está —membresía, sin re-verificar
-        // que el link siga activo—, porque apretar el Coach no es parte de este
-        // change. Un chat social paga 3 sobre el techo de 10.
-        //
-        // #637: la marca de consulta escapa igual que `linkId` y por el mismo
-        // motivo — `chatCreateOk` ya verificó al crear que el destinatario es
-        // un PF publicado, y el pin del `update` no deja plantarla después. Un
-        // chat de consulta paga 1 llamada, igual que uno de Coach. Los DOS
-        // miembros pueden postear: el atleta pregunta y el PF contesta, que es
-        // el punto entero de la feature.
+        // Absorbe el check de membresía: reusa el mismo `get(chats/{chatId})`
+        // para sacar `members`. Costo: 3 llamadas (1 get + 2 de `notBlocked`).
         function senderMayPost(uid) {
           let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
           let other = chat.members[0] == uid ? chat.members[1] : chat.members[0];
-          // notBlocked() afuera del paréntesis: un bloqueo corta el mensaje
-          // sin importar POR QUÉ rama se habilitaba (Coach, consulta o
-          // follow) — moderación va antes que cualquier motivo de contacto
-          // (change `moderacion-reporte-y-bloqueo`).
-          return uid in chat.members
-              && notBlocked(uid, other)
-              && (
-                   'linkId' in chat
-                   || chat.get('kind', '') == 'inquiry'
-                   || followAccepted(other, uid)
-                 );
+          return uid in chat.members && notBlocked(uid, other);
         }
 
-        // Lectura: membresía, SIN CAMBIOS. El lado que perdió la escritura
-        // conserva la conversación entera — bloquear también la lectura sería
-        // borrarle historia que ya recibió.
+        // Lectura: membresía, SIN CAMBIOS. El lado bloqueado conserva la
+        // conversación entera — bloquear también la lectura sería borrarle
+        // historia que ya recibió.
         allow read: if request.auth != null
                     && request.auth.uid in
                         get(/databases/$(database)/documents/chats/$(chatId)).data.members;
@@ -3559,8 +3596,10 @@ service cloud.firestore {
     // Create: athlete books their own slot, or the trainer registers a session
     //         (status must be 'confirmed').
     // Update: DOS caminos válidos —
-    //   Path 1 (cancelación): un miembro cancela con >24 h de anticipación.
-    //   Path 2 (PF): el PF edita las notas de coaching o linkea un Payment.
+    //   Path 1 (cancelación): el atleta cancela con >24 h de anticipación; el
+    //           PF, sin gate de tiempo (#1492).
+    //   Path 2 (PF): el PF edita las notas de coaching, linkea un Payment o
+    //           marca la asistencia (#1492).
     // Delete: never (audit trail preserved per ADR-1).
     //
     // ⚠️ #831 — acá había un TERCER camino, el flip `cancelled → confirmed` de
@@ -3611,13 +3650,33 @@ service cloud.firestore {
       // cancelarse nunca más. Es el error que #831 y #847 ya pagaron dos veces.
       // El cliente no puede escribir el campo, así que no hay nada que acotar
       // contra el cliente; contra la CF la cota la pone el code review.
+      //
+      // ─── #1492 — `attendance`, la clave 16 ──────────────────────────────────
+      //
+      // La asistencia que marca el PF sobre una sesión que ya pasó: `null` es
+      // "se dio" (el default, que el dashboard ya derivaba de `confirmed` + ya
+      // terminó) y `'absent'` es "el alumno faltó". NO es un `status` nuevo a
+      // propósito: las tres queries de `appointment_repository.dart` y el cobro
+      // exigen `status == 'confirmed'`, así que un estado `no_show` sacaba la
+      // sesión de la agenda de las dos partes y la volvía incobrable.
+      //
+      // Las tres puertas, igual que `reason`:
+      //   · `create`  → `d.get('attendance', null) == null`, acá abajo.
+      //   · `update`  → la ESCRIBE sólo el Path 2 (el PF); el Path 1 la pinea.
+      //   · `delete`  → `if false`.
+      //
+      // ⚠️ `Appointment.toJson()` la OMITE cuando es null
+      // (`includeIfNull: false`). No es estética: es lo que deja que la app
+      // nueva cree turnos contra las reglas VIEJAS, que no tienen la clave en
+      // `hasOnly()`. Las reglas se despliegan aparte del binario y en cualquier
+      // orden; sin eso, el PF se quedaba sin poder agendar hasta el deploy.
       function appointmentShapeOk(d) {
         return d.keys().hasOnly(['id', 'trainerId', 'athleteId',
                                  'athleteDisplayName', 'startsAt',
                                  'durationMin', 'status', 'cancelledAt',
                                  'cancelledBy', 'cancellationLog',
                                  'noteBefore', 'noteAfter', 'recurringId',
-                                 'paymentId', 'reason'])
+                                 'paymentId', 'reason', 'attendance'])
                && d.keys().hasAll(['id', 'trainerId', 'athleteId',
                                    'athleteDisplayName', 'startsAt',
                                    'durationMin', 'status'])
@@ -3757,7 +3816,11 @@ service cloud.firestore {
                // turno nuevo no viene cancelado y no viene cobrado. La cota de
                // 128 que había acá antes era irrelevante — el daño no era el
                // tamaño, era que el valor existiera.
-               && d.get('paymentId', null) == null;
+               && d.get('paymentId', null) == null
+               // #1492 — …ni con la asistencia ya marcada. Una sesión que
+               // todavía no ocurrió no tiene a quién marcar ausente, y el
+               // `== null` fija el tipo de paso (ver `paymentId`, arriba).
+               && d.get('attendance', null) == null;
       }
 
       // Variante para `update`. Misma cota de claves y de texto, PERO sin el
@@ -3795,7 +3858,16 @@ service cloud.firestore {
                                  'durationMin', 'status', 'cancelledAt',
                                  'cancelledBy', 'cancellationLog',
                                  'noteBefore', 'noteAfter', 'recurringId',
-                                 'paymentId', 'reason'])
+                                 'paymentId', 'reason', 'attendance'])
+               // #1492 — `attendance` vale `null` o `'absent'`, y nada más.
+               // Condicionado a que CAMBIE, como el resto de este bloque: valida
+               // la escritura, no el documento heredado. Hoy no puede haber un
+               // doc con otro valor (el create la exige null y sólo el Path 2
+               // la escribe, acotada acá), pero el día que alguien la siembre
+               // mal por Admin SDK el turno se tiene que poder seguir cerrando.
+               && (d.get('attendance', null) == resource.data.get('attendance', null)
+                   || d.get('attendance', null) == null
+                   || d.get('attendance', null) == 'absent')
                // ⚠️ #831 (quinta pasada) — estos dos chequeos estaban
                // INCONDICIONALES, que es el mismo error que los bloques de
                // `durationMin` y `startsAt` de acá abajo documentan. Corren
@@ -3965,11 +4037,13 @@ service cloud.firestore {
       // recurrencia llegan a ~449. El porqué entero está en
       // `appointmentShapeOk()`, sobre el borde mismo.
       //
-      // Lo que este cambio NO arregla, y conviene tener escrito: un turno
-      // legítimo creado a menos de 24 h tampoco se puede cancelar, porque el
-      // Path 1 de abajo exige >24 h. Eso es un hueco de PRODUCTO preexistente
-      // —el cliente permite reservar más cerca que eso— y apretarlo acá
-      // rompería reservas válidas. Ver §4.9.
+      // Lo que este cambio NO arregló, y conviene tener escrito: un turno
+      // legítimo creado a menos de 24 h tampoco se podía cancelar, porque el
+      // Path 1 de abajo exigía >24 h a los DOS miembros. Era un hueco de
+      // PRODUCTO —el cliente permite reservar más cerca que eso— y apretarlo
+      // acá rompería reservas válidas. Ver §4.9. Desde #1492 el gate es sólo
+      // del atleta: el PF cancela su turno en cualquier momento, así que ese
+      // turno siempre tiene una salida.
       allow create: if request.auth != null
                     && request.resource.data.status == 'confirmed'
                     && appointmentShapeOk(request.resource.data)
@@ -4028,7 +4102,9 @@ service cloud.firestore {
       allow update: if request.auth != null
                     && appointmentUpdateShapeOk(request.resource.data)
                     && (
-        // Path 1: cancelación por un miembro con >24 h de anticipación.
+        // Path 1: cancelación por un miembro — el atleta con >24 h de
+        // anticipación, el PF en cualquier momento (#1492, ver el gate al
+        // final del camino).
         //
         // QA-SEC-014 residual (#831) — `cancelledBy` se pinea contra el actor.
         // Antes el camino no lo miraba: cualquiera de los dos miembros podía
@@ -4158,6 +4234,14 @@ service cloud.firestore {
          // imborrable de #781 otra vez, por la puerta que abre el fix.
          && request.resource.data.get('reason', null)
             == resource.data.get('reason', null)
+         // #1492 — la asistencia la escribe el PF por el Path 2, no una
+         // cancelación. Sin el pin, el ATLETA (que también es actor de este
+         // camino) se borraba un «faltó» de paso al cancelar, o se lo ponía a
+         // una sesión que no pasó: el vecino que escribe la misma variable de
+         // #831, de entrada. `.get()` en las dos mitades, como `reason`: el
+         // 99% de los turnos no tiene la clave.
+         && request.resource.data.get('attendance', null)
+            == resource.data.get('attendance', null)
          // ─── #847 — el gate de 24 h no puede ser la puerta que traba el doc ──
          //
          // Este gate lee `resource.data`, o sea el valor VIEJO, y lo leía con
@@ -4189,12 +4273,53 @@ service cloud.firestore {
          // El `.get()` cubre las dos formas del mismo daño —el campo con otro
          // tipo y el campo AUSENTE—, que es el residuo que quedó anotado junto
          // a éste y depende del mismo acceso directo.
-         && (!(resource.data.get('startsAt', null) is timestamp)
-             || resource.data.startsAt.toMillis() - 86400000
+         //
+         // ─── #1492 — el gate es del ATLETA, no del PF ──────────────────────
+         //
+         // Las 24 h protegen la agenda del PF de una baja de último momento
+         // del alumno. Aplicadas al PF lo dejaban sin salida: si se enfermaba
+         // a la mañana, no tenía cómo cancelar la sesión de la tarde, y el
+         // alumno se enteraba yendo al gimnasio. El PF es el dueño de la
+         // agenda —el mismo argumento por el que el Path 2 le deja corregir
+         // `durationMin`—, así que acá no hay gate de tiempo para él.
+         //
+         // Que no pueda cancelar una sesión que ya EMPEZÓ lo pone el cliente,
+         // no esta regla, y no por descuido: `startsAt` es wall-clock UTC
+         // (ADR-7), así que "ya empezó" depende de la zona del PF y la regla no
+         // la conoce. Y no custodia nada: cancelar una sesión propia pasada no
+         // mueve ni el cobro (`paymentId` pineado arriba) ni la firma.
+         //
+         // El disyunto lee `resource.data.trainerId`, el valor GUARDADO, que
+         // de todas formas está pineado más arriba: un atleta no puede
+         // pasar por acá reescribiéndose como PF del turno.
+         //
+         // ─── 21 h y no 24 h: son 24 h REALES en ART ───────────────────────
+         //
+         // `startsAt` es wall-clock etiquetado UTC (ADR-7): una sesión a las
+         // 10:00 de Buenos Aires se guarda como 10:00Z, pero OCURRE a las
+         // 13:00Z. `request.time` es el instante real. Con el `- 24 h` que
+         // había acá, el alumno tenía que cancelar antes de las 10:00Z del
+         // día anterior = 07:00 ART: 27 h antes de la sesión, no 24. Medido
+         // en el emulador: DENY a 25 h y a 26:59 reales, ALLOW a 27:01.
+         //
+         // Restar 21 h (= 24 h − el offset de ART) devuelve las 24 h reales, y
+         // deja la regla igual al cliente, que mide en wall-clock
+         // (`AppointmentRepository.cancel`, `AppointmentTile` de MI AGENDA).
+         //
+         // Fijar UTC−3 es la misma apuesta que ya hace la app
+         // (`core/utils/argentina_time.dart`): Argentina no tiene horario de
+         // verano desde 2009. Un alumno con el teléfono en otra zona sigue
+         // desfasado, igual que con todo ADR-7. La alternativa —guardar
+         // también el instante real del turno— agregaba una clave escrita por
+         // el cliente que esta regla no puede verificar, y se descartó.
+         && (request.auth.uid == resource.data.trainerId
+             || !(resource.data.get('startsAt', null) is timestamp)
+             || resource.data.startsAt.toMillis() - 75600000
                 > request.time.toMillis()))
         ||
         // Path 2: trainer edits coaching notes OR links a Payment on their own
-        // appointment (Slice 2a, Agenda→cobro bridge, money-critical).
+        // appointment (Slice 2a, Agenda→cobro bridge, money-critical) OR marks
+        // attendance (#1492).
         // status / athleteId / trainerId / startsAt stay immutable.
         //
         // ─── #831 (cuarta pasada) — `cancelledBy` acá era el mismo error ────
@@ -4268,6 +4393,18 @@ service cloud.firestore {
          // lección de #831, aplicada de entrada esta vez.
          && request.resource.data.get('reason', null)
             == resource.data.get('reason', null)
+         // #1492 — la asistencia es del PF y es de este camino. El VALOR lo
+         // acota `appointmentUpdateShapeOk()` (`null` o `'absent'`); acá va el
+         // CUÁNDO: sólo sobre un turno que sigue `confirmed`. Un «faltó» sobre
+         // una sesión cancelada no significa nada, y como ninguna query de
+         // `lib/` lee cancelados, nadie lo vería para corregirlo.
+         //
+         // El "sólo después de que empezó" lo pone el cliente, por el mismo
+         // motivo que en el Path 1: `startsAt` es wall-clock y la regla no
+         // conoce la zona del PF.
+         && (request.resource.data.get('attendance', null)
+               == resource.data.get('attendance', null)
+             || resource.data.get('status', null) == 'confirmed')
          && ((resource.data.get('paymentId', null) == null
               && request.resource.data.get('paymentId', null) is string
               && request.resource.data.get('paymentId', null).size() > 0)
@@ -4469,16 +4606,17 @@ service cloud.firestore {
       // shared by create and update: PerformanceTestRepository.add and .update
       // both `set(t.toJson())` the full model, no merge.
       //
-      // Bounds mirror this screen's OWN validator, which differs from the
-      // measurements one: log_performance_test_screen.dart rejects
-      // `parsed <= 0` and sets NO ceiling. So the floor here is strictly
-      // positive — note that includes sitAndReachCm, which is conventionally a
-      // SIGNED metric but which the form already refuses to take negative; the
-      // rule deliberately tracks the app's contract, not the textbook one.
-      // The 100000 ceiling is the part the client lacks: it exists purely to
-      // block absurd magnitudes (same spirit as payments' amountArs cap) and
-      // sits ~25x above the largest plausible value in the set (cooperMeters,
-      // ~4000 m for a world-class 12-minute test), so it cannot reject real data.
+      // #1485 — rangos POR CAMPO, acordados con producto el 2026-10-16, en vez
+      // del `> 0` con techo de 100000 que había. Espejan EXACTAMENTE
+      // `PerformanceTestRanges` (lib/features/performance/domain/
+      // performance_test_ranges.dart): si el cliente acepta algo que esto
+      // rechaza, el form dice «válido» y la escritura vuelve permission-denied.
+      // Los bordes son inclusivos. Dos cosas que el `> 0` viejo impedía:
+      //   - el 0 en saltos, 1RM, lastre de dominada y Cooper;
+      //   - sitAndReachCm negativo (−40..60): es una métrica CON SIGNO, no
+      //     llegar a la punta del pie da negativo.
+      // `unchanged(...)` sigue dejando pasar un valor viejo intacto: un doc
+      // con el CMJ de 999 del QA se puede editar en OTRO campo sin rebotar.
       //
       // `id` is type-checked but NOT pinned to the doc id — same reasoning as
       // the measurements guard above (PerformanceTestRepository._fromDoc also
@@ -4505,39 +4643,39 @@ service cloud.firestore {
                    || (prior.get('recordedAt', null) != null
                        && d.get('recordedAt', null) == prior.get('recordedAt', null)))
                && (unchanged(d, prior, 'cmjCm')
-                   || optPositiveNum(d.get('cmjCm', null), 100000))
+                   || optNumInRange(d.get('cmjCm', null), 0, 150))
                && (unchanged(d, prior, 'squatJumpCm')
-                   || optPositiveNum(d.get('squatJumpCm', null), 100000))
+                   || optNumInRange(d.get('squatJumpCm', null), 0, 150))
                && (unchanged(d, prior, 'abalakovCm')
-                   || optPositiveNum(d.get('abalakovCm', null), 100000))
+                   || optNumInRange(d.get('abalakovCm', null), 0, 150))
                && (unchanged(d, prior, 'broadJumpCm')
-                   || optPositiveNum(d.get('broadJumpCm', null), 100000))
+                   || optNumInRange(d.get('broadJumpCm', null), 0, 400))
                && (unchanged(d, prior, 'sprint10mS')
-                   || optPositiveNum(d.get('sprint10mS', null), 100000))
+                   || optNumInRange(d.get('sprint10mS', null), 1, 5))
                && (unchanged(d, prior, 'sprint20mS')
-                   || optPositiveNum(d.get('sprint20mS', null), 100000))
+                   || optNumInRange(d.get('sprint20mS', null), 2, 8))
                && (unchanged(d, prior, 'sprint30mS')
-                   || optPositiveNum(d.get('sprint30mS', null), 100000))
+                   || optNumInRange(d.get('sprint30mS', null), 3, 10))
                && (unchanged(d, prior, 'sprint40mS')
-                   || optPositiveNum(d.get('sprint40mS', null), 100000))
+                   || optNumInRange(d.get('sprint40mS', null), 4, 12))
                && (unchanged(d, prior, 'squat1rmKg')
-                   || optPositiveNum(d.get('squat1rmKg', null), 100000))
+                   || optNumInRange(d.get('squat1rmKg', null), 0, 500))
                && (unchanged(d, prior, 'benchPress1rmKg')
-                   || optPositiveNum(d.get('benchPress1rmKg', null), 100000))
+                   || optNumInRange(d.get('benchPress1rmKg', null), 0, 500))
                && (unchanged(d, prior, 'deadlift1rmKg')
-                   || optPositiveNum(d.get('deadlift1rmKg', null), 100000))
+                   || optNumInRange(d.get('deadlift1rmKg', null), 0, 500))
                && (unchanged(d, prior, 'overheadPress1rmKg')
-                   || optPositiveNum(d.get('overheadPress1rmKg', null), 100000))
+                   || optNumInRange(d.get('overheadPress1rmKg', null), 0, 500))
                && (unchanged(d, prior, 'pullUp1rmKg')
-                   || optPositiveNum(d.get('pullUp1rmKg', null), 100000))
+                   || optNumInRange(d.get('pullUp1rmKg', null), 0, 200))
                && (unchanged(d, prior, 'vo2maxMlKgMin')
-                   || optPositiveNum(d.get('vo2maxMlKgMin', null), 100000))
+                   || optNumInRange(d.get('vo2maxMlKgMin', null), 10, 95))
                && (unchanged(d, prior, 'courseNavetteLevel')
-                   || optPositiveNum(d.get('courseNavetteLevel', null), 100000))
+                   || optNumInRange(d.get('courseNavetteLevel', null), 1, 21))
                && (unchanged(d, prior, 'cooperMeters')
-                   || optPositiveNum(d.get('cooperMeters', null), 100000))
+                   || optNumInRange(d.get('cooperMeters', null), 0, 5000))
                && (unchanged(d, prior, 'sitAndReachCm')
-                   || optPositiveNum(d.get('sitAndReachCm', null), 100000))
+                   || optNumInRange(d.get('sitAndReachCm', null), -40, 60))
                // #849 — `notes` queda INCONDICIONAL por la misma decisión y
                // el mismo motivo que en `measurementShapeOk`, donde está el
                // argumento entero: la cota entró en el mismo commit que las

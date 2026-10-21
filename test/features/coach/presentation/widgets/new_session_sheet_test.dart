@@ -26,6 +26,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_select.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/firestore_write.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -33,6 +35,7 @@ import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/data/availability_repository.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/availability_override.dart';
+import 'package:treino/features/coach/domain/availability_rule.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/widgets/new_session_sheet.dart';
@@ -65,11 +68,21 @@ class _FakeAvailabilityRepository extends Fake
     implements AvailabilityRepository {
   _FakeAvailabilityRepository({
     this.overrides = const [],
+    this.rules = const [],
     this.shouldThrow = false,
   });
 
   final List<AvailabilityOverride> overrides;
+  final List<AvailabilityRule> rules;
   final bool shouldThrow;
+
+  @override
+  Stream<List<AvailabilityRule>> watchRules(String trainerId) {
+    if (shouldThrow) {
+      return Stream.error(Exception('permission-denied'));
+    }
+    return Stream.value(rules);
+  }
 
   @override
   Stream<List<AvailabilityOverride>> watchOverrides(
@@ -146,6 +159,7 @@ Appointment _fakeAppointment({
 /// l10n + theme setup used by marcar_pagado_test.dart and the web dialog test.
 Widget _wrap({
   DateTime? initialDate,
+  TimeOfDay? initialTime,
   required List<Override> overrides,
 }) =>
     ProviderScope(
@@ -156,7 +170,10 @@ Widget _wrap({
         supportedLocales: AppL10n.supportedLocales,
         locale: const Locale('es', 'AR'),
         home: Scaffold(
-          body: NewSessionSheet(initialDate: initialDate),
+          body: NewSessionSheet(
+            initialDate: initialDate,
+            initialTime: initialTime,
+          ),
         ),
       ),
     );
@@ -203,7 +220,7 @@ List<Override> _overrides({
 /// Selects the (only) active athlete in the dropdown. The sheet requires an
 /// athlete before the submit button becomes enabled.
 Future<void> _selectAthlete(WidgetTester tester, String displayName) async {
-  await tester.tap(find.byType(DropdownButtonFormField<String>));
+  await tester.tap(find.byType(TreinoSelectField<String>));
   await tester.pumpAndSettle();
   await tester.tap(find.text(displayName).last);
   await tester.pumpAndSettle();
@@ -881,6 +898,39 @@ void main() {
     });
   });
 
+  // ── #1491: el selector de alumno no desborda la pantalla ────────────────
+  // El menú de Material tocaba los dos bordes del celular. Ahora es la hoja
+  // del kit: ocupa el ancho de la pantalla a propósito y marca al elegido.
+  group('Selector de alumno (#1491)', () {
+    testWidgets('abre la hoja de Treino y el alumno elegido queda en el campo',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(TreinoSelectField<String>));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('treino_select_title')), findsOneWidget);
+
+      await tester.tap(find.text('Carlos Pérez').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('treino_select_title')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(TreinoSelectField<String>),
+          matching: find.text('Carlos Pérez'),
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
   // ── H3: a failed links read must not read as "no athletes" ─────────────────
   group('H3 — links error surfaces a retry, not a false "no athletes"', () {
     testWidgets(
@@ -896,6 +946,360 @@ void main() {
       expect(find.text('Reintentar'), findsOneWidget);
       // ...so a transient failure never claims the trainer has no athletes.
       expect(find.text('No tenés alumnos activos.'), findsNothing);
+    });
+  });
+
+  // ── #1490: la hora por defecto no puede proponer el pasado ─────────────────
+  group('#1490 — hora por defecto', () {
+    tearDown(AppClock.unfreeze);
+
+    testWidgets('hoy a las 9:51 arranca en 10:00, no en 9:00', (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 9, 51));
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(overrides: _overrides()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('10:00'), findsOneWidget);
+      expect(find.text('9:00'), findsNothing);
+    });
+
+    testWidgets('hoy antes de las 9:00 sigue arrancando en 9:00',
+        (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 7, 40));
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(overrides: _overrides()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('9:00'), findsOneWidget);
+    });
+
+    testWidgets('una hora elegida por el timeline se respeta tal cual',
+        (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 9, 51));
+      _useTallViewport(tester);
+      await tester.pumpWidget(ProviderScope(
+        overrides: _overrides(),
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          home: Scaffold(
+            body: NewSessionSheet(
+              initialDate: DateTime(2026, 10, 25),
+              initialTime: const TimeOfDay(hour: 7, minute: 15),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('7:15'), findsOneWidget);
+    });
+  });
+
+  // ── #1490: los avisos del sheet tienen que verse ENCIMA del sheet ─────────
+  //
+  // Los tests de arriba montan el sheet como `body` de un Scaffold, así que
+  // nunca vieron el caso real: abierto con `showModalBottomSheet`, un
+  // `SnackBar` lo pinta el Scaffold de ATRÁS y el sheet lo tapa.
+  group('#1490 — aviso desde el sheet abierto como modal', () {
+    testWidgets('duración inválida → el aviso es tocable encima del sheet',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _overrides(
+            links: [_activeLink(_kAthleteId1)],
+            profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+            appointmentRepo: mockAppointmentRepo,
+          ),
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) =>
+                        NewSessionSheet(initialDate: targetDateOnly),
+                  ),
+                  child: const Text('abrir'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      await _selectAthlete(tester, 'Carlos Pérez');
+      await tester.enterText(find.widgetWithText(TextField, '60'), '2');
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      const aviso = 'Ingresá una duración válida (5–480 min).';
+      // Si lo pintara el Scaffold de atrás existiría pero el sheet lo taparía.
+      expect(find.text(aviso).hitTestable(), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+
+      // El toast por Overlay se cierra solo: no deja Timers colgando.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text(aviso), findsNothing);
+    });
+  });
+
+  // ── #1493: aviso de superposición / fuera de la disponibilidad ─────────────
+  //
+  // Aviso con "Cargar igual", no bloqueo: un PF puede superponer a propósito.
+  group('Conflictos al agendar (#1493)', () {
+    // Viernes 16/10/2026 10:15, hora local del dispositivo. El lunes 19 es
+    // el primer lunes futuro.
+    setUp(() => AppClock.freeze(DateTime(2026, 10, 16, 10, 15)));
+    tearDown(AppClock.unfreeze);
+
+    final lunes = DateTime(2026, 10, 19);
+
+    AvailabilityRule regla(int dia, int desde, int hasta) => AvailabilityRule(
+          id: 'r-$dia-$desde',
+          trainerId: _kTrainerId,
+          dayOfWeek: dia,
+          startHour: desde,
+          startMinute: 0,
+          endHour: hasta,
+          endMinute: 0,
+          slotDurationMin: 60,
+        );
+
+    Appointment sofia() => Appointment(
+          id: 'sofia',
+          trainerId: _kTrainerId,
+          athleteId: 'athlete-sofia',
+          athleteDisplayName: 'Sofía Ramírez',
+          startsAt: DateTime.utc(2026, 10, 19, 17),
+          durationMin: 60,
+          status: AppointmentStatus.confirmed,
+        );
+
+    void agendaDelPf(List<Appointment> existentes) {
+      when(
+        () => mockAppointmentRepo.watchForTrainer(
+          any(),
+          fromDate: any(named: 'fromDate'),
+          toDate: any(named: 'toDate'),
+        ),
+      ).thenAnswer((_) => Stream.value(existentes));
+    }
+
+    Future<void> abrir(
+      WidgetTester tester, {
+      TimeOfDay? hora,
+      List<AvailabilityRule> reglas = const [],
+    }) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(
+        initialDate: lunes,
+        initialTime: hora,
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+          availabilityRepo: _FakeAvailabilityRepository(rules: reglas),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await _selectAthlete(tester, 'Carlos Pérez');
+    }
+
+    void verificarCreada({required int veces}) {
+      Future<Appointment> llamada() => mockAppointmentRepo.createByTrainer(
+            trainerId: _kTrainerId,
+            athleteId: _kAthleteId1,
+            athleteDisplayName: 'Carlos Pérez',
+            startsAt: DateTime.utc(2026, 10, 19, 17),
+            durationMin: 60,
+            noteBefore: any(named: 'noteBefore'),
+          );
+      if (veces == 0) {
+        verifyNever(llamada);
+      } else {
+        verify(llamada).called(veces);
+      }
+    }
+
+    testWidgets(
+        'el caso del QA: Martín 17–18 encima de Sofía 17–18 avisa; '
+        '"Cargar igual" agenda', (tester) async {
+      agendaDelPf([sofia()]);
+      await abrir(tester, hora: const TimeOfDay(hour: 17, minute: 0));
+
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Revisá el horario'), findsOneWidget);
+      expect(
+        find.textContaining('Se superpone con Sofía Ramírez (17:00 – 18:00).'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('fuera de tu disponibilidad'), findsNothing);
+      // Todavía no se agendó nada: es un aviso, la decisión es del PF.
+      verificarCreada(veces: 0);
+
+      await tester.tap(find.text('Cargar igual'));
+      await tester.pumpAndSettle();
+
+      verificarCreada(veces: 1);
+    });
+
+    testWidgets('cancelar en el aviso NO agenda', (tester) async {
+      agendaDelPf([sofia()]);
+      await abrir(tester, hora: const TimeOfDay(hour: 17, minute: 0));
+
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Revisá el horario'), findsNothing);
+      verificarCreada(veces: 0);
+    });
+
+    testWidgets(
+        'fuera de la disponibilidad publicada (Lun 9–13, sesión a las 17) '
+        'avisa sólo eso', (tester) async {
+      agendaDelPf(const []);
+      await abrir(
+        tester,
+        hora: const TimeOfDay(hour: 17, minute: 0),
+        reglas: [regla(DateTime.monday, 9, 13)],
+      );
+
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Revisá el horario'), findsOneWidget);
+      expect(
+        find.textContaining('Queda fuera de tu disponibilidad publicada.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Se superpone'), findsNothing);
+    });
+
+    testWidgets('dentro de la disponibilidad y sin choques: agenda directo',
+        (tester) async {
+      agendaDelPf([sofia()]);
+      await abrir(
+        tester,
+        hora: const TimeOfDay(hour: 10, minute: 0),
+        reglas: [regla(DateTime.monday, 9, 13)],
+      );
+
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Revisá el horario'), findsNothing);
+      verify(
+        () => mockAppointmentRepo.createByTrainer(
+          trainerId: _kTrainerId,
+          athleteId: _kAthleteId1,
+          athleteDisplayName: 'Carlos Pérez',
+          startsAt: DateTime.utc(2026, 10, 19, 10),
+          durationMin: 60,
+          noteBefore: any(named: 'noteBefore'),
+        ),
+      ).called(1);
+    });
+
+    testWidgets(
+        'pegada a otra (Sofía 17–18, la nueva 18–19) no es superposición',
+        (tester) async {
+      agendaDelPf([sofia()]);
+      await abrir(tester, hora: const TimeOfDay(hour: 18, minute: 0));
+
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Revisá el horario'), findsNothing);
+    });
+
+    testWidgets(
+        'si la lectura de la agenda falla, NO frena: agenda sin el aviso '
+        '(falla abierto)', (tester) async {
+      when(
+        () => mockAppointmentRepo.watchForTrainer(
+          any(),
+          fromDate: any(named: 'fromDate'),
+          toDate: any(named: 'toDate'),
+        ),
+      ).thenAnswer((_) => Stream.error(Exception('permission-denied')));
+      await abrir(tester, hora: const TimeOfDay(hour: 17, minute: 0));
+
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Revisá el horario'), findsNothing);
+      verificarCreada(veces: 1);
+    });
+
+    testWidgets(
+        'serie: avisa en cuántas fechas queda fuera de la disponibilidad y '
+        '"Cargar igual" crea la serie', (tester) async {
+      agendaDelPf(const []);
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+          // Lunes 13–15; la serie arranca a las 10:30 (la hora default de
+          // hoy a las 10:15: la próxima media hora) → las cuatro fechas
+          // quedan afuera.
+          availabilityRepo: _FakeAvailabilityRepository(
+            rules: [regla(DateTime.monday, 13, 15)],
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Se repite'));
+      await tester.pumpAndSettle();
+      await _selectAthlete(tester, 'Carlos Pérez');
+      await tester.tap(find.text('L'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('REGISTRAR SERIE'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Revisá el horario'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '4 sesiones de la serie quedan fuera de tu disponibilidad publicada.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Cargar igual'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockAppointmentRepo.createRecurringByTrainer(
+          trainerId: _kTrainerId,
+          athleteId: _kAthleteId1,
+          athleteDisplayName: 'Carlos Pérez',
+          weekdays: any(named: 'weekdays'),
+          startHour: 10,
+          startMinute: 30,
+          durationMin: 60,
+          fromDate: any(named: 'fromDate'),
+          untilDate: any(named: 'untilDate'),
+          noteBefore: any(named: 'noteBefore'),
+        ),
+      ).called(1);
     });
   });
 }

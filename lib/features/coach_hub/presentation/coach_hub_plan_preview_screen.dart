@@ -44,6 +44,7 @@ import 'widgets/filter_chips/filter_chips.dart';
 import 'widgets/import_plan_widgets.dart';
 import 'widgets/periodized_plan_preview.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Preview del plan importado. Muestra:
 /// - Nombre / días / semanas / nivel
@@ -322,8 +323,10 @@ class _CoachHubPlanPreviewScreenState
     final msg = athleteIds.length == 1
         ? 'Plan asignado correctamente.'
         : 'Plan asignado a ${athleteIds.length} atletas.';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
+    showTreinoToast(
+      context,
+      msg,
+      type: TreinoToastType.success,
     );
     context.go('/dashboard');
   }
@@ -620,7 +623,7 @@ class _CoachHubPlanPreviewScreenState
                       Text(
                         _error!,
                         textAlign: TextAlign.center,
-                        style: importText(palette.danger,
+                        style: importText(palette.dangerText,
                             size: AppTextSize.bodyDense),
                       ),
                     ],

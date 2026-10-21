@@ -6,12 +6,17 @@ import 'package:intl/intl.dart' as intl;
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
-import '../../../core/widgets/motion/treino_success_check.dart';
+import '../../../core/widgets/form_scroll_to_error.dart';
+import '../../../core/utils/kg_format.dart';
+import '../../../core/utils/metric_range.dart';
+import '../../../core/utils/metric_range_message.dart';
 import '../../../l10n/app_l10n.dart';
+import '../domain/performance_test_ranges.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/performance_test_providers.dart';
 import '../domain/performance_test.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ── Date header ──────────────────────────────────────────────────────────────
 
@@ -42,10 +47,23 @@ String _formatDateTime(DateTime dt, String localeName) {
 /// ```
 ///
 /// All fields are optional — the trainer saves whatever metrics they tested.
+///
+/// Con [initial] EDITA una evaluación existente (#1485): pre-carga cada campo
+/// y guarda con `update()` preservando `id`/`athleteId`/`recordedBy`/
+/// `recordedAt` — lo que exige la regla de update de `performance_tests`.
+/// Sólo el autor (`initial.recordedBy == currentUid`) llega a este modo: el
+/// historial no ofrece el lápiz en filas ajenas.
 class LogPerformanceTestScreen extends ConsumerStatefulWidget {
-  const LogPerformanceTestScreen({super.key, required this.athleteId});
+  const LogPerformanceTestScreen({
+    super.key,
+    required this.athleteId,
+    this.initial,
+  });
 
   final String athleteId;
+
+  /// Evaluación a corregir; null = alta nueva.
+  final PerformanceTest? initial;
 
   @override
   ConsumerState<LogPerformanceTestScreen> createState() =>
@@ -87,6 +105,12 @@ class _LogPerformanceTestScreenState
   bool _saving = false;
   bool _hasAnyMetric = false;
 
+  /// Hay al menos una métrica fuera de rango o no numérica (#1485).
+  bool _hasInvalid = false;
+
+  /// Las notas tienen texto. Sólo cuenta en edición — ver [_hasContent].
+  bool _hasNotes = false;
+
   /// Every metric controller (excludes [_notesCtrl]) — used to detect whether
   /// at least one metric has a value so empty evaluations can't be saved.
   late final List<TextEditingController> _metricCtrls;
@@ -94,24 +118,34 @@ class _LogPerformanceTestScreenState
   @override
   void initState() {
     super.initState();
-    _cmjCtrl = TextEditingController();
-    _squatJumpCtrl = TextEditingController();
-    _abalakovCtrl = TextEditingController();
-    _broadJumpCtrl = TextEditingController();
-    _sprint10Ctrl = TextEditingController();
-    _sprint20Ctrl = TextEditingController();
-    _sprint30Ctrl = TextEditingController();
-    _sprint40Ctrl = TextEditingController();
-    _squat1rmCtrl = TextEditingController();
-    _benchPress1rmCtrl = TextEditingController();
-    _deadlift1rmCtrl = TextEditingController();
-    _overheadPress1rmCtrl = TextEditingController();
-    _pullUp1rmCtrl = TextEditingController();
-    _vo2maxCtrl = TextEditingController();
-    _courseNavetteCtrl = TextEditingController();
-    _cooperCtrl = TextEditingController();
-    _sitAndReachCtrl = TextEditingController();
-    _notesCtrl = TextEditingController();
+    // Edición (#1485): cada campo arranca con el valor guardado, sin ".0".
+    final i = widget.initial;
+    _cmjCtrl = TextEditingController(text: formatWeightKg(i?.cmjCm));
+    _squatJumpCtrl =
+        TextEditingController(text: formatWeightKg(i?.squatJumpCm));
+    _abalakovCtrl = TextEditingController(text: formatWeightKg(i?.abalakovCm));
+    _broadJumpCtrl =
+        TextEditingController(text: formatWeightKg(i?.broadJumpCm));
+    _sprint10Ctrl = TextEditingController(text: formatWeightKg(i?.sprint10mS));
+    _sprint20Ctrl = TextEditingController(text: formatWeightKg(i?.sprint20mS));
+    _sprint30Ctrl = TextEditingController(text: formatWeightKg(i?.sprint30mS));
+    _sprint40Ctrl = TextEditingController(text: formatWeightKg(i?.sprint40mS));
+    _squat1rmCtrl = TextEditingController(text: formatWeightKg(i?.squat1rmKg));
+    _benchPress1rmCtrl =
+        TextEditingController(text: formatWeightKg(i?.benchPress1rmKg));
+    _deadlift1rmCtrl =
+        TextEditingController(text: formatWeightKg(i?.deadlift1rmKg));
+    _overheadPress1rmCtrl =
+        TextEditingController(text: formatWeightKg(i?.overheadPress1rmKg));
+    _pullUp1rmCtrl =
+        TextEditingController(text: formatWeightKg(i?.pullUp1rmKg));
+    _vo2maxCtrl = TextEditingController(text: formatWeightKg(i?.vo2maxMlKgMin));
+    _courseNavetteCtrl =
+        TextEditingController(text: formatWeightKg(i?.courseNavetteLevel));
+    _cooperCtrl = TextEditingController(text: formatWeightKg(i?.cooperMeters));
+    _sitAndReachCtrl =
+        TextEditingController(text: formatWeightKg(i?.sitAndReachCm));
+    _notesCtrl = TextEditingController(text: i?.notes ?? '');
 
     _metricCtrls = [
       _cmjCtrl,
@@ -135,22 +169,53 @@ class _LogPerformanceTestScreenState
     for (final ctrl in _metricCtrls) {
       ctrl.addListener(_recomputeHasAnyMetric);
     }
+    _notesCtrl.addListener(_recomputeHasAnyMetric);
+    _hasNotes = _notesCtrl.text.trim().isNotEmpty;
+    // En edición los campos ya traen valores: GUARDAR tiene que reflejarlo
+    // desde el primer frame.
+    _hasAnyMetric = _metricCtrls.any((c) => c.text.trim().isNotEmpty);
+    _hasInvalid = _metricCtrls.any((c) => _ranges[c]!.check(c.text).isError);
+    // Un valor viejo fuera de rango (el CMJ de 999 del QA) deja GUARDAR
+    // deshabilitado; `onUserInteraction` no mostraría el error hasta tocar ESE
+    // campo. Validar al primer frame para que diga qué corregir (Codex, #1524).
+    if (_hasInvalid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _formKey.currentState?.validate();
+      });
+    }
   }
 
   /// Recomputes whether any metric field is non-empty so the Save button
   /// reflects it. Cheap string check; only calls [setState] on a real change.
   void _recomputeHasAnyMetric() {
     final hasAny = _metricCtrls.any((c) => c.text.trim().isNotEmpty);
-    if (hasAny != _hasAnyMetric) {
-      setState(() => _hasAnyMetric = hasAny);
+    final invalid = _metricCtrls.any((c) => _ranges[c]!.check(c.text).isError);
+    final notes = _notesCtrl.text.trim().isNotEmpty;
+    if (hasAny != _hasAnyMetric ||
+        invalid != _hasInvalid ||
+        notes != _hasNotes) {
+      setState(() {
+        _hasAnyMetric = hasAny;
+        _hasInvalid = invalid;
+        _hasNotes = notes;
+      });
     }
   }
+
+  /// Hay algo que guardar. Un ALTA exige al menos una métrica (una evaluación
+  /// vacía no aporta nada). Una EDICIÓN acepta también sólo notas: el Coach
+  /// Hub crea evaluaciones con todos los campos opcionales, y sin esto el
+  /// lápiz del historial abría un form que nunca habilitaba GUARDAR (Codex,
+  /// #1532).
+  bool get _hasContent =>
+      _hasAnyMetric || (widget.initial != null && _hasNotes);
 
   @override
   void dispose() {
     for (final ctrl in _metricCtrls) {
       ctrl.removeListener(_recomputeHasAnyMetric);
     }
+    _notesCtrl.removeListener(_recomputeHasAnyMetric);
     _cmjCtrl.dispose();
     _squatJumpCtrl.dispose();
     _abalakovCtrl.dispose();
@@ -181,21 +246,32 @@ class _LogPerformanceTestScreenState
     return double.tryParse(raw);
   }
 
-  /// Validates a numeric metric field. Empty is valid (all fields optional);
-  /// non-numeric input or a non-positive value surfaces inline error text so a
-  /// typo like `12.x.3` is never silently dropped. Reuses the existing generic
-  /// "valid number" string — a non-parseable or non-positive measurement is not
-  /// a valid value, so the same message covers both cases.
-  String? _validateMetric(String? value) {
-    final l10n = AppL10n.of(context);
-    final raw = (value ?? '').trim().replaceAll(',', '.');
-    if (raw.isEmpty) return null;
-    final parsed = double.tryParse(raw);
-    if (parsed == null || parsed <= 0) {
-      return l10n.profileEditPersonalWeightInvalidNumber;
-    }
-    return null;
-  }
+  /// Rango de cada métrica (#1485).
+  late final Map<TextEditingController, MetricRange> _ranges = {
+    _cmjCtrl: PerformanceTestRanges.verticalJumpCm,
+    _squatJumpCtrl: PerformanceTestRanges.verticalJumpCm,
+    _abalakovCtrl: PerformanceTestRanges.verticalJumpCm,
+    _broadJumpCtrl: PerformanceTestRanges.broadJumpCm,
+    _sprint10Ctrl: PerformanceTestRanges.sprint10mS,
+    _sprint20Ctrl: PerformanceTestRanges.sprint20mS,
+    _sprint30Ctrl: PerformanceTestRanges.sprint30mS,
+    _sprint40Ctrl: PerformanceTestRanges.sprint40mS,
+    _squat1rmCtrl: PerformanceTestRanges.oneRepMaxKg,
+    _benchPress1rmCtrl: PerformanceTestRanges.oneRepMaxKg,
+    _deadlift1rmCtrl: PerformanceTestRanges.oneRepMaxKg,
+    _overheadPress1rmCtrl: PerformanceTestRanges.oneRepMaxKg,
+    _pullUp1rmCtrl: PerformanceTestRanges.pullUpLoadKg,
+    _vo2maxCtrl: PerformanceTestRanges.vo2maxMlKgMin,
+    _courseNavetteCtrl: PerformanceTestRanges.courseNavetteLevel,
+    _cooperCtrl: PerformanceTestRanges.cooperMeters,
+    _sitAndReachCtrl: PerformanceTestRanges.sitAndReachCm,
+  };
+
+  /// Validator de un campo contra su rango. Vacío es válido (todos los campos
+  /// son opcionales); un typo como `12.x.3` o un CMJ de 999 cm muestra el
+  /// error inline en vez de guardarse.
+  FormFieldValidator<String> _validatorFor(TextEditingController ctrl) =>
+      (value) => metricRangeError(_ranges[ctrl]!, value, AppL10n.of(context));
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
@@ -204,10 +280,10 @@ class _LogPerformanceTestScreenState
     final l10n = AppL10n.of(context);
     final trainerUid = ref.read(currentUidProvider);
     if (trainerUid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.performanceLogNoSession),
-        ),
+      showTreinoToast(
+        context,
+        l10n.performanceLogNoSession,
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -215,19 +291,27 @@ class _LogPerformanceTestScreenState
     // Block empty evaluations: at least one metric must be filled before save.
     // The Save button is already disabled while [_hasAnyMetric] is false
     // (see `canSave` in build), so this is a defensive guard only.
-    if (!_hasAnyMetric) return;
+    if (!_hasContent) return;
 
     // Surface inline errors for any non-numeric / non-positive field instead of
     // silently dropping the value via tryParse.
-    if (!(_formKey.currentState?.validate() ?? true)) return;
+    if (!validateAndRevealFirstError(_formKey)) return;
 
     setState(() => _saving = true);
 
+    final initial = widget.initial;
+    assert(
+      initial == null || initial.recordedBy == trainerUid,
+      'sólo el autor edita: la regla de update pinea recordedBy',
+    );
+    // Edición: id, alumno, autor y fecha se conservan — la regla de update
+    // rechaza cualquier cambio de athleteId/recordedBy, y corregir un valor
+    // no mueve el punto en la línea de tiempo.
     final test = PerformanceTest(
-      id: '',
-      athleteId: widget.athleteId,
-      recordedBy: trainerUid,
-      recordedAt: DateTime.now().toUtc(),
+      id: initial?.id ?? '',
+      athleteId: initial?.athleteId ?? widget.athleteId,
+      recordedBy: initial?.recordedBy ?? trainerUid,
+      recordedAt: initial?.recordedAt ?? DateTime.now().toUtc(),
       cmjCm: _parseDouble(_cmjCtrl),
       squatJumpCm: _parseDouble(_squatJumpCtrl),
       abalakovCm: _parseDouble(_abalakovCtrl),
@@ -249,30 +333,30 @@ class _LogPerformanceTestScreenState
     );
 
     try {
-      await ref.read(performanceTestRepositoryProvider).add(test);
+      final repo = ref.read(performanceTestRepositoryProvider);
+      if (initial != null) {
+        await repo.update(test);
+      } else {
+        await repo.add(test);
+      }
       if (!mounted) return;
+      // Messenger capturado ANTES del pop: después la pantalla se desmonta.
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // El pop ya pasó (línea de arriba) — no compite con ninguna
-              // navegación.
-              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              const SizedBox(width: 10),
-              Flexible(child: Text(l10n.performanceLogSaveSuccess)),
-            ],
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        initial != null
+            ? l10n.performanceLogUpdateSuccess
+            : l10n.performanceLogSaveSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.performanceLogSaveError),
-        ),
+      showTreinoToast(
+        context,
+        l10n.performanceLogSaveError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -284,10 +368,13 @@ class _LogPerformanceTestScreenState
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final trainerUid = ref.watch(currentUidProvider);
-    final canSave = trainerUid != null && !_saving && _hasAnyMetric;
+    // Deshabilitado mientras haya un valor fuera de rango (#1485).
+    final canSave =
+        trainerUid != null && !_saving && _hasContent && !_hasInvalid;
     // Real instant; _formatDateTime localizes it for display (#392). The record
     // is still persisted as UTC in _save — same instant, shown in local time.
-    final now = DateTime.now();
+    // Alta muestra «ahora»; edición, la fecha original de la evaluación.
+    final now = widget.initial?.recordedAt ?? DateTime.now();
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -316,7 +403,9 @@ class _LogPerformanceTestScreenState
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        l10n.performanceLogTitle,
+                        widget.initial != null
+                            ? l10n.performanceLogTitleEdit
+                            : l10n.performanceLogTitle,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -352,7 +441,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldCmj,
                         controller: _cmjCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_cmjCtrl),
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -360,7 +449,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSquatJump,
                         controller: _squatJumpCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_squatJumpCtrl),
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -368,7 +457,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldAbalakov,
                         controller: _abalakovCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_abalakovCtrl),
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -376,7 +465,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldBroadJump,
                         controller: _broadJumpCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_broadJumpCtrl),
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -388,7 +477,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSprint10,
                         controller: _sprint10Ctrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_sprint10Ctrl),
                         palette: palette,
                         suffix: 's',
                       ),
@@ -396,7 +485,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSprint20,
                         controller: _sprint20Ctrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_sprint20Ctrl),
                         palette: palette,
                         suffix: 's',
                       ),
@@ -404,7 +493,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSprint30,
                         controller: _sprint30Ctrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_sprint30Ctrl),
                         palette: palette,
                         suffix: 's',
                       ),
@@ -412,7 +501,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSprint40,
                         controller: _sprint40Ctrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_sprint40Ctrl),
                         palette: palette,
                         suffix: 's',
                       ),
@@ -425,7 +514,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSquat1rm,
                         controller: _squat1rmCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_squat1rmCtrl),
                         palette: palette,
                         suffix: 'kg',
                       ),
@@ -433,7 +522,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldBenchPress,
                         controller: _benchPress1rmCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_benchPress1rmCtrl),
                         palette: palette,
                         suffix: 'kg',
                       ),
@@ -441,7 +530,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldDeadlift,
                         controller: _deadlift1rmCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_deadlift1rmCtrl),
                         palette: palette,
                         suffix: 'kg',
                       ),
@@ -449,7 +538,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldOverheadPress,
                         controller: _overheadPress1rmCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_overheadPress1rmCtrl),
                         palette: palette,
                         suffix: 'kg',
                       ),
@@ -457,7 +546,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldPullUp,
                         controller: _pullUp1rmCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_pullUp1rmCtrl),
                         palette: palette,
                         suffix: 'kg',
                       ),
@@ -470,7 +559,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldVo2max,
                         controller: _vo2maxCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_vo2maxCtrl),
                         palette: palette,
                         suffix: 'ml/kg/min',
                       ),
@@ -478,14 +567,14 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldCourseNavette,
                         controller: _courseNavetteCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_courseNavetteCtrl),
                         palette: palette,
                       ),
                       const SizedBox(height: 12),
                       _numericField(
                         label: l10n.performanceLogFieldCooper,
                         controller: _cooperCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_cooperCtrl),
                         palette: palette,
                         suffix: 'm',
                       ),
@@ -493,7 +582,8 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSitAndReach,
                         controller: _sitAndReachCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_sitAndReachCtrl),
+                        allowNegative: true,
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -552,7 +642,9 @@ class _LogPerformanceTestScreenState
                           ),
                         )
                       : Text(
-                          l10n.performanceLogSaveCta,
+                          widget.initial != null
+                              ? l10n.performanceLogUpdateCta
+                              : l10n.performanceLogSaveCta,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
@@ -631,6 +723,7 @@ Widget _numericField({
   required AppPalette palette,
   String? suffix,
   String? Function(String?)? validator,
+  bool allowNegative = false,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -646,13 +739,20 @@ Widget _numericField({
       const SizedBox(height: 6),
       TextFormField(
         controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        // `signed` en iOS cambia el teclado numérico por uno con signo menos:
+        // sólo donde el rango admite negativos (sit and reach).
+        keyboardType: TextInputType.numberWithOptions(
+          decimal: true,
+          signed: allowNegative,
+        ),
         // Allow digits and decimal separators (, or .) only; blocks letters and
         // stray symbols at the keyboard level. Multiple separators (e.g.
         // '1.2.3') can still be typed, so the validator is the source of truth
         // and rejects any value double.tryParse can't read.
         inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+          FilteringTextInputFormatter.allow(
+            allowNegative ? RegExp(r'[-0-9.,]') : RegExp(r'[0-9.,]'),
+          ),
         ],
         validator: validator,
         style: GoogleFonts.barlow(

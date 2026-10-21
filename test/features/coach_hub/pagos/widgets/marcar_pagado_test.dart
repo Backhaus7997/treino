@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/marcar_pagado_actions.dart';
@@ -223,8 +224,8 @@ void main() {
       await tester.tap(find.byKey(const Key('trigger')));
       await tester.pumpAndSettle();
 
-      // Dropdown must be hidden — athleteId was passed positionally.
-      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      // The athlete selector must be hidden — athleteId was passed positionally.
+      expect(find.byType(TreinoSelectField<String>), findsNothing);
 
       await tester.enterText(
           find.widgetWithText(TextField, 'Monto (ARS)'), '2500');

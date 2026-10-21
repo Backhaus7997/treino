@@ -21,6 +21,29 @@ void main() {
       expect(find.text('6'), findsOneWidget);
     });
 
+    testWidgets('#1512: la unidad va al lado del número, no en el label',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const StatTile(label: 'DURACIÓN', value: '2', unit: 'min'),
+      ));
+      expect(find.text('DURACIÓN'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      expect(find.text('min'), findsOneWidget);
+      // Misma línea, a la derecha del número.
+      final numero = tester.getRect(find.text('2'));
+      final unidad = tester.getRect(find.text('min'));
+      expect(unidad.left, greaterThan(numero.right));
+      expect(unidad.bottom, closeTo(numero.bottom, 6));
+    });
+
+    testWidgets('sin unit no dibuja nada extra (los 7 usos existentes)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const StatTile(label: 'EJERCICIOS', value: '6'),
+      ));
+      expect(find.byType(Text), findsNWidgets(2));
+    });
+
     testWidgets('SCENARIO-096: value null renders dash without exception',
         (tester) async {
       await tester.pumpWidget(_wrap(

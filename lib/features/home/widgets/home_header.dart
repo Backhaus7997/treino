@@ -40,6 +40,15 @@ class HomeHeader extends StatelessWidget {
     return displayName.characters.first.toUpperCase();
   }
 
+  /// Primera palabra del nombre (#1508): `displayName` guarda nombre y apellido
+  /// ("Martín López") y un saludo con los dos suena a planilla. Mismo criterio
+  /// que el saludo del PF (`trainer_dashboard_tab.dart`). Vacío si no hay
+  /// nombre.
+  static String _firstName(String? displayName) {
+    final trimmed = displayName?.trim() ?? '';
+    return trimmed.isEmpty ? '' : trimmed.split(RegExp(r'\s+')).first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -48,9 +57,10 @@ class HomeHeader extends StatelessWidget {
     final displayName = profile?.displayName;
     final avatarUrl = profile?.avatarUrl;
 
-    final greetingText = (displayName != null && displayName.isNotEmpty)
-        ? 'HOLA, ${displayName.toUpperCase()}!'
-        : 'HOLA!';
+    final firstName = _firstName(displayName);
+    final greetingText = firstName.isEmpty
+        ? l10n.homeGreeting
+        : l10n.homeGreetingNamed(firstName.toUpperCase());
 
     final initials = _computeInitials(displayName);
 

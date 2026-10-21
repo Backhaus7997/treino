@@ -155,7 +155,7 @@ class _SubNav extends StatelessWidget {
                   Icon(
                     TreinoIcon.signOut,
                     size: 18,
-                    color: AppPalette.of(ctx).danger,
+                    color: AppPalette.of(ctx).dangerText,
                   ),
                   const SizedBox(width: AppSpacing.s12),
                   // `Expanded` y no un `Text` suelto: la sub-nav tiene ancho
@@ -169,7 +169,7 @@ class _SubNav extends StatelessWidget {
                       style: TextStyle(
                         fontFamily: AppFonts.barlow,
                         fontWeight: AppFonts.w600,
-                        color: AppPalette.of(ctx).danger,
+                        color: AppPalette.of(ctx).dangerText,
                       ),
                     ),
                   ),

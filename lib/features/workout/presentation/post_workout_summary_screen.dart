@@ -11,6 +11,7 @@ import '../../../core/widgets/motion/treino_confetti.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../checkins/application/check_in_providers.dart';
 import '../../checkins/domain/check_in.dart';
 import '../../checkins/presentation/wellbeing_check_in_sheet.dart';
@@ -196,16 +197,20 @@ class _LoadedBody extends StatelessWidget {
             tiles: [
               StatTile(
                 icon: TreinoIcon.clock,
-                label: l10n.workoutStatDurationMin,
+                label: l10n.workoutStatDuration,
                 value: session.durationMin.toString(),
+                unit: 'min',
                 countUpValue: session.durationMin,
               ),
               StatTile(
                 icon: TreinoIcon.dumbbell,
-                label: l10n.workoutStatVolumeKg,
-                value: formatVolumeKg(session.totalVolumeKg),
+                label: l10n.workoutStatVolume,
+                unit: 'kg',
+                value: formatVolumeKg(
+                    session.totalVolumeKg, AppL10n.of(context).localeName),
                 countUpValue: session.totalVolumeKg,
-                countUpFormatter: (v) => formatVolumeKg(v.toDouble()),
+                countUpFormatter: (v) => formatVolumeKg(
+                    v.toDouble(), AppL10n.of(context).localeName),
               ),
               StatTile(
                 icon: TreinoIcon.statSets,
@@ -444,13 +449,36 @@ class _CheckInSlot extends ConsumerWidget {
                 .valueOrNull ??
             const <CheckIn>[];
     final existing = checkInForSession(dayCheckIns, sessionId);
+    // #1513: si hoy ya respondió en Inicio (registro sin sesión), no se
+    // vuelve a preguntar: se ofrece esa respuesta para ESTE entreno. Editarla
+    // o usarla escribe sobre ese mismo documento con el `sessionId`, así el PF
+    // conserva el registro por sesión y el día sigue teniendo uno solo.
+    final delDia =
+        existing == null ? dailyCheckInWithoutSession(dayCheckIns) : null;
 
     Future<void> open(CheckInFeeling? feeling) => showWellbeingCheckInSheet(
           context,
           sessionId: sessionId,
           initialFeeling: feeling,
-          existing: existing,
+          existing: existing ?? delDia,
         );
+
+    Future<void> usarElDelDia(CheckIn delDia) async {
+      final messenger = ScaffoldMessenger.of(context);
+      try {
+        await ref.read(checkInNotifierProvider.notifier).submit(
+              feeling: delDia.feeling,
+              hasPain: delDia.hasPain,
+              painAreas: delDia.painAreas,
+              note: delDia.note,
+              sessionId: sessionId,
+              existing: delDia,
+            );
+      } catch (_) {
+        showTreinoToastOn(messenger, l10n.wellbeingSaveError,
+            type: TreinoToastType.error);
+      }
+    }
 
     return TreinoFadeSlideIn(
       delay: AppMotion.stagger(5),
@@ -468,7 +496,25 @@ class _CheckInSlot extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          if (existing == null) ...[
+          if (existing == null && delDia != null) ...[
+            WellbeingCheckInRecorded(
+              checkIn: delDia,
+              onEdit: () => open(delDia.feeling),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.wellbeingCheckInFromToday,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlow(
+                fontSize: 13,
+                color: palette.textMuted,
+              ),
+            ),
+            TextButton(
+              onPressed: () => usarElDelDia(delDia),
+              child: Text(l10n.wellbeingCheckInUseForSession),
+            ),
+          ] else if (existing == null) ...[
             WellbeingMoodScale(onSelect: open),
             const SizedBox(height: 8),
             Text(

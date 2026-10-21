@@ -15,12 +15,12 @@ void main() {
     testWidgets('SCENARIO-185: renders correct copy', (tester) async {
       await tester.pumpWidget(
         _wrap(const FeedEmptyState(
-            message: 'Todavía no hay posts de a quienes seguís')),
+            message: 'Todavía no hay posts de quienes seguís')),
       );
       await tester.pump();
 
       expect(
-        find.text('Todavía no hay posts de a quienes seguís'),
+        find.text('Todavía no hay posts de quienes seguís'),
         findsOneWidget,
       );
     });

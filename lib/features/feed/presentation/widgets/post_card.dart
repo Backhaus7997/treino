@@ -1,5 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
+import 'package:treino/core/widgets/treino_confirm_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +9,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/kg_format.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../auth/application/auth_providers.dart';
@@ -95,9 +98,10 @@ class PostCard extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: GestureDetector(
+                child: TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+                  focusable: true,
                   onTap: onAuthorTap,
-                  behavior: HitTestBehavior.opaque,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -211,7 +215,7 @@ class PostCard extends ConsumerWidget {
             Row(
               children: [
                 Text(
-                  '${formatVolumeKg(post.workoutStats!.volumeKg)} kg',
+                  '${formatVolumeKg(post.workoutStats!.volumeKg, AppL10n.of(context).localeName)} kg',
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
@@ -263,6 +267,8 @@ class PostCard extends ConsumerWidget {
 
     showModalBottomSheet<void>(
       context: context,
+      // #1471: arriba de la nav bar flotante, como el sheet de Reportar.
+      useRootNavigator: true,
       backgroundColor: palette.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
@@ -287,13 +293,13 @@ class PostCard extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: Icon(TreinoIcon.trash, color: palette.danger),
+              leading: Icon(TreinoIcon.trash, color: palette.dangerText),
               title: Text(
                 l10n.postCardMenuDelete,
                 style: GoogleFonts.barlow(
                   fontWeight: FontWeight.w400,
                   fontSize: 14,
-                  color: palette.danger,
+                  color: palette.dangerText,
                 ),
               ),
               onTap: () {
@@ -311,35 +317,24 @@ class PostCard extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.postCardDeleteConfirmTitle),
-        content: Text(l10n.postCardDeleteConfirmBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(l10n.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l10n.postCardMenuDelete),
-          ),
-        ],
-      ),
+    // #1474: era un AlertDialog pelado con Cancelar/Eliminar en mint sobre
+    // blanco y la acción destructiva sin rojo.
+    final confirmed = await showTreinoConfirmDialog(
+      context,
+      title: l10n.postCardDeleteConfirmTitle,
+      body: l10n.postCardDeleteConfirmBody,
+      confirmLabel: l10n.postCardMenuDelete,
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     try {
       await ref.read(postActionsProvider).deletePost(post);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(l10n.postCardDeleteSuccess)));
+      showTreinoToastOn(messenger, l10n.postCardDeleteSuccess,
+          type: TreinoToastType.success);
     } catch (_) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(l10n.postCardDeleteError)));
+      showTreinoToastOn(messenger, l10n.postCardDeleteError,
+          type: TreinoToastType.error);
     }
   }
 }
@@ -497,9 +492,10 @@ class _RoutineTagChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    return GestureDetector(
+    return TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+      focusable: true,
       onTap: () => context.push('/workout/routine/${tag.routineId}'),
-      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(

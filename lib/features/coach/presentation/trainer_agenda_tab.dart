@@ -109,7 +109,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
                       child: OutlinedButton(
                         onPressed: () => _openAvailabilityEditor(context),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: palette.accent,
+                          foregroundColor: palette.accentText,
                           side: BorderSide(color: palette.accent, width: 1),
                           padding: EdgeInsets.zero,
                           shape: const CircleBorder(),
@@ -253,6 +253,9 @@ class _TrainerCalendar extends ConsumerWidget {
       firstDay: DateTime.utc(2026, 1, 1),
       lastDay: DateTime.utc(2027, 12, 31),
       focusedDay: focusedDay,
+      // Semana lunes→domingo, como el resto de la app (`weekdayInitials`);
+      // table_calendar arranca en domingo por default (#1491).
+      startingDayOfWeek: StartingDayOfWeek.monday,
       // "Today" in the same frame as the dots and the timeline (startsAt,
       // ADR-7); table_calendar's default reads the raw clock on its own.
       currentDay: nowWall(),

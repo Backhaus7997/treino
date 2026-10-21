@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_background.dart';
+import 'package:treino/app/theme/app_motion.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/features/home/application/todays_routine_provider.dart';
@@ -182,6 +184,32 @@ void main() {
     });
 
     testWidgets(
+        'skeleton → HomeHeader pasa por TreinoStateSwitcher (cross-fade, sin '
+        'salto)', (tester) async {
+      final controller = StreamController<UserProfile?>();
+      addTearDown(controller.close);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const HomeScreen(),
+        [userProfileProvider.overrideWith((ref) => controller.stream)],
+      ));
+      await tester.pump();
+
+      expect(find.byType(TreinoStateSwitcher), findsWidgets);
+      expect(find.byType(HomeHeader), findsNothing);
+
+      controller.add(makeProfile());
+      await tester.pump();
+      await tester.pump(AppMotion.base ~/ 2);
+      // A mitad del fade conviven el skeleton saliente y el header entrante.
+      expect(find.byType(HomeHeader), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_header_loading')), findsOneWidget);
+
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeHeader), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_header_loading')), findsNothing);
+    });
+
+    testWidgets(
         'REQ-HOME-SCREEN-001 / REQ-HOME-PROVIDER-003: AsyncLoading → no HomeHeader, skeleton present, cards still visible',
         (tester) async {
       await tester.pumpWidget(_wrapWithOverrides(
@@ -220,7 +248,7 @@ void main() {
       ));
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('HOLA!'), findsOneWidget);
+      expect(find.text('¡HOLA!'), findsOneWidget);
       expect(
         find.textContaining(RegExp(r'[Ee]rror|[Ee]xcepci')),
         findsNothing,
@@ -282,7 +310,7 @@ void main() {
 
       final header = tester.widget<HomeHeader>(find.byType(HomeHeader));
       expect(header.profile, isNull);
-      expect(find.text('HOLA!'), findsOneWidget);
+      expect(find.text('¡HOLA!'), findsOneWidget);
       expect(find.byType(CachedNetworkImage), findsNothing);
     });
 
@@ -303,7 +331,7 @@ void main() {
       ));
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('HOLA, MARTÍN!'), findsOneWidget);
+      expect(find.text('¡HOLA, MARTÍN!'), findsOneWidget);
       expect(find.byType(CachedNetworkImage), findsAtLeastNWidgets(1));
     });
 

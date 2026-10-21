@@ -44,6 +44,9 @@ _$AppointmentImpl _$$AppointmentImplFromJson(Map<String, dynamic> json) =>
       noteAfter: json['noteAfter'] as String?,
       recurringId: json['recurringId'] as String?,
       paymentId: json['paymentId'] as String?,
+      attendance: $enumDecodeNullable(
+          _$AppointmentAttendanceEnumMap, json['attendance'],
+          unknownValue: JsonKey.nullForUndefinedEnumValue),
     );
 
 Map<String, dynamic> _$$AppointmentImplToJson(_$AppointmentImpl instance) =>
@@ -64,6 +67,8 @@ Map<String, dynamic> _$$AppointmentImplToJson(_$AppointmentImpl instance) =>
       'noteAfter': instance.noteAfter,
       'recurringId': instance.recurringId,
       'paymentId': instance.paymentId,
+      if (_$AppointmentAttendanceEnumMap[instance.attendance] case final value?)
+        'attendance': value,
     };
 
 const _$AppointmentStatusEnumMap = {
@@ -76,6 +81,10 @@ Value? _$JsonConverterFromJson<Json, Value>(
   Value? Function(Json json) fromJson,
 ) =>
     json == null ? null : fromJson(json as Json);
+
+const _$AppointmentAttendanceEnumMap = {
+  AppointmentAttendance.absent: 'absent',
+};
 
 Json? _$JsonConverterToJson<Json, Value>(
   Value? value,

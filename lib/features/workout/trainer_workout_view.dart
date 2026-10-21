@@ -10,7 +10,9 @@ import '../../core/analytics/analytics_service.dart';
 import '../../l10n/app_l10n.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
+import '../../core/widgets/treino_destructive_menu_item.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../../core/widgets/treino_toast.dart';
 import '../coach/application/template_quota_provider.dart';
 import '../coach/presentation/template_limit_gate.dart';
 import '../coach/presentation/widgets/athlete_picker_sheet.dart';
@@ -152,7 +154,12 @@ class _AssignFromAlumnoCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Elegí un alumno y armale el plan en su perfil. La plantilla queda guardada y la podés reutilizar.',
+            // #1503: decía «La plantilla queda guardada y la podés
+            // reutilizar», y asignar NO guarda ninguna plantilla. Ahora dice
+            // cómo se reutiliza de verdad.
+            'Elegí un alumno y armale el plan en su perfil. Ese plan es sólo '
+            'para ese alumno: si lo querés reutilizar, armalo como '
+            'plantilla en tu biblioteca.',
             style: GoogleFonts.barlow(
               fontWeight: FontWeight.w400,
               fontSize: 13,
@@ -210,22 +217,17 @@ class _TemplateLibrarySection extends ConsumerWidget {
           .read(userPublicProfileRepositoryProvider)
           .setSharedTemplatesWithAthletes(uid, value);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            value
-                ? 'Tus alumnos ya pueden ver todas tus plantillas.'
-                : 'Tus plantillas vuelven a ser privadas.',
-          ),
-        ),
+      showTreinoToast(
+        context,
+        value
+            ? 'Tus alumnos ya pueden ver todas tus plantillas.'
+            : 'Tus plantillas vuelven a ser privadas.',
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos actualizar la configuración.'),
-        ),
-      );
+      showTreinoToast(context, 'No pudimos actualizar la configuración.',
+          type: TreinoToastType.error);
     }
   }
 
@@ -445,7 +447,8 @@ class _MenuRow extends StatelessWidget {
         const SizedBox(width: 12),
         Text(
           label,
-          style: GoogleFonts.barlow(fontSize: 14, color: color),
+          // Fuente, peso y tamaño los pone `popupMenuTheme.labelTextStyle`.
+          style: TextStyle(color: color),
         ),
       ],
     );
@@ -505,7 +508,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
               'Eliminar',
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                color: widget.palette.danger,
+                color: widget.palette.dangerText,
               ),
             ),
           ),
@@ -523,15 +526,13 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
       // whose Firestore doc no longer exists for the rest of the process.
       invalidateRoutineById(container, widget.template.id);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Plantilla eliminada.')),
-      );
+      showTreinoToast(context, 'Plantilla eliminada.',
+          type: TreinoToastType.success);
       // The templates stream auto-refreshes from the Firestore snapshot.
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos eliminar la plantilla.')),
-      );
+      showTreinoToast(context, 'No pudimos eliminar la plantilla.',
+          type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _deleting = false);
     }
@@ -599,23 +600,18 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
       // `visibleRoutineByIdProvider` keeps resolving it instead of null.
       invalidateRoutineById(container, widget.template.id);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isPublished
-                ? 'Tu plantilla salió del catálogo público.'
-                : '¡Tu plantilla ya está en el catálogo público!',
-          ),
-        ),
+      showTreinoToast(
+        context,
+        isPublished
+            ? 'Tu plantilla salió del catálogo público.'
+            : '¡Tu plantilla ya está en el catálogo público!',
+        type: TreinoToastType.success,
       );
       // The templates stream auto-refreshes from the Firestore snapshot.
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos actualizar la publicación.'),
-        ),
-      );
+      showTreinoToast(context, 'No pudimos actualizar la publicación.',
+          type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _publishing = false);
     }
@@ -639,14 +635,12 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
         weeksCount: widget.template.numWeeks,
       );
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Plantilla asignada al alumno.')),
-      );
+      showTreinoToast(context, 'Plantilla asignada al alumno.',
+          type: TreinoToastType.success);
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos asignar la plantilla.')),
-      );
+      showTreinoToast(context, 'No pudimos asignar la plantilla.',
+          type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _assigning = false);
     }
@@ -735,7 +729,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
           TextButton(
             onPressed: busy ? null : () => _onAssign(context),
             style: TextButton.styleFrom(
-              foregroundColor: palette.accent,
+              foregroundColor: palette.accentText,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             ),
             child: _assigning
@@ -757,7 +751,6 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
           PopupMenuButton<_TemplateAction>(
             key: Key('template_actions_menu_${t.id}'),
             enabled: !busy,
-            color: palette.bgCard,
             tooltip: 'Más acciones',
             icon: (_publishing || _deleting)
                 ? SizedBox(
@@ -804,13 +797,10 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                   color: palette.textPrimary,
                 ),
               ),
-              PopupMenuItem(
+              TreinoDestructiveMenuItem(
                 value: _TemplateAction.delete,
-                child: _MenuRow(
-                  icon: TreinoIcon.trash,
-                  label: 'Eliminar',
-                  color: palette.danger,
-                ),
+                icon: TreinoIcon.trash,
+                child: const Text('Eliminar'),
               ),
             ],
           ),

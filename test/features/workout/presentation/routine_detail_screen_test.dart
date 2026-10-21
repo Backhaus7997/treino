@@ -673,33 +673,49 @@ void main() {
         },
       );
 
+      // Desde que la acción flota (TreinoFloatingBottomAction) la lista
+      // corre por debajo y se desvanece contra el botón. La garantía que
+      // importa no es estructural sino de comportamiento: scrolleando hasta
+      // el final, el ÚLTIMO ejercicio termina por encima del degradé (entero a
+      // la vista, no a medio desvanecer) y del botón. Es lo que
+      // rompería un alto reservado fijo a texto grande — el riesgo que
+      // anotaba #641.
+      Future<Rect> lastRowAtEnd(WidgetTester tester) async {
+        final scroller = find.byType(CustomScrollView);
+        await tester.fling(scroller, const Offset(0, -4000), 4000);
+        await tester.pumpAndSettle();
+        return tester.getRect(find.byType(ExerciseSlotRow).last);
+      }
+
+      Rect scrim(WidgetTester tester) =>
+          tester.getRect(find.byKey(const Key('treino-floating-action-scrim')));
+
       testWidgets(
-        'the list area and the action are disjoint — nothing can scroll '
-        'underneath the bar',
+        'la lista pasa por debajo del botón y, al final, el último ejercicio '
+        'queda por encima',
         (tester) async {
           await tester.pumpWidget(longDayScreen());
           await tester.pumpAndSettle();
 
-          // The guarantee of Column + Expanded: the scroll viewport ENDS where
-          // the bar begins, so no exercise can ever end up behind it. A Stack +
-          // Positioned bar would satisfy every other assert in this group and
-          // still fail here whenever the reserved bottom inset drifts out of
-          // sync with the bar's real height — which is exactly what happens at
-          // large text scale.
           final viewport = tester.getRect(find.byType(CustomScrollView));
           final action =
               tester.getRect(find.widgetWithText(ElevatedButton, 'EMPEZAR'));
+          expect(viewport.overlaps(action), isTrue,
+              reason: 'la lista corre por debajo: la pantalla no se parte');
+
+          final last = await lastRowAtEnd(tester);
           expect(
-            viewport.overlaps(action),
-            isFalse,
-            reason: 'the pinned action must never overlap the exercise list',
+            last.bottom,
+            lessThanOrEqualTo(scrim(tester).top),
+            reason: 'el último ejercicio $last queda debajo del degradé '
+                '${scrim(tester)}: a medio desvanecer o tapado por el botón',
           );
         },
       );
 
       testWidgets(
-        'at large text scale the bar grows and the list yields — they stay '
-        'disjoint and the action stays on screen',
+        'a texto grande el botón crece y el final del scroll lo acompaña: el '
+        'último ejercicio sigue por encima y la acción en pantalla',
         (tester) async {
           tester.platformDispatcher.textScaleFactorTestValue = 2.0;
           addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -709,16 +725,15 @@ void main() {
 
           final action = find.widgetWithText(ElevatedButton, 'EMPEZAR');
           expect(action, findsOneWidget);
-
           final actionRect = tester.getRect(action);
-          final viewport = tester.getRect(find.byType(CustomScrollView));
           final screen = tester.getRect(find.byType(MaterialApp));
 
+          final last = await lastRowAtEnd(tester);
           expect(
-            viewport.overlaps(actionRect),
-            isFalse,
-            reason: 'a taller button must take height FROM the list, not '
-                'overlap it — the failure mode of a hardcoded bottom inset',
+            last.bottom,
+            lessThanOrEqualTo(scrim(tester).top),
+            reason: 'un alto reservado fijo dejaría el último ejercicio '
+                'debajo del botón agrandado',
           );
           expect(
             actionRect.bottom,

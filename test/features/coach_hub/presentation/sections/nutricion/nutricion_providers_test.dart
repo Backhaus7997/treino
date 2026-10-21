@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/nutrition_plan_repository.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -47,8 +48,9 @@ NutricionEntry _entry({
   required TrainerLink link,
   NutritionPlan? plan,
   bool planLoading = false,
+  bool planError = false,
 }) =>
-    (link: link, plan: plan, planLoading: planLoading);
+    (link: link, plan: plan, planLoading: planLoading, planError: planError);
 
 void main() {
   group('SCENARIO-NP-01 — matchesNutricionFiltro', () {
@@ -62,6 +64,10 @@ void main() {
     final loading = _entry(
       link: _link(id: 'l3', athleteId: 'a3', status: TrainerLinkStatus.active),
       planLoading: true,
+    );
+    final ilegible = _entry(
+      link: _link(id: 'l4', athleteId: 'a4', status: TrainerLinkStatus.active),
+      planError: true,
     );
 
     test('todos → siempre true, sin importar plan/loading', () {
@@ -106,6 +112,20 @@ void main() {
         matchesNutricionFiltro(loading, NutricionFiltro.sinPlan),
         isFalse,
       );
+    });
+
+    // #1581: un plan que no se pudo leer NO es «Sin plan». Contarlo ahí le
+    // decía al PF que a ese alumno le faltaba un plan que tiene.
+    test('planError → excluido de conPlan y sinPlan, pero está en todos', () {
+      expect(
+        matchesNutricionFiltro(ilegible, NutricionFiltro.conPlan),
+        isFalse,
+      );
+      expect(
+        matchesNutricionFiltro(ilegible, NutricionFiltro.sinPlan),
+        isFalse,
+      );
+      expect(matchesNutricionFiltro(ilegible, NutricionFiltro.todos), isTrue);
     });
   });
 
@@ -174,6 +194,43 @@ void main() {
       expect(entries[0].plan?.id, 'trainer-1_a1');
       expect(entries[1].plan, isNull);
       expect(entries[2].plan?.id, 'trainer-1_a3');
+    });
+
+    test('un plan ilegible marca planError, no «sin plan» (#1581)', () async {
+      final links = [
+        _link(id: 'l1', athleteId: 'a1', status: TrainerLinkStatus.active),
+      ];
+      final container = ProviderContainer(
+        overrides: [
+          currentUidProvider.overrideWithValue(_trainerId),
+          trainerLinksStreamProvider.overrideWith(
+            (ref) => Stream.value(links),
+          ),
+          nutritionPlanProvider(
+            (trainerId: _trainerId, athleteId: 'a1'),
+          ).overrideWith(
+            (ref) => Stream<NutritionPlan?>.error(
+              const NutritionPlanIlegible(
+                  '${_trainerId}_a1', 'meals no es lista'),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final sub = container.listen(
+        nutricionEntriesProvider,
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final entry = container.read(nutricionEntriesProvider).value!.single;
+      expect(entry.planError, isTrue);
+      expect(entry.planLoading, isFalse);
+      expect(matchesNutricionFiltro(entry, NutricionFiltro.sinPlan), isFalse);
     });
 
     test('loading de trainerLinksStreamProvider → AsyncValue.loading', () {

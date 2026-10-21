@@ -6,10 +6,12 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/date_labels.dart';
 import '../../../../core/utils/kg_format.dart';
+import '../../../../core/widgets/treino_confirm_dialog.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/measurement_providers.dart';
 import '../../domain/measurement.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Cantidad de filas visibles antes del toggle "Ver todas". Mantiene liviano
 /// el build dentro de pantallas que ya scrollean (la lista vive dentro de un
@@ -35,8 +37,7 @@ String _formatRowDate(DateTime dt, String localeName) {
 /// visto por el PF, o una carga del PF vista por el atleta — muestra
 /// [readOnlyLabel] en su lugar, explicando por qué no hay acciones.
 ///
-/// El borrado confirma con AlertDialog (patrón `_onDeletePlan` de
-/// athlete_detail_screen) y llama al repo directamente; los streams de
+/// El borrado confirma con [showTreinoConfirmDialog] (#1496) y llama al repo directamente; los streams de
 /// `snapshots()` refrescan la lista solos, sin invalidaciones manuales.
 class MeasurementHistoryList extends ConsumerStatefulWidget {
   const MeasurementHistoryList({
@@ -71,56 +72,29 @@ class _MeasurementHistoryListState
   bool _showAll = false;
 
   Future<void> _confirmDelete(Measurement m) async {
-    final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final dateLabel = _formatRowDate(m.recordedAt, l10n.localeName);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: palette.bgCard,
-        title: Text(
-          l10n.measurementDeleteConfirmTitle,
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            color: palette.textPrimary,
-          ),
-        ),
-        content: Text(
-          l10n.measurementDeleteConfirmBody(dateLabel),
-          style: GoogleFonts.barlow(fontSize: 13, color: palette.textPrimary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              l10n.commonCancel,
-              style: GoogleFonts.barlowCondensed(color: palette.textMuted),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              l10n.measurementDeleteConfirmAction,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                color: palette.danger,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await showTreinoConfirmDialog(
+      context,
+      title: l10n.measurementDeleteConfirmTitle,
+      body: l10n.measurementDeleteConfirmBody(dateLabel),
+      confirmLabel: l10n.measurementDeleteConfirmAction,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     try {
       await ref.read(measurementRepositoryProvider).delete(m.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.measurementDeleteSuccess)),
+      showTreinoToast(
+        context,
+        l10n.measurementDeleteSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.measurementDeleteError)),
+      showTreinoToast(
+        context,
+        l10n.measurementDeleteError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -201,16 +175,16 @@ class _HistoryRow extends StatelessWidget {
   /// (peso, % grasa, masa muscular, cintura). Sin ninguna de ellas cae a las
   /// notas; "Sin datos de composición" queda sólo para registros que
   /// efectivamente no traen composición (p.ej. sólo circunferencias).
-  String _summary() {
+  String _summary(String localeName) {
     final m = measurement;
+    String n(double? v) => formatWeightDisplay(v!, localeName);
     final parts = <String>[
-      if (m.weightKg != null) '${formatWeightKg(m.weightKg)} kg',
+      if (m.weightKg != null) '${n(m.weightKg)} kg',
       if (m.fatPercentage != null)
-        '${formatWeightKg(m.fatPercentage)}% grasa', // i18n: Fase W2
+        '${n(m.fatPercentage)}% grasa', // i18n: Fase W2
       if (m.muscleMassKg != null)
-        'masa ${formatWeightKg(m.muscleMassKg)} kg', // i18n: Fase W2
-      if (m.waistCm != null)
-        'cintura ${formatWeightKg(m.waistCm)} cm', // i18n: Fase W2
+        'masa ${n(m.muscleMassKg)} kg', // i18n: Fase W2
+      if (m.waistCm != null) 'cintura ${n(m.waistCm)} cm', // i18n: Fase W2
     ];
     if (parts.isEmpty) {
       final notes = m.notes;
@@ -245,7 +219,7 @@ class _HistoryRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _summary(),
+                  _summary(l10n.localeName),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.barlow(
@@ -267,7 +241,7 @@ class _HistoryRow extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               tooltip: l10n.measurementHistoryDeleteTooltip,
               onPressed: onDelete,
-              icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
+              icon: Icon(TreinoIcon.trash, size: 18, color: palette.dangerText),
             ),
           ] else
             Padding(

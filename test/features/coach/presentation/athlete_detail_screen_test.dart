@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/presentation/athlete_detail_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -210,7 +211,12 @@ Future<void> _pumpScreen(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: overrides,
+      overrides: [
+        // Sin plan nutricional por default: la sección (#1538) no es lo que
+        // miran estos tests, y sin override le pegaría a Firestore real.
+        nutritionPlanProvider.overrideWith((ref, key) => Stream.value(null)),
+        ...overrides,
+      ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
@@ -245,12 +251,25 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Athlete name in header (appears in AppBar title and in body header)
-      expect(find.text('Martín García'), findsWidgets);
+      // #1482: el nombre va UNA vez, en el header con avatar. Antes también
+      // era el título de la barra, y se leía duplicado.
+      expect(find.text('Martín García'), findsOneWidget);
       // Empty state text
       expect(find.text('Todavía no le asignaste planes.'), findsOneWidget);
       // CREAR PLAN button
       expect(find.text('CREAR PLAN'), findsOneWidget);
+
+      // #1482: sin planes, el texto vacío no queda pegado al título de
+      // ANTROPOMETRÍA: el mismo aire que entre las demás secciones.
+      final vacio =
+          tester.getRect(find.text('Todavía no le asignaste planes.'));
+      final antropometria = tester.getRect(find.text('ANTROPOMETRÍA'));
+      expect(antropometria.top - vacio.bottom, greaterThanOrEqualTo(20));
+
+      // #1482: el contenido no se corta en seco contra los botones fijos: hay
+      // un velo al pie del scroll.
+      expect(
+          find.byKey(const Key('athlete_detail_bottom_fade')), findsOneWidget);
     });
 
     testWidgets(
@@ -337,6 +356,70 @@ void main() {
 
       expect(find.text('MENSAJE'), findsOneWidget);
     });
+  });
+
+  // #1484: «Medición guardada» vuelve a esta pantalla y el SnackBar tapaba
+  // CREAR PLAN: los botones estaban al pie del body. Ahora van en el
+  // `bottomNavigationBar` del Scaffold de la pantalla, que dibuja los SnackBar
+  // arriba de esa barra. Se monta como en el router: ruta top-level, sin
+  // Scaffold de afuera.
+  testWidgets('#1484: un SnackBar sale arriba de CREAR PLAN', (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        currentUidProvider.overrideWithValue('trainer-1'),
+        userPublicProfileProvider('athlete-1').overrideWith(
+          (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+        ),
+        assignedRoutinesByTrainerProvider.overrideWith(
+          (ref, key) async => const [],
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const AthleteDetailScreen(athleteId: 'athlete-1'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    ScaffoldMessenger.of(tester.element(find.text('MENSAJE'))).showSnackBar(
+      const SnackBar(content: Text('Medición guardada')),
+    );
+    await tester.pumpAndSettle();
+
+    final snack = tester.getRect(find.byType(SnackBar));
+    final crearPlan = tester.getRect(find.text('CREAR PLAN'));
+    expect(snack.bottom, lessThanOrEqualTo(crearPlan.top),
+        reason: 'el SnackBar (${snack.top}–${snack.bottom}) tapa CREAR PLAN '
+            '(${crearPlan.top})');
+  });
+
+  testWidgets('#1484: con el teclado abierto la barra de acciones se saca',
+      (tester) async {
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        currentUidProvider.overrideWithValue('trainer-1'),
+        userPublicProfileProvider('athlete-1').overrideWith(
+          (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+        ),
+        assignedRoutinesByTrainerProvider.overrideWith(
+          (ref, key) async => const [],
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const AthleteDetailScreen(athleteId: 'athlete-1'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('CREAR PLAN'), findsNothing);
   });
 
   // ── Issue #399 — plan-card tap must land on the top-level plan route ──────
@@ -563,6 +646,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap the session row to expand
+      // El historial queda abajo de todo: scrollear antes de tocar, como el
+      // usuario. Sin esto el tap caía sobre los botones fijos (#1482).
+      await tester.ensureVisible(find.text('Plan Test'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
@@ -595,6 +682,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap to expand
+      // El historial queda abajo de todo: scrollear antes de tocar, como el
+      // usuario. Sin esto el tap caía sobre los botones fijos (#1482).
+      await tester.ensureVisible(find.text('Plan Test'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
@@ -625,6 +716,10 @@ void main() {
 
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.text('Plan Test'));
+
+      await tester.pumpAndSettle();
+
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
@@ -651,6 +746,10 @@ void main() {
               .overrideWith((ref) async => []),
         ],
       );
+
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Plan Test'));
 
       await tester.pumpAndSettle();
 
@@ -687,6 +786,8 @@ void main() {
       );
 
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Plan Test'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
@@ -721,6 +822,8 @@ void main() {
         ],
       );
 
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Plan Test'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
@@ -757,6 +860,8 @@ void main() {
       );
 
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Plan Test'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
@@ -792,6 +897,8 @@ void main() {
         ],
       );
 
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Plan Test'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
@@ -889,7 +996,7 @@ void main() {
       expect(find.text('100 kg'), findsOneWidget);
       expect(find.text('55 ml/kg/min'), findsOneWidget);
       // …a one-decimal value keeps its decimal (the helper trims to 1 dp).
-      expect(find.text('2.9 s'), findsOneWidget);
+      expect(find.text('2,9 s'), findsOneWidget);
       // Regression guard: the raw double interpolation ("30.0 cm") is gone.
       expect(find.text('30.0 cm'), findsNothing);
     });
@@ -1170,6 +1277,8 @@ void main() {
       expect(find.text('EN CURSO'), findsOneWidget);
       expect(find.text('Full Body'), findsOneWidget);
 
+      await tester.ensureVisible(find.text('EN CURSO'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('EN CURSO'));
       await tester.pumpAndSettle();
 
@@ -1227,6 +1336,8 @@ void main() {
       expect(find.text('Full Body'), findsOneWidget);
       expect(find.text('Pierna vieja'), findsNothing);
 
+      await tester.ensureVisible(find.text('EN CURSO'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('EN CURSO'));
       await tester.pumpAndSettle();
 

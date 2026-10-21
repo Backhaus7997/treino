@@ -4,8 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_shimmer.dart';
+import '../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../coach/application/trainer_link_providers.dart';
 import '../../../coach/domain/trainer_link.dart';
@@ -75,7 +80,7 @@ class RutinasSection extends ConsumerWidget {
             children: [
               Text(
                 l10n.workoutMisRutinasSectionTitle,
-                style: theme.textTheme.titleMedium,
+                style: _heading(theme),
               ),
               if (headerAction != null) ...[
                 const SizedBox(height: 12),
@@ -89,7 +94,7 @@ class RutinasSection extends ConsumerWidget {
               Expanded(
                 child: Text(
                   l10n.workoutMisRutinasSectionTitle,
-                  style: theme.textTheme.titleMedium,
+                  style: _heading(theme),
                 ),
               ),
               if (headerAction != null) headerAction,
@@ -117,54 +122,78 @@ class RutinasSection extends ConsumerWidget {
           orElse: () => const SizedBox.shrink(),
         ),
         // ── Content ───────────────────────────────────────────────────────────
-        entriesAsync.when(
-          // Keep the previous list on screen while the underlying streams
-          // recompose (archive/create/assignment) — no spinner flicker.
-          skipLoadingOnReload: true,
-          loading: () => const _SectionLoadingState(),
-          error: (err, _) => _SectionErrorState(
-            onRetry: () {
-              ref
-                ..invalidate(assignedRoutinesProvider(uid))
-                ..invalidate(userCreatedRoutinesProvider(uid))
-                ..invalidate(unifiedRoutinesProvider(uid));
-            },
-          ),
-          data: (entries) {
-            if (entries.isEmpty) {
-              return _SectionEmptyState(
-                onCta: () => context.push('/workout/my-routine-editor'),
-              );
-            }
-            // `activeRoutineId` viene del UserProfile; durante el loading de
-            // profile (cold start) ningún card se marca como activa — estado
-            // transitorio aceptable hasta que la adopción perezosa resuelva.
-            final activeId = ref.watch(
-              userProfileProvider.select(
-                (a) => a.valueOrNull?.activeRoutineId,
+        // TreinoStateSwitcher: cross-fade skeleton → lista (sin salto). Las keys
+        // distinguen los estados; `skipLoadingOnReload` evita re-fadear en reloads.
+        // AnimatedSize: los 3 skeletons miden 264 px y el resultado puede ser
+        // una sola línea (vacío) o una card. Sin esto, TreinoStateSwitcher
+        // fundía a la altura mayor y al terminar todo lo de abajo subía de golpe
+        // en un frame — el mismo salto que el skeleton venía a evitar (Codex,
+        // #1601).
+        AnimatedSize(
+          duration: AppMotion.resolve(context, AppMotion.base),
+          curve: AppMotion.standard,
+          alignment: Alignment.topCenter,
+          child: TreinoStateSwitcher(
+            child: entriesAsync.when(
+              // Keep the previous list on screen while the underlying streams
+              // recompose (archive/create/assignment) — no spinner flicker.
+              skipLoadingOnReload: true,
+              loading: () => const KeyedSubtree(
+                key: ValueKey('rutinas_loading'),
+                child: _SectionLoadingState(),
               ),
-            );
-            final linkAsync = ref.watch(currentAthleteLinkProvider);
-            // El toggle solo aporta cuando hay algo que elegir — con una
-            // sola rutina la adopción perezosa ya la dejó activa.
-            final canToggleActive = entries.length > 1;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final entry in entries)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _RoutineCard(
-                      routine: entry.routine,
-                      fromCoach: entry.fromCoach,
-                      isActive: entry.routine.id == activeId,
-                      canToggleActive: canToggleActive,
-                      linkAsync: linkAsync,
+              error: (err, _) => KeyedSubtree(
+                key: const ValueKey('rutinas_error'),
+                child: _SectionErrorState(
+                  onRetry: () {
+                    ref
+                      ..invalidate(assignedRoutinesProvider(uid))
+                      ..invalidate(userCreatedRoutinesProvider(uid))
+                      ..invalidate(unifiedRoutinesProvider(uid));
+                  },
+                ),
+              ),
+              data: (entries) {
+                if (entries.isEmpty) {
+                  return KeyedSubtree(
+                    key: const ValueKey('rutinas_empty'),
+                    child: _SectionEmptyState(
+                      onCta: () => context.push('/workout/my-routine-editor'),
                     ),
+                  );
+                }
+                // `activeRoutineId` viene del UserProfile; durante el loading de
+                // profile (cold start) ningún card se marca como activa — estado
+                // transitorio aceptable hasta que la adopción perezosa resuelva.
+                final activeId = ref.watch(
+                  userProfileProvider.select(
+                    (a) => a.valueOrNull?.activeRoutineId,
                   ),
-              ],
-            );
-          },
+                );
+                final linkAsync = ref.watch(currentAthleteLinkProvider);
+                // El toggle solo aporta cuando hay algo que elegir — con una
+                // sola rutina la adopción perezosa ya la dejó activa.
+                final canToggleActive = entries.length > 1;
+                return Column(
+                  key: const ValueKey('rutinas_data'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final entry in entries)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _RoutineCard(
+                          routine: entry.routine,
+                          fromCoach: entry.fromCoach,
+                          isActive: entry.routine.id == activeId,
+                          canToggleActive: canToggleActive,
+                          linkAsync: linkAsync,
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
         ),
       ],
     );
@@ -207,10 +236,26 @@ class _SectionLoadingState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Center(
-        child: CircularProgressIndicator(color: palette.accent),
+    // Tres placeholders con la altura real de _RoutineCard (14 de padding x2 +
+    // 48 del botón de overflow = 76) para que el skeleton → lista no salte.
+    return Semantics(
+      label: AppL10n.of(context).commonLoading,
+      liveRegion: true,
+      child: TreinoShimmer(
+        child: Column(
+          children: [
+            for (var i = 0; i < 3; i++)
+              Container(
+                height: 76,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: palette.bgCard,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: palette.border),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -316,15 +361,13 @@ class _RoutineCard extends ConsumerWidget {
         'activeRoutineId': routine.id,
       });
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasMarkActiveSuccess)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasMarkActiveSuccess,
+            type: TreinoToastType.success);
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasActiveError)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasActiveError,
+            type: TreinoToastType.error);
       }
     }
   }
@@ -361,15 +404,13 @@ class _RoutineCard extends ConsumerWidget {
       // siendo arrancable hasta que se reinicie la app.
       invalidateRoutineById(container, routine.id);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasArchiveSuccess)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasArchiveSuccess,
+            type: TreinoToastType.success);
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasArchiveError)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasArchiveError,
+            type: TreinoToastType.error);
       }
     }
   }
@@ -410,52 +451,74 @@ class _RoutineCard extends ConsumerWidget {
       ],
     );
 
-    return InkWell(
-      key: Key('routine_card_${routine.id}'),
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      onTap: () => context.push('/workout/routine/${routine.id}'),
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          // Outline más marcado en la activa para que destaque sin gritar.
-          border: Border.all(
-            color: isActive ? palette.accent : palette.border,
-            width: isActive ? 1.5 : 1,
+    // TreinoTappable REEMPLAZA al InkWell: scale 0.97 al apoyar el dedo. El
+    // PopupMenuButton de adentro sigue ganando su propio tap en la arena.
+    return Semantics(
+      button: true,
+      child: TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+        focusable: true,
+        key: Key('routine_card_${routine.id}'),
+        onTap: () => context.push('/workout/routine/${routine.id}'),
+        child: Container(
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            // Outline más marcado en la activa para que destaque sin gritar.
+            border: Border.all(
+              color: isActive ? palette.accent : palette.border,
+              width: isActive ? 1.5 : 1,
+            ),
           ),
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (useStackedTitle) ...[
-                    title,
-                    if (fromCoach || isActive) ...[
-                      const SizedBox(height: 8),
-                      statusChips,
-                    ],
-                  ] else
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: title),
-                        if (fromCoach || isActive) ...[
-                          const SizedBox(width: 8),
-                          statusChips,
-                        ],
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (useStackedTitle) ...[
+                      title,
+                      if (fromCoach || isActive) ...[
+                        const SizedBox(height: 8),
+                        statusChips,
                       ],
-                    ),
-                  if (fromCoach) ...[
-                    // Mirrors the old _PlanCard: the trainer-name line only
-                    // renders once the public profile resolves.
-                    if (trainerName != null) ...[
+                    ] else
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: title),
+                          if (fromCoach || isActive) ...[
+                            const SizedBox(width: 8),
+                            statusChips,
+                          ],
+                        ],
+                      ),
+                    if (fromCoach) ...[
+                      // Mirrors the old _PlanCard: the trainer-name line only
+                      // renders once the public profile resolves.
+                      if (trainerName != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          trainerName,
+                          style: GoogleFonts.barlow(
+                            fontWeight: FontWeight.w400,
+                            fontSize: 12,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    ] else ...[
                       const SizedBox(height: 4),
                       Text(
-                        trainerName,
+                        // #648: la jerga deja de liderar. Antes esta línea era
+                        // '{SPLIT} · {NIVEL}' y el split iba primero y en
+                        // mayúsculas. Ahora comparte fuente con la tarjeta de
+                        // EXPLORAR, que es lo que impide que vuelvan a divergir.
+                        routineMetaSegments(routine, l10n)
+                            .map((s) => s.toUpperCase())
+                            .join(' · '),
                         style: GoogleFonts.barlow(
                           fontWeight: FontWeight.w400,
                           fontSize: 12,
@@ -463,69 +526,53 @@ class _RoutineCard extends ConsumerWidget {
                         ),
                       ),
                     ],
-                  ] else ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      // #648: la jerga deja de liderar. Antes esta línea era
-                      // '{SPLIT} · {NIVEL}' y el split iba primero y en
-                      // mayúsculas. Ahora comparte fuente con la tarjeta de
-                      // EXPLORAR, que es lo que impide que vuelvan a divergir.
-                      routineMetaSegments(routine, l10n)
-                          .map((s) => s.toUpperCase())
-                          .join(' · '),
-                      style: GoogleFonts.barlow(
-                        fontWeight: FontWeight.w400,
-                        fontSize: 12,
-                        color: palette.textMuted,
+                    if (isTerminated) ...[
+                      const SizedBox(height: 8),
+                      const _FinalizadoChip(),
+                    ],
+                  ],
+                ),
+              ),
+              // Overflow menu
+              if (showMenu)
+                PopupMenuButton<_CardAction>(
+                  key: Key('routine_card_more_${routine.id}'),
+                  tooltip: l10n.workoutRoutineOptionsA11y,
+                  icon: Icon(TreinoIcon.dotsThree, color: palette.textMuted),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _CardAction.edit:
+                        context.push(
+                          '/workout/my-routine-editor',
+                          extra: routine.id,
+                        );
+                      case _CardAction.archive:
+                        _confirmArchive(context, ref);
+                      case _CardAction.markActive:
+                        _markActive(context, ref);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    if (showToggle)
+                      PopupMenuItem(
+                        key: Key('routine_card_toggle_active_${routine.id}'),
+                        value: _CardAction.markActive,
+                        child: Text(l10n.workoutMisRutinasOverflowMarkActive),
                       ),
-                    ),
+                    if (!fromCoach) ...[
+                      PopupMenuItem(
+                        value: _CardAction.edit,
+                        child: Text(l10n.workoutMisRutinasOverflowEdit),
+                      ),
+                      PopupMenuItem(
+                        value: _CardAction.archive,
+                        child: Text(l10n.workoutMisRutinasOverflowArchive),
+                      ),
+                    ],
                   ],
-                  if (isTerminated) ...[
-                    const SizedBox(height: 8),
-                    const _FinalizadoChip(),
-                  ],
-                ],
-              ),
-            ),
-            // Overflow menu
-            if (showMenu)
-              PopupMenuButton<_CardAction>(
-                key: Key('routine_card_more_${routine.id}'),
-                tooltip: l10n.workoutRoutineOptionsA11y,
-                icon: Icon(TreinoIcon.dotsThree, color: palette.textMuted),
-                onSelected: (action) {
-                  switch (action) {
-                    case _CardAction.edit:
-                      context.push(
-                        '/workout/my-routine-editor',
-                        extra: routine.id,
-                      );
-                    case _CardAction.archive:
-                      _confirmArchive(context, ref);
-                    case _CardAction.markActive:
-                      _markActive(context, ref);
-                  }
-                },
-                itemBuilder: (_) => [
-                  if (showToggle)
-                    PopupMenuItem(
-                      key: Key('routine_card_toggle_active_${routine.id}'),
-                      value: _CardAction.markActive,
-                      child: Text(l10n.workoutMisRutinasOverflowMarkActive),
-                    ),
-                  if (!fromCoach) ...[
-                    PopupMenuItem(
-                      value: _CardAction.edit,
-                      child: Text(l10n.workoutMisRutinasOverflowEdit),
-                    ),
-                    PopupMenuItem(
-                      value: _CardAction.archive,
-                      child: Text(l10n.workoutMisRutinasOverflowArchive),
-                    ),
-                  ],
-                ],
-              ),
-          ],
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -592,3 +639,10 @@ class _FinalizadoChip extends StatelessWidget {
     );
   }
 }
+
+/// #1514: heading de sección en Barlow Condensed 700, como todo heading del
+/// sistema (AGENTS §2). `titleMedium` del tema es Barlow regular.
+TextStyle? _heading(ThemeData theme) => GoogleFonts.barlowCondensed(
+      textStyle: theme.textTheme.titleMedium,
+      fontWeight: FontWeight.w700,
+    );

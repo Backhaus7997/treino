@@ -8,6 +8,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/core/widgets/treino_destructive_menu_item.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -35,6 +36,7 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Estado compuesto de un alumno en el roster (link + billing).
 ///
@@ -922,8 +924,10 @@ class _RutinaCell extends ConsumerWidget {
 /// duplica el patrón N-streams ya resuelto ahí, ADR-F6-04). "Con plan" si
 /// existe una entry para este alumno con un `NutritionPlan` resuelto (no
 /// loading); "Sin plan" en cualquier otro caso — incluye ausencia de entry
-/// (alumno no `active`, la agregación sólo cubre vínculos activos), loading
-/// o error (mismo criterio "barato" que `_RutinaCell`/último entreno). Tap
+/// (alumno no `active`, la agregación sólo cubre vínculos activos) o loading
+/// (mismo criterio "barato" que `_RutinaCell`/último entreno). Un plan que no
+/// se pudo leer dice «No se pudo leer»: el doc existe, y «Sin plan» sería
+/// falso (#1581). Tap
 /// navega al detalle del alumno (`/alumnos/:athleteId`, deep-link al editor
 /// real de Fase 3 — NO se edita en el hub, ADR-F6-03), envuelto en `InkWell`
 /// para que absorba el gesto y no dispare el `onRowTap` de la fila.
@@ -946,7 +950,11 @@ class _NutricionCell extends ConsumerWidget {
     final conPlan = entry != null && !entry.planLoading && entry.plan != null;
     return _TappableDotLabel(
       color: conPlan ? palette.accent : palette.textMuted,
-      label: conPlan ? 'Con plan' : 'Sin plan', // i18n
+      label: conPlan
+          ? 'Con plan' // i18n
+          : entry?.planError ?? false
+              ? 'No se pudo leer' // i18n
+              : 'Sin plan', // i18n
       onTap: () => context.go('/alumnos/$athleteId'),
     );
   }
@@ -1049,7 +1057,9 @@ class _DotLabel extends StatelessWidget {
             child: Text(
               label,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: color, fontSize: 13),
+              style: TextStyle(
+                  color: AppPalette.of(context).textVariantOf(color),
+                  fontSize: 13),
             ),
           ),
         ],
@@ -1107,7 +1117,9 @@ class _TappableDotLabel extends StatelessWidget {
               child: Text(
                 label,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: color, fontSize: 13),
+                style: TextStyle(
+                    color: AppPalette.of(context).textVariantOf(color),
+                    fontSize: 13),
               ),
             ),
           ],
@@ -1190,8 +1202,10 @@ class _RowActionsState extends ConsumerState<_RowActions> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    showTreinoToast(
+      context,
+      message,
+      type: TreinoToastType.error,
     );
   }
 
@@ -1269,7 +1283,7 @@ class _RowActionsState extends ConsumerState<_RowActions> {
     }
     if (status == TrainerLinkStatus.active ||
         status == TrainerLinkStatus.paused) {
-      menuItems.add(PopupMenuItem(
+      menuItems.add(TreinoDestructiveMenuItem<VoidCallback>(
         value: () => _terminate(context, ref),
         child: Text(l10n.coachHubActionTerminate),
       ));

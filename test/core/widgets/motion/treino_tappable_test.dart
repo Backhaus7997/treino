@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
@@ -172,5 +173,55 @@ void main() {
       await tester.pumpAndSettle();
       expect(longPresses, 1);
     });
+  });
+
+  // Codex en #1601: reemplazar un InkWell por esto dejaba las cards fuera del
+  // foco de teclado.
+  group('TreinoTappable — teclado', () {
+    for (final key in [LogicalKeyboardKey.enter, LogicalKeyboardKey.space]) {
+      testWidgets('Tab lo enfoca y ${key.keyLabel} lo activa', (tester) async {
+        var taps = 0;
+        await tester.pumpWidget(_wrap(
+          child: TreinoTappable(
+            onTap: () => taps++,
+            focusable: true,
+            child: const SizedBox(width: 100, height: 48),
+          ),
+        ));
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        await tester.sendKeyEvent(key);
+        await tester.pump();
+
+        expect(taps, 1);
+      });
+    }
+
+    testWidgets('deshabilitado (onTap null) no entra en el foco',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const TreinoTappable(child: SizedBox(width: 100, height: 48)),
+      ));
+      expect(find.byType(FocusableActionDetector), findsNothing);
+    });
+  });
+
+  // Por defecto NO entra en el foco: buena parte del kit del Coach Hub ya lo
+  // envuelve en su propio FocusableActionDetector, y prenderlo por defecto le
+  // daba dos paradas de Tab al mismo botón.
+  testWidgets('por defecto no agrega una parada de Tab propia', (tester) async {
+    var taps = 0;
+    await tester.pumpWidget(_wrap(
+      child: TreinoTappable(
+        onTap: () => taps++,
+        child: const SizedBox(width: 100, height: 48),
+      ),
+    ));
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(taps, 0);
   });
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/muscle_group.dart';
 import '../../domain/reps_format.dart';
@@ -56,7 +58,11 @@ class ExerciseSlotRow extends StatelessWidget {
   ///  1. durationSeconds > 0 → "<targetSets> · MM:SS"
   ///  2. targetReps non-empty → "<targetSets> · <formatted reps>"
   ///  3. Legacy → "<targetSets> · <min>–<max>"
-  static String _setsRepsSummary(RoutineSlot slot, int week) {
+  static String _setsRepsSummary(
+    RoutineSlot slot,
+    int week,
+    String localeName,
+  ) {
     // Week-aware path: resolve from weeklySets when available.
     if (slot.weeklySets.isNotEmpty) {
       final specs = slot.effectiveSetsForWeek(week);
@@ -74,7 +80,7 @@ class ExerciseSlotRow extends StatelessWidget {
         }
         if (failureCount > 0) {
           // Mixed: describe normal sets first, then failure count.
-          final normalPart = _describeNormalSpecs(normalSpecs);
+          final normalPart = _describeNormalSpecs(normalSpecs, localeName);
           return '$normalPart + $failureCount · Al fallo';
         }
 
@@ -87,7 +93,7 @@ class ExerciseSlotRow extends StatelessWidget {
           return '$count · $mm:$ss';
         }
         if (first.distanceMeters != null && first.distanceMeters! > 0) {
-          return '$count · ${_distance(first.distanceMeters!)} m';
+          return '$count · ${_distance(first.distanceMeters!, localeName)} m';
         }
         if (first.reps != null) {
           // Homogeneous per-set reps list.
@@ -117,7 +123,7 @@ class ExerciseSlotRow extends StatelessWidget {
   }
 
   /// Summarizes a list of non-failure [SetSpec]s as "<count> · <target>".
-  static String _describeNormalSpecs(List<SetSpec> specs) {
+  static String _describeNormalSpecs(List<SetSpec> specs, String localeName) {
     if (specs.isEmpty) return '';
     final count = specs.length;
     final first = specs.first;
@@ -128,7 +134,7 @@ class ExerciseSlotRow extends StatelessWidget {
       return '$count · $mm:$ss';
     }
     if (first.distanceMeters != null && first.distanceMeters! > 0) {
-      return '$count · ${_distance(first.distanceMeters!)} m';
+      return '$count · ${_distance(first.distanceMeters!, localeName)} m';
     }
     if (first.reps != null) {
       final allSame = specs.every((s) => s.reps == first.reps);
@@ -141,9 +147,8 @@ class ExerciseSlotRow extends StatelessWidget {
     return '$count sets';
   }
 
-  static String _distance(double meters) => meters == meters.roundToDouble()
-      ? meters.toInt().toString()
-      : meters.toStringAsFixed(1);
+  static String _distance(double meters, String localeName) =>
+      formatNumberDisplay(meters, localeName);
 
   /// Formats rest seconds: "1:30" when >= 60, "45s" when < 60.
   static String _restDisplay(int restSeconds) {
@@ -159,16 +164,23 @@ class ExerciseSlotRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final setsReps = _setsRepsSummary(slot, week);
+    final setsReps = _setsRepsSummary(
+      slot,
+      week,
+      // `Localizations` y no AppL10n: este widget no depende de AppL10n.
+      Localizations.localeOf(context).toString(),
+    );
     final restText = _restDisplay(slot.restSeconds);
     return Semantics(
       button: true,
       label: 'Ejercicio ${slot.exerciseName}, $setsReps, descanso $restText',
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
+        // TreinoTappable REEMPLAZA al InkWell: press feedback (scale 0.97).
+        child: TreinoTappable(
+// Reemplaza un InkWell: que siga alcanzable por teclado.
+          focusable: true,
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadius.md),
           child: Container(
             decoration: BoxDecoration(
               color: palette.bgCard,

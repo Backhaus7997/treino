@@ -13,7 +13,6 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/date_labels.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
-import 'package:treino/core/widgets/motion/treino_success_check.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
@@ -30,11 +29,13 @@ import 'package:treino/features/coach/domain/athlete_file.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/follow_up_entry.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
+import 'package:treino/features/coach/domain/nutrition_plan_ids.dart';
 import 'package:treino/features/coach/domain/nutrition_plan_presets.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/abrir_chat_con_alumno.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_display_name_provider.dart';
 import 'package:treino/features/gyms/domain/gym.dart' show hasRealGym;
@@ -43,6 +44,7 @@ import 'package:treino/features/insights/presentation/widgets/daily_heatmap_sect
 import 'package:treino/features/insights/presentation/widgets/day_strip_labels.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
+import 'package:treino/features/measurements/domain/measurement_ranges.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
 import 'package:treino/features/payments/application/billing_providers.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
@@ -50,6 +52,7 @@ import 'package:treino/features/payments/application/payment_providers.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/performance/application/performance_test_providers.dart';
 import 'package:treino/features/performance/domain/performance_test.dart';
+import 'package:treino/features/performance/domain/performance_test_ranges.dart';
 import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -73,6 +76,9 @@ import 'package:treino/features/workout/presentation/widgets/feedback_load_error
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
 import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/core/utils/metric_range.dart';
+import 'package:treino/core/utils/metric_range_message.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../infrastructure/browser_download.dart';
@@ -83,6 +89,7 @@ import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Estado de un grupo de la ficha, para su marca en la barra.
 ///
@@ -1048,10 +1055,10 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
     try {
       await ref.read(measurementRepositoryProvider).delete(m.id);
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la medición.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos eliminar la medición.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     }
   }
@@ -1084,10 +1091,10 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
     try {
       await ref.read(performanceTestRepositoryProvider).delete(t.id);
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la prueba.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos eliminar la prueba.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     }
   }
@@ -1459,8 +1466,9 @@ String _trimNum(double v) =>
     v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
 /// Volumen compacto: kg hasta 999, toneladas con un decimal de ahí en más.
-String _fmtVolKg(double kg) =>
-    kg >= 1000 ? '${(kg / 1000).toStringAsFixed(1)} t' : '${kg.round()} kg';
+String _fmtVolKg(double kg, String localeName) => kg >= 1000
+    ? '${formatNumberDisplay(kg / 1000, localeName)} t'
+    : '${formatNumberDisplay(kg.round(), localeName)} kg';
 
 /// Tab Resumen (W2 PR4): 4 métricas derivadas + heatmap de adherencia de 12
 /// semanas. Sólo usa data trainer-readable (sesiones, mediciones, plan
@@ -1540,7 +1548,7 @@ class _ResumenTab extends ConsumerWidget {
           : '${pesoDelta >= 0 ? '+' : ''}${pesoDelta.toStringAsFixed(1)} kg',
       deltaColor: pesoDelta == null
           ? null
-          : (pesoDelta >= 0 ? palette.accent : palette.danger),
+          : (pesoDelta >= 0 ? palette.accent : palette.dangerText),
       caption: pesoDelta == null ? null : '30 días',
     );
 
@@ -1577,7 +1585,7 @@ class _ResumenTab extends ConsumerWidget {
                           '${adhDelta.abs().round()} pts',
                   deltaColor: adhDelta == null
                       ? null
-                      : (adhDelta >= 0 ? palette.accent : palette.danger),
+                      : (adhDelta >= 0 ? palette.accent : palette.dangerText),
                   caption:
                       adh == null ? 'Todavía sin datos' : 'vs 30 días previos',
                 ),
@@ -1594,13 +1602,14 @@ class _ResumenTab extends ConsumerWidget {
                   palette: palette,
                   icon: TreinoIcon.dumbbell,
                   label: 'VOLUMEN', // i18n: Fase W2
-                  value: _fmtVolKg(m.volumenSemanaActualKg),
+                  value: _fmtVolKg(
+                      m.volumenSemanaActualKg, AppL10n.of(context).localeName),
                   delta: volDelta == null
                       ? null
                       : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
                   deltaColor: volDelta == null
                       ? null
-                      : (volDelta >= 0 ? palette.accent : palette.danger),
+                      : (volDelta >= 0 ? palette.accent : palette.dangerText),
                   caption:
                       volDelta == null ? 'esta semana' : 'vs semana pasada',
                 ),
@@ -2888,7 +2897,7 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               oneRepMaxLabel: '1RM', // i18n: Fase W2
               bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
               bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
-              volumeUnit: 'kg·reps', // i18n: Fase W2
+              volumeUnit: 'kg', // i18n: Fase W2
               weightUnit: 'kg', // i18n: Fase W2
               // #555: el count viene acotado al período activo del selector.
               frequencyLabel: (n) => n == 1
@@ -2913,7 +2922,7 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               oneRepMaxLabel: '1RM', // i18n: Fase W2
               bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
               bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
-              volumeUnit: 'kg·reps', // i18n: Fase W2
+              volumeUnit: 'kg', // i18n: Fase W2
               weightUnit: 'kg', // i18n: Fase W2
               emptyText:
                   'Sin datos suficientes para este ejercicio.', // i18n: Fase W2
@@ -3422,24 +3431,18 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
       // (appointment_detail_dialog.dart): mismo momento de éxito (guardado),
       // mismo feedback — antes solo el guardado de notas del TURNO tenía el
       // check y el de notas privadas del alumno quedaba en texto plano.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              const SizedBox(width: 10),
-              Flexible(child: Text(l10n.coachHubAlumnoDetailNotasSaveSuccess)),
-            ],
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToast(
+        context,
+        l10n.coachHubAlumnoDetailNotasSaveSuccess,
+        type: TreinoToastType.success,
       );
     } on FirebaseException catch (_) {
       if (!mounted) return;
       final l10n = AppL10n.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubAlumnoDetailNotasSaveError)),
+      showTreinoToast(
+        context,
+        l10n.coachHubAlumnoDetailNotasSaveError,
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) {
@@ -3715,7 +3718,9 @@ class _SessionStatusPill extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: color,
+          // El tinte y el borde usan el color de estado; el texto, su versión
+          // legible (#1550).
+          color: palette.textVariantOf(color),
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
@@ -3796,25 +3801,24 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
             bytes: bytes,
           );
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosUploadSuccess),
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosUploadSuccess,
+        type: TreinoToastType.success,
       );
     } on AthleteFileTooLargeException {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosUploadTooLarge),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosUploadTooLarge,
+        type: TreinoToastType.error,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosUploadError),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosUploadError,
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -3850,10 +3854,10 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
       await ref.read(athleteFileRepositoryProvider).delete(file);
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosDeleteError),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosDeleteError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -4020,10 +4024,10 @@ class _ArchivoRow extends ConsumerWidget {
           .read(athleteFileRepositoryProvider)
           .setShared(file, !file.sharedWithAthlete);
     } catch (_) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosShareError),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosShareError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -4113,7 +4117,7 @@ class _ArchivoRow extends ConsumerWidget {
             TreinoIconButton(
               icon: TreinoIcon.trash,
               tooltip: l10n.coachHubAlumnoDetailArchivosDeleteTooltip,
-              color: palette.danger,
+              color: palette.dangerText,
               onPressed: onDelete,
             ),
           ],
@@ -4302,10 +4306,13 @@ class _MedicionRowState extends State<_MedicionRow> {
   /// Si alguno es null, se omite del summary.
   String _summary() {
     final m = widget.measurement;
+    // Con el locale: «78,5 kg», no el double crudo «78.5 kg» ni «78.0 kg».
+    String n(double? v) =>
+        formatNumberDisplay(v!, AppL10n.of(context).localeName, maxDecimals: 2);
     final parts = <String>[];
-    if (m.weightKg != null) parts.add('${m.weightKg} kg');
-    if (m.fatPercentage != null) parts.add('${m.fatPercentage}% grasa');
-    if (m.waistCm != null) parts.add('cintura ${m.waistCm} cm');
+    if (m.weightKg != null) parts.add('${n(m.weightKg)} kg');
+    if (m.fatPercentage != null) parts.add('${n(m.fatPercentage)}% grasa');
+    if (m.waistCm != null) parts.add('cintura ${n(m.waistCm)} cm');
     if (parts.isEmpty) return 'Sin datos de composición'; // i18n: Fase W2
     return parts.join(' · ');
   }
@@ -4380,7 +4387,7 @@ class _MedicionRowState extends State<_MedicionRow> {
                 TreinoIconButton(
                   icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n: Fase W2
-                  color: palette.danger,
+                  color: palette.dangerText,
                   onPressed: widget.onDelete,
                 ),
               ],
@@ -4408,33 +4415,37 @@ class _MedicionDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = measurement;
+    String n(double? v) =>
+        formatNumberDisplay(v!, AppL10n.of(context).localeName, maxDecimals: 2);
     final entries = <(String, String)>[
       // Composición
-      if (m.weightKg != null) ('Peso', '${m.weightKg} kg'),
-      if (m.fatPercentage != null) ('% grasa', '${m.fatPercentage}%'),
-      if (m.muscleMassKg != null) ('Masa muscular', '${m.muscleMassKg} kg'),
+      if (m.weightKg != null) ('Peso', '${n(m.weightKg)} kg'),
+      if (m.fatPercentage != null) ('% grasa', '${n(m.fatPercentage)}%'),
+      if (m.muscleMassKg != null) ('Masa muscular', '${n(m.muscleMassKg)} kg'),
       // Trunk
-      if (m.shouldersCm != null) ('Hombros', '${m.shouldersCm} cm'),
-      if (m.chestCm != null) ('Pecho', '${m.chestCm} cm'),
-      if (m.waistCm != null) ('Cintura', '${m.waistCm} cm'),
-      if (m.hipsCm != null) ('Cadera', '${m.hipsCm} cm'),
-      if (m.glutesCm != null) ('Glúteos', '${m.glutesCm} cm'),
+      if (m.shouldersCm != null) ('Hombros', '${n(m.shouldersCm)} cm'),
+      if (m.chestCm != null) ('Pecho', '${n(m.chestCm)} cm'),
+      if (m.waistCm != null) ('Cintura', '${n(m.waistCm)} cm'),
+      if (m.hipsCm != null) ('Cadera', '${n(m.hipsCm)} cm'),
+      if (m.glutesCm != null) ('Glúteos', '${n(m.glutesCm)} cm'),
       // Upper
-      if (m.bicepsLCm != null) ('Bíceps izq.', '${m.bicepsLCm} cm'),
-      if (m.bicepsRCm != null) ('Bíceps der.', '${m.bicepsRCm} cm'),
+      if (m.bicepsLCm != null) ('Bíceps izq.', '${n(m.bicepsLCm)} cm'),
+      if (m.bicepsRCm != null) ('Bíceps der.', '${n(m.bicepsRCm)} cm'),
       if (m.bicepsFlexedLCm != null)
-        ('Bíceps flex. izq.', '${m.bicepsFlexedLCm} cm'),
+        ('Bíceps flex. izq.', '${n(m.bicepsFlexedLCm)} cm'),
       if (m.bicepsFlexedRCm != null)
-        ('Bíceps flex. der.', '${m.bicepsFlexedRCm} cm'),
-      if (m.forearmLCm != null) ('Antebrazo izq.', '${m.forearmLCm} cm'),
-      if (m.forearmRCm != null) ('Antebrazo der.', '${m.forearmRCm} cm'),
+        ('Bíceps flex. der.', '${n(m.bicepsFlexedRCm)} cm'),
+      if (m.forearmLCm != null) ('Antebrazo izq.', '${n(m.forearmLCm)} cm'),
+      if (m.forearmRCm != null) ('Antebrazo der.', '${n(m.forearmRCm)} cm'),
       // Lower
-      if (m.upperThighLCm != null) ('Muslo sup. izq.', '${m.upperThighLCm} cm'),
-      if (m.upperThighRCm != null) ('Muslo sup. der.', '${m.upperThighRCm} cm'),
-      if (m.midThighLCm != null) ('Muslo med. izq.', '${m.midThighLCm} cm'),
-      if (m.midThighRCm != null) ('Muslo med. der.', '${m.midThighRCm} cm'),
-      if (m.calfLCm != null) ('Gemelo izq.', '${m.calfLCm} cm'),
-      if (m.calfRCm != null) ('Gemelo der.', '${m.calfRCm} cm'),
+      if (m.upperThighLCm != null)
+        ('Muslo sup. izq.', '${n(m.upperThighLCm)} cm'),
+      if (m.upperThighRCm != null)
+        ('Muslo sup. der.', '${n(m.upperThighRCm)} cm'),
+      if (m.midThighLCm != null) ('Muslo med. izq.', '${n(m.midThighLCm)} cm'),
+      if (m.midThighRCm != null) ('Muslo med. der.', '${n(m.midThighRCm)} cm'),
+      if (m.calfLCm != null) ('Gemelo izq.', '${n(m.calfLCm)} cm'),
+      if (m.calfRCm != null) ('Gemelo der.', '${n(m.calfRCm)} cm'),
     ];
 
     if (entries.isEmpty && (m.notes ?? '').isEmpty) {
@@ -4710,20 +4721,21 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_isEditing
-              ? 'Medición actualizada.' // i18n: Fase W2
-              : 'Medición guardada.'), // i18n: Fase W2
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        _isEditing
+            ? 'Medición actualizada.' // i18n: Fase W2
+            : 'Medición guardada.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar la medición.'), // i18n: Fase W2
-        ),
+      // Con context y no con el messenger: el diálogo sigue abierto y un
+      // SnackBar del Scaffold de atrás quedaría tapado (#1490).
+      showTreinoToast(
+        context,
+        'No pudimos guardar la medición.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -4775,16 +4787,19 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Peso',
                                 suffix: 'kg',
                                 controller: _weightC,
+                                range: MeasurementRanges.weightKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: '% grasa',
                                 suffix: '%',
                                 controller: _fatC,
+                                range: MeasurementRanges.fatPercentage,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Masa muscular',
                                 suffix: 'kg',
                                 controller: _muscleC,
+                                range: MeasurementRanges.muscleMassKg,
                                 palette: palette),
                           ],
                         ),
@@ -4800,26 +4815,31 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Hombros',
                                 suffix: 'cm',
                                 controller: _shouldersC,
+                                range: MeasurementRanges.shouldersCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Pecho',
                                 suffix: 'cm',
                                 controller: _chestC,
+                                range: MeasurementRanges.chestCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Cintura',
                                 suffix: 'cm',
                                 controller: _waistC,
+                                range: MeasurementRanges.waistCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Cadera',
                                 suffix: 'cm',
                                 controller: _hipsC,
+                                range: MeasurementRanges.hipsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Glúteos',
                                 suffix: 'cm',
                                 controller: _glutesC,
+                                range: MeasurementRanges.glutesCm,
                                 palette: palette),
                           ],
                         ),
@@ -4835,31 +4855,37 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Bíceps izq.',
                                 suffix: 'cm',
                                 controller: _bicepsLC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Bíceps der.',
                                 suffix: 'cm',
                                 controller: _bicepsRC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Bíceps flex. izq.',
                                 suffix: 'cm',
                                 controller: _bicepsFlexedLC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Bíceps flex. der.',
                                 suffix: 'cm',
                                 controller: _bicepsFlexedRC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Antebrazo izq.',
                                 suffix: 'cm',
                                 controller: _forearmLC,
+                                range: MeasurementRanges.forearmCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Antebrazo der.',
                                 suffix: 'cm',
                                 controller: _forearmRC,
+                                range: MeasurementRanges.forearmCm,
                                 palette: palette),
                           ],
                         ),
@@ -4875,31 +4901,37 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Muslo sup. izq.',
                                 suffix: 'cm',
                                 controller: _upperThighLC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Muslo sup. der.',
                                 suffix: 'cm',
                                 controller: _upperThighRC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Muslo med. izq.',
                                 suffix: 'cm',
                                 controller: _midThighLC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Muslo med. der.',
                                 suffix: 'cm',
                                 controller: _midThighRC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Gemelo izq.',
                                 suffix: 'cm',
                                 controller: _calfLC,
+                                range: MeasurementRanges.calfCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Gemelo der.',
                                 suffix: 'cm',
                                 controller: _calfRC,
+                                range: MeasurementRanges.calfCm,
                                 palette: palette),
                           ],
                         ),
@@ -5036,17 +5068,25 @@ class _NuevaMedicionSection extends StatelessWidget {
 }
 
 /// Campo numérico del dialog. Acepta coma o punto como decimal.
+///
+/// Lo comparten los dialogs de medición y de evaluación del Hub, y valida
+/// contra el [range] de SU campo — los mismos `MeasurementRanges` /
+/// `PerformanceTestRanges` que mobile y que `firestore.rules`. Antes era un
+/// 0–500 genérico para todo: aceptaba 150 % de grasa (#1483) y un CMJ de
+/// 200 cm que la regla deniega (lo marcó Codex en #1540).
 class _NuevaMedicionField extends StatelessWidget {
   const _NuevaMedicionField({
     required this.label,
     required this.suffix,
     required this.controller,
+    required this.range,
     required this.palette,
   });
 
   final String label;
   final String suffix;
   final TextEditingController controller;
+  final MetricRange range;
   final AppPalette palette;
 
   @override
@@ -5078,16 +5118,7 @@ class _NuevaMedicionField extends StatelessWidget {
             borderSide: BorderSide(color: palette.accent, width: 1.5),
           ),
         ),
-        validator: (v) {
-          final s = v?.trim().replaceAll(',', '.') ?? '';
-          if (s.isEmpty) return null; // opcional
-          final parsed = double.tryParse(s);
-          if (parsed == null) return 'Número inválido'; // i18n: Fase W2
-          if (parsed < 0 || parsed > 500) {
-            return 'Fuera de rango'; // i18n: Fase W2
-          }
-          return null;
-        },
+        validator: (v) => metricRangeError(range, v, AppL10n.of(context)),
       ),
     );
   }
@@ -5198,7 +5229,7 @@ class _RendimientoRowState extends State<_RendimientoRow> {
                 TreinoIconButton(
                   icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n: Fase W2
-                  color: palette.danger,
+                  color: palette.dangerText,
                   onPressed: widget.onDelete,
                 ),
               ],
@@ -5506,20 +5537,21 @@ class _NuevoRendimientoDialogState
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_isEditing
-              ? 'Prueba actualizada.' // i18n: Fase W2
-              : 'Prueba guardada.'), // i18n: Fase W2
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        _isEditing
+            ? 'Prueba actualizada.' // i18n: Fase W2
+            : 'Prueba guardada.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar la prueba.'), // i18n: Fase W2
-        ),
+      // Con context y no con el messenger: el diálogo sigue abierto y un
+      // SnackBar del Scaffold de atrás quedaría tapado (#1490).
+      showTreinoToast(
+        context,
+        'No pudimos guardar la prueba.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -5571,21 +5603,25 @@ class _NuevoRendimientoDialogState
                                 label: 'CMJ',
                                 suffix: 'cm',
                                 controller: _cmjC,
+                                range: PerformanceTestRanges.verticalJumpCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Squat Jump',
                                 suffix: 'cm',
                                 controller: _squatJumpC,
+                                range: PerformanceTestRanges.verticalJumpCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Abalakov',
                                 suffix: 'cm',
                                 controller: _abalakovC,
+                                range: PerformanceTestRanges.verticalJumpCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Salto largo',
                                 suffix: 'cm',
                                 controller: _broadJumpC,
+                                range: PerformanceTestRanges.broadJumpCm,
                                 palette: palette),
                           ],
                         ),
@@ -5601,21 +5637,25 @@ class _NuevoRendimientoDialogState
                                 label: 'Sprint 10m',
                                 suffix: 's',
                                 controller: _sprint10C,
+                                range: PerformanceTestRanges.sprint10mS,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sprint 20m',
                                 suffix: 's',
                                 controller: _sprint20C,
+                                range: PerformanceTestRanges.sprint20mS,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sprint 30m',
                                 suffix: 's',
                                 controller: _sprint30C,
+                                range: PerformanceTestRanges.sprint30mS,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sprint 40m',
                                 suffix: 's',
                                 controller: _sprint40C,
+                                range: PerformanceTestRanges.sprint40mS,
                                 palette: palette),
                           ],
                         ),
@@ -5631,26 +5671,31 @@ class _NuevoRendimientoDialogState
                                 label: 'Sentadilla',
                                 suffix: 'kg',
                                 controller: _squat1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Press banca',
                                 suffix: 'kg',
                                 controller: _bench1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Peso muerto',
                                 suffix: 'kg',
                                 controller: _deadlift1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Press militar',
                                 suffix: 'kg',
                                 controller: _overhead1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Dominada',
                                 suffix: 'kg',
                                 controller: _pullUp1rmC,
+                                range: PerformanceTestRanges.pullUpLoadKg,
                                 palette: palette),
                           ],
                         ),
@@ -5666,21 +5711,25 @@ class _NuevoRendimientoDialogState
                                 label: 'VO2 máx',
                                 suffix: 'ml/kg/min',
                                 controller: _vo2maxC,
+                                range: PerformanceTestRanges.vo2maxMlKgMin,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Course Navette',
                                 suffix: 'nivel',
                                 controller: _courseNavetteC,
+                                range: PerformanceTestRanges.courseNavetteLevel,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Cooper',
                                 suffix: 'm',
                                 controller: _cooperC,
+                                range: PerformanceTestRanges.cooperMeters,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sit & Reach',
                                 suffix: 'cm',
                                 controller: _sitAndReachC,
+                                range: PerformanceTestRanges.sitAndReachCm,
                                 palette: palette),
                           ],
                         ),
@@ -5800,10 +5849,10 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
     try {
       await ref.read(followUpEntryRepositoryProvider).delete(entry.id);
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la entrada.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos eliminar la entrada.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     }
   }
@@ -5955,7 +6004,7 @@ class _SeguimientoEntryCard extends StatelessWidget {
               TreinoIconButton(
                 icon: TreinoIcon.trash,
                 tooltip: 'Eliminar', // i18n: Fase W2
-                color: palette.danger,
+                color: palette.dangerText,
                 onPressed: onDelete,
               ),
             ],
@@ -6010,7 +6059,9 @@ class _TagChip extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: color,
+          // El tinte y el borde usan el color de estado; el texto, su versión
+          // legible (#1550).
+          color: palette.textVariantOf(color),
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
@@ -6086,20 +6137,21 @@ class _NuevaEntradaSeguimientoDialogState
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_isEditing
-              ? 'Entrada actualizada.' // i18n: Fase W2
-              : 'Entrada guardada.'), // i18n: Fase W2
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        _isEditing
+            ? 'Entrada actualizada.' // i18n: Fase W2
+            : 'Entrada guardada.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar la entrada.'), // i18n: Fase W2
-        ),
+      // Con context y no con el messenger: el diálogo sigue abierto y un
+      // SnackBar del Scaffold de atrás quedaría tapado (#1490).
+      showTreinoToast(
+        context,
+        'No pudimos guardar la entrada.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -6132,20 +6184,19 @@ class _NuevaEntradaSeguimientoDialogState
                   ),
                 ),
                 const SizedBox(height: 16),
-                TreinoDropdown<FollowUpTag>(
-                  initialValue: _tag,
-                  onChanged: (v) {
-                    if (v != null) setState(() => _tag = v);
-                  },
+                TreinoSelectField<FollowUpTag>(
+                  value: _tag,
+                  sheetTitle: 'Categoría', // i18n: Fase W2
+                  onChanged: (v) => setState(() => _tag = v),
                   decoration: InputDecoration(
                     labelText: 'Categoría', // i18n: Fase W2
                     labelStyle: TextStyle(color: palette.textMuted),
                   ),
-                  items: [
+                  options: [
                     for (final t in FollowUpTag.values)
-                      DropdownMenuItem(
+                      TreinoSelectOption(
                         value: t,
-                        child: Text(_TagChip._labelAndColor(t, palette).$1),
+                        label: _TagChip._labelAndColor(t, palette).$1,
                       ),
                   ],
                 ),
@@ -6222,8 +6273,9 @@ class _NuevaEntradaSeguimientoDialogState
 /// vegetales…) y cada grupo con opciones que el alumno elige.
 ///
 /// Modelo: `NutritionPlan → Meal → FoodGroup → FoodOption`. Ver
-/// `nutrition_plan.dart` para detalle. En este MVP solo el PF arma el plan;
-/// el alumno NO lo ve todavía en mobile (feature scoped aparte).
+/// `nutrition_plan.dart` para detalle. El PF arma el plan (acá o, desde
+/// #1538, en la ficha del alumno mobile) y el alumno lo ve en su app, en MI
+/// PLAN NUTRICIONAL.
 ///
 /// Comportamiento:
 /// - Al abrir por primera vez muestra 6 comidas preset (desayuno, media
@@ -6232,6 +6284,11 @@ class _NuevaEntradaSeguimientoDialogState
 /// - Cambios locales viven en `_draft` — el stream de Firestore se lee al
 ///   entrar y cuando el PF guarda vuelve a persistir todo el doc.
 /// - Sin auto-save (evitamos writes innecesarios y forms rotos).
+/// - Si la lectura falla NO arranca de los presets: un GUARDAR PLAN sobre ese
+///   borrador pisaría el plan real que no se pudo leer (#1553).
+/// - Los ids salen del plan (`nextFreeId`) y no de un contador de sesión, y
+///   cada comida, grupo y opción lleva su id como `Key` (#1553): ver
+///   `nutrition_plan_ids.dart`.
 class _NutricionTab extends ConsumerStatefulWidget {
   const _NutricionTab({required this.athleteId});
 
@@ -6243,23 +6300,26 @@ class _NutricionTab extends ConsumerStatefulWidget {
 
 class _NutricionTabState extends ConsumerState<_NutricionTab> {
   NutritionPlan? _draft;
+
+  /// El borrador tal como se sembró o se guardó por última vez: contra esto se
+  /// mide si el PF editó algo (#1581).
+  NutritionPlan? _baseline;
   bool _loadedOnce = false;
   bool _saving = false;
-  int _idCounter = 0;
 
-  String _newId(String prefix) {
-    _idCounter++;
-    // Sin Date.now() porque en tests / hot reload no queremos ids
-    // dependientes de tiempo real. El id solo tiene que ser único en la
-    // sesión — Firestore acepta cualquier string.
-    return '$prefix-$_idCounter';
-  }
+  bool get _dirty => _draft != null && _draft != _baseline;
+
+  /// Un id que no usa ningún ítem del borrador. Antes era un contador que
+  /// arrancaba en 0 en cada sesión: sobre un plan con `meal-1` guardado, la
+  /// comida nueva salía con el mismo id y editarla editaba también la otra.
+  String _newId(String prefix) => _draft!.nextFreeId(prefix);
 
   void _seedIfNeeded(NutritionPlan? persisted, String trainerUid) {
     if (_loadedOnce) return;
     _loadedOnce = true;
     if (persisted != null) {
-      _draft = persisted;
+      // Un plan guardado con el contador viejo puede traer ids repetidos.
+      _draft = persisted.withUniqueIds();
     } else {
       _draft = NutritionPlan(
         id: '${trainerUid}_${widget.athleteId}',
@@ -6270,6 +6330,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
         updatedAt: DateTime(2000),
       );
     }
+    _baseline = _draft;
   }
 
   @override
@@ -6278,8 +6339,8 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     // Reset cross-alumno para que el swap no muestre el plan del anterior.
     if (oldWidget.athleteId != widget.athleteId) {
       _draft = null;
+      _baseline = null;
       _loadedOnce = false;
-      _idCounter = 0;
     }
   }
 
@@ -6289,12 +6350,10 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     final messenger = ScaffoldMessenger.of(context);
     final clean = draft.sanitizeForSave();
     if (clean.meals.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'El plan está vacío. Agregá al menos una comida con nombre.', // i18n: Fase W2
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        'El plan está vacío. Agregá al menos una comida con nombre.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -6302,18 +6361,19 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     try {
       await ref.read(nutritionPlanRepositoryProvider).save(clean);
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Plan guardado.'), // i18n: Fase W2
-          duration: Duration(seconds: 2),
-        ),
+      // Lo que está en pantalla ya quedó guardado: no hay cambios pendientes.
+      _baseline = draft;
+      showTreinoToastOn(
+        messenger,
+        'Plan guardado.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar el plan.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos guardar el plan.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -6365,19 +6425,52 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     final palette = AppPalette.of(context);
     final trainerUid = ref.watch(currentUidProvider);
     if (trainerUid == null) return const SizedBox.shrink();
-    final planAsync = ref.watch(
-      nutritionPlanProvider(
-        (trainerId: trainerUid, athleteId: widget.athleteId),
-      ),
+    final provider = nutritionPlanProvider(
+      (trainerId: trainerUid, athleteId: widget.athleteId),
     );
+    final planAsync = ref.watch(provider);
 
-    if (planAsync.hasValue) {
+    // El error GANA sobre un valor previo (#1581). Riverpod conserva el valor
+    // viejo dentro del `AsyncError`: con la copia buena en la caché y el doc
+    // que el servidor devuelve ilegible, `hasValue` da true, y sembrar de ahí
+    // dejaba GUARDAR PLAN pisando el doc del servidor con la copia vieja.
+    final readFailed = planAsync.hasError;
+    if (planAsync.hasValue && !readFailed) {
       _seedIfNeeded(planAsync.requireValue, trainerUid);
-    } else if (planAsync.hasError && !_loadedOnce) {
-      // Error al leer — dejamos que el PF arme el plan igual (arranca desde
-      // presets). El save intentará persistir; si sigue fallando el error
-      // se muestra en el snackbar.
-      _seedIfNeeded(null, trainerUid);
+    } else if (readFailed && _draft != null && !_dirty) {
+      // Carrera: se sembró con la copia de la caché y el servidor falló
+      // después. Sin ediciones del PF no hay nada que perder: se descarta el
+      // borrador y se muestra el error.
+      _draft = null;
+      _baseline = null;
+      _loadedOnce = false;
+    }
+    // Con ediciones del PF el borrador se conserva, pero GUARDAR PLAN queda
+    // bloqueado mientras la lectura esté en error: guardaría encima de un plan
+    // que no se pudo leer. Si Reintentar lee bien, se desbloquea.
+    final saveBlocked = readFailed && _draft != null;
+
+    if (_draft == null && planAsync.hasError) {
+      // NO arrancamos de los presets: guardar ese borrador pisaría el plan
+      // real que no se pudo leer. Antes lo hacía (#1553).
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('error'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _muted(
+              palette,
+              'No pudimos cargar el plan nutricional.', // i18n: Fase W2
+            ),
+            TreinoButton(
+              label: 'Reintentar', // i18n: Fase W2
+              variant: TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.sm,
+              onPressed: () => ref.invalidate(provider),
+            ),
+          ],
+        ),
+      );
     }
 
     if (_draft == null) {
@@ -6410,7 +6503,9 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Armá el plan por comidas, grupos y opciones. Solo vos lo ves.', // i18n: Fase W2
+                        // Decía «Solo vos lo ves»: falso desde que el
+                        // alumno lo ve en mobile (#1553, AGENTS.md §11.1).
+                        'Armá el plan por comidas, grupos y opciones. Tu alumno lo ve en su app.', // i18n: Fase W2
                         style:
                             TextStyle(color: palette.textMuted, fontSize: 13),
                       ),
@@ -6420,10 +6515,17 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                 TreinoButton(
                   label: 'GUARDAR PLAN', // i18n: Fase W2
                   loading: _saving,
-                  onPressed: _save,
+                  onPressed: saveBlocked ? null : _save,
                 ),
               ],
             ),
+            if (saveBlocked) ...[
+              StaleDataNotice(onRetry: () => ref.invalidate(provider)),
+              Text(
+                'No pudimos leer el plan guardado. Para no pisarlo, GUARDAR PLAN queda bloqueado hasta volver a leerlo.', // i18n: Fase W2
+                style: TextStyle(color: palette.textMuted, fontSize: 13),
+              ),
+            ],
             const SizedBox(height: 16),
             Expanded(
               child: SingleChildScrollView(
@@ -6458,8 +6560,14 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                       onChanged: _updateTitle,
                     ),
                     const SizedBox(height: 16),
+                    // La `Key` por id mantiene cada campo pegado a SU comida:
+                    // sin ella, al borrar la primera Flutter reusaba por
+                    // posición el estado del `TextFormField` (que lee
+                    // `initialValue` sólo al montar) y la card de arriba
+                    // mostraba el nombre de la borrada (#1553).
                     for (final meal in _draft!.meals)
                       Padding(
+                        key: ValueKey(meal.id),
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _MealEditor(
                           meal: meal,
@@ -6607,7 +6715,7 @@ class _MealEditor extends StatelessWidget {
               TreinoIconButton(
                 icon: TreinoIcon.trash,
                 tooltip: 'Eliminar comida', // i18n: Fase W2
-                color: palette.danger,
+                color: palette.dangerText,
                 size: TreinoButtonSize.xs,
                 onPressed: onDelete,
               ),
@@ -6616,6 +6724,7 @@ class _MealEditor extends StatelessWidget {
           children: [
             for (final group in meal.groups)
               Padding(
+                key: ValueKey(group.id),
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _GroupEditor(
                   group: group,
@@ -6723,7 +6832,7 @@ class _GroupEditor extends StatelessWidget {
               TreinoIconButton(
                 icon: TreinoIcon.trash,
                 tooltip: 'Eliminar grupo', // i18n: Fase W2
-                color: palette.danger,
+                color: palette.dangerText,
                 size: TreinoButtonSize.xs,
                 onPressed: onDelete,
               ),
@@ -6732,6 +6841,7 @@ class _GroupEditor extends StatelessWidget {
           const SizedBox(height: 6),
           for (final option in group.options)
             Padding(
+              key: ValueKey(option.id),
               padding: const EdgeInsets.only(top: 4),
               child: _OptionRow(
                 option: option,
@@ -6903,7 +7013,7 @@ class _OptionRow extends StatelessWidget {
         TreinoIconButton(
           icon: TreinoIcon.trash,
           tooltip: 'Eliminar opción', // i18n: Fase W2
-          color: palette.danger,
+          color: palette.dangerText,
           size: TreinoButtonSize.xs,
           onPressed: onDelete,
         ),

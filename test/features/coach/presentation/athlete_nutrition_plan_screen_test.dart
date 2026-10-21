@@ -157,4 +157,41 @@ void main() {
     expect(find.text(l10n.athleteNutritionEmptyGroup), findsNothing);
     expect(find.text('Avena'), findsOneWidget);
   });
+
+  // #1553: la cantidad sólo se mostraba con cantidad Y unidad. «2 huevos»
+  // cargado como alimento «Huevos» + cantidad «2» le llegaba al alumno como
+  // «Huevos» a secas: el PF lo había escrito y el alumno no lo veía.
+  testWidgets('muestra la cantidad aunque falte la unidad, y viceversa',
+      (tester) async {
+    await tester.pumpWidget(_wrap(NutritionPlan(
+      id: '${_trainerId}_$_athleteId',
+      trainerId: _trainerId,
+      athleteId: _athleteId,
+      title: 'Plan',
+      meals: const [
+        Meal(
+          id: 'breakfast',
+          name: 'Desayuno',
+          groups: [
+            FoodGroup(
+              id: 'protein',
+              name: 'Proteínas',
+              selectionMode: SelectionMode.chooseOne,
+              options: [
+                FoodOption(id: 'eggs', name: 'Huevos', quantity: '2'),
+                FoodOption(id: 'cheese', name: 'Queso', unit: 'a gusto'),
+                FoodOption(id: 'tuna', name: 'Atún', quantity: ' ', unit: ''),
+              ],
+            ),
+          ],
+        ),
+      ],
+      updatedAt: DateTime.utc(2026, 9, 1),
+    )));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('a gusto'), findsOneWidget);
+    expect(find.text('Atún'), findsOneWidget);
+  });
 }

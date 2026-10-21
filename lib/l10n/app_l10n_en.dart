@@ -63,8 +63,8 @@ class AppL10nEn extends AppL10n {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'DAYS',
-      one: 'DAY',
+      other: 'WEEKS',
+      one: 'WEEK',
     );
     return '$_temp0';
   }
@@ -92,6 +92,21 @@ class AppL10nEn extends AppL10n {
       one: 'workout',
     );
     return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaMusclesTitle => 'MUSCLES THIS WEEK';
+
+  @override
+  String get homeEstaSemanaMusclesLegend =>
+      'More color = closer to the sets your routine asks for this week.';
+
+  @override
+  String get homeGreeting => 'HELLO!';
+
+  @override
+  String homeGreetingNamed(String name) {
+    return 'HELLO, $name!';
   }
 
   @override
@@ -150,6 +165,17 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get authWelcomeSignIn => '';
+
+  @override
+  String get authWelcomeTrainerPrompt => 'Are you a trainer?';
+
+  @override
+  String get authWelcomeBecomeTrainer => 'I want to be a trainer';
+
+  @override
+  String authWelcomeBecomeTrainerFallback(String email) {
+    return 'We couldn\'t open your email app. Write to us at $email.';
+  }
 
   @override
   String get authLoginTitle => '';
@@ -259,6 +285,30 @@ class AppL10nEn extends AppL10n {
   String get authAppleLabel => '';
 
   @override
+  String get authLoginHeaderTitle => '';
+
+  @override
+  String get authRegisterHeaderTitle => '';
+
+  @override
+  String get authLoginOrSignInWith => '';
+
+  @override
+  String get authRegisterOrSignUpWith => '';
+
+  @override
+  String get authContinueWithGoogle => '';
+
+  @override
+  String get authContinueWithApple => '';
+
+  @override
+  String get authRegisterHaveAccount => '';
+
+  @override
+  String get authRegisterSignInLink => '';
+
+  @override
   String get authComingSoonTooltip => '';
 
   @override
@@ -343,6 +393,17 @@ class AppL10nEn extends AppL10n {
   @override
   String get coachInquiryCtaError =>
       'We couldn\'t open the chat. Please try again.';
+
+  @override
+  String get coachPreviewBannerTitle => 'PREVIEW';
+
+  @override
+  String get coachPreviewBannerBody =>
+      'This is how a student sees your profile. The buttons are disabled in this view.';
+
+  @override
+  String get coachPreviewMissingExperience =>
+      'You haven\'t added your years of experience yet: students see “—”. Tap to add them.';
 
   @override
   String get coachCtaProximamente => '';
@@ -479,7 +540,7 @@ class AppL10nEn extends AppL10n {
   String get coachExercisePicker => '';
 
   @override
-  String get agendaButtonLabel => 'VIEW TRAINER AGENDA';
+  String get agendaButtonLabel => 'MY SCHEDULE';
 
   @override
   String get athleteNutritionPlanButtonLabel => 'MY NUTRITION PLAN';
@@ -511,6 +572,157 @@ class AppL10nEn extends AppL10n {
   @override
   String get athleteNutritionNeedsActiveLink =>
       'You need an active trainer link to view your nutrition plan.';
+
+  @override
+  String get trainerNutritionSectionTitle => 'NUTRITION PLAN';
+
+  @override
+  String get trainerNutritionSectionLoadCta => '+ Add';
+
+  @override
+  String get trainerNutritionSectionEditCta => 'Edit';
+
+  @override
+  String get trainerNutritionSectionEmpty =>
+      'You haven\'t added a nutrition plan yet.';
+
+  @override
+  String get trainerNutritionSectionUntitled => 'Nutrition plan';
+
+  @override
+  String trainerNutritionSectionSummary(int count, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count meals',
+      one: '1 meal',
+    );
+    return '$_temp0 · updated $date';
+  }
+
+  @override
+  String get trainerNutritionLoadError =>
+      'We couldn\'t load the nutrition plan.';
+
+  @override
+  String get trainerNutritionEditorTitle => 'NUTRITION PLAN';
+
+  @override
+  String get trainerNutritionEditorPlanTitleLabel => 'Plan title (optional)';
+
+  @override
+  String get trainerNutritionEditorPlanTitleHint =>
+      'E.g. Progression 4 - Week 9 onwards';
+
+  @override
+  String get trainerNutritionEditorMealNameHint => 'Meal name';
+
+  @override
+  String get trainerNutritionEditorMealTimeHint => 'Time';
+
+  @override
+  String get trainerNutritionEditorDeleteMealTooltip => 'Delete meal';
+
+  @override
+  String get trainerNutritionEditorAddMeal => 'ADD MEAL';
+
+  @override
+  String get trainerNutritionEditorGroupNameHint => 'Group name';
+
+  @override
+  String get trainerNutritionEditorDeleteGroupTooltip => 'Delete group';
+
+  @override
+  String get trainerNutritionEditorAddGroup => '+ Add group';
+
+  @override
+  String get trainerNutritionEditorChooseOne => 'Choose one';
+
+  @override
+  String get trainerNutritionEditorAll => 'All';
+
+  @override
+  String get trainerNutritionEditorAddOption => '+ Add option';
+
+  @override
+  String get trainerNutritionEditorEmptyGroup => 'No options yet.';
+
+  @override
+  String get trainerNutritionEditorSave => 'SAVE PLAN';
+
+  @override
+  String get trainerNutritionEditorSaved => 'Nutrition plan saved.';
+
+  @override
+  String get trainerNutritionEditorSaveError =>
+      'We couldn\'t save the plan. Try again.';
+
+  @override
+  String get trainerNutritionEditorStaleReadError =>
+      'We couldn\'t read the saved plan. To avoid overwriting it, you can\'t save until it\'s read again.';
+
+  @override
+  String get trainerNutritionEditorEmptyPlan =>
+      'The plan is empty. Add at least one meal with a name.';
+
+  @override
+  String get trainerNutritionEditorDiscardTitle => 'Discard changes?';
+
+  @override
+  String get trainerNutritionEditorDiscardBody =>
+      'If you leave now you\'ll lose your unsaved plan changes.';
+
+  @override
+  String get trainerNutritionEditorDiscardConfirm => 'Discard';
+
+  @override
+  String trainerNutritionEditorDeleteTitle(String name) {
+    return 'Delete “$name”?';
+  }
+
+  @override
+  String get trainerNutritionEditorDeleteMealBody =>
+      'The meal will be deleted with all its groups and options.';
+
+  @override
+  String get trainerNutritionEditorDeleteGroupBody =>
+      'The group will be deleted with all its options.';
+
+  @override
+  String get trainerNutritionOptionNewTitle => 'NEW OPTION';
+
+  @override
+  String get trainerNutritionOptionEditTitle => 'EDIT OPTION';
+
+  @override
+  String get trainerNutritionOptionNameLabel => 'FOOD';
+
+  @override
+  String get trainerNutritionOptionNameHint => 'E.g. 5 rice cakes';
+
+  @override
+  String get trainerNutritionOptionQuantityLabel => 'QUANTITY';
+
+  @override
+  String get trainerNutritionOptionQuantityHint => 'E.g. 230-240';
+
+  @override
+  String get trainerNutritionOptionUnitLabel => 'UNIT';
+
+  @override
+  String get trainerNutritionOptionUnitHint => 'E.g. g cooked weight';
+
+  @override
+  String get trainerNutritionOptionNotesLabel => 'NOTES';
+
+  @override
+  String get trainerNutritionOptionNotesHint => 'Brand, clarifications…';
+
+  @override
+  String get trainerNutritionOptionDone => 'DONE';
+
+  @override
+  String get trainerNutritionOptionDelete => 'DELETE OPTION';
 
   @override
   String get athleteLinkRequired => 'We couldn\'t find an active trainer link.';
@@ -588,6 +800,27 @@ class AppL10nEn extends AppL10n {
   String get agendaCancellationTooLate => '';
 
   @override
+  String get agendaAthleteCancelCta => 'CANCEL';
+
+  @override
+  String get agendaAthleteCancelConfirmBody =>
+      'Cancel this session? We\'ll let your trainer know.';
+
+  @override
+  String get agendaBookingCancelledByAthlete =>
+      'Booking cancelled by the athlete.';
+
+  @override
+  String get agendaAthleteNotifyTrainerCta => 'TELL MY TRAINER';
+
+  @override
+  String get agendaAthleteNotifyHint =>
+      'Less than 24 h left: if you can\'t make it, tell your trainer.';
+
+  @override
+  String get agendaAthleteChatError => 'We couldn\'t open the chat. Try again.';
+
+  @override
   String get agendaUpcomingAppointmentsHeading => '';
 
   @override
@@ -621,7 +854,33 @@ class AppL10nEn extends AppL10n {
   String get agendaRuleInvalidWindow => '';
 
   @override
+  String agendaRuleOverlap(String day, String start, String end) {
+    return 'This time overlaps one you already added: $day, $start – $end.';
+  }
+
+  @override
   String get agendaBookingCancelledByCoach => '';
+
+  @override
+  String get agendaAttendanceMarkAbsent => 'MARK AS NO-SHOW';
+
+  @override
+  String get agendaAttendanceUndoAbsent => 'UNDO NO-SHOW';
+
+  @override
+  String get agendaAttendanceDefaultHint =>
+      'If you don\'t mark anything, the session counts as done.';
+
+  @override
+  String get agendaAttendanceAbsentHint =>
+      'You marked that the athlete didn\'t show up.';
+
+  @override
+  String get agendaAttendanceAbsentStatus => 'No-show';
+
+  @override
+  String get agendaAttendanceError =>
+      'We couldn\'t save attendance. Try again.';
 
   @override
   String get agendaBlockedDayTitle => '';
@@ -638,6 +897,58 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get agendaBlockedDayConfirm => '';
+
+  @override
+  String get agendaConflictTitle => 'Check the schedule';
+
+  @override
+  String agendaConflictOverlapLine(String name, String start, String end) {
+    return 'It overlaps with $name ($start – $end).';
+  }
+
+  @override
+  String agendaConflictOverlapMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'And $count more sessions.',
+      one: 'And 1 more session.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictSomeoneElse => 'another session';
+
+  @override
+  String get agendaConflictOutsideAvailability =>
+      'It falls outside your published availability.';
+
+  @override
+  String agendaConflictSeriesOverlap(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sessions in the series overlap others already scheduled.',
+      one: '1 session in the series overlaps another one already scheduled.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String agendaConflictSeriesOutside(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sessions in the series fall outside your published availability.',
+      one: '1 session in the series falls outside your published availability.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictQuestion => 'Schedule it anyway?';
 
   @override
   String get agendaSlotFreeLabel => '';
@@ -822,6 +1133,12 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get wellbeingCheckInTitle => 'HOW DID YOU FEEL?';
+
+  @override
+  String get wellbeingCheckInFromToday => 'You already told us today on Home.';
+
+  @override
+  String get wellbeingCheckInUseForSession => 'USE FOR THIS WORKOUT';
 
   @override
   String get wellbeingCheckInOptional => 'Optional. You can skip it.';
@@ -1041,6 +1358,50 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get workoutExploreEmptyLevel => 'No routines for this level.';
+
+  @override
+  String templatesFilterEmptyDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'No $days-day templates',
+      one: 'No 1-day templates',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String templatesFilterEmptyMinutes(String minutes) {
+    return 'No templates of $minutes min or less';
+  }
+
+  @override
+  String get templatesFilterEmptyCombination =>
+      'No template matches everything you picked at once';
+
+  @override
+  String get templatesFilterEmptyGoals =>
+      'No template targets the goals you picked';
+
+  @override
+  String get templatesFilterEmptyZones =>
+      'No template works the areas you picked';
+
+  @override
+  String get templatesFilterEmptyAction => 'Show all';
+
+  @override
+  String get templatesFilterBarClear => 'Clear filters';
+
+  @override
+  String get templatesFiltersCleared => 'Filters cleared';
+
+  @override
+  String get templatesFiltersClearError =>
+      'We couldn\'t clear your filters. Try again.';
+
+  @override
+  String get templatesFiltersUndo => 'UNDO';
 
   @override
   String get workoutExploreSearchHint => 'Search by name, muscle or exercise';
@@ -1815,6 +2176,59 @@ class AppL10nEn extends AppL10n {
   String get chatListRetryLabel => '';
 
   @override
+  String get chatContactsSectionTitle => '';
+
+  @override
+  String get chatContactReasonCoach => '';
+
+  @override
+  String get chatContactReasonAthlete => '';
+
+  @override
+  String get chatContactReasonFollowing => '';
+
+  @override
+  String get chatContactsError => '';
+
+  @override
+  String get chatContactOpenError => '';
+
+  @override
+  String get chatActionArchive => '';
+
+  @override
+  String get chatActionUnarchive => '';
+
+  @override
+  String get chatActionDelete => '';
+
+  @override
+  String get chatActionUndo => '';
+
+  @override
+  String get chatArchivedToast => '';
+
+  @override
+  String get chatUnarchivedToast => '';
+
+  @override
+  String get chatDeletedToast => '';
+
+  @override
+  String get chatActionError => '';
+
+  @override
+  String get chatDeleteConfirmTitle => '';
+
+  @override
+  String get chatDeleteConfirmBody => '';
+
+  @override
+  String chatArchivedSectionTitle(int count) {
+    return '$count';
+  }
+
+  @override
   String get chatRelativeJustNow => '';
 
   @override
@@ -2401,7 +2815,11 @@ class AppL10nEn extends AppL10n {
   String get searchUsersClearA11y => 'Clear search';
 
   @override
-  String get publicProfileMessageDisabledA11y => 'Message (coming soon)';
+  String get publicProfileMessageDisabledA11y =>
+      'Message (unavailable: this person needs to follow you)';
+
+  @override
+  String get publicProfileStatWorkouts => 'WORKOUTS';
 
   @override
   String a11yAvatarLabel(String name) {
@@ -2529,6 +2947,9 @@ class AppL10nEn extends AppL10n {
   String get routineEditorEditDayNameA11y => '';
 
   @override
+  String get routineEditorDayNameLabel => 'DAY NAME';
+
+  @override
   String get athleteDetailEditPlanA11y => 'Edit plan';
 
   @override
@@ -2539,6 +2960,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get commonCancel => 'Cancel';
+
+  @override
+  String get commonDone => 'Done';
 
   @override
   String get publicProfileLoadErrorA11y => 'We couldn\'t load this profile.';
@@ -3108,6 +3532,51 @@ class AppL10nEn extends AppL10n {
   @override
   String get sessionFinishError =>
       'We couldn\'t finish the session. Please try again.';
+
+  @override
+  String get sessionFinishNeedOneSet =>
+      'Do at least one set to finish. If you\'re not training today, tap ABANDON.';
+
+  @override
+  String get sessionFinishEarlyTitle => 'FINISH ANYWAY?';
+
+  @override
+  String sessionFinishEarlyMissingHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sets left:',
+      one: '1 set left:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'and $count more exercises',
+      one: 'and 1 more exercise',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyCounts(int percent) {
+    return 'You did $percent% of the session: it counts as a workout for your streak and rankings.';
+  }
+
+  @override
+  String sessionFinishEarlyNotCounts(int percent, int minPercent) {
+    return 'You did $percent% of the session. It\'s saved, but it doesn\'t count as a workout for your streak or rankings: $minPercent% is needed.';
+  }
+
+  @override
+  String get sessionFinishEarlyConfirm => 'FINISH ANYWAY';
+
+  @override
+  String get sessionFinishEarlyKeepGoing => 'KEEP TRAINING';
 
   @override
   String get routineEditorMissingName => 'Give your routine a name.';
@@ -4133,7 +4602,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get chatBlockedComposerNotice =>
-      'To message them, this person needs to follow you.';
+      'You blocked this person. Unblock them to send a message.';
 
   @override
   String get chatBlockedComposerHintA11y => 'You can\'t write in this chat';
@@ -4331,7 +4800,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'No answer filters the catalog: you will keep seeing every template.';
+      'Everything you pick filters the catalog: you will only see templates that match all of it. If none is left, you can show them all.';
 
   @override
   String get templatesOnboardingStep2Title => 'How long is your session?';
@@ -4438,7 +4907,12 @@ class AppL10nEn extends AppL10n {
   String get templatesFilterBarSetUp => 'SET UP MY SEARCH';
 
   @override
-  String get templatesFilterBarHint => 'Sorted to match what you are after';
+  String get templatesFilterBarHint =>
+      'Filtered and sorted to match what you are after';
+
+  @override
+  String get templatesFilterBarHintSorted =>
+      'Sorted to match what you are after';
 
   @override
   String get exerciseFeedbackAction => 'COMMENT / REPORT';
@@ -5242,4 +5716,71 @@ class AppL10nEn extends AppL10n {
   @override
   String get appUpdateOpenError =>
       'We couldn\'t open the store. Search for TREINO on the App Store or Google Play.';
+
+  @override
+  String get timePickerHelpText => 'Select time';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Between $min and $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Maximum $max $unit';
+  }
+
+  @override
+  String get performanceLogTitleEdit => 'Edit assessment';
+
+  @override
+  String get performanceLogUpdateCta => 'SAVE CHANGES';
+
+  @override
+  String get performanceLogUpdateSuccess => 'Assessment updated';
+
+  @override
+  String get performanceHistoryEditTooltip => 'Edit assessment';
+
+  @override
+  String get performanceHistoryDeleteTooltip => 'Delete assessment';
+
+  @override
+  String get performanceHistoryOtherTrainerTag => 'Logged by another trainer';
+
+  @override
+  String get performanceDeleteConfirmTitle => 'Delete assessment?';
+
+  @override
+  String performanceDeleteConfirmBody(String date) {
+    return 'The assessment from $date will be deleted. This can\'t be undone.';
+  }
+
+  @override
+  String get performanceDeleteSuccess => 'Assessment deleted';
+
+  @override
+  String get performanceDeleteError =>
+      'We couldn\'t delete the assessment. Try again.';
+
+  @override
+  String get commonDelete => 'Delete';
+
+  @override
+  String get agendaRuleDeleteTitle => 'Delete this time slot?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Existing bookings are kept.';
+
+  @override
+  String get agendaOverrideDeleteTitle => 'Delete this exception?';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'NOT NOW';
+
+  @override
+  String get authSignOutConfirmTitle => 'Sign out?';
+
+  @override
+  String get authSignOutConfirmAction => 'Sign out';
 }

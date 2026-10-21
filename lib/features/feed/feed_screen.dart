@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -246,18 +247,30 @@ class _FeedPageState extends ConsumerState<_FeedPage>
   }
 }
 
+/// Header del feed (título + acciones). Scrollea CON el contenido y no tiene
+/// fondo propio: se ve el [AppBackground] real, con sus glows.
+///
+/// Era `floating` + `snap` con `backgroundColor: palette.bg`, y ese fondo es
+/// sólo la base sólida de [AppBackground]: tapaba el glow del accent justo
+/// donde es más fuerte (arriba a la izquierda) y dejaba un corte recto contra
+/// el resto de la pantalla (#1470). Es el mismo problema, y la misma salida,
+/// que documenta [_FeedSegmentSliver]: un header `floating` reaparece ENCIMA
+/// del contenido al scrollear hacia arriba, y eso obliga a un fondo opaco.
 SliverAppBar _feedAppBar(
   BuildContext context, {
   required bool showTitle,
 }) {
-  final palette = AppPalette.of(context);
-
   return SliverAppBar(
     key: const ValueKey('feed-collapsible-header'),
-    floating: true,
-    snap: true,
     automaticallyImplyLeading: false,
-    backgroundColor: palette.bg,
+    backgroundColor: Colors.transparent,
+    forceMaterialTransparency: true,
+    // Sin fondo, el AppBar ya no puede deducir el brillo de los íconos de la
+    // status bar del color de fondo (transparente = "oscuro" = íconos claros,
+    // invisibles en el tema claro). Mismo criterio que `ThemeWatcher`.
+    systemOverlayStyle: Theme.of(context).brightness == Brightness.dark
+        ? SystemUiOverlayStyle.light
+        : SystemUiOverlayStyle.dark,
     surfaceTintColor: Colors.transparent,
     elevation: 0,
     scrolledUnderElevation: 0,
@@ -829,7 +842,7 @@ class _FeedAsyncBody<T> extends StatelessWidget {
                   TextButton(
                     onPressed: onRetry,
                     style: TextButton.styleFrom(
-                      foregroundColor: palette.accent,
+                      foregroundColor: palette.accentText,
                     ),
                     child: Text(l10n.coachRetryLabel),
                   ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart'
@@ -426,7 +427,7 @@ void main() {
           find.widgetWithText(TreinoInteractiveState, 'Registrar pago').first);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ana Activa').last);
       await tester.pumpAndSettle();
@@ -534,6 +535,14 @@ void main() {
       // importa.
       expect(find.text('Todo el historial'), findsOneWidget);
       expect(find.byKey(const Key('pagos_periodo_selector')), findsOneWidget);
+
+      // Al dejar de ser un `PopupMenuButton` el selector perdió los 8 px por
+      // lado de su IconButton: la píldora quedaba en 34 px de alto y toda la
+      // tabla subía 13 px (lo cazó el gate visual, que sólo corre en Linux).
+      // El target vuelve a 50: la píldora más su aire.
+      final selector =
+          tester.getSize(find.byKey(const Key('pagos_periodo_selector')));
+      expect(selector.height, greaterThanOrEqualTo(48));
     });
 
     testWidgets('elegir 30 dias saca los pagos viejos de la lista',

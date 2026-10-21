@@ -14,10 +14,9 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../core/moderation/moderation_guard.dart';
 import '../../../l10n/app_l10n.dart';
-import '../../feed/application/follow_providers.dart';
-import '../../feed/domain/follow.dart';
-import '../../feed/domain/follow_status.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
+import '../../moderation/application/moderation_providers.dart'
+    show blockedUidsProvider;
 import '../../moderation/domain/report_target_kind.dart';
 import '../../moderation/presentation/moderation_actions.dart';
 import '../../paywall/application/athlete_entitlement_provider.dart'
@@ -31,6 +30,7 @@ import '../domain/media_type.dart';
 import '../domain/message.dart';
 import 'chat_image_bubble.dart';
 import 'chat_video_bubble.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Pantalla de chat 1-1. Burbujas + textfield + send. Real-time via
 /// `messagesProvider(chatId)`.
@@ -95,6 +95,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (currentUid == null) return;
 
     setState(() => _sending = true);
+    // Se vacía YA y no al terminar: el campo queda habilitado durante el envío
+    // (si no, perdería el foco y el teclado se cerraría con cada mensaje,
+    // #1466), y limpiarlo recién al volver pisaba lo que la persona escribiera
+    // mientras tanto. Si el envío falla, el texto vuelve (ver el `catch`).
+    _textController.clear();
     // Capturados antes del await (mismo criterio que _onAttach / issue #435):
     // el envío pertenece a ESTE chat y `ref` no se puede usar una vez que la
     // pantalla murió, pero el mensaje igual salió y el evento corresponde.
@@ -108,12 +113,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         text: text,
       );
       analytics.logChatMessageSent(chatId: chatId, senderId: currentUid);
-      // #501: el await pudo sobrevivir a la pantalla (back, deep-link,
-      // logout). Tocar el controller ya disposed tira "used after being
-      // disposed" y el catch de abajo lo reporta como envío fallido cuando en
-      // realidad salió.
-      if (!mounted) return;
-      _textController.clear();
     } catch (e, st) {
       developer.log(
         'sendMessage failed',
@@ -121,19 +120,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         error: e,
         stackTrace: st,
       );
+      // #501: el await pudo sobrevivir a la pantalla (back, deep-link,
+      // logout). Con la pantalla muerta no se toca ni el controller (ya
+      // disposed: "used after being disposed") ni el contexto.
       if (mounted) {
+        _restaurarTexto(text);
         // `chatScreenSendError` dice "Probá de nuevo", y para un bloqueo de
         // moderación eso es consejo falso: el mismo texto falla siempre.
         final copy = e is ModerationBlockedException
             ? AppL10n.of(context).moderationBlockedMessage
             : AppL10n.of(context).chatScreenSendError;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(copy)),
-        );
+        showTreinoToast(context, copy, type: TreinoToastType.error);
       }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  /// Devuelve al campo el texto de un envío que falló, sin pisar lo que se
+  /// haya escrito después: va ANTES, en su propia línea.
+  void _restaurarTexto(String text) {
+    final actual = _textController.text;
+    final restaurado = actual.isEmpty ? text : '$text\n$actual';
+    _textController.value = TextEditingValue(
+      text: restaurado,
+      selection: TextSelection.collapsed(offset: restaurado.length),
+    );
   }
 
   /// Muestra un aviso del gate de cuota. Local y no por el messenger root: a
@@ -141,8 +153,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// construcción — el usuario acaba de tocar el clip.
   void _toastQuota(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    showTreinoToast(context, message, type: TreinoToastType.error);
   }
 
   static String _mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
@@ -258,64 +269,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final messagesAsync = ref.watch(messagesProvider(widget.chatId));
+    // Sin lo que el usuario eliminó para sí (Chat.hiddenBefore).
+    final messagesAsync = ref.watch(visibleMessagesProvider(widget.chatId));
     final currentUid = ref.watch(currentUidProvider);
 
-    // REQ-FOLLOW-012 — ESPEJO EXACTO de `senderMayPost` en las rules.
+    // Espejo de `senderMayPost` en las rules: en un chat existente escriben
+    // los dos miembros SIN requisito de follow (cambio de producto del
+    // 2026-10-21, que reemplazó a REQ-FOLLOW-012). Lo único que corta la
+    // escritura es un bloqueo.
     //
-    // Escribir lo habilita la arista ENTRANTE: el otro tiene que seguirme a
-    // mí. Es al revés de lo que sugiere la intuición, y es la decisión de
-    // producto: dejar de seguir a alguien le saca a ESA persona la escritura
-    // hacia vos, con una sola acción.
+    // Del bloqueo sólo se ve una mitad: los que bloqueé YO. Si el otro me
+    // bloqueó, las rules no me dejan leerlo; el envío rebota con un
+    // permission-denied recuperable, que es mejor que adivinar.
     //
-    // La rama del Coach va PRIMERO, igual que en las rules. Y no es
-    // decorativa: `athlete_coach_view.dart` y `athlete_detail_screen.dart`
-    // empujan `/coach/chat/...`, que renderiza ESTA pantalla, así que sin este
-    // escape el entrenador perdería el composer aunque el servidor se lo
-    // permita.
-    //
-    // Mientras carga se asume que SÍ puede escribir. Un falso positivo
-    // momentáneo termina en un `permission-denied` recuperable; un falso
-    // negativo le tapa el composer a alguien que sí puede, en cada apertura
-    // de chat.
-    //
-    // Eso es lo que este comentario prometía y lo que el código hacía al
-    // revés. `valueOrNull` sobre un `AsyncLoading` da null, así que
-    // `isCoachChat` daba false, `chat?.isInquiry == true` daba false y
-    // `incomingEdge?.status` daba null: los tres términos en false y el
-    // composer gris con el cartel de "esta persona tiene que seguirte" en
-    // CADA entrada al chat. La única escapatoria era `currentUid == null`,
-    // que es justo el caso que no le importa a nadie.
-    //
-    // Y no era un edge case de cold start: los dos providers son
-    // `autoDispose` sin `keepAlive`, así que salir de la pantalla los
-    // destruye y cada `ChatScreen` nuevo vuelve a arrancar en `AsyncLoading`.
-    final chatAsync = ref.watch(chatByIdProvider(widget.chatId));
-    final chat = chatAsync.valueOrNull;
-    final isCoachChat = chat?.linkId != null;
-    final edgeAsync = currentUid == null
-        ? null
-        : ref.watch(followEdgeProvider(
-            Follow.edgeId(widget.otherUid, currentUid),
-          ));
-    final incomingEdge = edgeAsync?.valueOrNull;
-    // "Ya sé la respuesta", no "la respuesta es que no". `hasValue` es false
-    // mientras carga Y ante un error sin valor previo: en los dos casos no
-    // sabemos, y no saber no puede leerse como una negativa.
-    final gateResuelto = chatAsync.hasValue && (edgeAsync?.hasValue ?? true);
-    // Las TRES ramas por las que escapa `senderMayPost` en las reglas
-    // (`firestore.rules`): vínculo, pre-consulta, y arista social aceptada.
-    //
-    // La pre-consulta faltaba, y la asimetría siempre cae para el mismo lado:
-    // la app quedaba MÁS ESTRICTA QUE EL SERVIDOR y le tapaba el composer a
-    // alguien a quien Firestore le habría aceptado el mensaje. Justo el caso
-    // que motiva la feature — consultarle algo a un entrenador ANTES de
-    // pedirle el vínculo—, que sin escribir no existe.
-    final canWrite = !gateResuelto ||
-        isCoachChat ||
-        chat?.isInquiry == true ||
-        incomingEdge?.status == FollowStatus.accepted ||
-        currentUid == null;
+    // Mientras carga se asume que SÍ puede escribir: un falso positivo
+    // momentáneo termina en un error recuperable; un falso negativo le tapa el
+    // composer a alguien que sí puede, en cada apertura de chat.
+    final iBlockedThem = currentUid != null &&
+        (ref.watch(blockedUidsProvider(currentUid)).valueOrNull ?? const [])
+            .contains(widget.otherUid);
+    final canWrite = !iBlockedThem;
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
     final mediaSend = ref.watch(chatMediaSendControllerProvider(widget.chatId));
 
@@ -449,6 +422,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             _Composer(
               controller: _textController,
               sending: _sending || mediaSend.uploading,
+              uploading: mediaSend.uploading,
               canWrite: canWrite,
               onSend: _onSend,
               onAttach: _onAttach,
@@ -592,6 +566,7 @@ class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
     required this.sending,
+    required this.uploading,
     required this.canWrite,
     required this.onSend,
     required this.onAttach,
@@ -601,8 +576,14 @@ class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final bool sending;
 
-  /// Espejo de `senderMayPost` en las rules. Se compone con [sending]: el
-  /// composer se apaga si hay un envío en vuelo O si no hay permiso.
+  /// Hay una foto o un video subiéndose. A diferencia de un envío de texto, ahí
+  /// el campo SÍ se apaga: la persona viene de la galería (el teclado ya está
+  /// cerrado) y no puede mandar texto hasta que termine la subida.
+  final bool uploading;
+
+  /// Espejo de `senderMayPost` en las rules. Se compone con [sending] para los
+  /// BOTONES: se apagan si hay un envío en vuelo O si no hay permiso. El campo
+  /// de texto no se apaga por un envío de texto (ver el `enabled` de abajo).
   final bool canWrite;
   final VoidCallback onSend;
   final VoidCallback onAttach;
@@ -637,13 +618,30 @@ class _Composer extends StatelessWidget {
                 maxLines: 5,
                 minLines: 1,
                 textInputAction: TextInputAction.newline,
+                // La caja es el `Container` de arriba: el campo va desnudo.
+                // `border: none` NO alcanza (#1466): el `InputDecorationTheme`
+                // de la app define `enabledBorder` y `focusedBorder`, que
+                // mandan sobre `border` según el estado, además de un relleno
+                // y un `contentPadding` propios. Por eso se anula cada uno.
                 decoration: InputDecoration(
                   hintText: l10n.chatScreenComposerHint,
                   hintStyle: TextStyle(color: palette.textMuted),
+                  filled: false,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
                   isCollapsed: true,
                 ),
-                enabled: !disabled,
+                // Se apaga si NO se puede escribir o si hay una SUBIDA en curso.
+                // Durante el envío de un texto queda habilitado: deshabilitar un
+                // `TextField` le saca el foco y el teclado se cerraba con cada
+                // mensaje (#1466). Lo que bloquea el doble envío son los
+                // botones y el guard de `_onSend`.
+                enabled: canWrite && !uploading,
               ),
             ),
           ),

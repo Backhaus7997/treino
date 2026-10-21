@@ -3820,7 +3820,7 @@ void main() {
       (tester) async {
         final repo = await pump(tester, _simpleRoutine());
 
-        await tester.tap(find.byType(PopupMenuButton<SetType>).first);
+        await tester.tap(find.byKey(const Key('set_type_chip')).first);
         await tester.pumpAndSettle();
         await tester.tap(find.text('Entrada en calor (W)'));
         await tester.pumpAndSettle();
@@ -3840,7 +3840,7 @@ void main() {
       expect(find.text('1'), findsOneWidget);
       expect(find.text('2'), findsOneWidget);
 
-      await tester.tap(find.byType(PopupMenuButton<SetType>).first);
+      await tester.tap(find.byKey(const Key('set_type_chip')).first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Al fallo (F)'));
       await tester.pumpAndSettle();
@@ -3923,6 +3923,10 @@ void main() {
               _overrides(repo: repo, analytics: analytics, blocked: blocked),
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            // El resumen de la prescripción escribe el peso con el locale (#1481).
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             routerConfig: router,
           ),
         ),

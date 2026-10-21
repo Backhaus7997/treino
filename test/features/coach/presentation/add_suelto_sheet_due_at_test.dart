@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -112,7 +113,7 @@ Future<void> _openAndFillRequired(WidgetTester tester) async {
   await tester.pumpAndSettle();
 
   // Alumno
-  await tester.tap(find.byType(DropdownButtonFormField<String>));
+  await tester.tap(find.byType(TreinoSelectField<String>));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Ana López').last);
   await tester.pumpAndSettle();

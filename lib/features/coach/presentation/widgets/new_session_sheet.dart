@@ -8,20 +8,28 @@ import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../../../core/telemetry/non_fatal.dart';
+import '../../../../core/utils/app_clock.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../core/widgets/treino_select.dart';
+import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../agenda_formatters.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../application/agenda_providers.dart';
+import '../../application/session_conflict_check.dart';
 import '../../application/trainer_link_providers.dart';
+import '../../domain/appointment.dart';
 import '../../domain/compute_free_slots.dart'
     show blockedDatesAmong, isDayBlocked;
+import '../../domain/default_session_start.dart';
+import '../../domain/session_conflicts.dart';
 import '../../domain/trainer_link.dart';
 import '../../domain/trainer_link_status.dart';
+import '../../domain/wall_clock.dart';
 
 /// Modal bottom-sheet form for the TRAINER to register a new session with an
 /// athlete. Supports single ("Una vez") and recurring ("Se repite") modes.
@@ -65,9 +73,20 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _date = widget.initialDate ?? DateTime(now.year, now.month, now.day);
-    _time = widget.initialTime ?? const TimeOfDay(hour: 9, minute: 0);
+    final now = AppClock.now();
+    final date = widget.initialDate ?? DateTime(now.year, now.month, now.day);
+    final initialTime = widget.initialTime;
+    if (initialTime != null) {
+      // Hora elegida en el timeline: se respeta tal cual.
+      _date = date;
+      _time = initialTime;
+      return;
+    }
+    // #1490: sin hora elegida, nunca proponer una que ya pasó (ver
+    // [defaultSessionStart]); si hoy no queda ninguna, pasa a mañana.
+    final inicio = defaultSessionStart(now: now, date: date);
+    _date = inicio.date;
+    _time = TimeOfDay(hour: inicio.hour, minute: inicio.minute);
   }
 
   @override
@@ -84,10 +103,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   int? _parsedDuration() {
     final val = int.tryParse(_durationController.text.trim());
     if (val == null || val < 5 || val > 480) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppL10n.of(context).newSessionSheetDurationError),
-        ),
+      showTreinoToast(
+        context,
+        AppL10n.of(context).newSessionSheetDurationError,
+        type: TreinoToastType.error,
       );
       return null;
     }
@@ -392,7 +411,11 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(context: context, initialTime: _time);
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _time,
+      helpText: AppL10n.of(context).timePickerHelpText,
+    );
     if (picked != null && mounted) {
       setState(() => _time = picked);
     }
@@ -466,14 +489,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     required int startHour,
     required int startMinute,
   }) {
-    final now = DateTime.now();
-    final nowWall = DateTime.utc(
-      now.year,
-      now.month,
-      now.day,
-      now.hour,
-      now.minute,
-    );
+    final nowWallClock = nowWall();
     final dates = <DateTime>[];
 
     var cursor = DateTime.utc(fromDate.year, fromDate.month, fromDate.day);
@@ -488,7 +504,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
           startHour,
           startMinute,
         );
-        if (startsAt.isAfter(nowWall)) {
+        if (startsAt.isAfter(nowWallClock)) {
           dates.add(cursor);
         }
       }
@@ -581,6 +597,60 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     return result ?? false;
   }
 
+  // ── Conflict warning (#1493) ──────────────────────────────────────────────
+
+  /// Nombre a mostrar de la sesión con la que se superpone: el del alumno, o
+  /// "otra sesión" si el doc trae un uid pelado en vez de un nombre.
+  String _conflictName(Appointment a, AppL10n l10n) {
+    final raw = a.athleteDisplayName.trim();
+    return raw.isEmpty || _looksLikeUid(raw)
+        ? l10n.agendaConflictSomeoneElse
+        : raw;
+  }
+
+  /// Texto del aviso para una sesión suelta: qué pisa, si está fuera de la
+  /// disponibilidad publicada, y la pregunta.
+  String _singleConflictBody(SessionConflicts c) {
+    final l10n = AppL10n.of(context);
+    final lines = <String>[
+      for (final a in c.overlapping.take(3))
+        l10n.agendaConflictOverlapLine(
+          _conflictName(a, l10n),
+          AgendaFormatters.formatTime(a.startsAt),
+          AgendaFormatters.formatTime(
+            a.startsAt.add(Duration(minutes: a.durationMin)),
+          ),
+        ),
+      if (c.overlapping.length > 3)
+        l10n.agendaConflictOverlapMore(c.overlapping.length - 3),
+      if (c.outsideAvailability) l10n.agendaConflictOutsideAvailability,
+    ];
+    return '${lines.join('\n')}\n\n${l10n.agendaConflictQuestion}';
+  }
+
+  /// Texto del aviso para una serie: en cuántas fechas pasa cada cosa.
+  String _seriesConflictBody(SeriesConflicts c) {
+    final l10n = AppL10n.of(context);
+    final lines = <String>[
+      if (c.overlapCount > 0) l10n.agendaConflictSeriesOverlap(c.overlapCount),
+      if (c.outsideCount > 0) l10n.agendaConflictSeriesOutside(c.outsideCount),
+    ];
+    return '${lines.join('\n')}\n\n${l10n.agendaConflictQuestion}';
+  }
+
+  /// Muestra el aviso de conflictos. Aviso, no bloqueo: un PF puede superponer
+  /// a propósito (sesión doble, grupo), así que siempre hay "Cargar igual".
+  /// Devuelve `true` si eligió seguir.
+  Future<bool> _confirmConflicts(String body) {
+    final l10n = AppL10n.of(context);
+    return _showBlockedDayDialog(
+      title: l10n.agendaConflictTitle,
+      body: body,
+      confirmLabel: l10n.agendaBlockedDayConfirm,
+      cancelLabel: l10n.commonCancel,
+    );
+  }
+
   // ── Single submit ─────────────────────────────────────────────────────────
 
   Future<void> _submitSingle() async {
@@ -599,14 +669,11 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   Future<void> _submitSingleInner() async {
     final athleteId = _selectedAthleteId;
     if (athleteId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Elegí un alumno.')));
+      showTreinoToast(context, 'Elegí un alumno.', type: TreinoToastType.error);
       return;
     }
 
     // Past date+time guard (date picker blocks past dates but not past times today).
-    final now = DateTime.now();
     final startsAt = DateTime.utc(
       _date.year,
       _date.month,
@@ -614,18 +681,14 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       _time.hour,
       _time.minute,
     );
-    final nowWall = DateTime.utc(
-      now.year,
-      now.month,
-      now.day,
-      now.hour,
-      now.minute,
-    );
-    if (!startsAt.isAfter(nowWall)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No podés registrar una sesión en el pasado.'),
-        ),
+    // `nowWall()` lee el reloj por AppClock, igual que la hora por defecto
+    // (`defaultSessionStart`): así el guard y el default hablan del mismo
+    // «ahora» y el flujo se testea con el reloj congelado.
+    if (!startsAt.isAfter(nowWall())) {
+      showTreinoToast(
+        context,
+        'No podés registrar una sesión en el pasado.',
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -635,10 +698,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
     final trainerId = ref.read(currentUidProvider);
     if (trainerId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error de autenticación. Intentá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'Error de autenticación. Intentá de nuevo.',
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -651,6 +714,21 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     if (!mounted) return;
     if (blocked) {
       final proceed = await _confirmBlockedDaySingle(_date);
+      if (!mounted || !proceed) return;
+    }
+
+    // Superposición / fuera de la disponibilidad publicada (#1493): mismo
+    // criterio que el día bloqueado, aviso con "Cargar igual" y no freno.
+    final conflicts = await checkSessionConflicts(
+      appointments: ref.read(appointmentRepositoryProvider),
+      availability: ref.read(availabilityRepositoryProvider),
+      trainerId: trainerId,
+      startsAt: startsAt,
+      durationMin: dur,
+    );
+    if (!mounted) return;
+    if (!conflicts.isEmpty) {
+      final proceed = await _confirmConflicts(_singleConflictBody(conflicts));
       if (!mounted || !proceed) return;
     }
 
@@ -693,17 +771,19 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       );
 
       if (!mounted) return;
+      // El messenger se captura ANTES del pop: el aviso va a la pantalla de
+      // atrás, que es la que queda visible cuando el sheet se cierra.
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Sesión registrada.')));
+      showTreinoToastOn(messenger, 'Sesión registrada.',
+          type: TreinoToastType.success);
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos registrar la sesión. Probá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'No pudimos registrar la sesión. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     }
   }
@@ -726,16 +806,13 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   Future<void> _submitRecurringInner() async {
     final athleteId = _selectedAthleteId;
     if (athleteId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Elegí un alumno.')));
+      showTreinoToast(context, 'Elegí un alumno.', type: TreinoToastType.error);
       return;
     }
 
     if (_weekdays.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Elegí al menos un día.')));
+      showTreinoToast(context, 'Elegí al menos un día.',
+          type: TreinoToastType.error);
       return;
     }
 
@@ -744,10 +821,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
     final trainerId = ref.read(currentUidProvider);
     if (trainerId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error de autenticación. Intentá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'Error de autenticación. Intentá de nuevo.',
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -755,7 +832,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     // Compute the same fromDate/untilDate window createRecurringByTrainer
     // uses, up front (pure sync — no await needed), so the blocked-day check
     // below and the actual creation call agree on the exact same window.
-    final today = DateTime.now();
+    final today = nowWall();
     final fromDate = DateTime(today.year, today.month, today.day);
     final untilDate = fromDate.add(Duration(days: _weeks * 7 - 1));
 
@@ -781,6 +858,24 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     if (!mounted) return;
     if (blockedDates.isNotEmpty) {
       final proceed = await _confirmBlockedDayRecurring(blockedDates.length);
+      if (!mounted || !proceed) return;
+    }
+
+    // Superposición / fuera de la disponibilidad publicada, fecha por fecha
+    // (#1493): un solo aviso con los conteos.
+    final series = await checkSeriesConflicts(
+      appointments: ref.read(appointmentRepositoryProvider),
+      availability: ref.read(availabilityRepositoryProvider),
+      trainerId: trainerId,
+      startsAts: [
+        for (final d in candidateDates)
+          DateTime.utc(d.year, d.month, d.day, _time.hour, _time.minute),
+      ],
+      durationMin: dur,
+    );
+    if (!mounted) return;
+    if (!series.isEmpty) {
+      final proceed = await _confirmConflicts(_seriesConflictBody(series));
       if (!mounted || !proceed) return;
     }
 
@@ -830,32 +925,29 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
       if (count == 0) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'No se creó ninguna sesión (todas caían en el pasado). '
-              'Revisá los días y la hora.',
-            ),
-          ),
+        showTreinoToast(
+          context,
+          'No se creó ninguna sesión (todas caían en el pasado). '
+          'Revisá los días y la hora.',
+          type: TreinoToastType.error,
         );
         return;
       }
 
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '$count ${count == 1 ? "sesión registrada" : "sesiones registradas"}.',
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        '$count ${count == 1 ? "sesión registrada" : "sesiones registradas"}.',
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos registrar la serie. Probá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'No pudimos registrar la serie. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     }
   }
@@ -1316,45 +1408,31 @@ class _AthleteDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DropdownButtonFormField<String>(
-      initialValue: selectedId,
-      hint: Text(
-        'Seleccioná un alumno',
-        style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
-      ),
-      dropdownColor: palette.bgCard,
-      style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: palette.bg,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.accent, width: 1.5),
-        ),
-      ),
-      items: links.map((link) {
-        final profileAsync = ref.watch(
-          userPublicProfileProvider(link.athleteId),
-        );
-        final rawName = profileAsync.valueOrNull?.displayName ?? '';
-        final showName = rawName.isEmpty || _looksLikeUid(rawName)
-            ? 'Alumno (${link.athleteId.substring(0, 6)})'
-            : rawName;
-        return DropdownMenuItem<String>(
-          value: link.athleteId,
-          child: Text(showName),
-        );
-      }).toList(),
+    return TreinoSelectField<String>(
+      value: selectedId,
+      hint: 'Seleccioná un alumno',
+      sheetTitle: 'Alumno',
+      decoration: InputDecoration(fillColor: palette.bg),
+      options: [
+        for (final link in links)
+          TreinoSelectOption(
+            value: link.athleteId,
+            label: _nombre(link, ref),
+          ),
+      ],
       onChanged: onChanged,
     );
+  }
+
+  String _nombre(TrainerLink link, WidgetRef ref) {
+    final rawName = ref
+            .watch(userPublicProfileProvider(link.athleteId))
+            .valueOrNull
+            ?.displayName ??
+        '';
+    return rawName.isEmpty || _looksLikeUid(rawName)
+        ? 'Alumno (${link.athleteId.substring(0, 6)})'
+        : rawName;
   }
 }
 

@@ -19,6 +19,7 @@ import 'package:treino/features/coach_hub/presentation/sections/facturacion_plan
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Tab «Cuenta» de Configuración (Fase W3.1 / W3.1b).
 ///
@@ -233,7 +234,8 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
     final last = _last.text.trim();
     final phone = _phone.text.trim();
     if (first.isEmpty) {
-      _toast('El nombre no puede estar vacío.'); // i18n: Fase W3
+      _toast('El nombre no puede estar vacío.',
+          type: TreinoToastType.error); // i18n: Fase W3
       return;
     }
     final displayName = [first, last].where((s) => s.isNotEmpty).join(' ');
@@ -248,22 +250,28 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
         'phone': phone,
         'displayName': displayName,
       });
-      _toast('Cambios guardados'); // i18n: Fase W3
+      _toast('Cambios guardados',
+          type: TreinoToastType.success); // i18n: Fase W3
     } on ModerationBlockedException catch (_) {
       // El `displayName` pasa por el filtro de términos vetados. El texto de
       // abajo invita a reintentar, y para un bloqueo eso es consejo falso: el
       // mismo nombre va a fallar siempre.
-      _toast(copyBloqueado);
+      _toast(copyBloqueado, type: TreinoToastType.error);
     } catch (_) {
-      _toast('No se pudieron guardar los cambios. Probá de nuevo.'); // i18n
+      _toast('No se pudieron guardar los cambios. Probá de nuevo.',
+          type: TreinoToastType.error); // i18n
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  void _toast(String msg) {
+  void _toast(String msg, {TreinoToastType type = TreinoToastType.info}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showTreinoToast(
+      context,
+      msg,
+      type: type,
+    );
   }
 
   @override
@@ -445,12 +453,15 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
       await ref
           .read(userRepositoryProvider)
           .update(widget.profile.uid, {'avatarUrl': url});
-      _toast('Foto actualizada'); // i18n: Fase W3
+      _toast('Foto actualizada',
+          type: TreinoToastType.success); // i18n: Fase W3
     } on AvatarTooLargeException {
       // i18n: Fase W3
-      _toast('La imagen supera el máximo de 2 MB. Probá con una más liviana.');
+      _toast('La imagen supera el máximo de 2 MB. Probá con una más liviana.',
+          type: TreinoToastType.error);
     } catch (_) {
-      _toast('No se pudo cambiar la foto. Probá de nuevo.'); // i18n: Fase W3
+      _toast('No se pudo cambiar la foto. Probá de nuevo.',
+          type: TreinoToastType.error); // i18n: Fase W3
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -476,8 +487,10 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
         await ref.read(avatarWebUploaderProvider).deleteStored();
       } on FirebaseException catch (e) {
         // i18n: Fase W3
-        _toast('No se pudo borrar la imagen del servidor (${e.code}). '
-            'Probá de nuevo.');
+        _toast(
+            'No se pudo borrar la imagen del servidor (${e.code}). '
+            'Probá de nuevo.',
+            type: TreinoToastType.error);
         return;
       }
 
@@ -490,23 +503,29 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
         // el estado es inconsistente y el mensaje tiene que decirlo, no un
         // «probá de nuevo» que sugiere que no pasó nada.
         // i18n: Fase W3
-        _toast('La imagen se borró pero el perfil no se actualizó '
-            '(${e.code}). Recargá la página.');
+        _toast(
+            'La imagen se borró pero el perfil no se actualizó '
+            '(${e.code}). Recargá la página.',
+            type: TreinoToastType.error);
         return;
       }
 
-      _toast('Foto quitada'); // i18n: Fase W3
+      _toast('Foto quitada', type: TreinoToastType.success); // i18n: Fase W3
     } catch (e) {
       // i18n: Fase W3
-      _toast('No se pudo quitar la foto: $e');
+      _toast('No se pudo quitar la foto: $e', type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  void _toast(String msg) {
+  void _toast(String msg, {TreinoToastType type = TreinoToastType.info}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showTreinoToast(
+      context,
+      msg,
+      type: type,
+    );
   }
 
   @override
@@ -603,7 +622,7 @@ class _DangerZone extends ConsumerWidget {
           Text(
             'ZONA PELIGROSA', // i18n: Fase W3
             style: TextStyle(
-              color: palette.danger,
+              color: palette.dangerText,
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,

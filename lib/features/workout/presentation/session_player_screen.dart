@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,7 @@ import '../../../core/utils/join_non_empty.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
 import '../../gyms/application/gym_display_name_provider.dart';
@@ -43,6 +45,7 @@ import 'widgets/coach_note.dart';
 import 'widgets/duration_set_row.dart';
 import 'widgets/exercise_feedback_sheet.dart';
 import 'widgets/mmss.dart';
+import 'widgets/rest_timer_bar.dart';
 import 'widgets/set_entry_sheet.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../gyms/domain/gym.dart' show hasRealGym;
@@ -163,7 +166,11 @@ int plannedRepsForSpec(SetSpec? spec, ExerciseMode mode) {
 ///
 /// [spec] is null for an added-beyond-plan row (AD-4) — returns an empty
 /// string so no prescription hint text renders for a bare row.
-String repsDisplayText(SetSpec? spec, ExerciseMode mode) {
+String repsDisplayText(
+  SetSpec? spec,
+  ExerciseMode mode, {
+  required String localeName,
+}) {
   if (spec == null) return '';
   if (spec.type == SetType.failure) return 'Al fallo';
   if (mode == ExerciseMode.duration) {
@@ -173,9 +180,7 @@ String repsDisplayText(SetSpec? spec, ExerciseMode mode) {
   if (mode == ExerciseMode.distance) {
     final meters = spec.distanceMeters;
     if (meters == null) return '— m';
-    final text = meters == meters.roundToDouble()
-        ? meters.toInt().toString()
-        : meters.toStringAsFixed(1);
+    final text = formatNumberDisplay(meters, localeName);
     return '$text m';
   }
   if (spec.reps != null) return '${spec.reps} reps';
@@ -208,6 +213,32 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   // context.go() pide al Navigator un pop que PopScope intercepta y dispara
   // showDialog en paralelo a la navegación — produce `!_debugLocked` assertion.
   bool _isFinalizing = false;
+
+  /// Descanso en curso (#1510): cuándo termina y cuánto dura en total. Null =
+  /// no hay. Lo arranca [_logSet] con el `restSeconds` del slot.
+  DateTime? _descansoHasta;
+  int _descansoTotal = 0;
+
+  void _empezarDescanso(int segundos) {
+    setState(() {
+      _descansoHasta = clock.now().add(Duration(seconds: segundos));
+      _descansoTotal = segundos;
+    });
+  }
+
+  void _terminarDescanso() {
+    if (_descansoHasta == null) return;
+    setState(() => _descansoHasta = null);
+  }
+
+  void _sumarDescanso(int segundos) {
+    final hasta = _descansoHasta;
+    if (hasta == null) return;
+    setState(() {
+      _descansoHasta = hasta.add(Duration(seconds: segundos));
+      _descansoTotal += segundos;
+    });
+  }
 
   // Navegación libre (SCENARIO-ORDER): bloques `future` que el usuario destrabó
   // a mano para adelantarlos (p.ej. la máquina del sugerido está ocupada).
@@ -416,14 +447,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     if (notifier == null || !notifier.finishedElsewhere.value) return;
     if (!mounted) return;
     final l10n = AppL10n.of(context);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(l10n.sessionFinishedOnWatch),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    showTreinoToast(context, l10n.sessionFinishedOnWatch);
     // `canPop` para no explotar si el player ya no es la ruta de arriba (el
     // atleta pudo navegar a un ejercicio mientras el reloj cerraba).
     final navigator = Navigator.of(context);
@@ -441,24 +465,16 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     }
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(l10n.sessionLogSetError),
-        behavior: SnackBarBehavior.floating,
-        // `persist: false` A MANO. `SnackBar` hace
-        // `persist = persist ?? action != null`: con acción es eterno por
-        // default y el `duration` de acá abajo NO se mira. Sin esto el cartel
-        // se queda hasta recargar la página.
-        persist: false,
-        duration: const Duration(seconds: 6),
-        action: SnackBarAction(
-          label: l10n.coachRetryLabel,
-          onPressed: () {
-            messenger.hideCurrentSnackBar();
-            notifier.retryLastLogError();
-          },
-        ),
+    showTreinoToastOn(
+      messenger,
+      l10n.sessionLogSetError,
+      type: TreinoToastType.error,
+      action: TreinoToastAction(
+        label: l10n.coachRetryLabel,
+        onPressed: () {
+          messenger.hideCurrentSnackBar();
+          notifier.retryLastLogError();
+        },
       ),
     );
     // Limpiamos el canal una vez mostrado el feedback para que no re-dispare el
@@ -499,7 +515,24 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     }
   }
 
-  Future<void> _finishSession() async {
+  /// TERMINAR SESIÓN (#1511). Con la sesión completa cierra de una; con series
+  /// sin hacer primero avisa cuáles faltan y si la sesión va a contar como
+  /// entreno, y recién ahí cierra si el atleta confirma.
+  Future<void> _onTerminarPressed(SessionState state) async {
+    if (_isFinalizing) return;
+    if (state.isFullyCompleted) {
+      await _finishSession();
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _FinishEarlyDialog(state: state),
+    );
+    if (confirmed != true || !mounted) return;
+    await _finishSession(allowIncomplete: true);
+  }
+
+  Future<void> _finishSession({bool allowIncomplete = false}) async {
     final notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
     final sessionId =
         ref.read(sessionNotifierProvider(widget.init)).value?.session.id;
@@ -508,11 +541,12 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       // Mismo contrato que abandon: el notifier relanza ante fallo de write
       // (finding 23). Capturamos para no dejar la pantalla congelada con el
       // botón inutilizable; reseteamos _isFinalizing y mostramos Reintentar.
-      await notifier.finishSession();
+      await notifier.finishSession(allowIncomplete: allowIncomplete);
     } catch (_) {
       if (mounted) {
         _isFinalizing = false;
-        _showFinishError(_finishSession);
+        _showFinishError(
+            () => _finishSession(allowIncomplete: allowIncomplete));
       }
       return;
     }
@@ -526,24 +560,16 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   void _showFinishError(Future<void> Function() onRetry) {
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(l10n.sessionFinishError),
-        behavior: SnackBarBehavior.floating,
-        // `persist: false` A MANO. `SnackBar` hace
-        // `persist = persist ?? action != null`: con acción es eterno por
-        // default y el `duration` de acá abajo NO se mira. Sin esto el cartel
-        // se queda hasta recargar la página.
-        persist: false,
-        duration: const Duration(seconds: 6),
-        action: SnackBarAction(
-          label: l10n.coachRetryLabel,
-          onPressed: () {
-            messenger.hideCurrentSnackBar();
-            onRetry();
-          },
-        ),
+    showTreinoToastOn(
+      messenger,
+      l10n.sessionFinishError,
+      type: TreinoToastType.error,
+      action: TreinoToastAction(
+        label: l10n.coachRetryLabel,
+        onPressed: () {
+          messenger.hideCurrentSnackBar();
+          onRetry();
+        },
       ),
     );
   }
@@ -577,6 +603,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             completedAt: DateTime.now(),
           ),
         );
+    // #1510: el descanso configurado en la rutina arranca solo al marcar la
+    // serie. Una serie nueva reinicia la cuenta (no se apilan).
+    if (slot.restSeconds > 0) _empezarDescanso(slot.restSeconds);
   }
 
   /// Actualiza un set ya logueado con nuevos valores de reps y/o peso.
@@ -791,19 +820,11 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         ? ref.read(routineByIdProvider(routineId)).valueOrNull
         : null;
     final ownerId = routine?.assignedBy ?? routine?.createdBy;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          backgroundColor: AppPalette.of(context).bg,
-          body: SafeArea(
-            child: ExerciseDetailScreen(
-              exerciseId: slot.exerciseId,
-              ownerId: ownerId,
-              exerciseName: slot.exerciseName,
-            ),
-          ),
-        ),
-      ),
+    ExerciseDetailScreen.push(
+      context,
+      exerciseId: slot.exerciseId,
+      ownerId: ownerId,
+      exerciseName: slot.exerciseName,
     );
   }
 
@@ -895,6 +916,18 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
               onAbandon: _showAbandonConfirm,
               onBack: _showAbandonConfirm,
             ),
+            // Fija bajo el header, fuera del scroll: el descanso se mira con
+            // el teléfono apoyado, sin buscarlo. Con la sesión completa no
+            // hay próxima serie que esperar.
+            if (_descansoHasta != null && !state.isFullyCompleted)
+              RestTimerBar(
+                key: ValueKey(_descansoHasta),
+                endsAt: _descansoHasta!,
+                totalSeconds: _descansoTotal,
+                onSkip: _terminarDescanso,
+                onAddSeconds: _sumarDescanso,
+                onDone: _terminarDescanso,
+              ),
             Expanded(
               child: ScrollConfiguration(
                 behavior: ScrollConfiguration.of(context).copyWith(
@@ -932,9 +965,16 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+              // #1511: TERMINAR se habilita con la PRIMERA serie hecha, no al
+              // 100 %. Antes el único modo de cerrar con series sin hacer era
+              // ABANDONAR, que suena a fracaso y no cuenta nada. Con series
+              // pendientes el botón abre un aviso de qué falta; con cero
+              // series sigue deshabilitado y la leyenda dice por qué.
               child: _TerminarSessionButton(
-                enabled: state.isFullyCompleted,
-                onPressed: state.isFullyCompleted ? _finishSession : null,
+                enabled: state.doneSetsTotal > 0,
+                onPressed: state.doneSetsTotal > 0
+                    ? () => _onTerminarPressed(state)
+                    : null,
               ),
             ),
           ],
@@ -963,8 +1003,10 @@ class _SessionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+    // #1510: ABANDONAR quedaba a 12 del borde; 20, alineado con las cards
+    // de abajo.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, AppSpacing.s20, 8),
       child: Row(
         children: [
           Semantics(
@@ -1113,7 +1155,10 @@ class _SessionStatsCard extends StatelessWidget {
     final palette = AppPalette.of(context);
     final total = state.day.slots.length;
     final completed = state.completedExerciseCount;
-    final progress = total > 0 ? completed / total : 0.0;
+    // #1510: la barra avanza por SERIE, no por ejercicio — antes no se movía
+    // hasta cerrar el ejercicio entero. El texto sigue contando ejercicios.
+    final setsTotal = state.totalPlannedSets;
+    final progress = setsTotal > 0 ? state.completedSetCount / setsTotal : 0.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -1139,7 +1184,7 @@ class _SessionStatsCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '$completed / $total ejercicios · '
-                  '${formatVolumeKg(state.totalVolumeKg)} kg vol.',
+                  '${formatVolumeKg(state.totalVolumeKg, AppL10n.of(context).localeName)} kg vol.',
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
@@ -1716,42 +1761,44 @@ class _FutureBlockPreview extends StatelessWidget {
     final palette = AppPalette.of(context);
     return TreinoTappable(
       onTap: onActivate,
-      child: Opacity(
-        opacity: 0.75,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exerciseName.toUpperCase(),
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        letterSpacing: 0.5,
-                        color: palette.textMuted,
-                      ),
+      // Sin Opacity de bloque (#1510): bajaba el hint por debajo de AA. Lo
+      // «futuro» ya lo dice el nombre en `textMuted`.
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    exerciseName.toUpperCase(),
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      letterSpacing: 0.5,
+                      color: palette.textMuted,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Tocá para adelantar este bloque',
-                      style: GoogleFonts.barlow(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 11,
-                        color: palette.accent,
-                      ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tocá para adelantar este bloque',
+                    // #1510: era `accent` a 11 px bajo un Opacity(0.75):
+                    // mint lavado sobre blanco. `accentText` a 12 y sin
+                    // opacidad encima pasa AA.
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w500,
+                      fontSize: AppTextSize.caption,
+                      color: palette.accentText,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Icon(TreinoIcon.play, color: palette.accent, size: 16),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            Icon(TreinoIcon.play, color: palette.accent, size: 16),
+          ],
         ),
       ),
     );
@@ -1777,56 +1824,58 @@ class _FutureSupersetPreview extends StatelessWidget {
     final names = joinNonEmpty(entries.map((e) => e.slot.exerciseName), ' · ');
     return TreinoTappable(
       onTap: onActivate,
-      child: Opacity(
-        opacity: 0.75,
-        child: Container(
-          decoration: BoxDecoration(
-            color: palette.highlight.withValues(alpha: 0.04),
-            border: Border(
-              left: BorderSide(color: palette.highlight, width: 3),
-            ),
+      // Sin Opacity de bloque (#1510): bajaba el hint por debajo de AA. Lo
+      // «futuro» ya lo dice el nombre en `textMuted`.
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.highlight.withValues(alpha: 0.04),
+          border: Border(
+            left: BorderSide(color: palette.highlight, width: 3),
           ),
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SUPERSERIE',
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 10,
-                        letterSpacing: 1.0,
-                        color: palette.highlight,
-                      ),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SUPERSERIE',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                      letterSpacing: 1.0,
+                      color: palette.highlight,
                     ),
-                    Text(
-                      names.toUpperCase(),
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        letterSpacing: 0.5,
-                        color: palette.textMuted,
-                      ),
+                  ),
+                  Text(
+                    names.toUpperCase(),
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      letterSpacing: 0.5,
+                      color: palette.textMuted,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Tocá para adelantar este bloque',
-                      style: GoogleFonts.barlow(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 11,
-                        color: palette.accent,
-                      ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tocá para adelantar este bloque',
+                    // #1510: era `accent` a 11 px bajo un Opacity(0.75):
+                    // mint lavado sobre blanco. `accentText` a 12 y sin
+                    // opacidad encima pasa AA.
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w500,
+                      fontSize: AppTextSize.caption,
+                      color: palette.accentText,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Icon(TreinoIcon.play, color: palette.accent, size: 16),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            Icon(TreinoIcon.play, color: palette.accent, size: 16),
+          ],
         ),
       ),
     );
@@ -2535,9 +2584,7 @@ class _DistanceSetRow extends StatelessWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final color = isDone ? palette.textMuted : palette.textPrimary;
-    final text = distanceMeters == distanceMeters.roundToDouble()
-        ? distanceMeters.toInt().toString()
-        : distanceMeters.toStringAsFixed(1);
+    final text = formatNumberDisplay(distanceMeters, l10n.localeName);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -2708,7 +2755,8 @@ class _RepsSetRowState extends State<_RepsSetRow> {
     widget.onCheck?.call(_reps, _weightKg);
   }
 
-  String get _repsDisplayText => repsDisplayText(widget.spec, widget.mode);
+  String get _repsDisplayText => repsDisplayText(widget.spec, widget.mode,
+      localeName: AppL10n.of(context).localeName);
 
   /// Reps label for the always-visible summary row. When the athlete has
   /// touched the reps field (or logged the set) we show the actual [_reps];
@@ -2751,7 +2799,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
             // planned display when the row is not done and _reps still equals
             // plannedReps, so the range hint stays visible pre-check.
             child: Text(
-              '${_summaryReps()} · ${formatWeightKg(_weightKg)} kg',
+              '${_summaryReps()} · ${formatWeightDisplay(_weightKg, AppL10n.of(context).localeName)} kg',
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
@@ -2862,10 +2910,16 @@ class _WeightField extends StatelessWidget {
       child: TextField(
         controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: const [
+        inputFormatters: [
           // QA-WKT-002/003: single separator + hard cap so the field text can
           // never diverge from the value that gets logged, nor exceed 500 kg.
-          BoundedNumberFormatter(max: kMaxWeightKg, decimal: true),
+          // #1510: and the rejected keystroke is announced, not swallowed.
+          BoundedNumberFormatter(
+            max: kMaxWeightKg,
+            decimal: true,
+            onOverMax: () =>
+                avisarTopeAlcanzado(context, max: kMaxWeightKg, unit: 'kg'),
+          ),
         ],
         textAlign: TextAlign.center,
         style: GoogleFonts.barlow(
@@ -3009,9 +3063,152 @@ class _TerminarSessionButton extends StatelessWidget {
     );
 
     if (!enabled) {
-      return Opacity(opacity: 0.4, child: button);
+      // #1511: un botón apagado que no dice por qué es exactamente lo que
+      // reportó el QA. Sin series hechas no hay nada que guardar, y la otra
+      // salida es ABANDONAR — la leyenda dice las dos cosas.
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Opacity(opacity: 0.4, child: button),
+          const SizedBox(height: 8),
+          Text(
+            AppL10n.of(context).sessionFinishNeedOneSet,
+            key: const Key('session_finish_need_one_set'),
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(
+              fontSize: AppTextSize.caption,
+              color: palette.textMuted,
+            ),
+          ),
+        ],
+      );
     }
     return button;
+  }
+}
+
+// ── _FinishEarlyDialog ────────────────────────────────────────────────────────
+
+/// Aviso de "TERMINAR IGUAL" (#1511): qué series faltan y qué pasa con la
+/// sesión. Devuelve `true` si el atleta confirma, `false`/`null` si vuelve.
+///
+/// El texto de abajo NO promete lo que no se cumple: dice que cuenta como
+/// entreno sólo cuando llegó al [kEarlyFinishCountsRatio] de las series
+/// planificadas, y si no, dice sin vueltas que se guarda pero no cuenta.
+class _FinishEarlyDialog extends StatelessWidget {
+  const _FinishEarlyDialog({required this.state});
+
+  final SessionState state;
+
+  /// Cuántos ejercicios se listan antes de resumir el resto con "y N más".
+  static const _maxListed = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    final missing = state.missingSets;
+    final missingTotal =
+        missing.fold<int>(0, (sum, m) => sum + (m.planned - m.done));
+    final listed = missing.take(_maxListed).toList();
+    final hidden = missing.length - listed.length;
+
+    final percent = (state.completionRatio * 100).floor();
+    final counts = state.countsAsWorkoutIfFinished;
+
+    return AlertDialog(
+      backgroundColor: palette.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      title: Text(
+        l10n.sessionFinishEarlyTitle,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: AppTextSize.bodyLarge,
+          letterSpacing: 1.0,
+          color: palette.textPrimary,
+        ),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.sessionFinishEarlyMissingHeader(missingTotal),
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w600,
+                fontSize: AppTextSize.body,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final m in listed)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '${m.slot.exerciseName} · ${m.done}/${m.planned}',
+                  style: GoogleFonts.barlow(
+                    fontSize: AppTextSize.body,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ),
+            if (hidden > 0)
+              Text(
+                l10n.sessionFinishEarlyMore(hidden),
+                style: GoogleFonts.barlow(
+                  fontSize: AppTextSize.body,
+                  color: palette.textMuted,
+                ),
+              ),
+            const SizedBox(height: 12),
+            Text(
+              counts
+                  ? l10n.sessionFinishEarlyCounts(percent)
+                  : l10n.sessionFinishEarlyNotCounts(
+                      percent,
+                      (kEarlyFinishCountsRatio * 100).round(),
+                    ),
+              key: const Key('session_finish_early_outcome'),
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w600,
+                fontSize: AppTextSize.body,
+                color: counts ? palette.accentText : palette.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(
+            l10n.sessionFinishEarlyKeepGoing,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: AppTextSize.body,
+              color: palette.textPrimary,
+            ),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: palette.accent),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(
+            l10n.sessionFinishEarlyConfirm,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: AppTextSize.body,
+              color: TreinoButtonTokens.foreground(context),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
@@ -86,6 +87,35 @@ class AppTheme {
 
   // ---------------------------------------------------------------------------
 
+  /// Estilo de la barra de estado (el color de los íconos de hora, wifi y
+  /// batería) para un tema de [brightness]: íconos CLAROS sobre el tema oscuro,
+  /// OSCUROS sobre el claro.
+  ///
+  /// Lo comparten dos consumidores y tienen que coincidir siempre:
+  /// [ThemeWatcher], que lo aplica a toda la app, y el `AppBarTheme` de las dos
+  /// fábricas de abajo. Si cada uno tuviera su propia copia del `if`, el día que
+  /// cambie uno el otro se queda atrás y la barra de estado vuelve a bailar
+  /// según haya o no un `AppBar` en pantalla.
+  ///
+  /// ## Por qué el `AppBarTheme` lo necesita (#1463)
+  ///
+  /// Un `AppBar` sin `systemOverlayStyle` NO hereda el de [ThemeWatcher]:
+  /// envuelve su contenido en su propio `AnnotatedRegion`, que está más abajo en
+  /// el árbol y por eso gana, y lo calcula estimando el brillo de su
+  /// `backgroundColor`. Con `Colors.transparent` (`0x00000000`) la luminancia da
+  /// negro, o sea «fondo oscuro» → íconos blancos, aunque detrás haya un fondo
+  /// claro. En el tema claro eso dejaba hora, wifi y batería casi invisibles en
+  /// el chat, las notificaciones y los perfiles.
+  ///
+  /// Poniéndolo en el tema, todo `AppBar` del árbol resuelve el estilo correcto
+  /// sin que cada pantalla lo repita. Una pantalla con una superficie de color
+  /// fijo (el visor de fotos) lo sigue pudiendo pisar con su propio
+  /// `AppBar.systemOverlayStyle` o con un `Theme` propio.
+  static SystemUiOverlayStyle systemOverlayStyleFor(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark;
+
   // ---------------------------------------------------------------------------
   // Estados de interacción — los defaults de Material, tapados
   // ---------------------------------------------------------------------------
@@ -118,6 +148,86 @@ class AppTheme {
         scrollbarTheme: ScrollbarThemeData(
           thumbColor: _ThumbDelScrollbar(palette.textMuted),
         ),
+        // Sin esto `TextButton` pinta su texto con `colorScheme.primary`: mint
+        // sobre blanco en claro (~1,6:1) — el Cancelar/ACEPTAR del time
+        // picker, entre otros (#1494). `accentText` es el acento para TEXTO.
+        textButtonTheme: TextButtonThemeData(
+          style: ButtonStyle(
+            foregroundColor: _TextoDeAcento(
+              habilitado: palette.accentText,
+              deshabilitado: palette.textPrimary.withValues(alpha: 0.38),
+            ),
+          ),
+        ),
+        // #1503: el switch APAGADO era el default de M3 — pulgar y contorno en
+        // `colorScheme.outline`, que se lee casi negro y grueso, al lado del
+        // encendido del kit. Sólo se toca el estado apagado (y habilitado): el
+        // encendido lo siguen pintando los llamadores, y el deshabilitado
+        // queda en el default.
+        switchTheme: SwitchThemeData(
+          thumbColor: _SoloApagado(palette.textMuted),
+          trackColor: _SoloApagado(palette.bgCard),
+          trackOutlineColor: _SoloApagado(palette.border),
+        ),
+        // #1558: sin esto los PopupMenuButton/showMenu (11 archivos) caían al
+        // default de Material: caja cuadrada, sin borde, Barlow regular. Ahora
+        // hablan el idioma del kit: superficie `bgCard`, contorno `border`,
+        // radio `AppRadius.md` y Barlow 600. La sombra es sutil a propósito:
+        // el menú flota sobre contenido y sin ella no se separa. Los ítems
+        // destructivos usan `TreinoDestructiveMenuItem` (`dangerText`).
+        popupMenuTheme: PopupMenuThemeData(
+          color: palette.bgCard,
+          surfaceTintColor: Colors.transparent,
+          elevation: 6,
+          shadowColor: Colors.black.withValues(alpha: 0.35),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            side: BorderSide(color: palette.border),
+          ),
+          textStyle: _itemDeMenu(palette.textPrimary),
+          // Con `useMaterial3: true`, `PopupMenuItem` ignora `textStyle` y
+          // sólo lee `labelTextStyle`: sin esto los ítems salían en el
+          // `labelLarge` de M3 (w500). El deshabilitado baja el texto a 0,38,
+          // igual que el `TextButton` del tema.
+          labelTextStyle: _EstiloDeItemDeMenu(
+            habilitado: _itemDeMenu(palette.textPrimary),
+            deshabilitado:
+                _itemDeMenu(palette.textPrimary.withValues(alpha: 0.38)),
+          ),
+        ),
+        // #1513: sin estos dos, `FilledButton` y `OutlinedButton` caían al
+        // default de Material — Barlow regular fina, y el outlined con texto
+        // `primary` (mint sobre blanco, ~1,6:1) y borde `outline` casi negro.
+        // LISTO/COMPARTIR del resumen y GUARDAR del check-in eran eso. Ahora
+        // hablan el idioma del CTA mobile (`HomeCtaButton`): Barlow Condensed
+        // 700 en mayúscula; el lleno con ink sobre acento (`onPrimary`), el
+        // de borde como `secondaryAccent` del kit: `accentText` + `border`.
+        filledButtonTheme: FilledButtonThemeData(
+          style:
+              ButtonStyle(textStyle: WidgetStatePropertyAll(_labelDeBoton())),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: ButtonStyle(
+            textStyle: WidgetStatePropertyAll(_labelDeBoton()),
+            foregroundColor: _TextoDeAcento(
+              habilitado: palette.accentText,
+              deshabilitado: palette.textPrimary.withValues(alpha: 0.38),
+            ),
+            side: WidgetStatePropertyAll(BorderSide(color: palette.border)),
+          ),
+        ),
+      );
+
+  static TextStyle _itemDeMenu(Color color) => GoogleFonts.barlow(
+        fontWeight: AppFonts.w600,
+        fontSize: AppTextSize.body,
+        color: color,
+      );
+
+  static TextStyle _labelDeBoton() => GoogleFonts.barlowCondensed(
+        fontWeight: FontWeight.w700,
+        fontSize: AppTextSize.bodyLarge,
+        letterSpacing: 1.0,
       );
 
   // Public factories
@@ -134,13 +244,23 @@ class AppTheme {
       scaffoldBackgroundColor: palette.bg,
       colorScheme: ColorScheme.dark(
         primary: palette.accent,
-        onPrimary: palette.bg,
+        // Ink, no `palette.bg`: lo que Material pinta sobre el acento (texto
+        // de botón, número del picker, chip seleccionado) tiene que leerse en
+        // las DOS paletas. `palette.bg` es blanco en claro → 1,57:1 (#1504).
+        onPrimary: TreinoButtonTokens.ink,
         secondary: palette.highlight,
         onSecondary: palette.textPrimary,
         surface: palette.bgCard,
         onSurface: palette.textPrimary,
       ),
       inputDecorationTheme: _buildInputDecoration(palette, errorColor),
+      appBarTheme: AppBarTheme(
+        systemOverlayStyle: systemOverlayStyleFor(Brightness.dark),
+        // Sin tinte de scrolled-under (#1559): sobre los AppBar transparentes
+        // pintaba una banda que cortaba el contenido de abajo.
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
       textTheme: textTheme,
       extensions: [palette],
     );
@@ -157,7 +277,10 @@ class AppTheme {
       scaffoldBackgroundColor: palette.bg,
       colorScheme: ColorScheme.light(
         primary: palette.accent,
-        onPrimary: palette.bg,
+        // Ink, no `palette.bg`: lo que Material pinta sobre el acento (texto
+        // de botón, número del picker, chip seleccionado) tiene que leerse en
+        // las DOS paletas. `palette.bg` es blanco en claro → 1,57:1 (#1504).
+        onPrimary: TreinoButtonTokens.ink,
         secondary: palette.highlight,
         onSecondary: palette.textPrimary,
         surface: palette.bgCard,
@@ -166,11 +289,91 @@ class AppTheme {
         onError: palette.onDanger,
       ),
       inputDecorationTheme: _buildInputDecoration(palette, palette.danger),
+      appBarTheme: AppBarTheme(
+        systemOverlayStyle: systemOverlayStyleFor(Brightness.light),
+        // Sin tinte de scrolled-under (#1559): sobre los AppBar transparentes
+        // pintaba una banda que cortaba el contenido de abajo.
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
       textTheme: textTheme,
       extensions: [palette],
     );
     return _conEstadosDeInteraccion(tema, palette);
   }
+}
+
+/// Color del texto de `TextButton`, con igualdad de VALOR — por lo mismo que
+/// [_ThumbDelScrollbar]: una closure de `resolveWith` en el tema lo haría
+/// rebuildear en cada frame.
+@immutable
+class _TextoDeAcento implements WidgetStateProperty<Color> {
+  const _TextoDeAcento({required this.habilitado, required this.deshabilitado});
+
+  final Color habilitado;
+  final Color deshabilitado;
+
+  @override
+  Color resolve(Set<WidgetState> states) =>
+      states.contains(WidgetState.disabled) ? deshabilitado : habilitado;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _TextoDeAcento &&
+      other.habilitado == habilitado &&
+      other.deshabilitado == deshabilitado;
+
+  @override
+  int get hashCode => Object.hash(habilitado, deshabilitado);
+}
+
+/// Estilo de los ítems de menú emergente, con igualdad de VALOR — por lo
+/// mismo que [_TextoDeAcento].
+@immutable
+class _EstiloDeItemDeMenu implements WidgetStateProperty<TextStyle> {
+  const _EstiloDeItemDeMenu({
+    required this.habilitado,
+    required this.deshabilitado,
+  });
+
+  final TextStyle habilitado;
+  final TextStyle deshabilitado;
+
+  @override
+  TextStyle resolve(Set<WidgetState> states) =>
+      states.contains(WidgetState.disabled) ? deshabilitado : habilitado;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _EstiloDeItemDeMenu &&
+      other.habilitado == habilitado &&
+      other.deshabilitado == deshabilitado;
+
+  @override
+  int get hashCode => Object.hash(habilitado, deshabilitado);
+}
+
+/// Color sólo para el switch APAGADO y habilitado; en cualquier otro estado
+/// devuelve null y rige el default (o lo que pase el llamador). Con igualdad
+/// de VALOR, por la misma razón que [_TextoDeAcento].
+class _SoloApagado implements WidgetStateProperty<Color?> {
+  const _SoloApagado(this.color);
+
+  final Color color;
+
+  @override
+  Color? resolve(Set<WidgetState> states) =>
+      states.contains(WidgetState.selected) ||
+              states.contains(WidgetState.disabled)
+          ? null
+          : color;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _SoloApagado && other.color == color;
+
+  @override
+  int get hashCode => color.hashCode;
 }
 
 /// Color del thumb del scrollbar, con igualdad de VALOR.

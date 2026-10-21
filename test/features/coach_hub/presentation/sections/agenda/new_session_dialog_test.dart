@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
@@ -49,6 +50,17 @@ class _StubAppointmentRepository extends Fake implements AppointmentRepository {
   int? capturedDurationMin;
   String? capturedNoteBefore;
   bool shouldThrow = false;
+
+  /// Sesiones confirmadas que la agenda del PF devuelve al chequear conflictos.
+  List<Appointment> existingForTrainer = const [];
+
+  @override
+  Stream<List<Appointment>> watchForTrainer(
+    String trainerId, {
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) =>
+      Stream.value(existingForTrainer);
 
   @override
   Future<Appointment> createByTrainer({
@@ -274,7 +286,7 @@ void main() {
       );
 
       // Abre el dropdown
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
 
       // El activo debe estar en el dropdown
@@ -300,7 +312,7 @@ void main() {
       );
 
       // Seleccionar el alumno en el dropdown
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -341,7 +353,7 @@ void main() {
         analytics: analytics,
       );
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -375,7 +387,7 @@ void main() {
         analytics: analytics,
       );
 
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -400,7 +412,7 @@ void main() {
       );
 
       // Seleccionar alumno
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -453,7 +465,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Seleccionar alumno
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -514,7 +526,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Seleccionar alumno
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -634,7 +646,7 @@ void main() {
       );
 
       // Seleccionar alumno
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(TreinoSelectField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Carlos Pérez').last);
       await tester.pumpAndSettle();
@@ -652,6 +664,105 @@ void main() {
         find.textContaining('entre 5 y 480'), // i18n
         findsOneWidget,
       );
+    });
+  });
+
+  // ── #1493: aviso de superposición (mismo criterio que el sheet mobile) ─────
+  group('Aviso de superposición (#1493)', () {
+    // Fecha futura fija para que la guarda de "en el pasado" no interfiera. La
+    // hora default del dialog es la próxima hora en punto.
+    final fecha = DateTime.now().add(const Duration(days: 10));
+    final fechaSola = DateTime(fecha.year, fecha.month, fecha.day);
+    final hora = DateTime.now().hour + 1 > 23 ? 23 : DateTime.now().hour + 1;
+
+    Appointment sofia() => Appointment(
+          id: 'sofia',
+          trainerId: _kTrainerId,
+          athleteId: 'athlete-sofia',
+          athleteDisplayName: 'Sofía Ramírez',
+          startsAt: DateTime.utc(fecha.year, fecha.month, fecha.day, hora),
+          durationMin: 60,
+          status: AppointmentStatus.confirmed,
+        );
+
+    Future<void> abrir(
+      WidgetTester tester,
+      _StubAppointmentRepository repo,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showDialog<bool>(
+                context: context,
+                builder: (_) => NewSessionDialog(initialDate: fechaSola),
+              ),
+              child: const Text('abrir'),
+            ),
+          ),
+          overrides: _overrides(
+            links: [_activeLink(_kAthleteId1)],
+            profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+            repo: repo,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(TreinoSelectField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Carlos Pérez').last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'encima de otra sesión avisa con quién y a qué hora; "Cargar igual" '
+        'agenda', (tester) async {
+      final repo = _StubAppointmentRepository()..existingForTrainer = [sofia()];
+      await abrir(tester, repo);
+
+      await tester.tap(find.text('REGISTRAR SESIÓN')); // i18n
+      await tester.pumpAndSettle();
+
+      final desde = '${hora.toString().padLeft(2, '0')}:00';
+      final hasta = '${(hora + 1).toString().padLeft(2, '0')}:00';
+      expect(find.text('Revisá el horario'), findsOneWidget); // i18n
+      expect(
+        find.textContaining(
+            'Se superpone con Sofía Ramírez ($desde – $hasta).'),
+        findsOneWidget,
+      );
+      expect(repo.capturedStartsAt, isNull, reason: 'es un aviso, no agenda');
+
+      await tester.tap(find.text('Cargar igual')); // i18n
+      await tester.pumpAndSettle();
+
+      expect(repo.capturedStartsAt, isNotNull);
+    });
+
+    testWidgets('cancelar en el aviso NO agenda', (tester) async {
+      final repo = _StubAppointmentRepository()..existingForTrainer = [sofia()];
+      await abrir(tester, repo);
+
+      await tester.tap(find.text('REGISTRAR SESIÓN')); // i18n
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar').last); // i18n
+      await tester.pumpAndSettle();
+
+      expect(find.text('Revisá el horario'), findsNothing); // i18n
+      expect(repo.capturedStartsAt, isNull);
+    });
+
+    testWidgets('sin choques agenda directo, sin aviso', (tester) async {
+      final repo = _StubAppointmentRepository();
+      await abrir(tester, repo);
+
+      await tester.tap(find.text('REGISTRAR SESIÓN')); // i18n
+      await tester.pumpAndSettle();
+
+      expect(find.text('Revisá el horario'), findsNothing); // i18n
+      expect(repo.capturedStartsAt, isNotNull);
     });
   });
 }

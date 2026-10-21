@@ -27,6 +27,9 @@ import '../domain/message.dart';
 /// - lastMessageAt strictly after lastRead[uid] → unread.
 /// - equal or before → read.
 bool chatHasUnread(Chat c, String uid) {
+  // Archivado o eliminado sin mensajes nuevos: no cuenta. Si llega uno, las
+  // dos marcas se vencen solas y el chat vuelve con su badge.
+  if (c.isArchivedFor(uid) || c.isHiddenFor(uid)) return false;
   final lastMessageAt = c.lastMessageAt;
   if (lastMessageAt == null) return false;
   if (c.lastMessageSenderId == uid) return false;
@@ -70,6 +73,58 @@ final chatsForCurrentUserProvider =
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return Stream.value(const []);
   return ref.read(chatRepositoryProvider).watchChatsForUser(uid);
+});
+
+/// Chats de la bandeja principal: ni archivados ni eliminados por el usuario
+/// actual. Deriva de [chatsForCurrentUserProvider], sin listeners nuevos.
+final inboxChatsProvider = Provider.autoDispose<AsyncValue<List<Chat>>>((ref) {
+  final uid = ref.watch(currentUidProvider);
+  return ref.watch(chatsForCurrentUserProvider).whenData(
+        (chats) => uid == null
+            ? chats
+            : chats
+                .where((c) => !c.isArchivedFor(uid) && !c.isHiddenFor(uid))
+                .toList(),
+      );
+});
+
+/// Chats que el usuario actual archivó y no eliminó.
+final archivedChatsProvider =
+    Provider.autoDispose<AsyncValue<List<Chat>>>((ref) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null) return const AsyncData([]);
+  return ref.watch(chatsForCurrentUserProvider).whenData(
+        (chats) => chats
+            .where((c) => c.isArchivedFor(uid) && !c.isHiddenFor(uid))
+            .toList(),
+      );
+});
+
+/// Los mensajes que [uid] no eliminó: los posteriores a su `hiddenBefore`.
+List<Message> visibleMessagesFor(
+        List<Message> messages, DateTime? hiddenBefore) =>
+    hiddenBefore == null
+        ? messages
+        : messages.where((m) => m.createdAt.isAfter(hiddenBefore)).toList();
+
+/// [messagesProvider] sin lo que el usuario actual eliminó (ver
+/// `Chat.hiddenBefore`). El corte se hace en el cliente: los mensajes ocultos
+/// son siempre los MÁS VIEJOS, así que la ventana de los últimos N sigue
+/// trayendo todos los visibles.
+///
+/// Mientras el doc del chat carga devuelve loading, para no mostrar un
+/// instante el historial que el usuario borró. Si el doc falla se muestran
+/// todos: es historia propia, no un permiso, y tapar la conversación entera
+/// por un error de lectura sería peor.
+final visibleMessagesProvider = Provider.autoDispose
+    .family<AsyncValue<List<Message>>, String>((ref, chatId) {
+  final messages = ref.watch(messagesProvider(chatId));
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null) return messages;
+  final chat = ref.watch(chatByIdProvider(chatId));
+  if (!chat.hasValue) return chat.hasError ? messages : const AsyncLoading();
+  final hiddenBefore = chat.requireValue?.hiddenBefore?[uid];
+  return messages.whenData((m) => visibleMessagesFor(m, hiddenBefore));
 });
 
 /// Stream de mensajes de un chat, ordenados por createdAt desc (más nuevo

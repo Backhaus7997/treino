@@ -23,6 +23,7 @@ import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
+import 'package:treino/features/coach/data/nutrition_plan_repository.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -154,6 +155,9 @@ Future<void> _pump(
   // `nutricionEntriesProvider` pegue contra el repo real (sin Firebase en
   // los tests).
   Map<String, NutritionPlan?> plansByAthleteId = const {},
+  // Alumnos cuyo plan existe y no se pudo leer (#1581): su stream emite
+  // `NutritionPlanIlegible`.
+  Set<String> unreadablePlanIds = const {},
   // Pagos del trainer (columna «Vencimiento», vía `pagosBucketsProvider`).
   List<Payment> payments = const [],
   TrainerLinkRepository? repo,
@@ -254,7 +258,14 @@ Future<void> _pump(
           nutritionPlanProvider(
             (trainerId: _trainerId, athleteId: athleteId),
           ).overrideWith(
-            (ref) => Stream.value(plansByAthleteId[athleteId]),
+            (ref) => unreadablePlanIds.contains(athleteId)
+                ? Stream<NutritionPlan?>.error(
+                    NutritionPlanIlegible(
+                      '${_trainerId}_$athleteId',
+                      'no parsea',
+                    ),
+                  )
+                : Stream.value(plansByAthleteId[athleteId]),
           ),
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
         // Va al final: gana sobre el override genérico del batch de perfiles.
@@ -1045,6 +1056,21 @@ void main() {
       );
 
       expect(find.text('Sin plan'), findsOneWidget);
+    });
+
+    // #1581: el doc existe y no parsea. «Sin plan» le decía al PF que le
+    // faltaba un plan que el alumno tiene.
+    testWidgets('plan ilegible → "No se pudo leer", no "Sin plan"',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        unreadablePlanIds: {'a1'},
+      );
+
+      expect(find.text('No se pudo leer'), findsOneWidget);
+      expect(find.text('Sin plan'), findsNothing);
     });
 
     testWidgets(

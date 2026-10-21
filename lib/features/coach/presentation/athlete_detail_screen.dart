@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/app_background.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,6 +23,7 @@ import '../application/athlete_note_providers.dart';
 import '../application/follow_up_entry_providers.dart';
 import '../domain/athlete_note.dart';
 import '../domain/follow_up_entry.dart';
+import 'widgets/trainer_nutrition_plan_section.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show groupThousands;
 import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
@@ -31,6 +34,8 @@ import '../../insights/presentation/widgets/day_strip_labels.dart';
 import '../../performance/application/performance_test_providers.dart';
 import '../../performance/presentation/log_performance_test_screen.dart';
 import '../../performance/presentation/widgets/performance_progress_chart.dart';
+import '../../performance/presentation/widgets/performance_test_history_list.dart';
+import '../../performance/domain/performance_test.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../insights/domain/chart_period.dart';
@@ -54,6 +59,7 @@ import '../../workout/presentation/widgets/personal_records_list.dart';
 import '../../workout/presentation/widgets/session_exercise_block.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Trainer's drill-down view for a specific athlete.
 ///
@@ -61,7 +67,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 /// the current trainer to this athlete. Provides a "CREAR PLAN" CTA that
 /// navigates to the RoutineEditorScreen.
 ///
-/// Lives under ShellRoute — NO own Scaffold (bottom bar provided by shell).
+/// Full-screen route with its OWN Scaffold: MENSAJE / CREAR PLAN live in its
+/// `bottomNavigationBar` so SnackBars land above them (#1484).
 /// REQ-COACH-PLANS-020, 021, 022 · SCENARIO-454, 455, 456.
 class AthleteDetailScreen extends ConsumerWidget {
   const AthleteDetailScreen({super.key, required this.athleteId});
@@ -78,51 +85,85 @@ class AthleteDetailScreen extends ConsumerWidget {
       (trainerId: trainerUid, athleteId: athleteId),
     ));
 
-    return Column(
-      children: [
-        // ── Header bar ────────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
-          child: Row(
+    // Scaffold PROPIO (el router ya no lo envuelve en `_immersive`): los
+    // botones van en `bottomNavigationBar` para que los SnackBar salgan
+    // arriba de ellos (#1484). El fondo liso de la barra es `palette.bg`, el
+    // mismo color al que funde el velo del pie del scroll.
+    //
+    // Con el teclado abierto (la NOTA DEL ALUMNO se edita inline) la barra se
+    // saca: subiría pegada al teclado y dejaría Cancelar/Guardar en una
+    // ventana mínima. El inset se lee ACÁ, arriba del Scaffold: adentro del
+    // body el Scaffold ya lo consumió.
+    final tecladoAbierto = MediaQuery.viewInsetsOf(context).bottom > 0;
+    return Scaffold(
+      backgroundColor: palette.bg,
+      bottomNavigationBar: tecladoAbierto
+          ? null
+          : _AthleteDetailActions(
+              athleteId: athleteId,
+              trainerUid: trainerUid,
+            ),
+      body: AppBackground(
+        child: SafeArea(
+          child: Column(
             children: [
-              IconButton(
-                icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-                onPressed: () =>
-                    context.canPop() ? context.pop() : context.go('/coach'),
-              ),
-              const SizedBox(width: 4),
-              profileAsync.maybeWhen(
-                data: (profile) => Text(
-                  profile?.displayName ?? '...',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    color: palette.textPrimary,
-                  ),
+              // ── Header bar ────────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+                      onPressed: () => context.canPop()
+                          ? context.pop()
+                          : context.go('/coach'),
+                    ),
+                    // #1482: sin el nombre acá. Ya va en el header con avatar, y
+                    // repetido en la barra se leía duplicado.
+                  ],
                 ),
-                orElse: () => Text(
-                  '...',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    color: palette.textPrimary,
-                  ),
+              ),
+
+              // ── Body ─────────────────────────────────────────────────────────
+              Expanded(
+                child: Stack(
+                  children: [
+                    _AthleteDetailBody(
+                      athleteId: athleteId,
+                      trainerUid: trainerUid,
+                      profileAsync: profileAsync,
+                      plansAsync: plansAsync,
+                    ),
+                    // #1482: velo al pie del scroll para que el contenido no se
+                    // corte en seco contra los botones fijos de abajo.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: AppSpacing.s20,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          key: const Key('athlete_detail_bottom_fade'),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                palette.bg.withValues(alpha: 0),
+                                palette.bg,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-
-        // ── Body ─────────────────────────────────────────────────────────
-        Expanded(
-          child: _AthleteDetailBody(
-            athleteId: athleteId,
-            trainerUid: trainerUid,
-            profileAsync: profileAsync,
-            plansAsync: plansAsync,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -187,14 +228,22 @@ class _AthleteDetailBody extends ConsumerWidget {
                   plansAsync: plansAsync,
                 ),
 
+                // ── Plan nutricional section (#1538) ─────────────────────
+                // 20 como entre las demás secciones (#1482): con 8 el texto de
+                // «sin planes» quedaba pegado al título que sigue.
+                const SizedBox(height: 20),
+                TrainerNutritionPlanSection(
+                    athleteId: athleteId, trainerUid: trainerUid),
+
                 // ── Antropometría section ────────────────────────────────
-                const SizedBox(height: 8),
+                const SizedBox(height: 20),
                 _AntropometriaSection(
                     athleteId: athleteId, trainerUid: trainerUid),
 
                 // ── Rendimiento section ──────────────────────────────────
                 const SizedBox(height: 20),
-                _RendimientoSection(athleteId: athleteId),
+                _RendimientoSection(
+                    athleteId: athleteId, trainerUid: trainerUid),
 
                 // ── Historial de sesiones section ─────────────────────────
                 const SizedBox(height: 20),
@@ -216,110 +265,8 @@ class _AthleteDetailBody extends ConsumerWidget {
             ),
           ),
         ),
-
-        // ── MENSAJE + CREAR PLAN buttons ──────────────────────────────
-        // Full-screen route (no nav bar); _immersive's SafeArea handles the
-        // home-indicator inset, so a plain bottom padding sits the buttons at
-        // the bottom of the screen.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: Column(
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _onMessage(context, ref),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: palette.accent, width: 1),
-                        foregroundColor: palette.accent,
-                        minimumSize: const Size.fromHeight(48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.full),
-                        ),
-                      ),
-                      icon: Icon(TreinoIcon.chat,
-                          size: 18, color: palette.accent),
-                      label: Text(
-                        AppL10n.of(context).athleteDetailMessageCta,
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Unread dot on the chat button when the alumno has written.
-                  if (ref.watch(hasUnreadFromProvider(athleteId)))
-                    Positioned(
-                      top: -3,
-                      right: -3,
-                      child: Semantics(
-                        label: 'Mensajes sin leer',
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: palette.accent,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: palette.bg, width: 2),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () =>
-                      context.push('/workout/routine-editor/$athleteId'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: TreinoButtonTokens.foreground(context),
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.full),
-                    ),
-                  ),
-                  child: Text(
-                    AppL10n.of(context).coachCreatePlanCta,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
-  }
-
-  Future<void> _onMessage(BuildContext context, WidgetRef ref) async {
-    if (trainerUid.isEmpty) return;
-    try {
-      final chat = await ref.read(chatRepositoryProvider).getOrCreate(
-            selfId: trainerUid,
-            otherId: athleteId,
-          );
-      if (!context.mounted) return;
-      context.push('/coach/chat/${chat.chatId}?other=$athleteId');
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos abrir el chat. Probá de nuevo.'),
-        ),
-      );
-    }
   }
 }
 
@@ -411,6 +358,9 @@ class _PlanesSection extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (final (i, plan) in myPlans.indexed) ...[
+                    // Separación ENTRE cards; el aire hasta la sección siguiente lo
+                    // pone la columna padre (#1482).
+                    if (i > 0) const SizedBox(height: 12),
                     TreinoFadeSlideIn(
                       delay: AppMotion.stagger(i),
                       child: _PlanCard(
@@ -425,7 +375,6 @@ class _PlanesSection extends ConsumerWidget {
                         onDelete: () => _onDeletePlan(context, ref, plan),
                       ),
                     ),
-                    const SizedBox(height: 12),
                   ],
                 ],
               );
@@ -484,7 +433,7 @@ class _PlanesSection extends ConsumerWidget {
               AppL10n.of(context).athleteDetailPlanDeleteConfirm,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                color: palette.danger,
+                color: palette.dangerText,
               ),
             ),
           ),
@@ -504,14 +453,17 @@ class _PlanesSection extends ConsumerWidget {
       // process, "empezar sesión" included.
       invalidateRoutineById(container, plan.id);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(AppL10n.of(context).athleteDetailPlanDeleteSuccess)),
+      showTreinoToast(
+        context,
+        AppL10n.of(context).athleteDetailPlanDeleteSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos eliminar el plan.')),
+      showTreinoToast(
+        context,
+        'No pudimos eliminar el plan.',
+        type: TreinoToastType.error,
       );
     }
   }
@@ -574,8 +526,8 @@ String _formatMeasurementDate(DateTime dt, String localeName) {
 /// Formats a metric double for the summary cards. Mirrors the chart header
 /// formatting (see measurement_progress_chart.dart) so whole numbers render
 /// as '70' (not '70.0') and float tails are trimmed to one decimal.
-String _formatMetricValue(double value) =>
-    value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+String _formatMetricValue(double value, String localeName) =>
+    formatNumberDisplay(value, localeName);
 
 /// Section that shows the latest anthropometric measurement for [athleteId]
 /// and a '+ Cargar' CTA to open the log form.
@@ -640,7 +592,7 @@ class _AntropometriaSection extends ConsumerWidget {
                 style: GoogleFonts.barlow(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
-                  color: palette.accent,
+                  color: palette.accentText,
                 ),
               ),
             ),
@@ -721,22 +673,22 @@ class _AntropometriaSection extends ConsumerWidget {
                             if (latest.weightKg != null)
                               _Metric(
                                 'Peso',
-                                '${_formatMetricValue(latest.weightKg!)} kg',
+                                '${_formatMetricValue(latest.weightKg!, localeName)} kg',
                               ),
                             if (latest.fatPercentage != null)
                               _Metric(
                                 '% Graso',
-                                '${_formatMetricValue(latest.fatPercentage!)}%',
+                                '${_formatMetricValue(latest.fatPercentage!, localeName)}%',
                               ),
                             if (latest.muscleMassKg != null)
                               _Metric(
                                 'Masa muscular',
-                                '${_formatMetricValue(latest.muscleMassKg!)} kg',
+                                '${_formatMetricValue(latest.muscleMassKg!, localeName)} kg',
                               ),
                             if (latest.waistCm != null)
                               _Metric(
                                 'Cintura',
-                                '${_formatMetricValue(latest.waistCm!)} cm',
+                                '${_formatMetricValue(latest.waistCm!, localeName)} cm',
                               ),
                           ],
                           palette: palette,
@@ -888,16 +840,25 @@ class _MetricChip extends StatelessWidget {
 ///
 /// When ≥2 tests exist a PROGRESO chart card is rendered below the summary
 /// card. With <2 tests a muted hint card is shown.
+///
+/// Debajo, un HISTORIAL con EDITAR/BORRAR por fila (#1485) vía
+/// [PerformanceTestHistoryList]: las acciones sólo aparecen en las filas que
+/// cargó este PF (`recordedBy == trainerUid`), como exigen las reglas.
 class _RendimientoSection extends ConsumerWidget {
-  const _RendimientoSection({required this.athleteId});
+  const _RendimientoSection({
+    required this.athleteId,
+    required this.trainerUid,
+  });
 
   final String athleteId;
+  final String trainerUid;
 
-  void _openLogForm(BuildContext context) {
+  void _openLogForm(BuildContext context, {PerformanceTest? initial}) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (_) => LogPerformanceTestScreen(athleteId: athleteId),
+        builder: (_) =>
+            LogPerformanceTestScreen(athleteId: athleteId, initial: initial),
       ),
     );
   }
@@ -931,7 +892,7 @@ class _RendimientoSection extends ConsumerWidget {
                 style: GoogleFonts.barlow(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
-                  color: palette.accent,
+                  color: palette.accentText,
                 ),
               ),
             ),
@@ -1014,16 +975,16 @@ class _RendimientoSection extends ConsumerWidget {
                             // consistente con la card de MEDICIONES vecina.
                             if (latest.cmjCm != null)
                               _Metric('CMJ',
-                                  '${_formatMetricValue(latest.cmjCm!)} cm'),
+                                  '${_formatMetricValue(latest.cmjCm!, localeName)} cm'),
                             if (latest.squat1rmKg != null)
                               _Metric('Sentadilla 1RM',
-                                  '${_formatMetricValue(latest.squat1rmKg!)} kg'),
+                                  '${_formatMetricValue(latest.squat1rmKg!, localeName)} kg'),
                             if (latest.sprint20mS != null)
                               _Metric('Sprint 20m',
-                                  '${_formatMetricValue(latest.sprint20mS!)} s'),
+                                  '${_formatMetricValue(latest.sprint20mS!, localeName)} s'),
                             if (latest.vo2maxMlKgMin != null)
                               _Metric('VO2máx',
-                                  '${_formatMetricValue(latest.vo2maxMlKgMin!)} ml/kg/min'),
+                                  '${_formatMetricValue(latest.vo2maxMlKgMin!, localeName)} ml/kg/min'),
                           ],
                           palette: palette,
                         ),
@@ -1055,6 +1016,24 @@ class _RendimientoSection extends ConsumerWidget {
                         ),
                       ),
                     ),
+
+                  // ── Historial con editar/borrar por fila (#1485) ───────
+                  const SizedBox(height: 12),
+                  Text(
+                    AppL10n.of(context).measurementsHistoryTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  PerformanceTestHistoryList(
+                    tests: tests,
+                    currentUid: trainerUid,
+                    onEdit: (t) => _openLogForm(context, initial: t),
+                  ),
                 ],
               );
             },
@@ -1287,8 +1266,10 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos guardar. Probá de nuevo.')),
+      showTreinoToast(
+        context,
+        'No pudimos guardar. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     }
   }
@@ -1395,7 +1376,8 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
                 selectedColor: palette.accent,
                 backgroundColor: palette.bgCard,
                 labelStyle: TextStyle(
-                  color: selected ? palette.bg : palette.textPrimary,
+                  color:
+                      selected ? TreinoButtonTokens.ink : palette.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
                 side: BorderSide(
@@ -1595,7 +1577,9 @@ class _SeguimientoRow extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   fontSize: 10,
                   letterSpacing: 1.0,
-                  color: color,
+                  // El tinte y el borde usan el color de estado; el texto, su versión
+                  // legible (#1550).
+                  color: palette.textVariantOf(color),
                 ),
               ),
             ),
@@ -1891,7 +1875,7 @@ class _NotaEditor extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'No pudimos guardar. Probá de nuevo.',
-            style: GoogleFonts.barlow(fontSize: 13, color: palette.danger),
+            style: GoogleFonts.barlow(fontSize: 13, color: palette.dangerText),
           ),
         ],
         const SizedBox(height: 10),
@@ -2106,7 +2090,7 @@ class _EntrenamientosSection extends ConsumerWidget {
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                   letterSpacing: 1.2,
-                  color: palette.accent,
+                  color: palette.accentText,
                 ),
               ),
             ),
@@ -2281,7 +2265,7 @@ class _ProgressionSectionState extends State<_ProgressionSection> {
               oneRepMaxLabel: l10n.progressionMetricOneRepMax,
               bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
               bestSessionVolumeLabel: l10n.progressionMetricVolume,
-              volumeUnit: 'kg·reps',
+              volumeUnit: 'kg',
               weightUnit: 'kg',
               // #555: el count viene acotado al período activo del selector.
               frequencyLabel: (n) => l10n.progressionFrequencyPeriod(n),
@@ -2302,7 +2286,7 @@ class _ProgressionSectionState extends State<_ProgressionSection> {
               oneRepMaxLabel: l10n.progressionMetricOneRepMax,
               bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
               bestSessionVolumeLabel: l10n.progressionMetricVolume,
-              volumeUnit: 'kg·reps',
+              volumeUnit: 'kg',
               weightUnit: 'kg',
               emptyText: l10n.progressionEmptyExercise,
               localeName: l10n.localeName,
@@ -2642,5 +2626,127 @@ class _PlanCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// MENSAJE + CREAR PLAN. Va en el `bottomNavigationBar` del Scaffold de la
+/// pantalla y no al pie del body: el Scaffold dibuja los SnackBar ARRIBA de
+/// esa barra. Al pie del body, el «Medición guardada» que vuelve de Cargar
+/// medición tapaba CREAR PLAN (#1484).
+class _AthleteDetailActions extends ConsumerWidget {
+  const _AthleteDetailActions({
+    required this.athleteId,
+    required this.trainerUid,
+  });
+
+  final String athleteId;
+  final String trainerUid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          // En `bottomNavigationBar` la barra recibe el alto entero: sin esto
+          // se come la pantalla y el scroll queda en 0 px.
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _onMessage(context, ref),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: palette.accent, width: 1),
+                      foregroundColor: palette.accentText,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                      ),
+                    ),
+                    icon:
+                        Icon(TreinoIcon.chat, size: 18, color: palette.accent),
+                    label: Text(
+                      AppL10n.of(context).athleteDetailMessageCta,
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ),
+                // Unread dot on the chat button when the alumno has written.
+                if (ref.watch(hasUnreadFromProvider(athleteId)))
+                  Positioned(
+                    top: -3,
+                    right: -3,
+                    child: Semantics(
+                      label: 'Mensajes sin leer',
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: palette.accent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: palette.bg, width: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () =>
+                    context.push('/workout/routine-editor/$athleteId'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: palette.accent,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                  ),
+                ),
+                child: Text(
+                  AppL10n.of(context).coachCreatePlanCta,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onMessage(BuildContext context, WidgetRef ref) async {
+    if (trainerUid.isEmpty) return;
+    try {
+      final chat = await ref.read(chatRepositoryProvider).getOrCreate(
+            selfId: trainerUid,
+            otherId: athleteId,
+          );
+      if (!context.mounted) return;
+      context.push('/coach/chat/${chat.chatId}?other=$athleteId');
+    } catch (_) {
+      if (!context.mounted) return;
+      showTreinoToast(
+        context,
+        'No pudimos abrir el chat. Probá de nuevo.',
+        type: TreinoToastType.error,
+      );
+    }
   }
 }

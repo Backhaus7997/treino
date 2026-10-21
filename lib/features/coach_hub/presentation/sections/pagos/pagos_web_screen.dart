@@ -18,6 +18,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/core/widgets/treino_select.dart';
 import 'package:treino/features/payments/application/payment_providers.dart'
     show paymentRepositoryProvider, trainerPaymentsProvider;
 import 'package:treino/features/payments/domain/payment.dart';
@@ -35,7 +36,6 @@ import '../../widgets/coach_hub_widgets.dart'
         CoachHubSectionHero,
         StaleDataNotice,
         TreinoFilterChips,
-        TreinoPopupMenuButton,
         TreinoInteractiveState,
         pageOf;
 import 'widgets/registrar_pago_dialog.dart';
@@ -48,6 +48,7 @@ import 'widgets/pagos_periodo_provider.dart';
 import 'widgets/pagos_filtro_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
 import 'widgets/pagos_web_table.dart';
+import 'package:treino/core/widgets/treino_toast.dart' show TreinoToastType;
 
 /// Etiquetas (es-AR) de cada [PagosFiltro], en el orden en que se muestran
 /// los chips.
@@ -165,11 +166,13 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     try {
       await ref.read(paymentRepositoryProvider).add(payment);
       if (mounted) {
-        pagoSnack(context, 'Pago registrado.'); // i18n
+        pagoSnack(context, 'Pago registrado.',
+            type: TreinoToastType.success); // i18n
       }
     } catch (_) {
       if (mounted) {
-        pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.'); // i18n
+        pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.',
+            type: TreinoToastType.error); // i18n
       }
     }
   }
@@ -459,43 +462,62 @@ class _PeriodoSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return TreinoPopupMenuButton<PagosPeriodo>(
-      key: const Key('pagos_periodo_selector'),
-      tooltip: 'Ventana de tiempo', // i18n
-      onSelected: onChanged,
-      itemBuilder: (_) => [
-        for (final p in PagosPeriodo.values)
-          PopupMenuItem(
-            key: Key('pagos_periodo_${p.name}'),
-            value: p,
-            child: Text(p.label),
-          ),
-      ],
-      icon: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s12,
-          vertical: AppSpacing.s8,
-        ),
-        decoration: BoxDecoration(
-          border: Border.all(color: palette.border),
+    return Tooltip(
+      message: 'Ventana de tiempo', // i18n
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          key: const Key('pagos_periodo_selector'),
           borderRadius: BorderRadius.circular(AppRadius.full),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(TreinoIcon.calendar, size: 14, color: palette.textMuted),
-            const SizedBox(width: AppSpacing.hairline),
-            Text(
-              periodo.label,
-              style: TextStyle(
-                fontFamily: AppFonts.barlow,
-                fontSize: AppTextSize.caption,
-                color: palette.textPrimary,
-              ),
+          onTap: () async {
+            final picked = await showTreinoSelect<PagosPeriodo>(
+              context,
+              title: 'Ventana de tiempo', // i18n
+              selected: periodo,
+              options: [
+                for (final p in PagosPeriodo.values)
+                  TreinoSelectOption(
+                    key: Key('pagos_periodo_${p.name}'),
+                    value: p,
+                    label: p.label,
+                  ),
+              ],
+            );
+            if (picked != null && context.mounted) onChanged(picked.value);
+          },
+          child: Container(
+            // El aire que antes ponía el IconButton de `PopupMenuButton`
+            // (8 por lado): sin él la fila de filtros pierde 13 px de alto,
+            // la tabla entera sube y la píldora queda pegada al borde. Va
+            // dentro del InkWell para que el target siga en 50 px.
+            margin: const EdgeInsets.all(AppSpacing.s8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s12,
+              vertical: AppSpacing.s8,
             ),
-            const SizedBox(width: AppSpacing.hairline),
-            Icon(TreinoIcon.chevronDown, size: 12, color: palette.textMuted),
-          ],
+            decoration: BoxDecoration(
+              border: Border.all(color: palette.border),
+              borderRadius: BorderRadius.circular(AppRadius.full),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(TreinoIcon.calendar, size: 14, color: palette.textMuted),
+                const SizedBox(width: AppSpacing.hairline),
+                Text(
+                  periodo.label,
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlow,
+                    fontSize: AppTextSize.caption,
+                    color: palette.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.hairline),
+                Icon(TreinoIcon.chevronDown,
+                    size: 12, color: palette.textMuted),
+              ],
+            ),
+          ),
         ),
       ),
     );

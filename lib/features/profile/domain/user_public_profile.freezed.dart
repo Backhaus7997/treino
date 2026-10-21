@@ -142,6 +142,23 @@ mixin _$UserPublicProfile {
   int? get benchRank => throw _privateConstructorUsedError;
   int? get deadliftRank => throw _privateConstructorUsedError;
 
+  /// Saca a la cuenta de los listados sociales —búsqueda de personas,
+  /// «gente para seguir» y rankings por gym— sin borrarla. Es para cuentas
+  /// internas (soporte, QA, revisores de las tiendas), atletas o PFs: por
+  /// eso vive acá y no sólo en `trainerPublicProfiles`, que un atleta no
+  /// tiene. Mismo nombre que el flag del directorio de coaches.
+  ///
+  /// Lo escribe SÓLO el admin con
+  /// `scripts/set_trainer_discovery_visibility.js`; las reglas le niegan el
+  /// campo al dueño. `includeToJson: false` para que ningún write del
+  /// cliente lo arrastre. Abrir el perfil por uid sigue andando.
+  ///
+  /// Cualquier valor distinto de `true` cuenta como visible: un doc con el
+  /// campo roto no tiene que esconder a nadie por accidente.
+// ignore: invalid_annotation_target
+  @JsonKey(fromJson: _hiddenFromJson, includeToJson: false)
+  bool get hiddenFromDiscovery => throw _privateConstructorUsedError;
+
   /// Serializes this UserPublicProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -179,7 +196,9 @@ abstract class $UserPublicProfileCopyWith<$Res> {
       num? bestDeadliftKg,
       int? squatRank,
       int? benchRank,
-      int? deadliftRank});
+      int? deadliftRank,
+      @JsonKey(fromJson: _hiddenFromJson, includeToJson: false)
+      bool hiddenFromDiscovery});
 }
 
 /// @nodoc
@@ -218,6 +237,7 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
     Object? squatRank = freezed,
     Object? benchRank = freezed,
     Object? deadliftRank = freezed,
+    Object? hiddenFromDiscovery = null,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -304,6 +324,10 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
           ? _value.deadliftRank
           : deadliftRank // ignore: cast_nullable_to_non_nullable
               as int?,
+      hiddenFromDiscovery: null == hiddenFromDiscovery
+          ? _value.hiddenFromDiscovery
+          : hiddenFromDiscovery // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 }
@@ -337,7 +361,9 @@ abstract class _$$UserPublicProfileImplCopyWith<$Res>
       num? bestDeadliftKg,
       int? squatRank,
       int? benchRank,
-      int? deadliftRank});
+      int? deadliftRank,
+      @JsonKey(fromJson: _hiddenFromJson, includeToJson: false)
+      bool hiddenFromDiscovery});
 }
 
 /// @nodoc
@@ -374,6 +400,7 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
     Object? squatRank = freezed,
     Object? benchRank = freezed,
     Object? deadliftRank = freezed,
+    Object? hiddenFromDiscovery = null,
   }) {
     return _then(_$UserPublicProfileImpl(
       uid: null == uid
@@ -460,6 +487,10 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
           ? _value.deadliftRank
           : deadliftRank // ignore: cast_nullable_to_non_nullable
               as int?,
+      hiddenFromDiscovery: null == hiddenFromDiscovery
+          ? _value.hiddenFromDiscovery
+          : hiddenFromDiscovery // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -488,7 +519,9 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       this.bestDeadliftKg,
       this.squatRank,
       this.benchRank,
-      this.deadliftRank});
+      this.deadliftRank,
+      @JsonKey(fromJson: _hiddenFromJson, includeToJson: false)
+      this.hiddenFromDiscovery = false});
 
   factory _$UserPublicProfileImpl.fromJson(Map<String, dynamic> json) =>
       _$$UserPublicProfileImplFromJson(json);
@@ -640,9 +673,27 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
   @override
   final int? deadliftRank;
 
+  /// Saca a la cuenta de los listados sociales —búsqueda de personas,
+  /// «gente para seguir» y rankings por gym— sin borrarla. Es para cuentas
+  /// internas (soporte, QA, revisores de las tiendas), atletas o PFs: por
+  /// eso vive acá y no sólo en `trainerPublicProfiles`, que un atleta no
+  /// tiene. Mismo nombre que el flag del directorio de coaches.
+  ///
+  /// Lo escribe SÓLO el admin con
+  /// `scripts/set_trainer_discovery_visibility.js`; las reglas le niegan el
+  /// campo al dueño. `includeToJson: false` para que ningún write del
+  /// cliente lo arrastre. Abrir el perfil por uid sigue andando.
+  ///
+  /// Cualquier valor distinto de `true` cuenta como visible: un doc con el
+  /// campo roto no tiene que esconder a nadie por accidente.
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(fromJson: _hiddenFromJson, includeToJson: false)
+  final bool hiddenFromDiscovery;
+
   @override
   String toString() {
-    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, rachaSemanas: $rachaSemanas, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes, isProfilePublic: $isProfilePublic, rankingOptIn: $rankingOptIn, lifetimeVolumeKg: $lifetimeVolumeKg, bestSquatKg: $bestSquatKg, bestBenchKg: $bestBenchKg, bestDeadliftKg: $bestDeadliftKg, squatRank: $squatRank, benchRank: $benchRank, deadliftRank: $deadliftRank)';
+    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, rachaSemanas: $rachaSemanas, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes, isProfilePublic: $isProfilePublic, rankingOptIn: $rankingOptIn, lifetimeVolumeKg: $lifetimeVolumeKg, bestSquatKg: $bestSquatKg, bestBenchKg: $bestBenchKg, bestDeadliftKg: $bestDeadliftKg, squatRank: $squatRank, benchRank: $benchRank, deadliftRank: $deadliftRank, hiddenFromDiscovery: $hiddenFromDiscovery)';
   }
 
   @override
@@ -689,7 +740,9 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
             (identical(other.benchRank, benchRank) ||
                 other.benchRank == benchRank) &&
             (identical(other.deadliftRank, deadliftRank) ||
-                other.deadliftRank == deadliftRank));
+                other.deadliftRank == deadliftRank) &&
+            (identical(other.hiddenFromDiscovery, hiddenFromDiscovery) ||
+                other.hiddenFromDiscovery == hiddenFromDiscovery));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -716,7 +769,8 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
         bestDeadliftKg,
         squatRank,
         benchRank,
-        deadliftRank
+        deadliftRank,
+        hiddenFromDiscovery
       ]);
 
   /// Create a copy of UserPublicProfile
@@ -758,7 +812,9 @@ abstract class _UserPublicProfile implements UserPublicProfile {
       final num? bestDeadliftKg,
       final int? squatRank,
       final int? benchRank,
-      final int? deadliftRank}) = _$UserPublicProfileImpl;
+      final int? deadliftRank,
+      @JsonKey(fromJson: _hiddenFromJson, includeToJson: false)
+      final bool hiddenFromDiscovery}) = _$UserPublicProfileImpl;
 
   factory _UserPublicProfile.fromJson(Map<String, dynamic> json) =
       _$UserPublicProfileImpl.fromJson;
@@ -903,6 +959,24 @@ abstract class _UserPublicProfile implements UserPublicProfile {
   int? get benchRank;
   @override
   int? get deadliftRank;
+
+  /// Saca a la cuenta de los listados sociales —búsqueda de personas,
+  /// «gente para seguir» y rankings por gym— sin borrarla. Es para cuentas
+  /// internas (soporte, QA, revisores de las tiendas), atletas o PFs: por
+  /// eso vive acá y no sólo en `trainerPublicProfiles`, que un atleta no
+  /// tiene. Mismo nombre que el flag del directorio de coaches.
+  ///
+  /// Lo escribe SÓLO el admin con
+  /// `scripts/set_trainer_discovery_visibility.js`; las reglas le niegan el
+  /// campo al dueño. `includeToJson: false` para que ningún write del
+  /// cliente lo arrastre. Abrir el perfil por uid sigue andando.
+  ///
+  /// Cualquier valor distinto de `true` cuenta como visible: un doc con el
+  /// campo roto no tiene que esconder a nadie por accidente.
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(fromJson: _hiddenFromJson, includeToJson: false)
+  bool get hiddenFromDiscovery;
 
   /// Create a copy of UserPublicProfile
   /// with the given fields replaced by the non-null parameter values.

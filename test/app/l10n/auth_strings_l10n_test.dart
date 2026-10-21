@@ -63,12 +63,12 @@ void main() {
 
     testWidgets('authWelcomeHaveAccount verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.authWelcomeHaveAccount, 'Ya tengo cuenta');
+      expect(l10n.authWelcomeHaveAccount, '¿Ya tenés cuenta?');
     });
 
     testWidgets('authWelcomeSignIn verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.authWelcomeSignIn, 'Iniciar sesión');
+      expect(l10n.authWelcomeSignIn, 'INICIAR SESIÓN');
     });
 
     // --- Login ---

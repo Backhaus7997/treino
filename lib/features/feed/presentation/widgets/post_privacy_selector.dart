@@ -128,13 +128,14 @@ class _PrivacyPill extends StatelessWidget {
               child: ExcludeSemantics(
                 child: Text(
                   label,
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: _isActive
-                        ? TreinoButtonTokens.foreground(context)
-                        : palette.textPrimary,
-                  ),
+                  // #1473: mismo estilo que los filtros del Feed
+                  // (`FeedSegmentPills`), del tema y no Barlow Condensed suelta.
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: _isActive
+                            ? TreinoButtonTokens.foreground(context)
+                            : palette.textPrimary,
+                      ),
                 ),
               ),
             ),

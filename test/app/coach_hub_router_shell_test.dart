@@ -23,10 +23,12 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/coach_hub_router.dart';
+import 'package:treino/features/coach_hub/application/coach_hub_router_refresh.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/application/email_gate_providers.dart';
+import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/auth/data/mail_verification_service.dart';
 import 'package:treino/features/auth/presentation/verify_mail_screen.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -55,6 +57,8 @@ class _MockUser extends Mock implements User {}
 class _MockFunctions extends Mock implements FirebaseFunctions {}
 
 class _MockAuth extends Mock implements FirebaseAuth {}
+
+class _MockAuthService extends Mock implements AuthService {}
 
 /// Servicio del código que no toca la red: contesta «ya hay uno vigente», que
 /// no arranca la cuenta regresiva del «Reenviar» (un `Timer` periódico que
@@ -112,6 +116,10 @@ Future<GoRouter> _pumpRouter(
   // Para los tests que cambian el perfil en vivo y disparan el redirect. El
   // helper se queda con su ciclo de vida: el test no lo descarta.
   ValueNotifier<int>? refresh,
+  // El `refreshListenable` de producción (`coachHubRouterRefreshProvider`) en
+  // vez de un `ValueNotifier` quieto: para los tests que esperan que un cambio
+  // de auth mueva al router solo, sin que el test lo empuje.
+  bool refreshReal = false,
   List<Override> overrides = const [],
 }) async {
   tester.view.physicalSize = size;
@@ -150,8 +158,14 @@ Future<GoRouter> _pumpRouter(
         );
   });
 
-  final refreshListenable = refresh ?? ValueNotifier<int>(0);
-  addTearDown(refreshListenable.dispose);
+  final Listenable refreshListenable;
+  if (refreshReal) {
+    refreshListenable = container.read(coachHubRouterRefreshProvider);
+  } else {
+    final notifier = refresh ?? ValueNotifier<int>(0);
+    addTearDown(notifier.dispose);
+    refreshListenable = notifier;
+  }
   final router = buildCoachHubRouter(
     refreshListenable: refreshListenable,
     read: container.read,
@@ -552,6 +566,112 @@ void main() {
         );
         expect(find.byType(VerifyMailScreen), findsNothing);
         expect(find.byType(PricingScreen), findsOneWidget);
+      },
+    );
+
+    // `AuthService.signOut()` espera primero a `GoogleSignIn` web, cuyo
+    // `initialize()` el Hub nunca llama: se cuelga y `AuthNotifier` queda en
+    // `AsyncLoading` para siempre (botón deshabilitado, router quieto). El
+    // servicio de acá reproduce ese cuelgue; el Hub tiene que cerrar la sesión
+    // directo contra Firebase Auth, como `CoachHubNotAllowedScreen`.
+    testWidgets(
+      'PF sin confirmar: «Cerrar sesión» cierra la sesión de Firebase Auth '
+      'aunque el camino de AuthService se cuelgue',
+      (tester) async {
+        final user = _MockUser();
+        when(() => user.email).thenReturn(email);
+        when(() => user.uid).thenReturn('test-uid');
+        final auth = _MockAuth();
+        when(() => auth.currentUser).thenReturn(user);
+        when(() => auth.signOut()).thenAnswer((_) async {});
+        final servicio = _MockAuthService();
+        when(() => servicio.signOut())
+            .thenAnswer((_) => Completer<void>().future);
+
+        await _pumpRouter(
+          tester,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(user)),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream.value(_trainerProfile()),
+          ),
+          emailGate: Stream<bool>.value(true),
+          overrides: [
+            firebaseAuthProvider.overrideWithValue(auth),
+            authServiceProvider.overrideWithValue(servicio),
+            mailVerificationServiceProvider
+                .overrideWithValue(_ServicioQuieto()),
+          ],
+        );
+        expect(find.byType(VerifyMailScreen), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('verify_mail_sign_out')));
+        await tester.pump();
+
+        verify(() => auth.signOut()).called(1);
+      },
+    );
+
+    // De punta a punta, como en `app.gettreino.com`: `AuthNotifier` real
+    // colgado de `authStateChanges`, el `refreshListenable` de producción y el
+    // `AuthService` que se cuelga en `signOut()` como en web. Que se llame a
+    // `FirebaseAuth.signOut()` no alcanza: el router tiene que llevar al PF a
+    // `/login` solo. Antes se quedaba en `/verificar-mail` sin usuario: el
+    // único refresh de la salida llegaba con `AuthNotifier` reconstruyéndose
+    // (`AsyncLoading`), el redirect se abstenía y nadie lo volvía a evaluar.
+    testWidgets(
+      'PF sin confirmar: «Cerrar sesión» termina en /login, sin quedarse en el '
+      'gate',
+      (tester) async {
+        final user = _MockUser();
+        when(() => user.email).thenReturn(email);
+        when(() => user.uid).thenReturn('test-uid');
+        final sesion = StreamController<User?>()..add(user);
+        addTearDown(sesion.close);
+        final auth = _MockAuth();
+        when(() => auth.currentUser).thenReturn(user);
+        when(() => auth.signOut()).thenAnswer((_) async => sesion.add(null));
+        final servicio = _MockAuthService();
+        when(() => servicio.signOut())
+            .thenAnswer((_) => Completer<void>().future);
+
+        final router = await _pumpRouter(
+          tester,
+          authOverride:
+              authStateChangesProvider.overrideWith((ref) => sesion.stream),
+          // Como el provider real: deriva de la sesión y al cerrarla emite
+          // `null`.
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => ref.watch(authStateChangesProvider).valueOrNull == null
+                ? Stream<UserProfile?>.value(null)
+                : Stream.value(_trainerProfile()),
+          ),
+          emailGate: Stream<bool>.value(true),
+          refreshReal: true,
+          overrides: [
+            firebaseAuthProvider.overrideWithValue(auth),
+            authServiceProvider.overrideWithValue(servicio),
+            mailVerificationServiceProvider
+                .overrideWithValue(_ServicioQuieto()),
+            userProfileHasPendingWritesProvider
+                .overrideWith((ref) => Stream.value(false)),
+          ],
+        );
+        expect(find.byType(VerifyMailScreen), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('verify_mail_sign_out')));
+        await tester.pumpAndSettle();
+        // La cadena de auth corre en la zona real: el `runAsync` del arranque
+        // de `_pumpRouter` creó ahí la suscripción al stream.
+        for (var i = 0; i < 3; i++) {
+          await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+          await tester.pumpAndSettle();
+        }
+
+        expect(router.routerDelegate.currentConfiguration.uri.path, '/login');
+        expect(find.byType(CoachHubLoginScreen), findsOneWidget);
+        expect(find.byType(VerifyMailScreen), findsNothing);
       },
     );
   });

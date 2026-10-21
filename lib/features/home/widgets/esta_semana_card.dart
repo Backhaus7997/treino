@@ -252,12 +252,31 @@ class _Loaded extends StatelessWidget {
           const SizedBox(height: 14),
 
           // ── Body silhouettes (front + back, full-width, prominent) ────
+          //
+          // #1508: sin título no se sabía qué mostraba el mapa. Pinta los sets
+          // YA registrados esta semana (`setsByGroup`, sesiones terminadas de
+          // la semana calendario), con opacidad = sets / objetivo semanal de la
+          // rutina (`targetByGroup`) — NO lo que toca hoy. El título y la
+          // leyenda dicen exactamente eso. La leyenda va como `label` de la
+          // silueta (queda dentro del recuadro) y la altura sube lo que ocupa
+          // para que las siluetas no encojan.
+          Text(
+            l10n.homeEstaSemanaMusclesTitle,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: AppTextSize.caption,
+              letterSpacing: 1.2,
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: 12),
           BodySilhouettePlaceholder(
             width: double.infinity,
-            height: 280,
+            height: 312,
             showBack: true,
             setsByGroup: wi.setsByGroup,
             targetByGroup: wi.targetByGroup,
+            label: l10n.homeEstaSemanaMusclesLegend,
           ),
           const SizedBox(height: 14),
 
@@ -463,7 +482,7 @@ class _ZeroWeekState extends StatelessWidget {
               onPressed: () => context.go('/workout'),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: palette.accent, width: 1),
-                foregroundColor: palette.accent,
+                foregroundColor: palette.accentText,
                 minimumSize: const Size.fromHeight(48),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppRadius.full),
