@@ -535,6 +535,14 @@ void main() {
       // importa.
       expect(find.text('Todo el historial'), findsOneWidget);
       expect(find.byKey(const Key('pagos_periodo_selector')), findsOneWidget);
+
+      // Al dejar de ser un `PopupMenuButton` el selector perdió los 8 px por
+      // lado de su IconButton: la píldora quedaba en 34 px de alto y toda la
+      // tabla subía 13 px (lo cazó el gate visual, que sólo corre en Linux).
+      // El target vuelve a 50: la píldora más su aire.
+      final selector =
+          tester.getSize(find.byKey(const Key('pagos_periodo_selector')));
+      expect(selector.height, greaterThanOrEqualTo(48));
     });
 
     testWidgets('elegir 30 dias saca los pagos viejos de la lista',

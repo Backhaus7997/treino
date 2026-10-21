@@ -486,6 +486,11 @@ class _PeriodoSelector extends StatelessWidget {
             if (picked != null && context.mounted) onChanged(picked.value);
           },
           child: Container(
+            // El aire que antes ponía el IconButton de `PopupMenuButton`
+            // (8 por lado): sin él la fila de filtros pierde 13 px de alto,
+            // la tabla entera sube y la píldora queda pegada al borde. Va
+            // dentro del InkWell para que el target siga en 50 px.
+            margin: const EdgeInsets.all(AppSpacing.s8),
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s12,
               vertical: AppSpacing.s8,
