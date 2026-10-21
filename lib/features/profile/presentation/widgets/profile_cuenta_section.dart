@@ -36,9 +36,9 @@ class ProfileCuentaSection extends ConsumerWidget {
 
     final gymId = profileAsync.valueOrNull?.gymId;
 
-    // Derives count from assignedRoutinesProvider (one-shot Future per mount).
-    // Returns 0 during loading/error — no flicker on the tile subtitle.
-    final routinesCount = ref.watch(assignedRoutinesCountProvider(myUid ?? ''));
+    // Same list as /profile/routines (coach + own). Returns 0 during
+    // loading/error — no flicker on the tile subtitle.
+    final routinesCount = ref.watch(activeRoutinesCountProvider(myUid ?? ''));
 
     final solicitudesSubtitle = requestCount > 0
         ? l10n.profileCuentaSolicitudesSubtitle(requestCount)

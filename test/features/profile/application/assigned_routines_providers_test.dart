@@ -1,6 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/application/assigned_routines_providers.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/application/unified_routines_providers.dart';
+import 'package:treino/features/workout/application/user_routines_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
@@ -12,92 +17,133 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 
 const _myUid = 'athlete-uid-123';
 
-Routine _routine({required String id, required String name}) {
-  return Routine(
-    id: id,
-    name: name,
-    split: 'Full Body',
-    level: ExperienceLevel.beginner,
-    days: const [],
-    source: RoutineSource.trainerAssigned,
-    assignedBy: 'trainer-uid',
-    assignedTo: _myUid,
-    visibility: RoutineVisibility.private,
+Routine _assigned({required String id}) => Routine(
+      id: id,
+      name: 'Plan $id',
+      split: 'Full Body',
+      level: ExperienceLevel.beginner,
+      days: const [],
+      source: RoutineSource.trainerAssigned,
+      assignedBy: 'trainer-uid',
+      assignedTo: _myUid,
+      visibility: RoutineVisibility.private,
+    );
+
+Routine _own({required String id}) => Routine(
+      id: id,
+      name: 'Propia $id',
+      split: 'Full Body',
+      level: ExperienceLevel.beginner,
+      days: const [],
+      source: RoutineSource.userCreated,
+      createdBy: _myUid,
+      visibility: RoutineVisibility.private,
+    );
+
+// `activeRoutineId` ya seteado: la adopción perezosa de
+// [unifiedRoutinesProvider] no escribe, así el test no necesita repositorio.
+UserProfile _profile() => UserProfile(
+      uid: _myUid,
+      email: 'a@treino.app',
+      displayName: 'Atleta',
+      role: UserRole.athlete,
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+      activeRoutineId: 'cualquiera',
+    );
+
+ProviderContainer _container({
+  List<Routine> assigned = const [],
+  List<Routine> own = const [],
+}) {
+  final c = ProviderContainer(
+    overrides: [
+      assignedRoutinesProvider(_myUid).overrideWith((_) async => assigned),
+      userCreatedRoutinesProvider(_myUid)
+          .overrideWith((_) => Stream.value(own)),
+      userProfileProvider.overrideWith((_) => Stream.value(_profile())),
+    ],
   );
+  addTearDown(c.dispose);
+  return c;
+}
+
+// Escucha la lista además del contador: mantiene vivo el autoDispose mientras
+// se espera el future, sin depender de cómo el contador la consuma.
+Future<int> _resolvedCount(ProviderContainer c) async {
+  c.listen(unifiedRoutinesProvider(_myUid), (_, __) {});
+  c.listen<int>(activeRoutinesCountProvider(_myUid), (_, __) {});
+  await c.read(unifiedRoutinesProvider(_myUid).future);
+  return c.read(activeRoutinesCountProvider(_myUid));
 }
 
 // ---------------------------------------------------------------------------
-// Tests — SCENARIO-519, SCENARIO-520, assignedRoutinesCountProvider
+// Tests — el subtítulo «N activas» de Perfil → Cuenta → Mis rutinas
 // ---------------------------------------------------------------------------
 
 void main() {
-  group('assignedRoutinesCountProvider', () {
-    // SCENARIO-520: count provider returns list.length on data
-    test(
-        'SCENARIO-520: returns list.length when assignedRoutinesProvider resolves with data',
+  group('activeRoutinesCountProvider', () {
+    // Bug QA 01: atleta sin PF con una rutina propia veía «0 activas» en el
+    // perfil y la rutina con el chip ACTIVA al entrar a Mis rutinas.
+    test('cuenta la rutina propia de un atleta sin PF', () async {
+      final c = _container(own: [_own(id: 'o1')]);
+      expect(await _resolvedCount(c), 1);
+    });
+
+    test('cuenta la rutina asignada por el coach', () async {
+      final c = _container(assigned: [_assigned(id: 'a1')]);
+      expect(await _resolvedCount(c), 1);
+    });
+
+    test('suma asignadas y propias: es la misma lista que Mis rutinas',
         () async {
-      final routines = [
-        _routine(id: 'r1', name: 'Plan A'),
-        _routine(id: 'r2', name: 'Plan B'),
-      ];
-
-      final container = ProviderContainer(
-        overrides: [
-          assignedRoutinesProvider(_myUid).overrideWith(
-            (_) async => routines,
-          ),
-        ],
+      final c = _container(
+        assigned: [_assigned(id: 'a1')],
+        own: [_own(id: 'o1'), _own(id: 'o2')],
       );
-      addTearDown(container.dispose);
-
-      // Trigger the future to resolve.
-      await container.read(assignedRoutinesProvider(_myUid).future);
-
-      final count = container.read(assignedRoutinesCountProvider(_myUid));
-      expect(count, equals(2));
+      final count = await _resolvedCount(c);
+      final entries = await c.read(unifiedRoutinesProvider(_myUid).future);
+      expect(count, 3);
+      expect(count, entries.length);
     });
 
-    // SCENARIO-519: returns 0 during loading state
-    test('SCENARIO-519: returns 0 during loading state', () {
-      // Use a never-completing Future to stay in loading state.
-      final container = ProviderContainer(
+    test('devuelve 0 mientras carga', () {
+      final c = ProviderContainer(
         overrides: [
           assignedRoutinesProvider(_myUid).overrideWith(
-            (_) => Future<List<Routine>>(() async {
-              await Future<void>.delayed(const Duration(seconds: 60));
-              return [];
-            }),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      // Read BEFORE the future completes → loading state → count = 0.
-      final count = container.read(assignedRoutinesCountProvider(_myUid));
-      expect(count, equals(0));
-    });
-
-    // error → 0
-    test('returns 0 on error from assignedRoutinesProvider', () async {
-      final container = ProviderContainer(
-        overrides: [
-          assignedRoutinesProvider(_myUid).overrideWith(
-            (_) => Future<List<Routine>>.error(
-              Exception('Firestore unavailable'),
+            (_) => Future<List<Routine>>.delayed(
+              const Duration(seconds: 60),
+              () => const [],
             ),
           ),
+          userCreatedRoutinesProvider(_myUid)
+              .overrideWith((_) => Stream.value(const [])),
+          userProfileProvider.overrideWith((_) => Stream.value(_profile())),
         ],
       );
-      addTearDown(container.dispose);
+      addTearDown(c.dispose);
+      expect(c.read(activeRoutinesCountProvider(_myUid)), 0);
+    });
 
-      // Let the error propagate.
+    test('devuelve 0 si la lista falla', () async {
+      final c = ProviderContainer(
+        overrides: [
+          assignedRoutinesProvider(_myUid).overrideWith(
+            (_) => Future<List<Routine>>.error(Exception('sin red')),
+          ),
+          userCreatedRoutinesProvider(_myUid)
+              .overrideWith((_) => Stream.value(const [])),
+          userProfileProvider.overrideWith((_) => Stream.value(_profile())),
+        ],
+      );
+      addTearDown(c.dispose);
+      c.listen(unifiedRoutinesProvider(_myUid), (_, __) {});
+      c.listen<int>(activeRoutinesCountProvider(_myUid), (_, __) {});
       await expectLater(
-        container.read(assignedRoutinesProvider(_myUid).future),
+        c.read(unifiedRoutinesProvider(_myUid).future),
         throwsA(isA<Exception>()),
       );
-
-      final count = container.read(assignedRoutinesCountProvider(_myUid));
-      expect(count, equals(0));
+      expect(c.read(activeRoutinesCountProvider(_myUid)), 0);
     });
   });
 }
