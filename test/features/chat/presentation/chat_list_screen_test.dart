@@ -524,6 +524,45 @@ void main() {
         expect(((await chatDoc())['hiddenBefore']! as Map).keys, ['aaa']);
       });
 
+      testWidgets(
+          '200 archivados desplegados: sólo se arman las filas visibles',
+          (tester) async {
+        // Codex (#1608): desplegar un archivo grande montaba todas las filas, y
+        // cada una abre el listener de su perfil.
+        var profileReads = 0;
+        await tester.pumpWidget(
+          _wrap(
+            const ChatListScreen(),
+            overrides: [
+              currentUidProvider.overrideWith((_) => 'aaa'),
+              chatsForCurrentUserProvider.overrideWith(
+                (ref) => Stream.value([
+                  for (var i = 0; i < 200; i++)
+                    _chat(
+                      chatId: 'aaa_u$i',
+                      members: ['aaa', 'u$i'],
+                      lastMessageText: 'hola',
+                      lastMessageAt: last,
+                      archivedAt: {'aaa': last.add(const Duration(minutes: 1))},
+                    ),
+                ]),
+              ),
+              userPublicProfileProvider.overrideWith((ref, uid) {
+                profileReads++;
+                return Stream.value(_pub(uid, 'Persona $uid'));
+              }),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(profileReads, 0);
+
+        await tester.tap(find.text('Archivados · 200'));
+        await tester.pumpAndSettle();
+        expect(find.text('Persona u0'), findsOneWidget);
+        expect(profileReads, lessThan(40));
+      });
+
       testWidgets('Archivados: plegado con el conteo, se despliega al tocar', (
         tester,
       ) async {
