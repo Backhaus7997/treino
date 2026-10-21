@@ -5,9 +5,9 @@
  *
  * Cada miembro estampa SU entrada en `archivedAt.{uid}` (archivar) o
  * `hiddenBefore.{uid}` (eliminar: oculta el historial previo sólo para él).
- * Nadie toca la entrada del otro, el valor va pineado a `request.time`, y el
- * lado que perdió la escritura (unfollow) igual puede sacarse el chat de la
- * bandeja. Ver `ownStampOk` en `match /chats/{chatId}`.
+ * Nadie toca la entrada del otro, el valor va pineado a `request.time`, y
+ * con un bloqueo de por medio (que corta la escritura) el chat igual se puede
+ * sacar de la bandeja. Ver `ownStampOk` en `match /chats/{chatId}`.
  *
  * Run via: bash scripts/test_rules.sh
  */
@@ -57,16 +57,15 @@ afterEach(async () => {
   await testEnv.clearFirestore();
 });
 
-/** Chat social alice↔bob. Con [bobFollowsAlice], alice puede escribir. */
-async function seed({ bobFollowsAlice = true, extra = {} } = {}) {
+/** Chat social alice↔bob. Con [blocked], bob bloqueó a alice: ella no escribe. */
+async function seed({ blocked = false, extra = {} } = {}) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    if (bobFollowsAlice) {
-      await db.collection('follows').doc(`${BOB}_${ALICE}`).set({
+    if (blocked) {
+      await db.collection('blocks').doc(`${BOB}_${ALICE}`).set({
         id: `${BOB}_${ALICE}`,
-        followerUid: BOB,
-        followeeUid: ALICE,
-        status: 'accepted',
+        blockerUid: BOB,
+        blockedUid: ALICE,
         members: [BOB, ALICE],
         createdAt: new Date(),
       });
@@ -95,9 +94,9 @@ describe('archivar (archivedAt.{uid})', () => {
       chatAs(ALICE).update({ [`archivedAt.${ALICE}`]: serverTimestamp() }));
   });
 
-  test('sin permiso de escritura (dejaron de seguirlo) igual archiva',
+  test('sin permiso de escritura (la bloquearon) igual archiva',
     async () => {
-      await seed({ bobFollowsAlice: false });
+      await seed({ blocked: true });
       await assertSucceeds(
         chatAs(ALICE).update({ [`archivedAt.${ALICE}`]: serverTimestamp() }));
     });
@@ -142,8 +141,8 @@ describe('eliminar (hiddenBefore.{uid})', () => {
       chatAs(BOB).update({ [`hiddenBefore.${BOB}`]: serverTimestamp() }));
   });
 
-  test('sin permiso de escritura igual lo elimina para él', async () => {
-    await seed({ bobFollowsAlice: false });
+  test('sin permiso de escritura (la bloquearon) igual lo elimina', async () => {
+    await seed({ blocked: true });
     await assertSucceeds(
       chatAs(ALICE).update({ [`hiddenBefore.${ALICE}`]: serverTimestamp() }));
   });
@@ -176,7 +175,7 @@ describe('eliminar (hiddenBefore.{uid})', () => {
 describe('no abre un costado', () => {
   test('el lado sin escritura no cuela un preview junto con el archivado',
     async () => {
-      await seed({ bobFollowsAlice: false });
+      await seed({ blocked: true });
       await assertFails(chatAs(ALICE).update({
         [`archivedAt.${ALICE}`]: serverTimestamp(),
         lastMessageText: 'spam',

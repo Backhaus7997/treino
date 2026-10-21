@@ -167,7 +167,7 @@ void main() {
             .overrideWith((_) => Stream.value(const [])),
         chatContactLinksAsTrainerProvider
             .overrideWith((_) => Stream.value(const [])),
-        chatContactFollowersProvider
+        chatContactFollowingProvider
             .overrideWith((_) => Stream.value(const [_other, 'r'])),
         chatsForCurrentUserProvider.overrideWith(
           (_) => Stream.value([
@@ -184,7 +184,7 @@ void main() {
       // El eliminado vuelve como contacto; el archivado NO (vive en Archivados).
       expect(
         c.read(chatContactsProvider).requireValue,
-        [const ChatContact(uid: _other, reason: ChatContactReason.follower)],
+        [const ChatContact(uid: _other, reason: ChatContactReason.following)],
       );
     });
   });

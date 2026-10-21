@@ -3088,10 +3088,10 @@ service cloud.firestore {
                     && ownStampOk('archivedAt', true)
                     && ownStampOk('hiddenBefore', false)
                     && (
-                         // Archivar/eliminar quedan del lado SIN permiso de
-                         // escritura, igual que `lastRead`: a quien dejaron de
-                         // seguir o bloquearon tiene que poder sacarse el chat
-                         // de encima. No cambian nada que el otro vea.
+                         // Archivar/eliminar quedan afuera de `chatWriterOk`,
+                         // igual que `lastRead`: un chat con un bloqueo de por
+                         // medio también tiene que poder sacarse de la bandeja.
+                         // No cambian nada que el otro vea.
                          request.resource.data.diff(resource.data)
                            .affectedKeys()
                            .hasOnly(['lastRead', 'archivedAt', 'hiddenBefore'])
