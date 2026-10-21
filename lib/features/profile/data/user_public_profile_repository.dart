@@ -249,10 +249,15 @@ class UserPublicProfileRepository {
     String metricField,
     List<DocumentSnapshot<Map<String, Object?>>> docs,
   ) {
-    if (metricField == 'rachaSemanas') return _decayedStreakBoard(docs);
+    // Las cuentas ocultas ([isDiscoverable]) se sacan después del `limit`: le
+    // pueden restar una fila al board, pero no hace falta un índice nuevo.
+    if (metricField == 'rachaSemanas') {
+      return _decayedStreakBoard(docs).where(isDiscoverable).toList();
+    }
 
     return docs
         .map((d) => UserPublicProfile.fromJson(d.data() ?? const {}))
+        .where(isDiscoverable)
         .toList();
   }
 
@@ -380,6 +385,10 @@ class UserPublicProfileRepository {
   /// el doble. No se recorta a [limit] a propósito: si "martin" llena las 20
   /// de la vieja con handles `martin_…`, recortar dejaría afuera justo a
   /// "Martín López", que es lo que este cambio vino a encontrar.
+  ///
+  /// Las cuentas internas ([isDiscoverable]) no salen nunca, por ninguna de
+  /// las dos consultas: el filtro va acá y no en el provider para que ningún
+  /// otro llamador se las olvide.
   Future<List<UserPublicProfile>> searchByDisplayName(
     String query, {
     int limit = 20,
@@ -403,10 +412,13 @@ class UserPublicProfileRepository {
     final seen = <String>{};
     final results = <UserPublicProfile>[];
     for (final doc in snaps.first.docs) {
-      if (seen.add(doc.id)) results.add(UserPublicProfile.fromJson(doc.data()));
+      final profile = UserPublicProfile.fromJson(doc.data());
+      if (!isDiscoverable(profile)) continue;
+      if (seen.add(doc.id)) results.add(profile);
     }
     for (final doc in snaps.skip(1).expand((s) => s.docs)) {
       final profile = UserPublicProfile.fromJson(doc.data());
+      if (!isDiscoverable(profile)) continue;
       if (!nameMatchesQuery(profile.displayName, queryTokens)) continue;
       if (seen.add(doc.id)) results.add(profile);
     }
