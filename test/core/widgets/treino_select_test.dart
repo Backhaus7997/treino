@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
@@ -326,5 +327,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(elegido, 'espalda');
     handle.dispose();
+  });
+
+  // El campo pinta `bgCard` encima del highlight de foco del InkWell: si el
+  // foco no llega al InputDecorator, navegar con Tab (Coach Hub) no muestra
+  // nada hasta que el selector ya está abierto.
+  testWidgets('el foco de teclado se ve antes de abrir', (tester) async {
+    _tamanio(tester, const Size(1280, 800));
+    await tester.pumpWidget(
+      _harness(
+        theme: AppTheme.light(),
+        child: TreinoSelectField<String?>(
+          value: 'pecho',
+          options: _opciones,
+          sheetTitle: 'Grupo muscular',
+          onChanged: (_) {},
+        ),
+      ),
+    );
+
+    bool enfocado() =>
+        tester.widget<InputDecorator>(find.byType(InputDecorator)).isFocused;
+    expect(enfocado(), isFalse);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    expect(enfocado(), isTrue);
+
+    final context = tester.element(find.byType(InputDecorator));
+    final borde = tester
+        .widget<InputDecorator>(find.byType(InputDecorator))
+        .decoration
+        .focusedBorder as OutlineInputBorder;
+    expect(borde.borderSide.color, AppPalette.of(context).accentText);
+    // Y nada se abrió: es sólo el indicador.
+    expect(find.text('Espalda'), findsNothing);
   });
 }

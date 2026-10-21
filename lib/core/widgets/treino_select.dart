@@ -157,6 +157,11 @@ class TreinoSelectField<T> extends StatefulWidget {
 class _TreinoSelectFieldState<T> extends State<TreinoSelectField<T>> {
   bool _open = false;
 
+  /// Foco de teclado (Tab en el Coach Hub). El `bgCard` del campo tapa el
+  /// highlight del InkWell, así que sin esto un campo enfocado se ve igual
+  /// que uno que no lo está: el foco se dibuja con el mismo borde de «abierto».
+  bool _focused = false;
+
   TreinoSelectOption<T>? get _current {
     for (final o in widget.options) {
       if (o.value == widget.value) return o;
@@ -233,11 +238,12 @@ class _TreinoSelectFieldState<T> extends State<TreinoSelectField<T>> {
           type: MaterialType.transparency,
           child: InkWell(
             onTap: enabled ? () => _abrir(anchorContext) : null,
+            onFocusChange: (f) => setState(() => _focused = f),
             borderRadius: BorderRadius.circular(AppRadius.sm),
             child: InputDecorator(
               decoration: decoration,
               isEmpty: current == null,
-              isFocused: _open,
+              isFocused: _open || _focused,
               child: current == null
                   ? null
                   : Text(
