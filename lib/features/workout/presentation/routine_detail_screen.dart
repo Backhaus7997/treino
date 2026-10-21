@@ -7,6 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_collapsing_top_bar.dart';
+import '../../../core/widgets/treino_floating_bottom_action.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -694,171 +695,153 @@ class _RoutineDetailContent extends ConsumerWidget {
         routine.isPremium &&
         ref.watch(catalogLockActiveProvider);
 
-    return Column(
-      children: [
-        Expanded(
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: _HeroStrip(
-                  routine: routine,
-                  badgeText:
-                      '${(routine.split ?? l10n.workoutSplitFallback).toUpperCase()} · ${l10n.routineDetailDayLabel(day.dayNumber)}',
-                  titleText: day.name.toUpperCase(),
-                ),
+    Widget buildScroll(double bottomPad) => CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: _HeroStrip(
+                routine: routine,
+                badgeText:
+                    '${(routine.split ?? l10n.workoutSplitFallback).toUpperCase()} · ${l10n.routineDetailDayLabel(day.dayNumber)}',
+                titleText: day.name.toUpperCase(),
               ),
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  0,
-                  20,
-                  // With the action pinned below, the Column already reserves
-                  // the bottom chrome — inseting the scroll on top of it would
-                  // double-count. Without it (read-only viewer, no bar) the
-                  // scroll still has to clear the shell's floating nav bar
-                  // itself.
-                  showStartAction ? 0 : MediaQuery.paddingOf(context).bottom,
-                ),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    // Plain-language summary (#648). Sits directly under the
-                    // hero because the hero is where the jargon lands: its
-                    // badge reads "PPL · DÍA 1" or "BRO SPLIT · DÍA 1", and 2
-                    // of 5 usability participants could not tell what those
-                    // meant. The term is not hidden — it is explained, right
-                    // where it is first read.
-                    //
-                    // Absent on routines with no summary (every athlete- and
-                    // trainer-authored one today), and the layout collapses
-                    // with it rather than reserving an empty gap.
-                    if (routine.summary != null &&
-                        routine.summary!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      _RoutineSummary(text: routine.summary!.trim()),
-                    ],
-                    const SizedBox(height: 20),
-                    _StatRow(
-                      tiles: [
-                        StatTile(
-                          label: l10n.routineDetailStatExercises,
-                          value: '${day.slots.length}',
-                        ),
-                        StatTile(
-                          label: l10n.routineDetailStatSets,
-                          value: '${_totalSets(day)}',
-                        ),
-                        StatTile(
-                          label: l10n.routineDetailStatMinutes,
-                          value: _minutesValue(day, selectedWeekIndex),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    // ── Periodized: week selector above the day selector ────
-                    if (isPeriodized) ...[
-                      _WeekSelector(
-                        numWeeks: routine.numWeeks,
-                        selectedIndex: viewedWeek,
-                        onSelect: onSelectWeek,
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    if (routine.days.length > 1) ...[
-                      _DaySelector(
-                        days: routine.days,
-                        selectedIndex: selectedDayIndex,
-                        onSelect: onSelectDay,
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    _SectionHeader(text: l10n.routineDetailStatExercises),
-                    const SizedBox(height: 12),
-                    if (day.slots.isEmpty)
-                      _EmptyState(
-                        message: l10n.routineDetailNoExercisesThisDay,
-                      )
-                    else
-                      // REQ-WPRES-020: filter by presence when periodized.
-                      // REQ-WPRES-028: zero present slots → show info message.
-                      ..._buildPresenceFilteredSection(
-                        viewedWeek,
-                        isPeriodized,
-                        emptyWeekMessage: l10n.routineDetailNoExercisesThisWeek,
-                      ),
-                    // Completion SIGNAL stays with the content while the
-                    // ACTION is pinned below (#641). That split is what the
-                    // periodized contract already asked for: completion only
-                    // ever changes the signal and the action's LABEL, never
-                    // the action's availability (AD-1/AD-2). Pinning the
-                    // banner too would nail ~56px of terminal-state chrome to
-                    // the bottom of a screen whose whole problem was vertical
-                    // budget.
-                    if (isPeriodized) ...[
-                      const SizedBox(height: 20),
-                      _PeriodizedCompletionSignal(
-                        routine: routine,
-                        day: day,
-                        viewedWeek: viewedWeek,
-                      ),
-                    ],
-                    // Community reputation — published trainer templates only.
-                    // It sits at the end on purpose: whoever opened the
-                    // template came to train, and the ratings are what they
-                    // check before (or after) deciding.
-                    if (routine.source == RoutineSource.trainerTemplate &&
-                        routine.visibility == RoutineVisibility.public) ...[
-                      const SizedBox(height: 20),
-                      TemplateRatingsSection(routine: routine),
-                    ],
-                    const SizedBox(height: 18),
-                  ]),
-                ),
-              ),
-            ],
-          ),
-        ),
-        // ── Pinned start action (#641) ──────────────────────────────────────
-        // 5/5 usability participants failed to reach EMPEZAR while it lived at
-        // the end of the exercise list, below a 320px hero and every slot of
-        // the day. It is the ONLY action of this screen, so reaching it must
-        // never depend on scrolling.
-        //
-        // Column + Expanded (not Stack + Positioned) on purpose: the scroll
-        // viewport ends exactly where the bar begins, so the bar occupies
-        // whatever the button naturally measures — including at large text
-        // scale, where it grows. A Stack would need that height hardcoded or
-        // measured over an extra frame, and either one silently clips the last
-        // exercise as soon as the user bumps their font size. Same shape
-        // AthleteDetailScreen already uses for its bottom actions.
-        if (showStartAction)
-          Padding(
-            // Bottom inset: in-shell, Scaffold publishes the floating nav
-            // bar's height through MediaQuery.padding.bottom (see
-            // `_ShellScaffold`, `extendBody: true`), so this lifts the action
-            // clear of it. In the out-of-shell coach context (#399/#410)
-            // `_immersive`'s SafeArea already consumed that padding and the
-            // same expression resolves to 0 — correct in BOTH mounts without
-            // branching on which one we are in.
-            padding: EdgeInsets.fromLTRB(
-              20,
-              12,
-              20,
-              12 + MediaQuery.paddingOf(context).bottom,
             ),
-            child: isPeriodized
-                ? _PeriodizedStartAction(
-                    routine: routine,
-                    day: day,
-                    viewedWeek: viewedWeek,
-                    paywallLocked: startLocked,
-                  )
-                : _StartSessionAction(
-                    routine: routine,
-                    day: day,
-                    paywallLocked: startLocked,
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                0,
+                20,
+                // Con la acción flotando, lo que mide su área (botón +
+                // degradé + barra del shell); sin acción (viewer de sólo
+                // lectura), el alto de la barra flotante del shell.
+                bottomPad,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // Plain-language summary (#648). Sits directly under the
+                  // hero because the hero is where the jargon lands: its
+                  // badge reads "PPL · DÍA 1" or "BRO SPLIT · DÍA 1", and 2
+                  // of 5 usability participants could not tell what those
+                  // meant. The term is not hidden — it is explained, right
+                  // where it is first read.
+                  //
+                  // Absent on routines with no summary (every athlete- and
+                  // trainer-authored one today), and the layout collapses
+                  // with it rather than reserving an empty gap.
+                  if (routine.summary != null &&
+                      routine.summary!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    _RoutineSummary(text: routine.summary!.trim()),
+                  ],
+                  const SizedBox(height: 20),
+                  _StatRow(
+                    tiles: [
+                      StatTile(
+                        label: l10n.routineDetailStatExercises,
+                        value: '${day.slots.length}',
+                      ),
+                      StatTile(
+                        label: l10n.routineDetailStatSets,
+                        value: '${_totalSets(day)}',
+                      ),
+                      StatTile(
+                        label: l10n.routineDetailStatMinutes,
+                        value: _minutesValue(day, selectedWeekIndex),
+                      ),
+                    ],
                   ),
-          ),
-      ],
+                  const SizedBox(height: 18),
+                  // ── Periodized: week selector above the day selector ────
+                  if (isPeriodized) ...[
+                    _WeekSelector(
+                      numWeeks: routine.numWeeks,
+                      selectedIndex: viewedWeek,
+                      onSelect: onSelectWeek,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (routine.days.length > 1) ...[
+                    _DaySelector(
+                      days: routine.days,
+                      selectedIndex: selectedDayIndex,
+                      onSelect: onSelectDay,
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                  _SectionHeader(text: l10n.routineDetailStatExercises),
+                  const SizedBox(height: 12),
+                  if (day.slots.isEmpty)
+                    _EmptyState(
+                      message: l10n.routineDetailNoExercisesThisDay,
+                    )
+                  else
+                    // REQ-WPRES-020: filter by presence when periodized.
+                    // REQ-WPRES-028: zero present slots → show info message.
+                    ..._buildPresenceFilteredSection(
+                      viewedWeek,
+                      isPeriodized,
+                      emptyWeekMessage: l10n.routineDetailNoExercisesThisWeek,
+                    ),
+                  // Completion SIGNAL stays with the content while the
+                  // ACTION is pinned below (#641). That split is what the
+                  // periodized contract already asked for: completion only
+                  // ever changes the signal and the action's LABEL, never
+                  // the action's availability (AD-1/AD-2). Pinning the
+                  // banner too would nail ~56px of terminal-state chrome to
+                  // the bottom of a screen whose whole problem was vertical
+                  // budget.
+                  if (isPeriodized) ...[
+                    const SizedBox(height: 20),
+                    _PeriodizedCompletionSignal(
+                      routine: routine,
+                      day: day,
+                      viewedWeek: viewedWeek,
+                    ),
+                  ],
+                  // Community reputation — published trainer templates only.
+                  // It sits at the end on purpose: whoever opened the
+                  // template came to train, and the ratings are what they
+                  // check before (or after) deciding.
+                  if (routine.source == RoutineSource.trainerTemplate &&
+                      routine.visibility == RoutineVisibility.public) ...[
+                    const SizedBox(height: 20),
+                    TemplateRatingsSection(routine: routine),
+                  ],
+                  const SizedBox(height: 18),
+                ]),
+              ),
+            ),
+          ],
+        );
+
+    if (!showStartAction) {
+      return buildScroll(MediaQuery.paddingOf(context).bottom);
+    }
+
+    // ── Acción de empezar, siempre a la vista (#641) ─────────────────────
+    // 5/5 participantes de las pruebas de usabilidad no llegaban a EMPEZAR
+    // cuando vivía al final de la lista, debajo de un hero de 320px y de
+    // todos los ejercicios del día. Es la ÚNICA acción de la pantalla, así que
+    // llegar a ella nunca puede depender de scrollear.
+    //
+    // Flota sobre la lista (TreinoFloatingBottomAction) en vez de partir la
+    // pantalla con un Column: la lista corre por debajo y se desvanece contra
+    // el botón. El final del scroll reserva el alto MEDIDO del área de la
+    // acción, así que con texto grande —donde el botón crece— el último
+    // ejercicio sigue quedando por encima.
+    return TreinoFloatingBottomAction(
+      body: (_, reserved) => buildScroll(reserved),
+      action: isPeriodized
+          ? _PeriodizedStartAction(
+              routine: routine,
+              day: day,
+              viewedWeek: viewedWeek,
+              paywallLocked: startLocked,
+            )
+          : _StartSessionAction(
+              routine: routine,
+              day: day,
+              paywallLocked: startLocked,
+            ),
     );
   }
 }
