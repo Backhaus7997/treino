@@ -160,6 +160,37 @@ void main() {
       expect(headerY, lessThan(contactY));
     });
 
+    testWidgets(
+        '200 contactos: sólo se piden los perfiles de las filas visibles',
+        (tester) async {
+      // Cada fila escucha su perfil público. Con una lista eager se abría un
+      // listener por contacto al entrar a la pantalla (Codex, #1607).
+      var profileReads = 0;
+      await tester.pumpWidget(
+        _wrap(
+          const ChatListScreen(),
+          contacts: AsyncData([
+            for (var i = 0; i < 200; i++)
+              ChatContact(uid: 'u$i', reason: ChatContactReason.following),
+          ]),
+          overrides: [
+            currentUidProvider.overrideWith((_) => 'aaa'),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream.value(const <Chat>[]),
+            ),
+            userPublicProfileProvider.overrideWith((ref, uid) {
+              profileReads++;
+              return Stream.value(_pub(uid, 'Persona $uid'));
+            }),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Persona u0'), findsOneWidget);
+      expect(profileReads, lessThan(40));
+    });
+
     testWidgets('sin chats y contactos cargando: no afirma el estado vacío', (
       tester,
     ) async {

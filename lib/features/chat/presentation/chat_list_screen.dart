@@ -102,30 +102,52 @@ class ChatListScreen extends ConsumerWidget {
                 }
                 if (contacts.isEmpty) return const _EmptyState();
               }
-              return ListView(
+              // Lista PLANA de entradas con un builder: sólo se montan las
+              // filas visibles. Cada fila escucha su perfil público, así que
+              // armarlas todas de una abría un listener por seguido y por
+              // chat al entrar a la pantalla.
+              final entries = <_Entry>[
+                for (final chat in chats) _ChatEntry(chat),
+                if (contacts.isNotEmpty) ...[
+                  _HeaderEntry(l10n.chatContactsSectionTitle),
+                  for (final contact in contacts) _ContactEntry(contact),
+                ] else if (contactsAsync.hasError)
+                  _NoticeEntry(l10n.chatContactsError),
+              ];
+              return ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
-                  for (var i = 0; i < chats.length; i++) ...[
-                    if (i > 0)
-                      Divider(height: 1, color: palette.border, indent: 76),
-                    _ChatRow(chat: chats[i], currentUid: currentUid ?? ''),
-                  ],
-                  if (contacts.isNotEmpty) ...[
-                    _SectionHeader(label: l10n.chatContactsSectionTitle),
-                    for (var i = 0; i < contacts.length; i++) ...[
-                      if (i > 0)
-                        Divider(height: 1, color: palette.border, indent: 76),
-                      _ContactRow(contact: contacts[i]),
-                    ],
-                  ] else if (contactsAsync.hasError)
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(
-                        l10n.chatContactsError,
-                        style: TextStyle(color: palette.textMuted),
+                itemCount: entries.length,
+                itemBuilder: (_, i) {
+                  final entry = entries[i];
+                  // Divisor entre filas consecutivas del mismo tipo, igual
+                  // que el `separatorBuilder` de antes.
+                  final divided = i > 0 &&
+                      entries[i - 1].runtimeType == entry.runtimeType &&
+                      entry is! _HeaderEntry;
+                  final Widget row = switch (entry) {
+                    _ChatEntry(:final chat) =>
+                      _ChatRow(chat: chat, currentUid: currentUid ?? ''),
+                    _ContactEntry(:final contact) =>
+                      _ContactRow(contact: contact),
+                    _HeaderEntry(:final label) => _SectionHeader(label: label),
+                    _NoticeEntry(:final text) => Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text(
+                          text,
+                          style: TextStyle(color: palette.textMuted),
+                        ),
                       ),
-                    ),
-                ],
+                  };
+                  if (!divided) return row;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Divider(height: 1, color: palette.border, indent: 76),
+                      row,
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -136,6 +158,31 @@ class ChatListScreen extends ConsumerWidget {
 }
 
 // ── Private widgets ────────────────────────────────────────────────────────
+
+/// Una fila de la lista plana de [ChatListScreen].
+sealed class _Entry {
+  const _Entry();
+}
+
+final class _ChatEntry extends _Entry {
+  const _ChatEntry(this.chat);
+  final Chat chat;
+}
+
+final class _ContactEntry extends _Entry {
+  const _ContactEntry(this.contact);
+  final ChatContact contact;
+}
+
+final class _HeaderEntry extends _Entry {
+  const _HeaderEntry(this.label);
+  final String label;
+}
+
+final class _NoticeEntry extends _Entry {
+  const _NoticeEntry(this.text);
+  final String text;
+}
 
 class _ChatRow extends ConsumerWidget {
   const _ChatRow({required this.chat, required this.currentUid});
