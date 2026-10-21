@@ -3594,10 +3594,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                               TextField(
                                 key: const Key('editor_name_field'),
                                 controller: _nameController,
-                                style: GoogleFonts.barlow(
-                                  color: palette.textPrimary,
-                                  fontSize: 13,
-                                ),
+                                style: _editorFieldTextStyle(palette),
                                 decoration: _inputDecoration(
                                   palette,
                                   hint: _isTrainerMode
@@ -3623,10 +3620,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                 TextField(
                                   key: const Key('editor_split_field'),
                                   controller: _splitController,
-                                  style: GoogleFonts.barlow(
-                                    color: palette.textPrimary,
-                                    fontSize: 13,
-                                  ),
+                                  style: _editorFieldTextStyle(palette),
                                   decoration: _inputDecoration(
                                     palette,
                                     hint: l10n.routineEditorSplitHint,
@@ -3827,27 +3821,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     }
   }
 
-  InputDecoration _inputDecoration(AppPalette palette, {String? hint}) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
-      filled: true,
-      fillColor: palette.bgCard,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: palette.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: palette.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: palette.accent),
-      ),
-    );
-  }
+  InputDecoration _inputDecoration(AppPalette palette, {String? hint}) =>
+      _editorFieldDecoration(palette, hint: hint);
 }
 
 // ── Week tab bar ──────────────────────────────────────────────────────────────
@@ -4338,11 +4313,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   // Reads/writes widget.day.expanded so the collapse survives the ListView
   // recycling the tile off-screen.
 
-  /// True while the inline TextField is replacing the Text label. Local to the
-  /// tile — does NOT survive the tile being recycled off-screen by the
-  /// ListView (acceptable: the only state that would be lost is "user mid-
-  /// typing while scrolling away", which is not a real flow).
-  bool _editingName = false;
+  /// El campo NOMBRE DEL DÍA, siempre visible. Guarda en cada tecla —la
+  /// pestaña se actualiza mientras escribís— y al perder el foco normaliza:
+  /// vacío vuelve a «Día N» y los espacios de los bordes se van.
   late final TextEditingController _nameController;
   late final FocusNode _nameFocus;
 
@@ -4351,22 +4324,19 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     super.initState();
     _nameController = TextEditingController(text: widget.day.name);
     _nameFocus = FocusNode();
-    // Commit on blur: matches Hevy-style editors where tap-elsewhere persists
-    // the edit (instead of discarding it like a modal Cancel).
     _nameFocus.addListener(() {
-      if (!_nameFocus.hasFocus && _editingName) {
-        _commitName();
-      }
+      if (!_nameFocus.hasFocus) _normalizarNombre();
     });
   }
 
   @override
   void didUpdateWidget(_DayExpansionTile oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Parent re-numbered the day (e.g. another day was deleted) and pushed a
-    // fresh default name. Sync the controller so the inline TextField reflects
-    // the new label next time the user taps edit.
-    if (!_editingName && widget.day.name != _nameController.text) {
+    // El padre renumeró el día (se borró otro) o cambió de pestaña: el campo
+    // tiene que mostrar el nombre nuevo. Con foco NO: vaciar el campo mientras
+    // escribís hace que el padre ponga «Día N», y sincronizar acá te lo
+    // escribiría encima en la tecla siguiente.
+    if (!_nameFocus.hasFocus && widget.day.name != _nameController.text) {
       _nameController.text = widget.day.name;
     }
   }
@@ -4384,23 +4354,13 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     super.dispose();
   }
 
-  void _startEditing() {
-    _nameController.text = widget.day.name;
-    setState(() => _editingName = true);
-    // Schedule focus AFTER the TextField is in the tree.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _nameFocus.requestFocus();
-      _nameController.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _nameController.text.length,
-      );
-    });
-  }
-
-  void _commitName() {
-    if (!_editingName) return;
+  /// Al soltar el foco el campo pasa a mostrar lo que quedó guardado: el
+  /// padre ya recortó los espacios y repuso «Día N» si quedó vacío.
+  void _normalizarNombre() {
     widget.onNameChanged(_nameController.text);
-    setState(() => _editingName = false);
+    if (_nameController.text != widget.day.name) {
+      _nameController.text = widget.day.name;
+    }
   }
 
   /// The nearest slot BEFORE [slotIndex] that can act as a copy source: it must
@@ -4899,89 +4859,40 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           // Fila de acciones del día: el atajo a la izquierda, y
           // renombrar/borrar a la derecha, donde antes había una
           // cabecera entera para lo mismo.
-          if (_editingName)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('day_name_editing_field'),
-                      controller: _nameController,
-                      focusNode: _nameFocus,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _commitName(),
-                      onTap: () {},
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        color: palette.textPrimary,
-                      ),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                        border: InputBorder.none,
-                        hintText:
-                            l10n.routineEditorDayName(widget.day.dayNumber),
-                        hintStyle: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    key: Key('day_name_commit_button_${widget.day.dayNumber}'),
-                    icon: Icon(TreinoIcon.check,
-                        size: 18, color: palette.accentText),
-                    tooltip: l10n.routineEditorEditDayNameA11y,
-                    onPressed: _commitName,
-                    constraints:
-                        const BoxConstraints(minWidth: 48, minHeight: 48),
-                    padding: EdgeInsets.zero,
-                  ),
-                ],
-              ),
-            )
-          else
-            Row(
-              children: [
-                if (widget.onQuickSearch != null && widget.onQuickAdd != null)
-                  QuickEntryToggle(
-                    active: _quickEntryOpen,
-                    onTap: () => setState(() {
-                      if (_quickEntryOpen) {
-                        _cerrarEntradaRapida();
-                      } else {
-                        _quickEntryOpen = true;
-                      }
-                    }),
-                  ),
-                const Spacer(),
+          _DayNameField(
+            dayNumber: widget.day.dayNumber,
+            controller: _nameController,
+            focusNode: _nameFocus,
+            palette: palette,
+            onChanged: widget.onNameChanged,
+          ),
+          Row(
+            children: [
+              if (widget.onQuickSearch != null && widget.onQuickAdd != null)
+                QuickEntryToggle(
+                  active: _quickEntryOpen,
+                  onTap: () => setState(() {
+                    if (_quickEntryOpen) {
+                      _cerrarEntradaRapida();
+                    } else {
+                      _quickEntryOpen = true;
+                    }
+                  }),
+                ),
+              const Spacer(),
+              if (widget.onRemoveDay != null)
                 IconButton(
-                  key: Key('day_name_edit_button_${widget.day.dayNumber}'),
-                  icon:
-                      Icon(TreinoIcon.edit, size: 16, color: palette.textMuted),
-                  tooltip: l10n.routineEditorEditDayNameA11y,
-                  onPressed: _startEditing,
+                  key: Key('day_remove_button_${widget.day.dayNumber}'),
+                  icon: Icon(TreinoIcon.trash,
+                      size: 18, color: palette.textMuted),
+                  tooltip: l10n.routineEditorDeleteDayA11y,
+                  onPressed: widget.onRemoveDay,
                   constraints:
                       const BoxConstraints(minWidth: 48, minHeight: 48),
                   padding: EdgeInsets.zero,
                 ),
-                if (widget.onRemoveDay != null)
-                  IconButton(
-                    key: Key('day_remove_button_${widget.day.dayNumber}'),
-                    icon: Icon(TreinoIcon.trash,
-                        size: 18, color: palette.textMuted),
-                    tooltip: l10n.routineEditorDeleteDayA11y,
-                    onPressed: widget.onRemoveDay,
-                    constraints:
-                        const BoxConstraints(minWidth: 48, minHeight: 48),
-                    padding: EdgeInsets.zero,
-                  ),
-              ],
-            ),
+            ],
+          ),
           if (widget.onQuickSearch != null && widget.onQuickAdd != null) ...[
             if (_quickEntryOpen) ...[
               const SizedBox(height: AppSpacing.s8),
@@ -7195,6 +7106,97 @@ class RoutineEditorTestBridge {
 }
 
 // ── Section label ─────────────────────────────────────────────────────────────
+
+/// Texto de los campos del formulario del editor (NOMBRE, SPLIT, NOMBRE DEL
+/// DÍA). Compartido para que no se separen.
+TextStyle _editorFieldTextStyle(AppPalette palette) => GoogleFonts.barlow(
+      color: palette.textPrimary,
+      fontSize: 13,
+    );
+
+/// Decoración de los campos del formulario del editor. Vive afuera del State
+/// de la pantalla para que [_DayNameField], que está en otro widget, use la
+/// misma y no una copia que se desincronice.
+InputDecoration _editorFieldDecoration(AppPalette palette, {String? hint}) {
+  return InputDecoration(
+    hintText: hint,
+    hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+    filled: true,
+    fillColor: palette.bgCard,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: palette.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: palette.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: palette.accent),
+    ),
+  );
+}
+
+/// Campo NOMBRE DEL DÍA del editor de rutina, siempre visible.
+///
+/// Hasta la revisión en device del 21/10 renombrar era un modo aparte: lápiz
+/// en la fila de acciones → aparecía un campo → check para confirmar. El
+/// lápiz no decía que renombraba el día y el check se leía como un ícono
+/// roto, así que el nombre del día pasó a ser un campo más del formulario,
+/// con la decoración EXACTA del campo NOMBRE de la rutina
+/// ([_editorFieldDecoration]): mismo alto, fondo, borde, tipografía y
+/// placeholder.
+///
+/// No contradice la revisión del 31/08, que sacó la cabecera del día: aquella
+/// repetía el nombre como TÍTULO de solo lectura a 200 px de la pestaña. Esto
+/// es el único lugar donde se edita; la pestaña sigue siendo la única que lo
+/// muestra.
+class _DayNameField extends StatelessWidget {
+  const _DayNameField({
+    required this.dayNumber,
+    required this.controller,
+    required this.focusNode,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final int dayNumber;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final AppPalette palette;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionLabel(
+          label: l10n.routineEditorDayNameLabel,
+          palette: palette,
+        ),
+        const SizedBox(height: AppSpacing.hairline),
+        TextField(
+          key: const Key('day_name_field'),
+          controller: controller,
+          focusNode: focusNode,
+          maxLines: 1,
+          textCapitalization: TextCapitalization.sentences,
+          textInputAction: TextInputAction.done,
+          style: _editorFieldTextStyle(palette),
+          decoration: _editorFieldDecoration(
+            palette,
+            hint: l10n.routineEditorDayName(dayNumber),
+          ),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+}
 
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel({required this.label, required this.palette});

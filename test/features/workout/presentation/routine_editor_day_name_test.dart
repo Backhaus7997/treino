@@ -1,6 +1,9 @@
-// Widget tests for the inline day-name editor introduced 2026-06-29.
-// Decisión A1 + 2A + E2: tap on the pencil icon turns the day title into a
-// TextField; an empty commit restores the localized "Día N" default.
+// Campo NOMBRE DEL DÍA del editor de rutina.
+//
+// Hasta la revisión en device del 21/10 renombrar era un modo aparte (lápiz →
+// campo → check). Ahora es un campo más del formulario, siempre visible, con la
+// decoración del campo NOMBRE de la rutina; guarda en cada tecla y al perder el
+// foco normaliza. Vacío (o sólo espacios) vuelve a «Día N» (decisión 2A).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,25 +85,28 @@ List<Override> _overrides({String uid = 'athlete-1'}) {
   ];
 }
 
-const _firstDayPencilKey = Key('day_name_edit_button_1');
-const _editingFieldKey = Key('day_name_editing_field');
+const _dayFieldKey = Key('day_name_field');
 
 /// Nombre del día, leído de la PESTAÑA.
 ///
-/// Hasta la revisión en device del 31/08 el nombre aparecía dos veces: en la
-/// pestaña y en una cabecera 200 px más abajo. La cabecera se fue —entre el
-/// borde, el padding y el divisor se comía ~70 px en la única pantalla donde
-/// el alto es el recurso escaso—, así que ahora hay una sola fuente.
-///
 /// Se lee del widget y no con `find.text` porque la pestaña trunca a 15
 /// caracteres para mostrar: `labels` tiene el nombre entero.
-String _nombreEnCabecera(WidgetTester tester) =>
+String _nombreEnPestana(WidgetTester tester) =>
     tester.widget<DayTabBar>(find.byType(DayTabBar)).labels.first;
 
+TextField _campoDelDia(WidgetTester tester) =>
+    tester.widget<TextField>(find.byKey(_dayFieldKey));
+
+Future<void> _soltarFoco(WidgetTester tester) async {
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  group('Editable day name (decisión A1 + 2A + E2)', () {
+  group('Campo NOMBRE DEL DÍA', () {
     testWidgets(
-      'E2: each day card renders a pencil IconButton next to the title',
+      'está siempre visible, con su label y el nombre actual, sin lápiz ni '
+      'check',
       (tester) async {
         await _pumpEditor(
           tester,
@@ -108,15 +114,16 @@ void main() {
           overrides: _overrides(),
         );
 
-        // Default editor opens with at least Día 1; the pencil signals
-        // editability per day (decisión E2).
-        expect(find.byKey(const Key('day_name_edit_button_1')), findsOneWidget);
+        expect(find.text('NOMBRE DEL DÍA'), findsOneWidget);
+        expect(_campoDelDia(tester).controller!.text, 'Día 1');
+        // El modo aparte se fue entero: ni el lápiz ni el check existen.
+        expect(find.byKey(const Key('day_name_edit_button_1')), findsNothing);
+        expect(find.byKey(const Key('day_name_commit_button_1')), findsNothing);
       },
     );
 
     testWidgets(
-      'A1: tap pencil swaps the Text for an inline TextField with the current '
-      'name pre-selected',
+      'usa la misma decoración y tipografía que el campo NOMBRE de la rutina',
       (tester) async {
         await _pumpEditor(
           tester,
@@ -124,26 +131,35 @@ void main() {
           overrides: _overrides(),
         );
 
-        // Pre-edit: Text "Día 1" present, TextField absent.
-        expect(_nombreEnCabecera(tester), 'Día 1');
-        expect(find.byKey(_editingFieldKey), findsNothing);
+        final nombre = tester.widget<TextField>(
+          find.byKey(const Key('editor_name_field')),
+        );
+        final dia = _campoDelDia(tester);
 
-        await tester.tap(find.byKey(_firstDayPencilKey));
-        await tester.pumpAndSettle();
-
-        // Post-edit: TextField present, Text label gone (only the editing
-        // field stays).
-        expect(find.byKey(_editingFieldKey), findsOneWidget);
-        final field = tester.widget<TextField>(find.byKey(_editingFieldKey));
-        expect(field.controller!.text, 'Día 1');
-        // The pencil itself hides while editing — UI signals "you are inside".
-        expect(find.byKey(_firstDayPencilKey), findsNothing);
+        expect(dia.style, nombre.style);
+        expect(dia.decoration!.fillColor, nombre.decoration!.fillColor);
+        expect(dia.decoration!.filled, nombre.decoration!.filled);
+        expect(
+          dia.decoration!.contentPadding,
+          nombre.decoration!.contentPadding,
+        );
+        expect(dia.decoration!.hintStyle, nombre.decoration!.hintStyle);
+        expect(dia.decoration!.enabledBorder, nombre.decoration!.enabledBorder);
+        expect(dia.decoration!.focusedBorder, nombre.decoration!.focusedBorder);
+        // Y miden lo mismo en pantalla.
+        expect(
+          tester.getSize(find.byKey(_dayFieldKey)).height,
+          tester.getSize(find.byKey(const Key('editor_name_field'))).height,
+        );
+        expect(
+          tester.getSize(find.byKey(_dayFieldKey)).height,
+          greaterThanOrEqualTo(44),
+        );
       },
     );
 
     testWidgets(
-      'A1: editing + onSubmitted commits the new custom name and reverts the '
-      'TextField to a static Text label',
+      'guarda en cada tecla: la pestaña cambia mientras escribís',
       (tester) async {
         await _pumpEditor(
           tester,
@@ -151,72 +167,97 @@ void main() {
           overrides: _overrides(),
         );
 
-        await tester.tap(find.byKey(_firstDayPencilKey));
+        await tester.enterText(find.byKey(_dayFieldKey), 'Pecho');
         await tester.pumpAndSettle();
+
+        expect(_nombreEnPestana(tester), 'Pecho');
+      },
+    );
+
+    testWidgets(
+      'vaciar el campo mientras escribís no te repone «Día 1» encima',
+      (tester) async {
+        await _pumpEditor(
+          tester,
+          mode: const SelfCreating(),
+          overrides: _overrides(),
+        );
+
+        await tester.enterText(find.byKey(_dayFieldKey), '');
+        await tester.pumpAndSettle();
+        // El padre ya guardó el default, pero el campo con foco sigue vacío.
+        expect(_campoDelDia(tester).controller!.text, '');
+
+        await tester.enterText(find.byKey(_dayFieldKey), 'Piernas');
+        await tester.pumpAndSettle();
+        expect(_nombreEnPestana(tester), 'Piernas');
+        expect(_campoDelDia(tester).controller!.text, 'Piernas');
+      },
+    );
+
+    testWidgets(
+      '2A: vacío al soltar el foco vuelve a «Día 1» en la pestaña y en el '
+      'campo',
+      (tester) async {
+        await _pumpEditor(
+          tester,
+          mode: const SelfCreating(),
+          overrides: _overrides(),
+        );
+
+        await tester.enterText(find.byKey(_dayFieldKey), 'PUSH');
+        await tester.pumpAndSettle();
+        expect(_nombreEnPestana(tester), 'PUSH');
+
+        await tester.enterText(find.byKey(_dayFieldKey), '');
+        await _soltarFoco(tester);
+
+        expect(_nombreEnPestana(tester), 'Día 1');
+        expect(_campoDelDia(tester).controller!.text, 'Día 1');
+      },
+    );
+
+    testWidgets(
+      '2A: sólo espacios cuenta como vacío, y los bordes se recortan',
+      (tester) async {
+        await _pumpEditor(
+          tester,
+          mode: const SelfCreating(),
+          overrides: _overrides(),
+        );
+
+        await tester.enterText(find.byKey(_dayFieldKey), '   ');
+        await _soltarFoco(tester);
+        expect(_nombreEnPestana(tester), 'Día 1');
+
+        await tester.enterText(find.byKey(_dayFieldKey), '  Espalda  ');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(_nombreEnPestana(tester), 'Espalda');
+        expect(_campoDelDia(tester).controller!.text, 'Espalda');
+      },
+    );
+
+    testWidgets(
+      'un nombre largo no desborda en una pantalla chica',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        await _pumpEditor(
+          tester,
+          mode: const SelfCreating(),
+          overrides: _overrides(),
+        );
 
         await tester.enterText(
-          find.byKey(_editingFieldKey),
-          'Día 1 - Pecho',
+          find.byKey(_dayFieldKey),
+          'Tren superior con énfasis en espalda y bíceps',
         );
-        await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
 
-        // New custom label visible.
-        expect(_nombreEnCabecera(tester), 'Día 1 - Pecho');
-        // Field is gone, pencil is back.
-        expect(find.byKey(_editingFieldKey), findsNothing);
-        expect(find.byKey(_firstDayPencilKey), findsOneWidget);
-      },
-    );
-
-    testWidgets(
-      '2A: committing an empty string restores the localized "Día N" default '
-      '(no error, no friction)',
-      (tester) async {
-        await _pumpEditor(
-          tester,
-          mode: const SelfCreating(),
-          overrides: _overrides(),
-        );
-
-        await tester.tap(find.byKey(_firstDayPencilKey));
-        await tester.pumpAndSettle();
-
-        // Set a custom name first.
-        await tester.enterText(find.byKey(_editingFieldKey), 'PUSH');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
-        expect(_nombreEnCabecera(tester), 'PUSH');
-
-        // Now wipe it.
-        await tester.tap(find.byKey(_firstDayPencilKey));
-        await tester.pumpAndSettle();
-        await tester.enterText(find.byKey(_editingFieldKey), '');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
-
-        // Localized default is back, no PUSH leftover.
-        expect(_nombreEnCabecera(tester), 'Día 1');
-        expect(find.text('PUSH'), findsNothing);
-      },
-    );
-
-    testWidgets(
-      '2A: whitespace-only commit is treated like empty and restores default',
-      (tester) async {
-        await _pumpEditor(
-          tester,
-          mode: const SelfCreating(),
-          overrides: _overrides(),
-        );
-
-        await tester.tap(find.byKey(_firstDayPencilKey));
-        await tester.pumpAndSettle();
-        await tester.enterText(find.byKey(_editingFieldKey), '   ');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
-
-        expect(_nombreEnCabecera(tester), 'Día 1');
+        expect(tester.takeException(), isNull);
       },
     );
   });

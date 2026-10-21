@@ -1094,6 +1094,7 @@
   "sessionPlayerRemoveSetA11y": "Remove set",
   "routineEditorDeleteDayA11y": "Delete day",
   "routineEditorEditDayNameA11y": "",
+  "routineEditorDayNameLabel": "DAY NAME",
   "athleteDetailEditPlanA11y": "Edit plan",
   "athleteDetailDeletePlanA11y": "Delete plan",
   "coachMapDisabledOnlineA11y": "Map, unavailable in Online mode",
