@@ -306,5 +306,17 @@ void main() {
       expect(slot.sets, const [SetSpec(repsMin: 5, repsMax: 5, weightKg: 80)]);
       expect(slot.weeklySets[1], const [SetSpec(repsMin: 8, repsMax: 10)]);
     });
+
+    test('rango a medias: se completa con el otro extremo, nunca invertido',
+        () {
+      final slot = slotFrom([
+        const [SetSpec(repsMin: 8), SetSpec(repsMax: 12)],
+      ]);
+      expect(slot.sets, const [
+        SetSpec(repsMin: 8, repsMax: 8),
+        SetSpec(repsMin: 12, repsMax: 12),
+      ]);
+      expect([slot.targetRepsMin, slot.targetRepsMax], [8, 12]);
+    });
   });
 }

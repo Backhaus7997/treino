@@ -157,8 +157,10 @@ SetSpec _coerce(SetSpec s, ExerciseMode mode, {required bool range}) =>
     switch (mode) {
       ExerciseMode.reps when range => SetSpec(
           type: s.type,
-          repsMin: s.repsMin ?? s.reps,
-          repsMax: s.repsMax ?? s.reps,
+          // Un rango a medias ("8+") se completa con el otro extremo: nunca
+          // sale un rango invertido (máximo 0 con mínimo 8).
+          repsMin: s.repsMin ?? s.repsMax ?? s.reps,
+          repsMax: s.repsMax ?? s.repsMin ?? s.reps,
           weightKg: s.weightKg,
         ),
       ExerciseMode.reps =>
