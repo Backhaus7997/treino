@@ -87,7 +87,10 @@ class _PlanPdfImportUploadScreenState
     if (result is PdfImportSuccess) {
       // La subida se reemplaza por la vista previa: «atrás» desde ahí
       // vuelve a la ficha, no a un archivo ya procesado.
-      ref.read(periodizedImportProvider.notifier).state = result.draft;
+      // Atado al alumno de esta ruta: la vista previa no muestra el
+      // borrador de otro.
+      ref.read(periodizedImportProvider.notifier).state =
+          result.draft.forAthlete(widget.athleteId);
       context.pushReplacement(planPdfImportPreviewPath(widget.athleteId));
       return;
     }

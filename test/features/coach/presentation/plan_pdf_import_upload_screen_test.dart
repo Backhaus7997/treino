@@ -232,7 +232,10 @@ void main() {
     service.complete(PdfImportSuccess(draft: draft, quota: null, model: 'm'));
     await tester.pumpAndSettle();
 
-    expect(container.read(periodizedImportProvider), same(draft));
+    final stored = container.read(periodizedImportProvider)!;
+    expect(stored.plan, same(draft.plan));
+    // Atado al alumno de la ruta: la vista previa de otro no lo muestra.
+    expect(stored.athleteId, 'ath-1');
     expect(find.text('preview:ath-1'), findsOneWidget);
     // Reemplaza: atrás desde la vista previa vuelve a la ficha.
     await tester.binding.handlePopRoute();

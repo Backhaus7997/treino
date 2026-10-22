@@ -15,6 +15,7 @@ class PeriodizedImportDraft {
     required this.assignments,
     required this.suggestions,
     this.alternatives = const {},
+    this.athleteId,
   });
 
   /// Arma el borrador a partir del veredicto del matcher: lo exacto o por
@@ -61,6 +62,12 @@ class PeriodizedImportDraft {
   /// Excel.
   final Map<ExerciseKey, MatcherExercise> alternatives;
 
+  /// PDF: el alumno para el que se importó. La vista previa mobile vive en
+  /// una ruta por alumno y sólo muestra (y asigna) el borrador de ESE
+  /// alumno: un borrador de A abierto en la ruta de B no es de B. `null` en
+  /// el Excel del Coach Hub, que elige los alumnos al asignar.
+  final String? athleteId;
+
   bool isResolved(ExerciseKey key) => assignments.containsKey(key);
 
   /// Componentes que bloquean la asignación: con sugerencia pendiente o sin
@@ -88,6 +95,7 @@ class PeriodizedImportDraft {
       assignments: {...assignments, key: exercise},
       suggestions: {...suggestions}..remove(key),
       alternatives: {...alternatives}..remove(key),
+      athleteId: athleteId,
     );
   }
 
@@ -131,6 +139,7 @@ class PeriodizedImportDraft {
       suggestions: nextSuggestions,
       alternatives: {...alternatives}
         ..removeWhere((k, _) => next.containsKey(k)),
+      athleteId: athleteId,
     );
   }
 
@@ -141,5 +150,17 @@ class PeriodizedImportDraft {
         assignments: assignments,
         suggestions: suggestions,
         alternatives: alternatives,
+        athleteId: athleteId,
+      );
+
+  /// El mismo borrador, atado a [id].
+  PeriodizedImportDraft forAthlete(String id) => PeriodizedImportDraft(
+        plan: plan,
+        warnings: warnings,
+        name: name,
+        assignments: assignments,
+        suggestions: suggestions,
+        alternatives: alternatives,
+        athleteId: id,
       );
 }

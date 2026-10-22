@@ -172,6 +172,7 @@ void main() {
     WidgetTester tester,
     PeriodizedImportDraft draft, {
     CustomExerciseQuota quota = (limit: null, count: 0),
+    String? owner = kAthleteId,
   }) async {
     final router = GoRouter(
       initialLocation: '/coach/athlete/$kAthleteId',
@@ -196,7 +197,8 @@ void main() {
     );
     final container = ProviderContainer(overrides: [
       ...previewOverrides(routineRepo),
-      periodizedImportProvider.overrideWith((ref) => draft),
+      periodizedImportProvider.overrideWith(
+          (ref) => owner == null ? draft : draft.forAthlete(owner)),
       customExerciseRepositoryProvider.overrideWithValue(customRepo),
       customExerciseQuotaProvider.overrideWithValue(AsyncValue.data(quota)),
       customExercisesForTrainerStreamProvider(kTrainerUid)
@@ -549,6 +551,46 @@ void main() {
       expect(calls, 2);
       expect(created.single.name, 'Plan de fuerza');
       expect(find.text('FICHA'), findsOneWidget);
+    });
+  });
+
+  group('el borrador es de un alumno', () {
+    testWidgets('el de A abierto en la ruta de B no se muestra ni se asigna',
+        (tester) async {
+      final c = await pump(tester, _resolved(), owner: 'otro-alumno');
+
+      expect(find.byKey(const Key('pdf_import_assign')), findsNothing);
+      expect(find.text('Plan de Ana'), findsNothing);
+      expect(find.text('FICHA'), findsOneWidget);
+      verifyNever(() => routineRepo.createAssigned(any()));
+      // Y no queda colgado para la próxima vista previa.
+      expect(c.read(periodizedImportProvider), isNull);
+    });
+
+    testWidgets('sin alumno (el del Excel del Hub) tampoco', (tester) async {
+      await pump(tester, _resolved(), owner: null);
+      expect(find.byKey(const Key('pdf_import_assign')), findsNothing);
+      expect(find.text('FICHA'), findsOneWidget);
+    });
+
+    testWidgets('resolver a mano conserva el alumno del borrador',
+        (tester) async {
+      final c = await pump(tester, _draft());
+      await tester.tap(find.text('Confirmar').first);
+      await tester.pumpAndSettle();
+      expect(c.read(periodizedImportProvider)!.athleteId, kAthleteId);
+      expect(find.byKey(const Key('pdf_import_assign')), findsOneWidget);
+    });
+
+    testWidgets('si la ruta se cierra sin asignar, el borrador se descarta',
+        (tester) async {
+      final c = await pump(tester, _resolved());
+      GoRouter.of(tester.element(find.byKey(const Key('pdf_import_assign'))))
+          .go('/coach/athlete/$kAthleteId');
+      await tester.pumpAndSettle();
+
+      expect(find.text('FICHA'), findsOneWidget);
+      expect(c.read(periodizedImportProvider), isNull);
     });
   });
 }

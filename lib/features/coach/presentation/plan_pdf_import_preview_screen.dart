@@ -17,6 +17,7 @@ import '../../../l10n/app_l10n.dart';
 import '../../coach_hub/application/plan_import_preview_controller.dart';
 import '../../coach_hub/application/plan_import_providers.dart';
 import '../../coach_hub/data/exercise_matcher.dart';
+import '../../coach_hub/data/periodized_import_draft.dart';
 import '../../coach_hub/data/plan_pdf_import_service.dart'
     show kPdfPlanNameMaxLength;
 import '../../coach_hub/domain/periodized_plan.dart';
@@ -79,10 +80,30 @@ class _PlanPdfImportPreviewScreenState
   /// La moderación rechazó el nombre: se muestra en el campo, no abajo.
   String? _nameError;
 
+  /// Leído en [initState]: en [dispose] ya no se puede usar `ref`.
+  late final StateController<PeriodizedImportDraft?> _draftStore;
+
+  @override
+  void initState() {
+    super.initState();
+    _draftStore = ref.read(periodizedImportProvider.notifier);
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     _nameFocus.dispose();
+    // Se fue sin asignar ni descartar (la ruta se cerró por otro lado): el
+    // borrador no queda colgado para la próxima vista previa. Fuera del
+    // frame, porque modificar un provider mientras se desmonta el árbol no
+    // está permitido; y sólo si nadie lo reemplazó mientras tanto.
+    final store = _draftStore;
+    final left = store.mounted ? store.state : null;
+    if (!_leaving && left != null) {
+      Future.microtask(() {
+        if (store.mounted && identical(store.state, left)) store.state = null;
+      });
+    }
     super.dispose();
   }
 
@@ -218,7 +239,8 @@ class _PlanPdfImportPreviewScreenState
     final l10n = AppL10n.of(context);
     final draft = _controller.draft;
     final uid = ref.read(currentUidProvider);
-    if (draft == null || uid == null || uid.isEmpty) return;
+    if (draft == null || draft.athleteId != widget.athleteId) return;
+    if (uid == null || uid.isEmpty) return;
     setState(() {
       _saving = true;
       _error = null;
@@ -280,10 +302,13 @@ class _PlanPdfImportPreviewScreenState
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final draft = ref.watch(periodizedImportProvider);
+    final stored = ref.watch(periodizedImportProvider);
+    // Sólo el borrador de ESTE alumno: el de otro no se muestra ni se asigna.
+    final draft = stored?.athleteId == widget.athleteId ? stored : null;
 
     if (draft == null) {
-      // Entrada sin borrador (deep link, o se perdió): de vuelta a la ficha.
+      // Entrada sin borrador (deep link, o se perdió) o con el de otro
+      // alumno: de vuelta a la ficha.
       if (!_leaving) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && !_leaving) _back();
