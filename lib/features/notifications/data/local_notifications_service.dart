@@ -1,5 +1,8 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 /// Id del canal de Android por el que salen TODAS las notificaciones de TREINO.
 ///
@@ -29,6 +32,29 @@ const kCanalDeAvisos = 'treino_avisos';
 /// locale primario de la app, es menos malo que uno que depende de cuándo se
 /// creó.
 const kNombreDelCanal = 'Avisos de TREINO';
+
+/// Id de la notificación que dibuja [LocalNotificationsService.show].
+///
+/// Fijo a propósito: una nueva REEMPLAZA a la anterior en vez de apilar. Se
+/// nombra para que los ids de las otras notificaciones locales no choquen con
+/// él: reusar el 0 pisaría un aviso entrante que el usuario todavía no leyó.
+const kIdAvisoEntrante = 0;
+
+/// Id de la notificación AGENDADA que avisa que terminó el descanso (#1617).
+///
+/// Propio y distinto de [kIdAvisoEntrante]: agendar/cancelar el aviso del
+/// descanso no puede tocar un mensaje entrante, y al revés. Es también la
+/// clave para el tap: ver [LocalNotificationsService.agendar].
+const kIdFinDeDescanso = 1;
+
+/// Notificaciones cuyo tap sólo trae la app al frente, sin navegar a ningún
+/// lado.
+///
+/// `goDeepLink` manda a `/coach` cuando el payload viene vacío, y una
+/// notificación agendada no lleva payload. Para el aviso de fin de descanso eso
+/// sería sacar al atleta del player en plena sesión justo cuando vuelve a la
+/// serie.
+const _idsQueSoloAbrenLaApp = {kIdFinDeDescanso};
 
 /// Muestra notificaciones del SISTEMA operativo con la app en primer plano.
 ///
@@ -109,8 +135,10 @@ class LocalNotificationsService {
 
     await _plugin.initialize(
       settings: const InitializationSettings(android: android, iOS: darwin),
-      onDidReceiveNotificationResponse: (response) =>
-          _onTap?.call(response.payload),
+      onDidReceiveNotificationResponse: (response) {
+        if (_soloAbreLaApp(response.id)) return;
+        _onTap?.call(response.payload);
+      },
     );
 
     await _plugin
@@ -151,6 +179,9 @@ class LocalNotificationsService {
     try {
       final detalles = await _plugin.getNotificationAppLaunchDetails();
       if (detalles == null || !detalles.didNotificationLaunchApp) return null;
+      // Un arranque en frío por el aviso de fin de descanso es un arranque
+      // normal: no hay destino al que llevar al usuario.
+      if (_soloAbreLaApp(detalles.notificationResponse?.id)) return null;
       final payload = detalles.notificationResponse?.payload;
       debugPrint('[local-notif] arrancó por notificación — deepLink=$payload');
       return payload;
@@ -198,7 +229,7 @@ class LocalNotificationsService {
     String? deepLink,
   }) async {
     await _plugin.show(
-      id: 0,
+      id: kIdAvisoEntrante,
       title: title.isEmpty ? null : title,
       body: body.isEmpty ? null : body,
       notificationDetails: const NotificationDetails(
@@ -213,4 +244,139 @@ class LocalNotificationsService {
       payload: deepLink,
     );
   }
+
+  /// Agenda UNA notificación para el instante [cuando] (#1617). La dispara el
+  /// sistema operativo, no Dart: sale con la app en segundo plano o la pantalla
+  /// bloqueada, que es justo cuando `show` no sirve.
+  ///
+  /// Devuelve `true` si quedó agendada y `false` si NO se pudo (servicio sin
+  /// inicializar, [cuando] ya pasó o falla del plugin). Igual que [show], no
+  /// tira nunca: el llamador decide qué hacer con el `false`.
+  ///
+  /// Con el mismo [id] reemplaza a la anterior, así que reagendar (el «+15 s»)
+  /// no deja dos avisos.
+  ///
+  /// ## Instante, no hora local
+  ///
+  /// Se agenda con `TZDateTime.from(cuando, tz.UTC)`: es el MISMO instante, sólo
+  /// escrito en UTC. Así no depende del nombre de la zona del aparato (ni de
+  /// que la base de zonas esté inicializada). El plugin manda la fecha a la
+  /// plataforma con precisión de segundo y la trunca: el aviso puede salir hasta
+  /// 999 ms antes de [cuando].
+  ///
+  /// ## Android: exacta si se puede, inexacta si no
+  ///
+  /// Con `SCHEDULE_EXACT_ALARM` concedido (`canScheduleExactNotifications`) va
+  /// `exactAllowWhileIdle`. Si no, `inexactAllowWhileIdle`: NO se le pide el
+  /// permiso al usuario y NO se declara `USE_EXACT_ALARM` (el README del plugin
+  /// avisa que las tiendas pueden auditarlo). El costo es real: sin el permiso
+  /// el sistema puede demorar la alarma, y desde Android 14 viene denegado por
+  /// defecto.
+  ///
+  /// Pedir una alarma exacta sin el permiso hace que el plugin tire
+  /// `exact_alarms_not_permitted`. Pasa sólo si el permiso se revoca entre la
+  /// consulta y el agendado, y en ese caso se cae a la inexacta en vez de
+  /// quedarse sin aviso.
+  ///
+  /// ## El tap
+  ///
+  /// No lleva payload y [kIdFinDeDescanso] está en [_idsQueSoloAbrenLaApp]: tocar
+  /// el aviso trae la app al frente y nada más.
+  Future<bool> agendar({
+    required int id,
+    required DateTime cuando,
+    required String title,
+    required String body,
+  }) async {
+    if (!_inicializado) {
+      debugPrint('[local-notif] agendar() con init fallido o pendiente — '
+          'no se agenda');
+      return false;
+    }
+    if (!cuando.isAfter(clock.now())) {
+      debugPrint('[local-notif] agendar() para un instante que ya pasó');
+      return false;
+    }
+    try {
+      final exacta = await _puedeAgendarExacta();
+      try {
+        await _agendar(
+          id: id,
+          cuando: cuando,
+          title: title,
+          body: body,
+          modo: exacta
+              ? AndroidScheduleMode.exactAllowWhileIdle
+              : AndroidScheduleMode.inexactAllowWhileIdle,
+        );
+      } on PlatformException catch (e) {
+        if (!exacta || e.code != 'exact_alarms_not_permitted') rethrow;
+        await _agendar(
+          id: id,
+          cuando: cuando,
+          title: title,
+          body: body,
+          modo: AndroidScheduleMode.inexactAllowWhileIdle,
+        );
+      }
+      debugPrint('[local-notif] agendada id=$id para $cuando');
+      return true;
+    } catch (e) {
+      debugPrint('[local-notif] agendar() FALLÓ — $e');
+      return false;
+    }
+  }
+
+  /// Saca la notificación [id]: la agendada que todavía no salió y también la
+  /// que ya se mostró y sigue en la bandeja. Nunca tira.
+  Future<void> cancelar(int id) async {
+    if (!_inicializado) return;
+    try {
+      await _plugin.cancel(id: id);
+    } catch (e) {
+      debugPrint('[local-notif] cancelar($id) FALLÓ — $e');
+    }
+  }
+
+  /// `canScheduleExactNotifications` sólo existe en Android: en iOS no hay
+  /// implementación que resolver y el modo se ignora. Ante un fallo de la
+  /// consulta se asume que NO se puede: la inexacta siempre es válida.
+  Future<bool> _puedeAgendarExacta() async {
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      return await android?.canScheduleExactNotifications() ?? false;
+    } catch (e) {
+      debugPrint('[local-notif] canScheduleExactNotifications FALLÓ — $e');
+      return false;
+    }
+  }
+
+  Future<void> _agendar({
+    required int id,
+    required DateTime cuando,
+    required String title,
+    required String body,
+    required AndroidScheduleMode modo,
+  }) {
+    return _plugin.zonedSchedule(
+      id: id,
+      title: title.isEmpty ? null : title,
+      body: body.isEmpty ? null : body,
+      scheduledDate: tz.TZDateTime.from(cuando, tz.UTC),
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          kCanalDeAvisos,
+          kNombreDelCanal,
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: modo,
+    );
+  }
+
+  static bool _soloAbreLaApp(int? id) =>
+      id != null && _idsQueSoloAbrenLaApp.contains(id);
 }
