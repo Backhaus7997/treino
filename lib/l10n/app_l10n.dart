@@ -10074,6 +10074,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Tu sesión se cerró. Volvé a iniciar sesión.'**
   String get pdfImportErrorSignedOut;
+
+  /// CTA en la ficha del alumno, al lado de CREAR PLAN. Sólo si el kill switch de app_config/pdf_import habilita al PF (docs/plan-import-pdf.md).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'IMPORTAR DE PDF'**
+  String get pdfImportCta;
+
+  /// Cupo restante de imports de PDF. Sólo se muestra si se sabe: nunca un número inventado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Te quedan {week} esta semana y {day} hoy.'**
+  String pdfImportQuotaRemaining(int week, int day);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

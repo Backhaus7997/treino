@@ -5456,5 +5456,9 @@
   "pdfImportErrorNotTrainer": "Solo los entrenadores pueden importar planes.",
   "@pdfImportErrorNotTrainer": {"description": "permission-denied."},
   "pdfImportErrorSignedOut": "Tu sesión se cerró. Volvé a iniciar sesión.",
-  "@pdfImportErrorSignedOut": {"description": "unauthenticated."}
+  "@pdfImportErrorSignedOut": {"description": "unauthenticated."},
+  "pdfImportCta": "IMPORTAR DE PDF",
+  "@pdfImportCta": {"description": "CTA en la ficha del alumno, al lado de CREAR PLAN. Sólo si el kill switch de app_config/pdf_import habilita al PF (docs/plan-import-pdf.md)."},
+  "pdfImportQuotaRemaining": "Te quedan {week} esta semana y {day} hoy.",
+  "@pdfImportQuotaRemaining": {"description": "Cupo restante de imports de PDF. Sólo se muestra si se sabe: nunca un número inventado.", "placeholders": {"week": {"type": "int"}, "day": {"type": "int"}}}
 }

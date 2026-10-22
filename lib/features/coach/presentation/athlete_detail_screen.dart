@@ -23,6 +23,9 @@ import '../application/athlete_note_providers.dart';
 import '../application/follow_up_entry_providers.dart';
 import '../domain/athlete_note.dart';
 import '../domain/follow_up_entry.dart';
+import '../../coach_hub/application/plan_pdf_import_providers.dart'
+    show PdfImportGate, pdfImportGateProvider;
+import 'plan_pdf_import_upload_screen.dart' show planPdfImportPath;
 import 'widgets/trainer_nutrition_plan_section.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show groupThousands;
@@ -2702,29 +2705,7 @@ class _AthleteDetailActions extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () =>
-                    context.push('/workout/routine-editor/$athleteId'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                  ),
-                ),
-                child: Text(
-                  AppL10n.of(context).coachCreatePlanCta,
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ),
-            ),
+            _PlanCtas(athleteId: athleteId),
           ],
         ),
       ),
@@ -2748,5 +2729,66 @@ class _AthleteDetailActions extends ConsumerWidget {
         type: TreinoToastType.error,
       );
     }
+  }
+}
+
+/// CREAR PLAN y, si el kill switch habilita al PF, IMPORTAR DE PDF al lado
+/// (docs/plan-import-pdf.md). Cargando o con error el gate da `loading` /
+/// `disabled` y queda sólo CREAR PLAN: el CTA nunca aparece y desaparece.
+class _PlanCtas extends ConsumerWidget {
+  const _PlanCtas({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final showImport =
+        ref.watch(pdfImportGateProvider) == PdfImportGate.enabled;
+    final label = GoogleFonts.barlowCondensed(
+      fontWeight: FontWeight.w700,
+      fontSize: AppTextSize.body,
+      letterSpacing: 0.8,
+    );
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.full),
+    );
+    // FittedBox: con la letra de accesibilidad al máximo, dos CTAs en una
+    // fila no entran a tamaño completo; se achican en vez de cortarse.
+    Widget text(String value) => FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(value, maxLines: 1, style: label),
+        );
+    final create = ElevatedButton(
+      onPressed: () => context.push('/workout/routine-editor/$athleteId'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: palette.accent,
+        foregroundColor: TreinoButtonTokens.foreground(context),
+        minimumSize: const Size.fromHeight(48),
+        shape: shape,
+      ),
+      child: text(l10n.coachCreatePlanCta),
+    );
+    if (!showImport) return SizedBox(width: double.infinity, child: create);
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            key: const Key('athlete_detail_import_pdf'),
+            onPressed: () => context.push(planPdfImportPath(athleteId)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: palette.accent),
+              foregroundColor: palette.accentText,
+              minimumSize: const Size.fromHeight(48),
+              shape: shape,
+            ),
+            child: text(l10n.pdfImportCta),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.s12),
+        Expanded(child: create),
+      ],
+    );
   }
 }

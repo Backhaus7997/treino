@@ -5919,4 +5919,12 @@ class AppL10nEn extends AppL10n {
   @override
   String get pdfImportErrorSignedOut =>
       'You\'ve been signed out. Sign in again.';
+
+  @override
+  String get pdfImportCta => 'IMPORT FROM PDF';
+
+  @override
+  String pdfImportQuotaRemaining(int week, int day) {
+    return '$week left this week, $day today.';
+  }
 }

@@ -1338,5 +1338,7 @@
   "pdfImportErrorDisabled": "Importar de PDF no está disponible para tu cuenta.",
   "pdfImportErrorUnavailable": "Importar de PDF no está disponible por un problema nuestro. No se descontó de tu cupo.",
   "pdfImportErrorNotTrainer": "Solo los entrenadores pueden importar planes.",
-  "pdfImportErrorSignedOut": "Tu sesión se cerró. Vuelve a iniciar sesión."
+  "pdfImportErrorSignedOut": "Tu sesión se cerró. Vuelve a iniciar sesión.",
+  "pdfImportCta": "IMPORTAR DE PDF",
+  "pdfImportQuotaRemaining": "Te quedan {week} esta semana y {day} hoy."
 }
