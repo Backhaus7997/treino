@@ -32,7 +32,39 @@ final class WorkoutCoordinator: ObservableObject {
     var exercises: [WatchExercise] { workout?.exercises ?? [] }
 
     /// Segundos que faltan del descanso, o nil si no hay descanso corriendo.
+    ///
+    /// Desde #1616 se DERIVA de `rest` en cada tick, contra el reloj de pared.
+    /// Antes era un contador que se decrementaba: se atrasaba con cada tick
+    /// perdido y no tenia un instante de fin que comparar con el del telefono.
     @Published private(set) var restRemaining: Int?
+
+    /// El descanso en curso, propio o espejado de la sesion (#1616).
+    ///
+    /// Es COMPARTIDO con el telefono por el documento de la sesion: marcar una
+    /// serie en cualquiera de los dos lo arranca en los dos, y Saltar o +15 s
+    /// en uno se ve en el otro. La regla de quien gana esta en `RestRules`.
+    private(set) var rest: SharedRest?
+
+    /// Un cambio de descanso hecho ACA que todavia no llego a la sesion.
+    ///
+    /// Este reloj escribe por REST y no tiene listeners: un Saltar sin señal
+    /// queda en vuelo. Mientras tanto la sesion dice lo viejo, y adoptarlo
+    /// resucitaria el descanso que el atleta acaba de saltar. Ver
+    /// `RestRules.decide(localPending:)`.
+    private enum CambioDeDescanso {
+        case anotar(SharedRest)
+        case borrar
+    }
+
+    private var descansoPorSubir: CambioDeDescanso?
+
+    /// Cuenta los cambios LOCALES del descanso. Sirve para saber si el atleta
+    /// toco algo mientras una lectura o una escritura estaba viajando.
+    private var revisionDelDescanso = 0
+
+    /// Hay una subida del descanso en curso. Las subidas van de a UNA: dos
+    /// PATCH en vuelo pueden llegar al reves, y el que llega ultimo gana.
+    private var subiendoDescanso = false
 
     /// Un ejercicio POR TIEMPO en curso.
     ///
@@ -379,7 +411,7 @@ final class WorkoutCoordinator: ObservableObject {
         session = current
         WorkoutSessionStore.save(current)
 
-        startRest(seconds: restSeconds)
+        startRest(exerciseId: exerciseId, setNumber: setNumber, seconds: restSeconds)
         // Se RECALCULA la posicion en vez de incrementar el indice.
         //
         // `advanceIfExerciseDone` solo avanzaba cuando el ejercicio actual
@@ -508,10 +540,23 @@ final class WorkoutCoordinator: ObservableObject {
             //
             // Va ANTES de subir lo pendiente a propósito: no tiene sentido
             // escribir series nuevas en algo que ya se cerró.
-            if let remoteId = current.remoteId,
-               try await HistorySync.isFinished(
-                   client: client, uid: uid, sessionId: remoteId
-               ) {
+            //
+            // La MISMA lectura trae el descanso compartido (#1616). La revision
+            // se toma ANTES de leer: si el atleta toca Saltar mientras esta
+            // lectura viaja, lo que vuelva ya es viejo y no se adopta.
+            let revisionAlLeer = revisionDelDescanso
+            var descansoDeLaSesion: SharedRest?
+            var leyoElDescanso = false
+            var terminada = false
+            if let remoteId = current.remoteId {
+                let remota = try await HistorySync.sessionState(
+                    client: client, uid: uid, sessionId: remoteId
+                )
+                terminada = remota.finished
+                descansoDeLaSesion = remota.rest
+                leyoElDescanso = true
+            }
+            if let remoteId = current.remoteId, terminada {
                 // ⚠️ ANTES DE DESCARTAR, SE SUBE LO QUE FALTE.
                 //
                 // Esta rama borraba el estado local sin mirar `pendingSets`,
@@ -604,6 +649,19 @@ final class WorkoutCoordinator: ObservableObject {
 
             guard let remoteId = current.remoteId else { return }
 
+            // ── El descanso compartido (#1616) ─────────────────────────────
+            //
+            // Con un cambio propio en vuelo, se sube: es el mas nuevo y va a
+            // ganar. Si no, se espeja lo que dice la sesion — que puede ser el
+            // descanso que arranco el telefono al marcar la serie, un +15 s o
+            // un Saltar. Espejar NUNCA escribe: si escribiera, los dos aparatos
+            // se contestarian y el descanso rebotaria para siempre.
+            if descansoPorSubir != nil {
+                await subirDescanso()
+            } else if leyoElDescanso, revisionDelDescanso == revisionAlLeer {
+                reconciliarDescanso(con: descansoDeLaSesion)
+            }
+
             // ── Se LEE el historial antes de ESCRIBIR ──────────────────────
             //
             // El orden era el otro: primero se subia lo pendiente y despues se
@@ -627,7 +685,7 @@ final class WorkoutCoordinator: ObservableObject {
             )
 
             // Las series que el reloj NO tenia: sirven para saber si hay que
-            // arrancar el descanso, no solo para contar.
+            // guardar el estado y mover el cursor, no solo para contar.
             var nuevas: [LoggedSet] = []
             for set in remote where !current.isLogged(
                 exerciseId: set.exerciseId, setNumber: set.setNumber
@@ -674,19 +732,13 @@ final class WorkoutCoordinator: ObservableObject {
                 session = current
                 WorkoutSessionStore.save(current)
 
-                // El descanso arranca TAMBIEN cuando la serie se marco en el
-                // telefono. Antes solo lo disparaba `logSet`, o sea marcar en la
-                // muñeca: el atleta marcaba en el celular y el reloj —que es
-                // donde mira el descanso— se quedaba mudo.
-                //
-                // Solo si la serie nueva es del ejercicio EN CURSO: una que
-                // llega de un ejercicio ya pasado (una correccion tardia) no
-                // tiene por que poner a contar nada.
-                if let exercise = currentExercise,
-                   restRemaining == nil,
-                   nuevas.contains(where: { $0.exerciseId == exercise.exerciseId }) {
-                    startRest(seconds: exercise.restSeconds)
-                }
+                // El descanso de una serie marcada en el TELEFONO ya no se
+                // arranca aca (#1616). Antes este bloque arrancaba uno PROPIO
+                // con el `restSeconds` del ejercicio, y eso era justamente el
+                // segundo descanso: corrido del del telefono por lo que tardaba
+                // el sync, con su propia vibracion. Ahora el telefono anota su
+                // descanso en la sesion ANTES que la serie, y la lectura de
+                // arriba lo espeja con el mismo instante de fin.
 
                 // El cursor se RECALCULA, no se incrementa.
                 //
@@ -701,10 +753,6 @@ final class WorkoutCoordinator: ObservableObject {
                 // `logSet` y a `removeSet`, ahora en el cursor: aplicar deltas
                 // sobre un estado que otro actor movió. La regla es la misma —
                 // valores absolutos.
-                //
-                // Va DESPUÉS del descanso a propósito: el descanso tiene que
-                // mirar el ejercicio en el que estaba el atleta cuando llegó la
-                // serie, no al que salta el cursor.
                 //
                 // Y cubre las dos direcciones: si el teléfono BORRÓ una serie
                 // del ejercicio en curso, ese ejercicio dejó de estar completo y
@@ -791,7 +839,13 @@ final class WorkoutCoordinator: ObservableObject {
         }
     }
 
-    func skipRest() { stopRest() }
+    /// Saltar: corta el descanso aca y en la sesion, o sea tambien en el
+    /// telefono (#1616).
+    func skipRest() {
+        guard rest != nil else { return }
+        aplicarDescanso(nil)
+        publicarDescanso(.borrar)
+    }
 
     // MARK: - Metricas del entreno
 
@@ -878,11 +932,6 @@ final class WorkoutCoordinator: ObservableObject {
         return cursor(in: exercises, session: session)
     }
 
-    /// Descanso contado LOCALMENTE por el reloj.
-    ///
-    /// El plan original lo descartaba porque mandar un tick por segundo desde
-    /// el teléfono saturaba el canal. Acá no aplica: el reloj es autónomo y
-    /// tiene el estado, así que contar no cuesta tráfico (Locked Decision #8).
     /// Arranca el cronometro de un ejercicio por tiempo.
     ///
     /// NO se dispara solo al llegar al ejercicio: lo arranca el atleta. Empezar
@@ -902,7 +951,10 @@ final class WorkoutCoordinator: ObservableObject {
         // la fila REENTRA a el (ver `WorkoutView`), no arranca nada.
         guard let seconds = spec.durationSeconds, seconds > 0,
               durationSet == nil, phoneTimer == nil else { return }
-        stopRest()
+        // Arrancar una serie es terminar el descanso. Desde #1616 eso se
+        // publica: si no, el telefono seguiria mostrando un descanso que la
+        // muñeca ya corto, y el proximo sync lo volveria a traer aca.
+        skipRest()
         let fin = Date().addingTimeInterval(TimeInterval(seconds))
         durationSet = DurationSet(
             exerciseId: exerciseId,
@@ -1080,29 +1132,148 @@ final class WorkoutCoordinator: ObservableObject {
         )
     }
 
-    private func startRest(seconds: Int) {
-        stopRest()
-        guard seconds > 0 else { return }
-        restRemaining = seconds
-        restTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+    // MARK: - Descanso compartido (#1616)
+
+    /// Marco la serie `setNumber` de `exerciseId`: arranca el descanso aca y
+    /// lo anota en la sesion, con este reloj como dueño.
+    ///
+    /// Con `seconds` en cero es SALTAR, no "nada": una serie de un ejercicio
+    /// sin descanso significa que el atleta ya volvio a entrenar, y el descanso
+    /// que venia corriendo se corta tambien en el telefono. Ya lo cortaba aca
+    /// antes de #1616; ahora el corte viaja.
+    private func startRest(exerciseId: String, setNumber: Int, seconds: Int) {
+        guard seconds > 0 else {
+            skipRest()
+            return
+        }
+        let nuevo = SharedRest(
+            exerciseId: exerciseId,
+            setNumber: setNumber,
+            totalSeconds: seconds,
+            endsAt: RestRules.endsAt(start: Date(), totalSeconds: seconds),
+            owner: .reloj
+        )
+        aplicarDescanso(nuevo)
+        publicarDescanso(.anotar(nuevo))
+    }
+
+    /// Corta el descanso SOLO aca y olvida lo que hubiera por subir.
+    ///
+    /// Es para cuando el entreno se CIERRA: no queda sesion a la que avisarle,
+    /// y una subida pendiente que sobreviviera se escribiria en el entreno
+    /// siguiente.
+    private func stopRest() {
+        aplicarDescanso(nil)
+        descansoPorSubir = nil
+    }
+
+    /// Lo que se muestra. El unico lugar que toca `rest` y su ticker.
+    ///
+    /// El ticker solo REDIBUJA: lo que falta se deriva del instante de fin
+    /// contra el reloj de pared, asi que un tick perdido no atrasa nada. Y al
+    /// llegar a cero vibra aca, en el mismo instante que el telefono, porque
+    /// los dos cuentan contra el mismo fin.
+    private func aplicarDescanso(_ nuevo: SharedRest?) {
+        restTimer?.invalidate()
+        restTimer = nil
+        guard let nuevo, !RestRules.isFinished(endsAt: nuevo.endsAt, now: Date()) else {
+            rest = nil
+            restRemaining = nil
+            return
+        }
+        rest = nuevo
+        restRemaining = RestRules.remaining(endsAt: nuevo.endsAt, now: Date())
+        restTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                guard let self, let remaining = self.restRemaining else { return }
-                if remaining <= 1 {
-                    self.stopRest()
+                guard let self, let actual = self.rest else { return }
+                let ahora = Date()
+                if RestRules.isFinished(endsAt: actual.endsAt, now: ahora) {
+                    self.restTimer?.invalidate()
+                    self.restTimer = nil
+                    self.rest = nil
+                    self.restRemaining = nil
                     // Antes el descanso terminaba en SILENCIO: habia que mirar
                     // la pantalla para enterarse, que es justo lo que un reloj
                     // viene a evitar.
                     Haptics.restFinished()
                 } else {
-                    self.restRemaining = remaining - 1
+                    self.restRemaining = RestRules.remaining(
+                        endsAt: actual.endsAt, now: ahora
+                    )
                 }
             }
         }
     }
 
-    private func stopRest() {
-        restTimer?.invalidate()
-        restTimer = nil
-        restRemaining = nil
+    /// Lo que dice la sesion, aplicado con la regla compartida.
+    private func reconciliarDescanso(con remoto: SharedRest?, now: Date = Date()) {
+        switch RestRules.decide(
+            local: rest?.endsAt,
+            remote: remoto?.endsAt,
+            localPending: descansoPorSubir != nil,
+            now: now
+        ) {
+        case .adopt:
+            aplicarDescanso(remoto)
+        case .stop:
+            aplicarDescanso(nil)
+        case .keep:
+            break
+        }
+    }
+
+    /// Deja un cambio local para subir, y lo sube.
+    private func publicarDescanso(_ cambio: CambioDeDescanso) {
+        revisionDelDescanso += 1
+        descansoPorSubir = cambio
+        Task { await subirDescanso() }
+    }
+
+    /// Sube lo pendiente, DE A UNO y en orden.
+    ///
+    /// Una sola subida en vuelo: dos PATCH simultaneos pueden llegar al reves
+    /// —el descanso despues del Saltar— y en la sesion gana el ultimo que
+    /// llega. Si el atleta toco algo mientras subia, el bucle vuelve a subir lo
+    /// nuevo.
+    ///
+    /// Sin red queda pendiente, y lo reintenta el proximo `sync()`. Un descanso
+    /// que vencio esperando ya no se sube: escribir un fin en el pasado no
+    /// cambia nada en el otro aparato y podria pisar uno nuevo que arranco el
+    /// telefono mientras tanto.
+    private func subirDescanso() async {
+        guard !subiendoDescanso else { return }
+        subiendoDescanso = true
+        defer { subiendoDescanso = false }
+
+        while let cambio = descansoPorSubir,
+              let remoteId = session?.remoteId,
+              let makeClient {
+            let revision = revisionDelDescanso
+            let estado: SharedRest?
+            switch cambio {
+            case .anotar(let descanso):
+                if RestRules.isFinished(endsAt: descanso.endsAt, now: Date()) {
+                    if revisionDelDescanso == revision { descansoPorSubir = nil }
+                    continue
+                }
+                estado = descanso
+            case .borrar:
+                estado = nil
+            }
+            do {
+                let (client, uid) = try await makeClient()
+                try await HistorySync.writeRest(
+                    client: client, uid: uid, sessionId: remoteId, rest: estado
+                )
+                if revisionDelDescanso == revision { descansoPorSubir = nil }
+            } catch {
+                syncError = String(describing: error)
+                if case FirestoreREST.FirestoreError.http(let status, _) = error,
+                   status == 401 || status == 403 {
+                    onAuthFailure?()
+                }
+                return
+            }
+        }
     }
 }
