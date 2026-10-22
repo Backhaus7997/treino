@@ -196,6 +196,7 @@ financiero visible para cualquier usuario de la app. Cargalo sabiendo eso.
 | **Seguridad** | Prevención de abuso, protección de cuentas, integridad del servicio |
 | **Mejora del producto** | Analítica agregada y diagnóstico de errores |
 | **Facturación** | Sólo para quien tiene una suscripción paga, entrenador o atleta |
+| **Importar planes desde PDF** | Sólo si sos entrenador y usás esa función: leer el PDF que subís para extraer el plan de entrenamiento (ver sección 6.3) |
 
 **Lo que NO hacemos:** no vendemos tus datos, no mostramos publicidad de terceros, no cedemos
 información a data brokers, no cruzamos tu actividad con fuentes externas para
@@ -262,10 +263,22 @@ instrucciones:
 |---|---|
 | **Google (Firebase / Google Cloud)** | Autenticación, base de datos, archivos, notificaciones, analítica, reportes de error |
 | **Google Places** | Las búsquedas de gimnasios que hacés |
+| **Google Cloud Vertex AI, con el modelo Claude de Anthropic** | Sólo si sos entrenador y usás «Importar de PDF»: el PDF que subís, para extraer de él el plan de entrenamiento |
 | **Resend** | Envío de correo (verificación, recupero de contraseña, avisos sobre tu plan y tus pagos) |
 | **Vercel** | Alojamiento del sitio web y del panel web para entrenadores |
 | **CARTO** | Provee las imágenes del mapa. Al cargarlo, tu dirección IP llega a su servidor |
 | **Apple / Google** | Si iniciás sesión con sus cuentas, o si contratás por sus tiendas |
+
+**Sobre el import de planes desde PDF.** Cuando un entrenador sube el PDF de un
+plan, lo procesa Google a través de Vertex AI con un modelo de lenguaje (Claude,
+desarrollado por Anthropic) con una única finalidad: extraer de él los días,
+ejercicios, series y repeticiones, para que el entrenador los revise antes de
+guardar nada. **Nosotros no guardamos el PDF**: no se sube a nuestro
+almacenamiento ni a nuestra base de datos; se usa para esa lectura y se
+descarta. Lo que se guarda es el plan que el entrenador confirma, como
+cualquier otra rutina. Si sos entrenador, tené en cuenta que el PDF puede
+contener **datos de tu alumno** —su nombre, lesiones u observaciones de
+salud—: subí sólo lo necesario para armar el plan.
 
 Si abrís un video de ejercicio alojado en **YouTube**, se abre en el navegador y
 pasás a regirte por las políticas de Google.
@@ -359,6 +372,7 @@ Se suman a los de la sección 9:
 | Registros de facturación (entrenadores) | El plazo que exija la normativa fiscal |
 | Copias de seguridad | Hasta **28 días**, por el esquema de backup diario |
 | Reportes de error | Según la retención de Firebase Crashlytics |
+| PDF de un plan importado (entrenadores) | No lo guardamos: se procesa para extraer el plan y se descarta |
 
 Detalle completo en [`retencion-y-borrado.md`](./retencion-y-borrado.md).
 

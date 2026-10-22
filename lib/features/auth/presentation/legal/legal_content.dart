@@ -23,7 +23,7 @@ class LegalSection {
 const String kTermsLastUpdated = '1 de octubre de 2026';
 
 /// Ultima revision de Política de Privacidad.
-const String kPrivacyLastUpdated = '2 de octubre de 2026';
+const String kPrivacyLastUpdated = '22 de octubre de 2026';
 
 /// Version vigente de Términos y Condiciones, para evidencia de
 /// aceptacion (`UserProfile.accepted...Version`).
@@ -329,6 +329,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         '• Seguridad: Prevención de abuso, protección de cuentas, integridad del servicio\n'
         '• Mejora del producto: Analítica agregada y diagnóstico de errores\n'
         '• Facturación: Sólo para quien tiene una suscripción paga, entrenador o atleta\n'
+        '• Importar planes desde PDF: Sólo si sos entrenador y usás esa función: leer el PDF que subís para extraer el plan de entrenamiento (ver sección 6.3)\n'
         '\n'
         'Lo que NO hacemos: no vendemos tus datos, no mostramos publicidad de terceros, no cedemos información a data brokers, no cruzamos tu actividad con fuentes externas para perfilarte, y no usamos tus datos de salud para nada que no sea mostrarte tu progreso y —si vos lo habilitás— compartirlo con tu entrenador.',
   ),
@@ -373,10 +374,13 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         'Actúan como encargados del tratamiento, bajo contrato y sólo siguiendo nuestras instrucciones:\n'
         '• Google (Firebase / Google Cloud): Autenticación, base de datos, archivos, notificaciones, analítica, reportes de error\n'
         '• Google Places: Las búsquedas de gimnasios que hacés\n'
+        '• Google Cloud Vertex AI, con el modelo Claude de Anthropic: Sólo si sos entrenador y usás «Importar de PDF»: el PDF que subís, para extraer de él el plan de entrenamiento\n'
         '• Resend: Envío de correo (verificación, recupero de contraseña, avisos sobre tu plan y tus pagos)\n'
         '• Vercel: Alojamiento del sitio web y del panel web para entrenadores\n'
         '• CARTO: Provee las imágenes del mapa. Al cargarlo, tu dirección IP llega a su servidor\n'
         '• Apple / Google: Si iniciás sesión con sus cuentas, o si contratás por sus tiendas\n'
+        '\n'
+        'Sobre el import de planes desde PDF. Cuando un entrenador sube el PDF de un plan, lo procesa Google a través de Vertex AI con un modelo de lenguaje (Claude, desarrollado por Anthropic) con una única finalidad: extraer de él los días, ejercicios, series y repeticiones, para que el entrenador los revise antes de guardar nada. Nosotros no guardamos el PDF: no se sube a nuestro almacenamiento ni a nuestra base de datos; se usa para esa lectura y se descarta. Lo que se guarda es el plan que el entrenador confirma, como cualquier otra rutina. Si sos entrenador, tené en cuenta que el PDF puede contener datos de tu alumno —su nombre, lesiones u observaciones de salud—: subí sólo lo necesario para armar el plan.\n'
         '\n'
         'Si abrís un video de ejercicio alojado en YouTube, se abre en el navegador y pasás a regirte por las políticas de Google.\n'
         '\n'
@@ -430,6 +434,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         '• Registros de facturación (entrenadores): El plazo que exija la normativa fiscal\n'
         '• Copias de seguridad: Hasta 28 días, por el esquema de backup diario\n'
         '• Reportes de error: Según la retención de Firebase Crashlytics\n'
+        '• PDF de un plan importado (entrenadores): No lo guardamos: se procesa para extraer el plan y se descarta\n'
         '\n'
         'Detalle completo en retencion-y-borrado.md.',
   ),
