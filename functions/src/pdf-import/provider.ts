@@ -16,7 +16,7 @@
  * cupo.
  */
 import AnthropicVertex from "@anthropic-ai/vertex-sdk";
-import { APIConnectionTimeoutError } from "@anthropic-ai/sdk";
+import { APIConnectionTimeoutError, APIUserAbortError } from "@anthropic-ai/sdk";
 import { buildSystemPrompt, buildUserText, CatalogEntry } from "./prompt";
 import { PDF_PLAN_EXTRACTION_SCHEMA } from "./extraction";
 
@@ -119,10 +119,18 @@ export function vertexPlanExtractor(projectId: string): PlanExtractor {
               effort: req.effort,
               format: { type: "json_schema", schema: PDF_PLAN_EXTRACTION_SCHEMA },
             },
+          }, {
+            // El timeout del cliente cubre la espera de la respuesta; esta
+            // señal corta tambien la lectura del stream.
+            signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
           })
           .finalMessage();
       } catch (e) {
-        if (e instanceof APIConnectionTimeoutError) {
+        if (
+          e instanceof APIConnectionTimeoutError ||
+          (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) ||
+          (e instanceof APIUserAbortError)
+        ) {
           throw new ExtractorError("timeout", "LLM call timed out.");
         }
         throw new ExtractorError("provider", e instanceof Error ? e.message : String(e));

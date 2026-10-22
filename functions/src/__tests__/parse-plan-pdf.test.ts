@@ -180,6 +180,46 @@ describe("kill switch", () => {
   });
 });
 
+describe("lista de prueba (allowlistUids)", () => {
+  it("apagado: un uid de la lista pasa, y el cupo se le aplica igual", async () => {
+    await seedTrainer();
+    await setConfig({ enabled: false, allowlistUids: ["otro-uid", uid] });
+    const f = fakeExtractor(() => planWith([null]));
+    const res = await runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1 });
+    expect(res.quota).toMatchObject({ usedThisWeek: 1, limitWeekly: 2 });
+    expect(await usage()).toMatchObject({ weekCount: 1, dayCount: 1 });
+  });
+
+  it("apagado: un uid fuera de la lista rebota con failed-precondition", async () => {
+    await seedTrainer();
+    await setConfig({ enabled: false, allowlistUids: ["otro-uid"] });
+    const f = fakeExtractor(() => planWith([null]));
+    await expectHttpsError(runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1 }), "failed-precondition");
+    expect(f.calls).toHaveLength(0);
+  });
+
+  it("apagado: estar en la lista no saltea el rol", async () => {
+    await db().collection("users").doc(uid).set({ role: "athlete" });
+    await setConfig({ enabled: false, allowlistUids: [uid] });
+    const f = fakeExtractor(() => planWith([null]));
+    await expectHttpsError(runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1 }), "permission-denied");
+  });
+
+  it("apagado: la lista con otra forma (string) no habilita a nadie", async () => {
+    await seedTrainer();
+    await setConfig({ enabled: false, allowlistUids: uid });
+    const f = fakeExtractor(() => planWith([null]));
+    await expectHttpsError(runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1 }), "failed-precondition");
+  });
+
+  it("prendido: pasan todos los trainers, esten o no en la lista", async () => {
+    await seedTrainer();
+    await setConfig({ enabled: true, allowlistUids: ["otro-uid"] });
+    const f = fakeExtractor(() => planWith([null]));
+    await expect(runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1 })).resolves.toBeDefined();
+  });
+});
+
 describe("el archivo", () => {
   it.each([
     ["no es PDF", () => Buffer.from("hola").toString("base64"), "not_pdf"],
@@ -293,19 +333,29 @@ describe("cupo", () => {
 
 describe("falla nuestra: se devuelve el cupo", () => {
   it.each([
-    ["el proveedor falla", () => { throw new ExtractorError("provider", "503"); }, "internal"],
-    ["el modelo se niega", () => { throw new ExtractorError("refusal", "no"); }, "internal"],
-    ["salida truncada", () => { throw new ExtractorError("truncated", "max_tokens"); }, "internal"],
-    ["timeout del LLM", () => { throw new ExtractorError("timeout", "slow"); }, "deadline-exceeded"],
-    ["error inesperado", () => { throw new Error("boom"); }, "internal"],
-    ["salida invalida (numWeeks 99)", () => ({ ...planWith([null]), numWeeks: 99 }), "internal"],
-    ["salida que no es un plan", () => "hola", "internal"],
-  ])("%s: %s y el contador vuelve a cero", async (_n, behavior, code) => {
+    ["el proveedor falla", "internal", () => { throw new ExtractorError("provider", "503"); }],
+    ["el modelo se niega", "internal", () => { throw new ExtractorError("refusal", "no"); }],
+    ["salida truncada", "internal", () => { throw new ExtractorError("truncated", "max_tokens"); }],
+    ["timeout del LLM", "deadline-exceeded", () => { throw new ExtractorError("timeout", "slow"); }],
+    ["error inesperado", "internal", () => { throw new Error("boom"); }],
+    ["salida invalida (numWeeks 99)", "internal", () => ({ ...planWith([null]), numWeeks: 99 })],
+    ["salida que no es un plan", "internal", () => "hola"],
+  ])("%s: %s y el contador vuelve a cero", async (_n, code, behavior) => {
     await seedTrainer();
     const f = fakeExtractor(behavior as () => unknown);
     await expectHttpsError(runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1 }), code as string);
     expect(f.calls).toHaveLength(1);
     expect(await usage()).toMatchObject({ weekKey: WEEK, weekCount: 0, dayKey: DAY, dayCount: 0 });
+  });
+
+  it("un LLM que no contesta corta en el deadline propio: deadline-exceeded y cupo devuelto", async () => {
+    await seedTrainer();
+    const f = fakeExtractor(() => new Promise(() => undefined));
+    await expectHttpsError(
+      runParsePlanPdf({ ...deps(f.extractor), llmDeadlineMs: 50 }, uid, { pdfBase64: pdf1 }),
+      "deadline-exceeded",
+    );
+    expect(await usage()).toMatchObject({ weekCount: 0, dayCount: 0 });
   });
 
   it("la devolucion no toca el uso previo: 1 usado + 1 fallido = 1", async () => {
@@ -327,6 +377,14 @@ describe("candidatos del catalogo", () => {
     expect(exs[0]).toMatchObject({ candidateExerciseId: "ex-press-banca", candidateConfidence: 0.8 });
     expect(exs[1]).toMatchObject({ candidateExerciseId: null, candidateConfidence: null });
     expect(exs[2]).toMatchObject({ candidateExerciseId: null, candidateConfidence: null });
+  });
+
+  it("un id con forma invalida (barra, __x__) se anula sin tumbar el plan", async () => {
+    await seedTrainer();
+    const f = fakeExtractor(() => planWith(["exercises/otro", "__nope__", "ex-press-banca"]));
+    const res = await runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1 });
+    const ids = res.plan.days[0].rows.map((r) => r.exercises[0].candidateExerciseId);
+    expect(ids).toEqual([null, null, "ex-press-banca"]);
   });
 
   it("se verifica contra Firestore, no contra el catalogo que viajo en el prompt", async () => {

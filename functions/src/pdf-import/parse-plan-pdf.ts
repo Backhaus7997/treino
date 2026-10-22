@@ -9,7 +9,8 @@
  * ─── El orden, y por que es ese ─────────────────────────────────────────────
  *
  *   1. auth y `role == "trainer"`.
- *   2. kill switch `app_config/pdf_import.enabled` (apagado por defecto).
+ *   2. kill switch `app_config/pdf_import.enabled` (apagado por defecto), con
+ *      `allowlistUids` como lista de prueba que pasa aunque este apagado.
  *   3. el archivo: `%PDF-`, 5 MB, 20 paginas. Antes del cupo: un archivo que
  *      rebota por forma no le cuesta un import al PF.
  *   4. descuento del cupo en transaccion (`quota.ts`).
@@ -28,7 +29,7 @@
  *
  * ─── El modelo se cambia sin redeploy ───────────────────────────────────────
  *
- * `app_config/pdf_import` lleva `{ enabled, model?, effort? }`. `model` se
+ * `app_config/pdf_import` lleva `{ enabled, allowlistUids?, model?, effort? }`. `model` se
  * acepta solo si esta en `SUPPORTED_MODELS`; cualquier otro valor cae al
  * default y deja un warn. Asi un typo en la consola no rompe el import ni
  * manda la llamada a un modelo que no evaluamos.
@@ -74,6 +75,36 @@ export interface ParsePlanPdfDeps {
   extractor: PlanExtractor;
   now: () => Date;
   loadCatalog: () => Promise<CatalogEntry[]>;
+  /** Tope total de la llamada al LLM; por defecto `LLM_DEADLINE_MS`. */
+  llmDeadlineMs?: number;
+}
+
+/**
+ * Tope de la llamada al LLM medido por NOSOTROS, por debajo de los 300 s del
+ * callable. El timeout del SDK no alcanza: cubre la espera de la respuesta,
+ * no la lectura de un stream largo. Si el runtime mata la funcion a los 300 s
+ * no corre el `catch` y el cupo no vuelve; con este tope el error es nuestro
+ * `deadline-exceeded` y la devolucion corre.
+ */
+export const LLM_DEADLINE_MS = 280_000;
+
+function withDeadline<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ExtractorError("timeout", `No answer in ${ms} ms.`)), ms);
+  });
+  return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Un id que Firestore acepta como documento de `exercises`. Lo que no cumple
+ * (una barra, `.`, `..`, `__x__`) haria tirar a `doc()`, y un candidato
+ * alucinado no puede tumbar un plan valido: se anula como cualquier otro
+ * inexistente.
+ */
+function isValidDocId(id: string): boolean {
+  return id.length > 0 && id.length <= 1500 && !id.includes("/") &&
+    id !== "." && id !== ".." && !/^__.*__$/.test(id);
 }
 
 interface PdfImportConfig {
@@ -81,11 +112,18 @@ interface PdfImportConfig {
   effort: Effort;
 }
 
-/** Lee el kill switch y la config. Apagado si el doc no existe o no dice `true`. */
-async function readConfig(db: Firestore): Promise<PdfImportConfig> {
+/**
+ * Lee el kill switch y la config. Apagado si el doc no existe o `enabled` no
+ * es `true` literal — salvo para los uids de `allowlistUids`, la lista de
+ * prueba: con el import apagado para todos, el dueño evalua con PDFs reales
+ * en produccion desde cuentas puntuales. A los de la lista el cupo se les
+ * aplica igual.
+ */
+async function readConfig(db: Firestore, uid: string): Promise<PdfImportConfig> {
   const snap = await db.doc(PDF_IMPORT_CONFIG_DOC).get();
   const data = snap.data() ?? {};
-  if (data.enabled !== true) {
+  const allowlisted = Array.isArray(data.allowlistUids) && data.allowlistUids.includes(uid);
+  if (data.enabled !== true && !allowlisted) {
     throw new HttpsError("failed-precondition", "PDF import is disabled.");
   }
   let model = DEFAULT_MODEL;
@@ -121,7 +159,8 @@ async function readConfig(db: Firestore): Promise<PdfImportConfig> {
  */
 async function dropUnknownCandidates(db: Firestore, plan: PdfPlanExtraction): Promise<number> {
   const exercises = plan.days.flatMap((d) => d.rows.flatMap((r) => r.exercises));
-  const ids = [...new Set(exercises.map((e) => e.candidateExerciseId).filter((x): x is string => x != null))];
+  const ids = [...new Set(exercises.map((e) => e.candidateExerciseId)
+    .filter((x): x is string => x != null && isValidDocId(x)))];
   const existing = new Set<string>();
   if (ids.length > 0) {
     const snaps = await db.getAll(...ids.map((id) => db.collection("exercises").doc(id)));
@@ -155,7 +194,7 @@ export async function runParsePlanPdf(
   }
 
   // ── 2. kill switch ────────────────────────────────────────────────────────
-  const config = await readConfig(db);
+  const config = await readConfig(db, uid);
 
   // ── 3. el archivo ─────────────────────────────────────────────────────────
   const pdf = await checkPdf(data?.pdfBase64);
@@ -172,13 +211,16 @@ export async function runParsePlanPdf(
   // ── 5 y 6. LLM y validacion; si fallan, se devuelve el cupo ───────────────
   try {
     const catalog = await deps.loadCatalog();
-    const result = await deps.extractor.extract({
-      pdfBase64: data.pdfBase64 as string,
-      fileName,
-      catalog,
-      model: config.model,
-      effort: config.effort,
-    });
+    const result = await withDeadline(
+      deps.extractor.extract({
+        pdfBase64: data.pdfBase64 as string,
+        fileName,
+        catalog,
+        model: config.model,
+        effort: config.effort,
+      }),
+      deps.llmDeadlineMs ?? LLM_DEADLINE_MS,
+    );
 
     const validation = validateExtraction(result.raw);
     if (!validation.ok) {
