@@ -318,9 +318,18 @@ Documento **`app_config/pdf_import`** con `{ enabled: bool }`.
 ## Aviso en la pantalla de subida
 
 El PDF puede traer datos del alumno (nombre, lesiones, observaciones de salud).
-La pantalla de subida lo dice antes del selector de archivo, y la política de
-privacidad lo detalla en §6.3. Texto propuesto en el PR de esta spec; lo
-implementa la sesión de UI con `AppL10n` (es-AR y en).
+La pantalla de subida lo dice antes del selector de archivo. Texto final,
+aprobado por el dueño (2026-10-22), con `AppL10n`:
+
+| Idioma | Texto |
+|---|---|
+| es-AR | Usamos IA para leer tu PDF y armar el plan. No guardamos el archivo. Subí solo los datos de tu alumno que sean necesarios. |
+| en | We use AI to read your PDF and build the plan. We don't keep the file. Only include the client details you need. |
+
+**Sin nombres técnicos a propósito** (decisión del dueño): ni Claude, ni
+Anthropic, ni Google Cloud. El aviso es para el momento de subir; quién procesa
+el PDF lo dice la política de privacidad, que sí nombra a los encargados
+(§6.3). No se reemplazan uno al otro.
 
 ## Rollout
 
