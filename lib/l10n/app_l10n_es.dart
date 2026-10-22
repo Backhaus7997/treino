@@ -6047,6 +6047,64 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get pdfImportUseAlternative => 'Usar alternativa';
+
+  @override
+  String pdfImportPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Quedan $count ejercicios por resolver: confirma las sugerencias o vincúlalos.',
+      one:
+          'Queda 1 ejercicio por resolver: confirma la sugerencia o vincúlalo.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportBulkCreate(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'CREAR $count PROPIOS',
+      one: 'CREAR 1 PROPIO',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportBulkPartialTitle(int allowed, int total) {
+    return 'Te alcanza para $allowed de $total';
+  }
+
+  @override
+  String get pdfImportBulkPartialBody =>
+      'Se crean los primeros en el orden del plan. El resto queda para vincular con la biblioteca.';
+
+  @override
+  String get pdfImportBulkQuotaUnknown =>
+      'No pudimos verificar tu tope de ejercicios propios. Prueba de nuevo.';
+
+  @override
+  String pdfImportBulkFailed(int created, int requested) {
+    return 'Se crearon $created de $requested. No pudimos crear el resto.';
+  }
+
+  @override
+  String get pdfImportAssign => 'ASIGNAR PLAN';
+
+  @override
+  String get pdfImportAssigned => 'Plan asignado.';
+
+  @override
+  String get pdfImportOpenEditor => 'ABRIR EDITOR';
+
+  @override
+  String get pdfImportAssignFailed =>
+      'No pudimos guardar el plan. Prueba de nuevo.';
+
+  @override
+  String get pdfImportLevel => 'Nivel del plan';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -12089,4 +12147,62 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get pdfImportUseAlternative => 'Usar alternativa';
+
+  @override
+  String pdfImportPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Quedan $count ejercicios por resolver: confirmá las sugerencias o vinculalos.',
+      one:
+          'Queda 1 ejercicio por resolver: confirmá la sugerencia o vinculalo.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportBulkCreate(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'CREAR $count PROPIOS',
+      one: 'CREAR 1 PROPIO',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportBulkPartialTitle(int allowed, int total) {
+    return 'Te alcanza para $allowed de $total';
+  }
+
+  @override
+  String get pdfImportBulkPartialBody =>
+      'Se crean los primeros en el orden del plan. El resto queda para vincular con la biblioteca.';
+
+  @override
+  String get pdfImportBulkQuotaUnknown =>
+      'No pudimos verificar tu tope de ejercicios propios. Probá de nuevo.';
+
+  @override
+  String pdfImportBulkFailed(int created, int requested) {
+    return 'Se crearon $created de $requested. No pudimos crear el resto.';
+  }
+
+  @override
+  String get pdfImportAssign => 'ASIGNAR PLAN';
+
+  @override
+  String get pdfImportAssigned => 'Plan asignado.';
+
+  @override
+  String get pdfImportOpenEditor => 'ABRIR EDITOR';
+
+  @override
+  String get pdfImportAssignFailed =>
+      'No pudimos guardar el plan. Probá de nuevo.';
+
+  @override
+  String get pdfImportLevel => 'Nivel del plan';
 }

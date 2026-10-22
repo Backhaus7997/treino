@@ -5941,4 +5941,60 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get pdfImportUseAlternative => 'Use alternative';
+
+  @override
+  String pdfImportPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count exercises left to resolve: confirm the suggestions or link them.',
+      one: '1 exercise left to resolve: confirm the suggestion or link it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportBulkCreate(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'CREATE $count CUSTOM',
+      one: 'CREATE 1 CUSTOM',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportBulkPartialTitle(int allowed, int total) {
+    return 'You have room for $allowed of $total';
+  }
+
+  @override
+  String get pdfImportBulkPartialBody =>
+      'The first ones in plan order are created. Link the rest from the library.';
+
+  @override
+  String get pdfImportBulkQuotaUnknown =>
+      'We couldn\'t check your custom exercise limit. Try again.';
+
+  @override
+  String pdfImportBulkFailed(int created, int requested) {
+    return '$created of $requested were created. We couldn\'t create the rest.';
+  }
+
+  @override
+  String get pdfImportAssign => 'ASSIGN PLAN';
+
+  @override
+  String get pdfImportAssigned => 'Plan assigned.';
+
+  @override
+  String get pdfImportOpenEditor => 'OPEN EDITOR';
+
+  @override
+  String get pdfImportAssignFailed => 'We couldn\'t save the plan. Try again.';
+
+  @override
+  String get pdfImportLevel => 'Plan level';
 }

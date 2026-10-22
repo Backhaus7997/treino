@@ -1344,5 +1344,16 @@
   "pdfImportSourceShow": "Ver texto del PDF",
   "pdfImportSourceHide": "Ocultar texto del PDF",
   "pdfImportAlternative": "Alternativa: {name}",
-  "pdfImportUseAlternative": "Usar alternativa"
+  "pdfImportUseAlternative": "Usar alternativa",
+  "pdfImportPending": "{count, plural, =1{Queda 1 ejercicio por resolver: confirma la sugerencia o vincúlalo.} other{Quedan {count} ejercicios por resolver: confirma las sugerencias o vincúlalos.}}",
+  "pdfImportBulkCreate": "{count, plural, =1{CREAR 1 PROPIO} other{CREAR {count} PROPIOS}}",
+  "pdfImportBulkPartialTitle": "Te alcanza para {allowed} de {total}",
+  "pdfImportBulkPartialBody": "Se crean los primeros en el orden del plan. El resto queda para vincular con la biblioteca.",
+  "pdfImportBulkQuotaUnknown": "No pudimos verificar tu tope de ejercicios propios. Prueba de nuevo.",
+  "pdfImportBulkFailed": "Se crearon {created} de {requested}. No pudimos crear el resto.",
+  "pdfImportAssign": "ASIGNAR PLAN",
+  "pdfImportAssigned": "Plan asignado.",
+  "pdfImportOpenEditor": "ABRIR EDITOR",
+  "pdfImportAssignFailed": "No pudimos guardar el plan. Prueba de nuevo.",
+  "pdfImportLevel": "Nivel del plan"
 }
