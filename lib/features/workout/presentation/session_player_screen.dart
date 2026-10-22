@@ -25,9 +25,12 @@ import '../application/session_init.dart';
 import '../application/session_notifier.dart';
 import '../application/session_providers.dart';
 import '../application/phone_duration_timer.dart';
+import '../application/rest_sync_providers.dart';
 import '../application/session_state.dart';
 import '../application/workout_clock.dart';
 import '../domain/duration_timer.dart';
+import '../domain/rest_rules.dart';
+import '../domain/rest_state.dart';
 import '../domain/routine.dart';
 import '../domain/superset_order.dart';
 import '../domain/routine_slot.dart';
@@ -215,29 +218,115 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   bool _isFinalizing = false;
 
   /// Descanso en curso (#1510): cuándo termina y cuánto dura en total. Null =
-  /// no hay. Lo arranca [_logSet] con el `restSeconds` del slot.
+  /// no hay.
+  ///
+  /// Desde #1616 el descanso es COMPARTIDO con el reloj: lo arranca marcar una
+  /// serie acá ([_logSet]) o en la muñeca, y llega por la sesión
+  /// ([_onDescansoRemoto]). Las dos puntas terminan en [_ponerDescanso], que es
+  /// el ÚNICO lugar donde esto se asigna — así, lo que necesite enterarse de un
+  /// cambio de descanso (la notificación de #1617) se engancha ahí y cubre los
+  /// dos orígenes sin saber que existen.
   DateTime? _descansoHasta;
   int _descansoTotal = 0;
 
-  void _empezarDescanso(int segundos) {
+  /// El mismo descanso, con identidad y dueño. La pantalla lee
+  /// [_descansoHasta]; esto sólo hace falta para reescribirlo entero en la
+  /// sesión al estirarlo con +15 s.
+  RestState? _descanso;
+
+  /// El único lugar que cambia el descanso de esta pantalla. Ver
+  /// [_descansoHasta].
+  void _ponerDescanso(RestState? descanso) {
+    if (!mounted) return;
     setState(() {
-      _descansoHasta = clock.now().add(Duration(seconds: segundos));
-      _descansoTotal = segundos;
+      _descanso = descanso;
+      _descansoHasta = descanso?.endsAt;
+      _descansoTotal = descanso?.totalSeconds ?? 0;
     });
   }
 
-  void _terminarDescanso() {
-    if (_descansoHasta == null) return;
-    setState(() => _descansoHasta = null);
+  /// Arranca el descanso de la serie recién marcada y lo anota en la sesión.
+  ///
+  /// Una serie de un ejercicio SIN descanso corta el que viniera corriendo: el
+  /// atleta ya volvió a entrenar. Es lo que ya hacían los dos relojes; con el
+  /// descanso compartido el teléfono no puede ser el único que lo ignore,
+  /// porque quedaría mostrando un descanso que la muñeca ya cortó.
+  void _empezarDescanso(RoutineSlot slot, int setNumber) {
+    if (slot.restSeconds <= 0) {
+      _saltarDescanso();
+      return;
+    }
+    final descanso = RestState.startedAt(
+      exerciseId: slot.exerciseId,
+      setNumber: setNumber,
+      totalSeconds: slot.restSeconds,
+      start: clock.now().toUtc(),
+      owner: RestOwner.telefono,
+    );
+    _ponerDescanso(descanso);
+    _registroDelDescanso()?.anotar(descanso);
   }
 
+  /// SALTAR: lo corta acá y en la sesión, o sea también en el reloj.
+  void _saltarDescanso() {
+    if (_descanso == null) return;
+    _ponerDescanso(null);
+    _registroDelDescanso()?.borrar();
+  }
+
+  /// Llegó a cero solo. NO se escribe nada: el reloj cuenta contra el mismo
+  /// instante de fin y llega a cero a la vez — y vibra a la vez.
+  void _descansoTermino() {
+    if (_descanso == null) return;
+    _ponerDescanso(null);
+  }
+
+  /// +15 s: estira el MISMO descanso, acá y en la sesión.
   void _sumarDescanso(int segundos) {
-    final hasta = _descansoHasta;
-    if (hasta == null) return;
-    setState(() {
-      _descansoHasta = hasta.add(Duration(seconds: segundos));
-      _descansoTotal += segundos;
-    });
+    final estirado = _descanso?.extendedBy(segundos, now: clock.now().toUtc());
+    if (estirado == null) return;
+    _ponerDescanso(estirado);
+    _registroDelDescanso()?.anotar(estirado);
+  }
+
+  /// Lo que la sesión dice del descanso cambió: lo marcó, lo estiró o lo saltó
+  /// el reloj — o es el eco de lo que escribió este teléfono, que la regla
+  /// reconoce y deja pasar sin tocar nada.
+  ///
+  /// Espejar NUNCA escribe: si escribiera, cada aparato le contestaría al otro
+  /// y el descanso rebotaría para siempre. Ver `rest_rules.dart`.
+  void _onDescansoRemoto(RestState? remoto) {
+    final accion = RestRules.decide(
+      local: _descansoHasta,
+      remote: remoto?.endsAt,
+      now: clock.now().toUtc(),
+    );
+    switch (accion) {
+      case RestMirrorAction.adopt:
+        _ponerDescanso(remoto);
+      case RestMirrorAction.stop:
+        _ponerDescanso(null);
+      case RestMirrorAction.keep:
+        break;
+    }
+  }
+
+  /// El que anota el descanso en la sesión, o null si el scope no está.
+  ///
+  /// Se lee del contenedor del player y no con `ref.read`, por lo mismo que
+  /// [_borrarAnotacionDelCronometro] (#817): el `ref` de este `State` cuelga de
+  /// arriba del scope que sabe cuál es la sesión, y el registro que devolvería
+  /// no anotaría nada sin decirlo.
+  RestRecorder? _registroDelDescanso() {
+    final contenedor = _contenedorDelPlayer;
+    if (contenedor == null) return null;
+    try {
+      return contenedor.read(restRecorderProvider);
+    } catch (e) {
+      // Un espejo que no sale no puede tumbar el descanso del teléfono.
+      debugPrint('[descanso] sin registro en la sesión — $e');
+      return null;
+    }
   }
 
   // Navegación libre (SCENARIO-ORDER): bloques `future` que el usuario destrabó
@@ -592,6 +681,15 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     if (slot.effectiveExerciseMode == ExerciseMode.reps && reps <= 0) {
       return;
     }
+    // #1510: el descanso configurado en la rutina arranca solo al marcar la
+    // serie. Una serie nueva reinicia la cuenta (no se apilan).
+    //
+    // #1616: va ANTES que la serie, y no por prolijidad. Las dos son
+    // escrituras de este cliente, y Firestore las confirma en el orden en que
+    // se encolan. El reloj de Apple relee cuando la SERIE queda confirmada
+    // (`reasonSetLogged`): con este orden, para entonces el descanso ya está
+    // en la sesión y lo levanta en esa misma lectura.
+    _empezarDescanso(slot, setNumber);
     ref.read(sessionNotifierProvider(widget.init).notifier).logSet(
           SetLog(
             id: '',
@@ -603,9 +701,6 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             completedAt: DateTime.now(),
           ),
         );
-    // #1510: el descanso configurado en la rutina arranca solo al marcar la
-    // serie. Una serie nueva reinicia la cuenta (no se apilan).
-    if (slot.restSeconds > 0) _empezarDescanso(slot.restSeconds);
   }
 
   /// Actualiza un set ya logueado con nuevos valores de reps y/o peso.
@@ -885,7 +980,10 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                 scopeContext,
                 listen: false,
               );
-              return _cuerpoDelPlayer(state, routineSplit);
+              return _EspejoDelDescanso(
+                onCambio: _onDescansoRemoto,
+                child: _cuerpoDelPlayer(state, routineSplit),
+              );
             },
           ),
         ),
@@ -924,9 +1022,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                 key: ValueKey(_descansoHasta),
                 endsAt: _descansoHasta!,
                 totalSeconds: _descansoTotal,
-                onSkip: _terminarDescanso,
+                onSkip: _saltarDescanso,
                 onAddSeconds: _sumarDescanso,
-                onDone: _terminarDescanso,
+                onDone: _descansoTermino,
               ),
             Expanded(
               child: ScrollConfiguration(
@@ -981,6 +1079,33 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         ),
       ),
     );
+  }
+}
+
+// ── _EspejoDelDescanso ────────────────────────────────────────────────────────
+
+/// Escucha el descanso anotado en la sesión y se lo pasa a la pantalla (#1616).
+///
+/// Es un widget aparte por #817: [sessionRestProvider] está scopeado por la
+/// sesión del player, y el `ref` del `State` de la pantalla cuelga de ARRIBA de
+/// ese scope. Escucharlo desde allá daría el default sin sesión — no oiría nada
+/// y no fallaría, que es la peor combinación. Este widget vive ADENTRO del
+/// scope, así que su `ref` sí resuelve la sesión.
+class _EspejoDelDescanso extends ConsumerWidget {
+  const _EspejoDelDescanso({required this.onCambio, required this.child});
+
+  final ValueChanged<RestState?> onCambio;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<AsyncValue<RestState?>>(sessionRestProvider, (_, next) {
+      // Sólo DATOS. Un loading o un error no dicen nada del descanso, y
+      // leerlos como "no hay" cortaría el del teléfono cada vez que la red
+      // parpadea — justo lo que #1616 promete que no pasa sin red.
+      if (next is AsyncData<RestState?>) onCambio(next.value);
+    });
+    return child;
   }
 }
 

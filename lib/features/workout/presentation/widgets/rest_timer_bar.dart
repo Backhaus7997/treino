@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
+import '../../domain/rest_rules.dart';
 
 /// Cuenta regresiva del descanso entre series, en el teléfono (#1510).
 ///
@@ -44,8 +45,10 @@ class RestTimerBar extends StatefulWidget {
   /// Llegó a cero. Ya vibró; el llamador saca la barra.
   final VoidCallback onDone;
 
-  /// Cuánto se suma con el botón «+15 s».
-  static const int extraSeconds = 15;
+  /// Cuánto se suma con el botón «+15 s». Sale de la regla compartida con el
+  /// reloj (#1616): el +15 s del teléfono se ve en la muñeca, y si cada lado
+  /// sumara su propio número dejarían de coincidir.
+  static const int extraSeconds = RestRules.extraSeconds;
 
   @override
   State<RestTimerBar> createState() => _RestTimerBarState();

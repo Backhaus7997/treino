@@ -54,6 +54,18 @@ class WatchNudgeService {
   /// que llega tarde no puede deduplicar por id.
   static const String reasonSetLogged = 'setLogged';
 
+  /// Cambió el descanso compartido: arrancó, se estiró con +15 s o se saltó
+  /// (#1616).
+  ///
+  /// El reloj de Apple no tiene listeners, así que el descanso que el teléfono
+  /// anota en la sesión le llega recién cuando relee. Con este aviso relee en
+  /// el momento. Va DESPUÉS de la confirmación del servidor, por lo mismo que
+  /// [reasonSetLogged]: avisar antes le hace leer una sesión que todavía no lo
+  /// tiene. Del lado Swift no hace falta nada nuevo: cualquier motivo que no
+  /// sea [reasonAccountChanged] dispara un `sync()`, y es el `sync()` el que
+  /// lee el descanso.
+  static const String reasonRestChanged = 'restChanged';
+
   /// CAMBIÓ EL ATLETA. Hay una credencial nueva esperando en el contexto.
   ///
   /// No le pide al reloj que relea Firestore —eso lo haría con la credencial
