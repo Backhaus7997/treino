@@ -18,6 +18,7 @@ import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/duration_timer.dart';
 import '../domain/duration_timer_owner.dart';
 import '../domain/duration_timer_state.dart';
+import '../domain/rest_state.dart';
 import '../domain/session.dart';
 import '../domain/session_status.dart';
 import '../domain/set_log.dart';
@@ -1094,6 +1095,116 @@ class SessionRepository {
         ownerWatch => DurationTimerOwner.reloj,
         _ => null,
       };
+
+  // ─── Descanso entre series, compartido (#1616) ──────────────────────────
+
+  /// Campos del descanso dentro del doc de sesión.
+  ///
+  /// Mismo patrón que el cronómetro de arriba, por los mismos motivos: ESTADO
+  /// y no mensaje —el aparato que mira tarde lo encuentra igual—, por
+  /// Firestore y no por la Data Layer, e INSTANTE DE FIN en epoch UTC de
+  /// milisegundos. La regla de quién gana y por qué está en `rest_rules.dart`.
+  ///
+  /// ⚠️ Son un contrato con el reloj de Apple, que los escribe por REST:
+  /// `ios/TreinoWatch Watch App/RestRules.swift`. Los nombres y el formato
+  /// están bajo `conformance/rest_timer.json` (casos `decode`).
+  static const String fieldRestExerciseId = 'restExerciseId';
+  static const String fieldRestSetNumber = 'restSetNumber';
+  static const String fieldRestTotalSeconds = 'restTotalSeconds';
+  static const String fieldRestEndsAt = 'restEndsAtMs';
+  static const String fieldRestOwner = 'restOwner';
+
+  /// Anota el descanso en curso: al arrancarlo y al estirarlo con +15 s.
+  ///
+  /// `update` y no `set(merge)`: el descanso cuelga de una sesión que YA
+  /// existe. Con `merge`, una sesión borrada en el medio renacería como un
+  /// documento que sólo tiene el descanso — una sesión fantasma en el
+  /// historial. Mejor que la escritura falle y el espejo no salga.
+  Future<void> writeRest({
+    required String uid,
+    required String sessionId,
+    required RestState rest,
+  }) async {
+    if (uid.isEmpty || sessionId.isEmpty) return;
+    if (rest.totalSeconds <= 0 || rest.exerciseId.isEmpty) return;
+    await _sessions(uid).doc(sessionId).update(restToDoc(rest));
+  }
+
+  /// Borra el descanso. Es SALTAR, venga del aparato que venga.
+  ///
+  /// Al terminar solo NO se borra: el instante de fin ya pasó y todos los
+  /// lectores lo tratan como "no hay descanso". Borrarlo serían tres
+  /// escrituras simultáneas, una por aparato, para no cambiar nada.
+  Future<void> clearRest({
+    required String uid,
+    required String sessionId,
+  }) async {
+    if (uid.isEmpty || sessionId.isEmpty) return;
+    await _sessions(uid).doc(sessionId).update({
+      fieldRestExerciseId: FieldValue.delete(),
+      fieldRestSetNumber: FieldValue.delete(),
+      fieldRestTotalSeconds: FieldValue.delete(),
+      fieldRestEndsAt: FieldValue.delete(),
+      fieldRestOwner: FieldValue.delete(),
+    });
+  }
+
+  /// El descanso anotado en la sesión, o null si no hay.
+  ///
+  /// Emite el valor inicial al suscribirse, así el aparato que entra tarde lo
+  /// encuentra corriendo. `distinct` porque el doc de sesión cambia por muchas
+  /// otras cosas —el cronómetro, el cierre— y cada espejo reacciona sólo a su
+  /// descanso.
+  Stream<RestState?> watchRest({
+    required String uid,
+    required String sessionId,
+  }) {
+    if (uid.isEmpty || sessionId.isEmpty) return Stream.value(null);
+    return _sessions(uid)
+        .doc(sessionId)
+        .snapshots()
+        .map((snap) => restFromDoc(snap.data()))
+        .distinct();
+  }
+
+  /// Lo que se escribe. Público para que el contrato con Swift lo pueda medir.
+  static Map<String, Object> restToDoc(RestState rest) => {
+        fieldRestExerciseId: rest.exerciseId,
+        fieldRestSetNumber: rest.setNumber,
+        fieldRestTotalSeconds: rest.totalSeconds,
+        fieldRestEndsAt: rest.endsAt.toUtc().millisecondsSinceEpoch,
+        fieldRestOwner: switch (rest.owner) {
+          RestOwner.telefono => ownerPhone,
+          RestOwner.reloj => ownerWatch,
+        },
+      };
+
+  /// Lo que se lee. Un documento al que le falta cualquier campo —o con un
+  /// dueño que no se reconoce— se lee como "no hay descanso", igual que el
+  /// cronómetro: medio descanso no se puede espejar con confianza.
+  static RestState? restFromDoc(Map<String, Object?>? data) {
+    if (data == null) return null;
+    final exerciseId = data[fieldRestExerciseId];
+    final setNumber = (data[fieldRestSetNumber] as num?)?.toInt();
+    final totalSeconds = (data[fieldRestTotalSeconds] as num?)?.toInt();
+    final endsAtMs = (data[fieldRestEndsAt] as num?)?.toInt();
+    final owner = switch (data[fieldRestOwner]) {
+      ownerPhone => RestOwner.telefono,
+      ownerWatch => RestOwner.reloj,
+      _ => null,
+    };
+    if (exerciseId is! String || exerciseId.isEmpty) return null;
+    if (setNumber == null || setNumber <= 0) return null;
+    if (totalSeconds == null || totalSeconds <= 0) return null;
+    if (endsAtMs == null || owner == null) return null;
+    return RestState(
+      exerciseId: exerciseId,
+      setNumber: setNumber,
+      totalSeconds: totalSeconds,
+      endsAt: DateTime.fromMillisecondsSinceEpoch(endsAtMs, isUtc: true),
+      owner: owner,
+    );
+  }
 
   // ─── watchSessionFinished ───────────────────────────────────────────────
 

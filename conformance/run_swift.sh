@@ -32,6 +32,7 @@ WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/CountdownRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/EffortBroadcastRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/CatalogGate.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/RestRules.swift"
 )
 
 for src in "${WATCH_SOURCES[@]}"; do

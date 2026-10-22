@@ -874,6 +874,242 @@ private func runCatalogGate(fixtureURL: URL) {
     }
 }
 
+// MARK: - rest_timer
+
+/// Envuelve un documento del fixture como lo entrega la REST API de Firestore:
+/// strings en `stringValue`, enteros como STRING dentro de `integerValue`.
+///
+/// El fixture trae los valores como los ve el SDK de Dart, y el reloj los lee
+/// de la REST API. Envolverlos acá es lo que hace que el caso `decode` mida el
+/// parser REAL del reloj — con el entero de 64 bits adentro de un string, que
+/// es justo donde `Int(raw)` daria nil en la muñeca.
+private func envolverComoREST(_ doc: [String: Any]) -> [String: Any] {
+    var out: [String: Any] = [:]
+    for (clave, valor) in doc {
+        if let s = valor as? String {
+            out[clave] = ["stringValue": s]
+        } else if let n = int64(valor) {
+            out[clave] = ["integerValue": String(n)]
+        }
+    }
+    return out
+}
+
+/// Un documento REST aplanado a texto comparable, clave por clave.
+private func aplanar(_ fields: [String: Any]) -> [String: String] {
+    var out: [String: String] = [:]
+    for (clave, valor) in fields {
+        guard let envoltorio = valor as? [String: Any] else {
+            out[clave] = "?"
+            continue
+        }
+        out[clave] = envoltorio
+            .map { "\($0.key)=\($0.value)" }
+            .sorted()
+            .joined(separator: ",")
+    }
+    return out
+}
+
+private func runRestTimer(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "rest-timer" else {
+        fail("Se esperaba rule 'rest-timer' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    /// Un instante opcional del fixture: `null` es "no hay".
+    func fechaOpt(_ any: Any?) -> Date? {
+        int64(any).map { fecha(desdeMs: $0) }
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard
+            let op = testCase["op"] as? String,
+            let given = testCase["given"] as? [String: Any],
+            let expected = testCase["expect"] as? [String: Any]
+        else {
+            fail("Caso '\(name)' mal formado.")
+            continue
+        }
+
+        switch op {
+        case "remaining":
+            guard
+                let endsAt = fechaOpt(given["endsAtMs"]),
+                let now = fechaOpt(given["nowMs"]),
+                let esperado = int64(expected["remaining"]),
+                let termina = boolOpt(expected["finished"])
+            else {
+                fail("Caso '\(name)' mal formado.")
+                continue
+            }
+            let restante = RestRules.remaining(endsAt: endsAt, now: now)
+            let termino = RestRules.isFinished(endsAt: endsAt, now: now)
+            if Int64(restante) != esperado || termino != termina {
+                fail("Caso '\(name)': se esperaba \(esperado) s (terminado: "
+                    + "\(termina)) y vino \(restante) s (terminado: \(termino)).")
+            }
+
+        case "start":
+            guard
+                let start = fechaOpt(given["startMs"]),
+                let total = int64(given["totalSeconds"]),
+                let esperado = int64(expected["endsAtMs"])
+            else {
+                fail("Caso '\(name)' mal formado.")
+                continue
+            }
+            let fin = RestRules.millis(
+                RestRules.endsAt(start: start, totalSeconds: Int(total))
+            )
+            if fin != esperado {
+                fail("Caso '\(name)': fin — se esperaba \(esperado) y vino \(fin).")
+            }
+
+        case "extend":
+            guard
+                let endsAt = fechaOpt(given["endsAtMs"]),
+                let total = int64(given["totalSeconds"]),
+                let segundos = int64(given["seconds"]),
+                let now = fechaOpt(given["nowMs"])
+            else {
+                fail("Caso '\(name)' mal formado.")
+                continue
+            }
+            let r = RestRules.extend(
+                endsAt: endsAt,
+                totalSeconds: Int(total),
+                seconds: Int(segundos),
+                now: now
+            )
+            let obtenido = r.map { "\(RestRules.millis($0.endsAt)) / \($0.totalSeconds) s" }
+                ?? "nada"
+            let esperado: String
+            if boolOpt(expected["none"]) == true {
+                esperado = "nada"
+            } else if let fin = int64(expected["endsAtMs"]),
+                      let tot = int64(expected["totalSeconds"]) {
+                esperado = "\(fin) / \(tot) s"
+            } else {
+                fail("Caso '\(name)' mal formado.")
+                continue
+            }
+            if obtenido != esperado {
+                fail("Caso '\(name)': se esperaba \(esperado) y vino \(obtenido).")
+            }
+
+        case "mirror":
+            guard
+                let now = fechaOpt(given["nowMs"]),
+                let pendiente = boolOpt(given["localPending"]),
+                let esperado = expected["action"] as? String
+            else {
+                fail("Caso '\(name)' mal formado.")
+                continue
+            }
+            // `localEndsAtMs` y `remoteEndsAtMs` son OPCIONALES a proposito:
+            // su ausencia (null) es un caso del contrato, "no hay descanso".
+            let accion = RestRules.decide(
+                local: fechaOpt(given["localEndsAtMs"]),
+                remote: fechaOpt(given["remoteEndsAtMs"]),
+                localPending: pendiente,
+                now: now
+            )
+            if accion.rawValue != esperado {
+                fail("Caso '\(name)': se esperaba \(esperado) y vino \(accion.rawValue).")
+            }
+
+        case "decode":
+            guard let doc = given["doc"] as? [String: Any] else {
+                fail("Caso '\(name)' mal formado.")
+                continue
+            }
+            let campos = envolverComoREST(doc)
+            let leido = RestRules.parse(fields: campos)
+
+            guard let esperado = expected["rest"] as? [String: Any] else {
+                // `rest: null` en el fixture: no tiene que leerse nada.
+                if let leido {
+                    fail("Caso '\(name)': se esperaba nada y se leyó \(leido).")
+                }
+                continue
+            }
+            guard
+                let exerciseId = esperado["exerciseId"] as? String,
+                let setNumber = int64(esperado["setNumber"]),
+                let total = int64(esperado["totalSeconds"]),
+                let endsAtMs = int64(esperado["endsAtMs"]),
+                let ownerRaw = esperado["owner"] as? String,
+                let owner = RestOwner(rawValue: ownerRaw)
+            else {
+                fail("Caso '\(name)' mal formado.")
+                continue
+            }
+            let debe = SharedRest(
+                exerciseId: exerciseId,
+                setNumber: Int(setNumber),
+                totalSeconds: Int(total),
+                endsAt: fecha(desdeMs: endsAtMs),
+                owner: owner
+            )
+            // Con otro nombre y no `guard let leido`: re-ligar una constante
+            // en el MISMO scope no compila en todas las versiones de Swift, y
+            // este archivo no se puede compilar en la maquina del que lo
+            // escribe.
+            guard let real = leido else {
+                fail("Caso '\(name)': se esperaba \(debe) y no se leyó nada.")
+                continue
+            }
+            // Se compara por milisegundos y no por `Date`: un `Date` que vino
+            // de dividir por mil puede diferir en el ultimo bit sin que el
+            // instante cambie.
+            if real.exerciseId != debe.exerciseId
+                || real.setNumber != debe.setNumber
+                || real.totalSeconds != debe.totalSeconds
+                || real.endsAtMs != debe.endsAtMs
+                || real.owner != debe.owner {
+                fail("Caso '\(name)': se esperaba \(debe) y se leyó \(real).")
+                continue
+            }
+            // Y al revés: escribirlo tiene que dar EXACTAMENTE el documento que
+            // lee el telefono.
+            let escrito = aplanar(RestRules.encode(real))
+            let original = aplanar(campos)
+            if escrito != original {
+                fail("Caso '\(name)': al escribirlo — se esperaba \(original) "
+                    + "y vino \(escrito).")
+            }
+
+        default:
+            fail("Caso '\(name)': operación desconocida '\(op)'.")
+        }
+    }
+}
+
 // MARK: - main
 
 // El script pasa la raíz de `conformance/` como primer argumento.
@@ -893,6 +1129,7 @@ runSupersetOrder(fixtureURL: conformanceDir.appendingPathComponent("superset_ord
 runDurationTimer(fixtureURL: conformanceDir.appendingPathComponent("duration_timer.json"))
 runEffortPayload(fixtureURL: conformanceDir.appendingPathComponent("effort_payload.json"))
 runCatalogGate(fixtureURL: conformanceDir.appendingPathComponent("catalog_gate.json"))
+runRestTimer(fixtureURL: conformanceDir.appendingPathComponent("rest_timer.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")
