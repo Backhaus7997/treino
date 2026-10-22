@@ -5794,4 +5794,16 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get authSignOutConfirmAction => 'Sign out';
+
+  @override
+  String get sessionRestEndedTitle => 'Rest is over';
+
+  @override
+  String get sessionRestEndedBody => 'Back to your set';
+
+  @override
+  String get sessionRestCountdownTitle => 'Rest';
+
+  @override
+  String get sessionRestCountdownBody => 'Back to your set when it hits zero';
 }

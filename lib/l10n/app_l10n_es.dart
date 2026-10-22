@@ -5898,6 +5898,19 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get authSignOutConfirmAction => 'Salir';
+
+  @override
+  String get sessionRestEndedTitle => 'Terminó el descanso';
+
+  @override
+  String get sessionRestEndedBody => 'Vuelve a la serie';
+
+  @override
+  String get sessionRestCountdownTitle => 'Descanso';
+
+  @override
+  String get sessionRestCountdownBody =>
+      'Vuelve a la serie cuando llegue a cero';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -11791,4 +11804,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get authSignOutConfirmAction => 'Salir';
+
+  @override
+  String get sessionRestEndedTitle => 'Terminó el descanso';
+
+  @override
+  String get sessionRestEndedBody => 'Volvé a la serie';
+
+  @override
+  String get sessionRestCountdownTitle => 'Descanso';
+
+  @override
+  String get sessionRestCountdownBody =>
+      'Volvé a la serie cuando llegue a cero';
 }
