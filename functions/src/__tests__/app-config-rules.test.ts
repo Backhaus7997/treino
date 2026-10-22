@@ -139,3 +139,41 @@ describe("app_config/email_gate — lectura con sesión, escritura de nadie", ()
     await assertFails(conSesion().collection("app_config").doc("email_gate").delete());
   });
 });
+
+describe("app_config/pdf_import — lo lee solo un PF, no lo escribe nadie", () => {
+  const PF = "pf-kill-switch";
+  const pf = () => testEnv.authenticatedContext(PF).firestore();
+
+  beforeEach(async () => {
+    await sembrar("users", PF, { role: "trainer" });
+    await sembrar("users", UID, { role: "athlete" });
+  });
+
+  it("un PF lee el kill switch", async () => {
+    await sembrar("app_config", "pdf_import", { enabled: false, allowlistUids: [PF] });
+
+    await assertSucceeds(pf().collection("app_config").doc("pdf_import").get());
+  });
+
+  it("un PF lo lee aunque el documento no exista (apagado)", async () => {
+    await assertSucceeds(pf().collection("app_config").doc("pdf_import").get());
+  });
+
+  it("un alumno NO lo lee: trae la lista de uids de prueba", async () => {
+    await sembrar("app_config", "pdf_import", { enabled: false, allowlistUids: [PF] });
+
+    await assertFails(conSesion().collection("app_config").doc("pdf_import").get());
+  });
+
+  it("sin sesión NO se lee", async () => {
+    await sembrar("app_config", "pdf_import", { enabled: true });
+
+    await assertFails(sinSesion().collection("app_config").doc("pdf_import").get());
+  });
+
+  it("un PF NO lo puede escribir", async () => {
+    await assertFails(
+      pf().collection("app_config").doc("pdf_import").set({ enabled: true, allowlistUids: [PF] }),
+    );
+  });
+});

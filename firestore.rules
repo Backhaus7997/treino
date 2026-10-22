@@ -5320,6 +5320,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Kill switch del import de PDF: `app_config/pdf_import` con
+    // `{enabled, allowlistUids?, model?, effort?}` (docs/plan-import-pdf.md).
+    // La barrera es el callable, que lo relee en cada llamada; la app lo lee
+    // SOLO para esconder el CTA (`pdfImportGateProvider`). Lo leen únicamente
+    // los PF: trae `allowlistUids`, y un alumno no tiene por qué ver qué
+    // cuentas están probando la feature. Solo `get`; lo escribe el equipo.
+    match /app_config/pdf_import {
+      allow get: if request.auth != null
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer';
+      allow write: if false;
+    }
+
     // Cupo de imports de plan desde PDF (`parsePlanPdf`,
     // functions/src/pdf-import/): un doc por PF con lo usado en la semana
     // (lunes a domingo, hora de Buenos Aires) y en el día. Lo lee SOLO su
