@@ -212,6 +212,9 @@ class _PlanPdfImportPreviewScreenState
   }
 
   Future<void> _assign() async {
+    // Dos taps en el mismo frame llegan los dos antes de que el botón se
+    // redibuje deshabilitado: sin esto, son dos rutinas.
+    if (_saving) return;
     final l10n = AppL10n.of(context);
     final draft = _controller.draft;
     final uid = ref.read(currentUidProvider);

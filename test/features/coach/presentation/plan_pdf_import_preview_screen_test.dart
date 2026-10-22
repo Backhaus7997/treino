@@ -451,6 +451,28 @@ void main() {
       expect(find.text('FICHA'), findsOneWidget);
     });
 
+    testWidgets('dos taps en el mismo frame crean una sola rutina',
+        (tester) async {
+      final pending = Completer<Routine>();
+      when(() => routineRepo.createAssigned(any()))
+          .thenAnswer((_) => pending.future);
+      await pump(tester, _resolved());
+
+      // Sin pump entre los dos: el botón todavía está habilitado.
+      await tester.tap(assignButton());
+      await tester.tap(assignButton());
+      await tester.pump();
+
+      verify(() => routineRepo.createAssigned(any())).called(1);
+      pending.complete(const Routine(
+          id: 'nuevo-1',
+          name: 'Plan de Ana',
+          level: ExperienceLevel.intermediate,
+          days: []));
+      await tester.pumpAndSettle();
+      verifyNever(() => routineRepo.createAssigned(any()));
+    });
+
     testWidgets('si falla, el error queda en la pantalla y el plan también',
         (tester) async {
       when(() => routineRepo.createAssigned(any()))
