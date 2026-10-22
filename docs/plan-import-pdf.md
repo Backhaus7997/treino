@@ -89,7 +89,7 @@ Errores (`HttpsError`):
 |---|---|---|
 | `unauthenticated` | sin auth | no se toca |
 | `permission-denied` | no es `role == "trainer"` | no se toca |
-| `failed-precondition` | kill switch apagado | no se toca |
+| `failed-precondition` | kill switch apagado (sin `details`); o Vertex rechaza los structured outputs por la org policy (`details: { reason: "structured_outputs_disabled" }`, ver Rollout paso 3) | no se toca / **se devuelve** |
 | `invalid-argument` | no es PDF, > 5 MB, > 20 páginas o cifrado/con contraseña; `details: { reason: "not_pdf" \| "too_big" \| "too_many_pages" \| "encrypted" }` | no se toca |
 | `resource-exhausted` | sin cupo; `details: { scope: "week" \| "day", resetsAt: ISO }` | — |
 | `deadline-exceeded` | el LLM tardó demasiado | **se devuelve** |
@@ -352,6 +352,44 @@ el PDF lo dice la política de privacidad, que sí nombra a los encargados
 3. **Habilitar Vertex AI** (Model Garden, modelo Claude) en `treino-dev`.
    **`treino-dev` ES producción** (AGENTS.md): lo hace un humano, con OK
    explícito. Deploy filtrado con `--only functions:parsePlanPdf`.
+
+   **Permitir los structured outputs (obligatorio).** En Vertex AI están
+   **denegados por defecto** para todo proyecto dentro de una organización —y
+   `treino-dev` lo está— por la org policy
+   `constraints/vertexai.allowedPartnerModelFeatures` (docs de Google Cloud
+   «Control access to Model Garden models» y «Structured outputs with Anthropic
+   Claude models», 2026-10-21). Sin este paso **todo** import falla antes de la
+   inferencia: el callable lo devuelve como `failed-precondition` con
+   `reason: "structured_outputs_disabled"`, devuelve el cupo y deja un log que
+   nombra la policy. Strict tool use no lo esquiva: Google lo cuenta como parte
+   de la misma feature.
+
+   La policy se puede poner a nivel proyecto (la de proyecto puede pisar la de
+   la organización; requiere `roles/orgpolicy.policyAdmin`). Un archivo
+   `policy.yaml` con un valor por cada modelo que se vaya a usar:
+
+   ```yaml
+   name: projects/treino-dev/policies/vertexai.allowedPartnerModelFeatures
+   spec:
+     rules:
+       - values:
+           allowedValues:
+             - publishers/anthropic/models/claude-opus-5-5:structured_outputs
+             - publishers/anthropic/models/claude-sonnet-5-5:structured_outputs
+             - publishers/anthropic/models/claude-haiku-5-5:structured_outputs
+   ```
+
+   ```bash
+   gcloud org-policies set-policy policy.yaml --project=treino-dev
+   gcloud org-policies describe vertexai.allowedPartnerModelFeatures --project=treino-dev --effective
+   ```
+
+   Por consola: IAM y administración → Políticas de la organización →
+   `vertexai.allowedPartnerModelFeatures` → *Administrar política* sobre el
+   proyecto `treino-dev` → valores permitidos personalizados, los mismos tres.
+   Un `deny` explícito en un nivel superior gana sobre este `allow`: si después
+   del cambio el log sigue diciendo `structured_outputs_disabled`, mirar la
+   policy efectiva (el segundo comando).
 4. **Evaluación con 10 a 20 PDFs reales** de PFs, variados a propósito: tablas,
    prosa, superseries, semanas en columnas y **al menos uno escaneado**. Se
    empieza con **`claude-opus-5-5`** como techo de calidad. Por cada PDF se

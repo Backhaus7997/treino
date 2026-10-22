@@ -360,6 +360,19 @@ describe("falla nuestra: se devuelve el cupo", () => {
     expect(await usage()).toMatchObject({ weekCount: 0, dayCount: 0 });
   });
 
+  it("structured outputs denegados por la org policy: failed-precondition con motivo y cupo devuelto", async () => {
+    await seedTrainer();
+    const f = fakeExtractor(() => {
+      throw new ExtractorError("feature_disabled", "400: structured_outputs not allowed");
+    });
+    await expectHttpsError(
+      runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1 }),
+      "failed-precondition",
+      { reason: "structured_outputs_disabled" },
+    );
+    expect(await usage()).toMatchObject({ weekCount: 0, dayCount: 0 });
+  });
+
   it("la devolucion no toca el uso previo: 1 usado + 1 fallido = 1", async () => {
     await seedTrainer();
     const ok = fakeExtractor(() => planWith([null]));

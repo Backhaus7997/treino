@@ -16,7 +16,7 @@
  * cupo.
  */
 import AnthropicVertex from "@anthropic-ai/vertex-sdk";
-import { APIConnectionTimeoutError, APIUserAbortError } from "@anthropic-ai/sdk";
+import { APIConnectionTimeoutError, APIError, APIUserAbortError } from "@anthropic-ai/sdk";
 import { buildSystemPrompt, CatalogEntry, USER_TEXT } from "./prompt";
 import { PDF_PLAN_EXTRACTION_SCHEMA } from "./extraction";
 
@@ -45,13 +45,55 @@ export interface ExtractResult {
   model: string;
 }
 
-export type ExtractorErrorKind = "timeout" | "refusal" | "truncated" | "bad_output" | "provider";
+export type ExtractorErrorKind =
+  | "timeout"
+  | "refusal"
+  | "truncated"
+  | "bad_output"
+  | "feature_disabled"
+  | "provider";
 
 export class ExtractorError extends Error {
   constructor(public readonly kind: ExtractorErrorKind, message: string) {
     super(message);
     this.name = "ExtractorError";
   }
+}
+
+/**
+ * Clasifica un error del SDK en el `kind` que entiende el callable.
+ *
+ * `feature_disabled`: en Vertex AI los structured outputs (`output_config.format`
+ * y strict tool use) estan DENEGADOS POR DEFECTO para todo proyecto dentro de
+ * una organizacion, por la org policy `constraints/vertexai.allowedPartnerModelFeatures`
+ * (docs de Google Cloud, «Control access to Model Garden models» y «Structured
+ * outputs with Anthropic Claude models», actualizadas al 2026-10-21). treino-dev
+ * esta en una organizacion. Sin ese permiso cada import se rechaza antes de la
+ * inferencia; el callable lo convierte en un `failed-precondition` con motivo,
+ * en vez de un `internal` mudo.
+ *
+ * Google no documenta el texto exacto del rechazo, asi que se reconoce por lo
+ * que tiene que nombrar: la feature o la policy. Un 400/403 que no las nombra
+ * sigue siendo `provider` (y el log lleva status y mensaje para diagnosticarlo).
+ */
+export function classifyProviderError(e: unknown): ExtractorError {
+  if (
+    e instanceof APIConnectionTimeoutError ||
+    e instanceof APIUserAbortError ||
+    (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError"))
+  ) {
+    return new ExtractorError("timeout", "LLM call timed out.");
+  }
+  const message = e instanceof Error ? e.message : String(e);
+  if (
+    e instanceof APIError &&
+    (e.status === 400 || e.status === 403) &&
+    /structured[_ ]?outputs?|allowedPartnerModelFeatures|organization policy|org policy/i.test(message)
+  ) {
+    return new ExtractorError("feature_disabled", `${e.status}: ${message}`);
+  }
+  const status = e instanceof APIError && e.status != null ? `${e.status}: ` : "";
+  return new ExtractorError("provider", `${status}${message}`);
 }
 
 export interface PlanExtractor {
@@ -125,14 +167,7 @@ export function vertexPlanExtractor(projectId: string): PlanExtractor {
           })
           .finalMessage();
       } catch (e) {
-        if (
-          e instanceof APIConnectionTimeoutError ||
-          (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) ||
-          (e instanceof APIUserAbortError)
-        ) {
-          throw new ExtractorError("timeout", "LLM call timed out.");
-        }
-        throw new ExtractorError("provider", e instanceof Error ? e.message : String(e));
+        throw classifyProviderError(e);
       }
 
       if (message.stop_reason === "refusal") {

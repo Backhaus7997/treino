@@ -256,6 +256,20 @@ export async function runParsePlanPdf(
       if (e.kind === "timeout") {
         throw new HttpsError("deadline-exceeded", "The PDF took too long to process.");
       }
+      if (e.kind === "feature_disabled") {
+        // No es culpa del PF ni del archivo: falta un paso de rollout. El log
+        // dice cual, para que nadie lo tenga que adivinar desde un `internal`.
+        logger.error(
+          "parsePlanPdf: Vertex rechazo los structured outputs. Falta permitir " +
+            "`publishers/anthropic/models/<modelo>:structured_outputs` en la org policy " +
+            "constraints/vertexai.allowedPartnerModelFeatures del proyecto " +
+            "(docs/plan-import-pdf.md, rollout).",
+          { uid, model: config.model, message: e.message },
+        );
+        throw new HttpsError("failed-precondition", "PDF import is not available.", {
+          reason: "structured_outputs_disabled",
+        });
+      }
       throw new HttpsError("internal", "The PDF could not be processed.");
     }
     logger.error("parsePlanPdf: error inesperado", { uid, error: String(e) });
