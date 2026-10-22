@@ -54,6 +54,7 @@ import 'features/watch/application/wear_session_providers.dart';
 import 'features/auth/application/auth_providers.dart';
 import 'features/watch/application/wear_pairing_providers.dart';
 import 'features/watch/application/wear_push_providers.dart';
+import 'features/watch/application/wear_rest_sync_providers.dart';
 import 'features/watch/application/wear_timer_sync_providers.dart';
 import 'features/watch/application/wear_routine_list_providers.dart';
 import 'features/watch/application/wear_today_providers.dart';
@@ -282,6 +283,10 @@ class _WearHomeState extends ConsumerState<_WearHome> {
     // Idem: sin esto nadie escucha lo que manda el teléfono sobre el
     // temporizador y la sincronización es código muerto.
     ref.watch(wearTimerInboxProvider);
+
+    // Y lo mismo con el descanso compartido (#1616): sin esto el descanso que
+    // arranca el teléfono nunca llega a la muñeca.
+    ref.watch(wearRestInboxProvider);
 
     final pairing = ref.watch(wearPairingProvider);
 

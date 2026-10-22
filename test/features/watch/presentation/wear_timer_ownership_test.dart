@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/features/watch/application/wear_rest_providers.dart';
+import 'package:treino/features/watch/application/wear_rest_sync_providers.dart';
 import 'package:treino/features/watch/application/wear_timer_sync_providers.dart';
 import 'package:treino/features/watch/data/wear_workout_service.dart';
 import 'package:treino/features/watch/domain/watch_effort.dart';
@@ -16,6 +17,8 @@ import 'package:treino/features/workout/domain/set_spec.dart';
 class _ServicioFalso extends Mock implements WearWorkoutService {}
 
 class _SyncFalso extends Mock implements WearTimerSync {}
+
+class _DescansoFalso extends Mock implements WearRestSync {}
 
 /// **El lado que arranca el cronómetro es el dueño de la serie. El otro la
 /// espeja y no la carga.**
@@ -35,6 +38,7 @@ void main() {
 
   late _ServicioFalso service;
   late _SyncFalso sync;
+  late _DescansoFalso descanso;
   late StreamController<WearExerciseTimer?> temporizador;
   late List<({String exerciseId, int setNumber})> marcadas;
 
@@ -55,6 +59,14 @@ void main() {
     marcadas = [];
     when(() => service.startRest(any())).thenAnswer((_) async {});
     when(sync.cancelar).thenAnswer((_) async {});
+    descanso = _DescansoFalso();
+    when(
+      () => descanso.arrancar(
+        exerciseId: any(named: 'exerciseId'),
+        setNumber: any(named: 'setNumber'),
+        seconds: any(named: 'seconds'),
+      ),
+    ).thenAnswer((_) async {});
   });
 
   tearDown(() {
@@ -93,6 +105,7 @@ void main() {
         overrides: [
           wearWorkoutServiceProvider.overrideWithValue(service),
           wearTimerSyncProvider.overrideWithValue(sync),
+          wearRestSyncProvider.overrideWithValue(descanso),
           wearExerciseTimerProvider.overrideWith((ref) => temporizador.stream),
           wearRestProvider.overrideWith((ref) => Stream.value(null)),
           wearEffortProvider.overrideWith(
@@ -134,8 +147,12 @@ void main() {
 
       expect(marcadas, [(exerciseId: 'plancha', setNumber: 1)]);
       // Terminar de aguantar es terminar la serie: el descanso arranca igual
-      // que en una serie normal.
-      verify(() => service.startRest(60)).called(1);
+      // que en una serie normal — y desde #1616 por el camino compartido, con
+      // la identidad de la serie que se acaba de marcar.
+      verify(
+        () =>
+            descanso.arrancar(exerciseId: 'plancha', setNumber: 1, seconds: 60),
+      ).called(1);
     });
 
     testWidgets('un cronómetro del TELÉFONO no marca nada', (tester) async {
@@ -146,6 +163,13 @@ void main() {
       // El teléfono es el dueño y ya la marcó. Si este reloj la marcara
       // también, el atleta la vería repetida en el historial.
       expect(marcadas, isEmpty);
+      verifyNever(
+        () => descanso.arrancar(
+          exerciseId: any(named: 'exerciseId'),
+          setNumber: any(named: 'setNumber'),
+          seconds: any(named: 'seconds'),
+        ),
+      );
       verifyNever(() => service.startRest(any()));
     });
 
