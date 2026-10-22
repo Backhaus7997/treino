@@ -32,6 +32,21 @@ typedef TextosDelAviso = ({String titulo, String cuerpo});
 ///   haya salido;
 /// - si el instante cambia mientras está agendado, reagenda.
 ///
+/// ## El fin natural del descanso NO cancela
+///
+/// Lo que cancela es VOLVER, SALTAR, un descanso nuevo y cerrar la sesión; que
+/// el descanso llegue a cero, no. El cero lo ve la barra (`RestTimerBar`) y
+/// llama a `update(null)`, y ve el cero a la misma hora que la alarma —o ANTES,
+/// si la alarma es inexacta—, o apenas descongela el proceso, justo cuando el
+/// sistema está por publicar la notificación. Cancelar ahí la mata: medido en
+/// un emulador, el aviso no se llegó a mostrar nunca.
+///
+/// Por eso `update(null)` cuando el instante vigente YA pasó se toma como «el
+/// descanso terminó solo» y no toca nada, ni lo agendado ni lo publicado. Se
+/// limpia al volver a primer plano o con el próximo `update` de un instante
+/// futuro. Una sola regla, adentro de esta clase: quien arranque descansos
+/// (la pantalla, el reloj) no tiene que distinguir cómo terminaron.
+///
 /// Mirar el ciclo de vida acá adentro, y no en cada pantalla, es lo que permite
 /// que cualquier otro origen de descanso (el que arranca el reloj, #1616) use
 /// el MISMO enganche sin duplicar la regla.
@@ -81,15 +96,30 @@ class RestEndAlerts with WidgetsBindingObserver {
   /// El descanso en curso termina en [endsAt]; `null` = no hay descanso.
   ///
   /// Idempotente: repetir el mismo valor no toca el plugin.
+  ///
+  /// `null` con el instante vigente ya vencido es el fin NATURAL del descanso:
+  /// no se toca nada (ver la clase). Para retirar todo pase lo que pase, [cancel].
   void update(DateTime? endsAt) {
+    final vigente = _fin;
+    if (endsAt == null && vigente != null && !vigente.isAfter(clock.now())) {
+      return;
+    }
     _fin = endsAt;
+    _conciliar();
+  }
+
+  /// La sesión terminó o se abandonó: no queda nada que avisar. Retira lo
+  /// agendado y lo ya publicado AUNQUE el descanso haya terminado solo, que es
+  /// la diferencia con `update(null)`.
+  void cancel() {
+    _fin = null;
     _conciliar();
   }
 
   /// Deja de mirar el ciclo de vida y retira lo que haya agendado.
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    update(null);
+    cancel();
   }
 
   @override

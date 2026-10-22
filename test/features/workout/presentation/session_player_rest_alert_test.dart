@@ -217,6 +217,55 @@ void main() {
     expect(falso.cancelados, [kIdFinDeDescanso]);
   });
 
+  // Medido en un emulador: la barra llega a cero con la app en segundo plano
+  // (o apenas se descongela el proceso) y su `onDone` cancelaba el aviso justo
+  // antes de que el sistema lo publicara. Con el ciclo de vida REAL en `paused`
+  // Flutter no arma frames, pero los timers corren: el tick de la barra llega al
+  // cero igual.
+  testWidgets(
+      'el descanso llega a cero con la app en segundo plano: el aviso NO se '
+      'cancela, y al volver sí', (tester) async {
+    await montar(tester, series: 3);
+    await marcarSerie(tester);
+    await irseAlSegundoPlano(tester);
+    expect(falso.agendados, hasLength(1));
+
+    await tester.pump(const Duration(seconds: 91));
+
+    expect(falso.cancelados, isEmpty,
+        reason: 'el fin natural del descanso no retira el aviso');
+    expect(falso.agendados, hasLength(1));
+
+    await volver(tester);
+
+    expect(falso.cancelados, [kIdFinDeDescanso]);
+    // Y la barra se fue sola: el `onDone` sí corrió (el test no es vacuo).
+    expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+  });
+
+  testWidgets(
+      'terminar la sesión DESPUÉS de que el descanso terminó solo igual retira '
+      'el aviso', (tester) async {
+    await montar(tester, series: 3);
+    await marcarSerie(tester);
+    // Sólo el observador: con el ciclo de vida real en `paused` el árbol no se
+    // puede reemplazar (ver el test de abajo).
+    container
+        .read(restEndAlertsProvider)
+        .didChangeAppLifecycleState(AppLifecycleState.paused);
+    await tester.pump();
+    expect(falso.agendados, hasLength(1));
+
+    await tester.pump(const Duration(seconds: 91));
+    expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+    expect(falso.cancelados, isEmpty);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+
+    expect(falso.cancelados, [kIdFinDeDescanso]);
+  });
+
   testWidgets(
       'terminar o abandonar la sesión (la pantalla se va) retira el aviso',
       (tester) async {

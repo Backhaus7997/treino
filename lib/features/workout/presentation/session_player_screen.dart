@@ -230,7 +230,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// ÚNICO punto donde cambia el descanso: arranque, «+15 s», SALTAR, llegar a
   /// cero. Todo lo que mueve [_descansoHasta] pasa por acá, así no hay un
   /// camino que cambie la barra y deje la notificación agendada para la hora
-  /// vieja.
+  /// vieja. Llegar a cero (`onDone`) llega a [_avisos] como `update(null)` con el
+  /// instante ya vencido, y `RestEndAlerts` lo toma como fin natural: NO cancela
+  /// el aviso, que a esa hora está por salir.
   void _fijarDescanso(DateTime? hasta, {int? total}) {
     setState(() {
       _descansoHasta = hasta;
@@ -246,8 +248,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// Se llama desde [_fijarDescanso] y desde el listener de la sesión completa
   /// (que puede cambiar DESPUÉS del descanso, porque `logSet` es asíncrono).
   /// `dispose` no pasa por acá: no conviene leer providers mientras la pantalla
-  /// se desmonta, y no hace falta (el valor es siempre `null`): le habla a
-  /// [_avisos] directo.
+  /// se desmonta, y no hace falta: le habla a [_avisos] directo, con `cancel`.
   void _sincronizarAviso() {
     final completa = ref
             .read(sessionNotifierProvider(widget.init))
@@ -480,8 +481,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     _cronometroTick?.cancel();
     // La pantalla se va (TERMINAR, ABANDONAR, volver atrás): ya no hay descanso
     // que esperar, y una notificación agendada anunciaría «Volvé a la serie»
-    // de una sesión que ya terminó.
-    _avisos.update(null);
+    // de una sesión que ya terminó. `cancel` y no `update(null)`: éste toma un
+    // descanso ya vencido por «terminó solo» y no retira nada.
+    _avisos.cancel();
     super.dispose();
   }
 

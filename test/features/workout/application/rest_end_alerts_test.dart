@@ -257,6 +257,146 @@ void main() {
     });
   });
 
+  // Medido en un emulador (Android 17): la notificación NO se llegaba a mostrar
+  // nunca. El cero de la cuenta lo ve la barra —a la misma hora que la alarma, o
+  // antes si es inexacta, o apenas descongela el proceso— y llama a
+  // `update(null)`. Si eso cancelaba, mataba el aviso justo cuando el sistema lo
+  // iba a publicar («Cannot find enqueued record for key»).
+  group('el fin NATURAL del descanso no cancela el aviso', () {
+    /// Corre [cuerpo] con un reloj que el test mueve a mano.
+    Future<void> conReloj(
+      Future<void> Function(
+              DateTime Function() ahora, void Function(DateTime) ir)
+          cuerpo,
+    ) async {
+      var ahora = DateTime(2026, 10, 22, 10, 40);
+      await withClock(
+        Clock(() => ahora),
+        () => cuerpo(() => ahora, (t) => ahora = t),
+      );
+    }
+
+    test('update(null) con el instante vencido no toca lo agendado; volver sí',
+        () async {
+      await conReloj((ahora, ir) async {
+        await armar();
+        final fin = ahora().add(const Duration(seconds: 199));
+        alertas.update(fin);
+        segundoPlano();
+        await reposo();
+        expect(falso.eventos, ['agendar:$kIdFinDeDescanso']);
+
+        // El reloj llega al cero: el tick de la barra (o el proceso al
+        // descongelarse) avisa que el descanso terminó.
+        ir(fin);
+        alertas.update(null);
+        await reposo();
+        expect(falso.cancelados, isEmpty,
+            reason: 'cancelar acá mata la notificación antes de publicarse');
+
+        // Y recién al volver se retira, junto con la que ya haya salido.
+        primerPlano();
+        await reposo();
+        expect(falso.cancelados, [kIdFinDeDescanso]);
+      });
+    });
+
+    // Control negativo del de arriba: SALTAR un segundo ANTES del cero sigue
+    // cancelando. Sin esto, una regla que ignorara TODO `update(null)` pasaría
+    // el test anterior y dejaría un aviso de un descanso saltado.
+    test('update(null) ANTES del instante (SALTAR) sigue cancelando', () async {
+      await conReloj((ahora, ir) async {
+        await armar();
+        final fin = ahora().add(const Duration(seconds: 199));
+        alertas.update(fin);
+        segundoPlano();
+        await reposo();
+
+        ir(fin.subtract(const Duration(seconds: 1)));
+        alertas.update(null);
+        await reposo();
+
+        expect(falso.cancelados, [kIdFinDeDescanso]);
+      });
+    });
+
+    test('un segundo update(null) tras el fin natural tampoco cancela',
+        () async {
+      // El cero de la barra y el listener de la sesión completa pueden llegar
+      // los dos con `null`.
+      await conReloj((ahora, ir) async {
+        await armar();
+        final fin = ahora().add(const Duration(seconds: 90));
+        alertas.update(fin);
+        segundoPlano();
+        await reposo();
+
+        ir(fin);
+        alertas.update(null);
+        alertas.update(null);
+        await reposo();
+
+        expect(falso.cancelados, isEmpty);
+      });
+    });
+
+    test('un descanso nuevo después del fin natural se agenda', () async {
+      await conReloj((ahora, ir) async {
+        await armar();
+        final fin = ahora().add(const Duration(seconds: 90));
+        alertas.update(fin);
+        segundoPlano();
+        await reposo();
+        ir(fin);
+        alertas.update(null);
+        await reposo();
+
+        // El reloj arranca otro descanso con la app todavía en segundo plano.
+        final otro = ahora().add(const Duration(seconds: 60));
+        alertas.update(otro);
+        await reposo();
+
+        expect(falso.eventos,
+            ['agendar:$kIdFinDeDescanso', 'agendar:$kIdFinDeDescanso']);
+        expect(falso.agendados.last.cuando.isAtSameMomentAs(otro), isTrue);
+      });
+    });
+
+    test('cancel() retira todo aunque el descanso haya terminado solo',
+        () async {
+      // Terminar o abandonar la sesión: no hay nada que avisar.
+      await conReloj((ahora, ir) async {
+        await armar();
+        final fin = ahora().add(const Duration(seconds: 90));
+        alertas.update(fin);
+        segundoPlano();
+        await reposo();
+        ir(fin);
+        alertas.update(null);
+        await reposo();
+        expect(falso.cancelados, isEmpty);
+
+        alertas.cancel();
+        await reposo();
+
+        expect(falso.cancelados, [kIdFinDeDescanso]);
+      });
+    });
+
+    test('con la app en primer plano el fin natural no hace nada', () async {
+      await conReloj((ahora, ir) async {
+        await armar();
+        final fin = ahora().add(const Duration(seconds: 90));
+        alertas.update(fin);
+        ir(fin);
+        alertas.update(null);
+        await reposo();
+
+        expect(falso.eventos, isEmpty);
+      });
+    });
+  });
+
   group('reagenda', () {
     test('con +15 s: el MISMO id con el instante nuevo', () async {
       await armar();
