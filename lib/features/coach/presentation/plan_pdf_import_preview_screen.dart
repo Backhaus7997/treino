@@ -17,6 +17,9 @@ import '../../../l10n/app_l10n.dart';
 import '../../coach_hub/application/plan_import_preview_controller.dart';
 import '../../coach_hub/application/plan_import_providers.dart';
 import '../../coach_hub/data/exercise_matcher.dart';
+import '../../coach_hub/data/periodized_import_draft.dart';
+import '../../coach_hub/data/plan_pdf_import_service.dart'
+    show kPdfPlanNameMaxLength;
 import '../../coach_hub/domain/periodized_plan.dart';
 import '../../coach_hub/presentation/widgets/create_custom_exercise_dialog.dart';
 import '../../coach_hub/presentation/widgets/import_plan_widgets.dart';
@@ -68,6 +71,50 @@ class _PlanPdfImportPreviewScreenState
   /// pisar esa navegación (mismo bug que la vista previa del Coach Hub).
   bool _leaving = false;
 
+  /// Nombre de la rutina, editable. Arranca con el del borrador (el del
+  /// archivo, saneado) y cada cambio vuelve al borrador con `withName`.
+  final TextEditingController _nameController = TextEditingController();
+  final FocusNode _nameFocus = FocusNode();
+  bool _nameSeeded = false;
+
+  /// La moderación rechazó el nombre: se muestra en el campo, no abajo.
+  String? _nameError;
+
+  /// Leído en [initState]: en [dispose] ya no se puede usar `ref`.
+  late final StateController<PeriodizedImportDraft?> _draftStore;
+
+  @override
+  void initState() {
+    super.initState();
+    _draftStore = ref.read(periodizedImportProvider.notifier);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _nameFocus.dispose();
+    // Se fue sin asignar ni descartar (la ruta se cerró por otro lado): el
+    // borrador no queda colgado para la próxima vista previa. Fuera del
+    // frame, porque modificar un provider mientras se desmonta el árbol no
+    // está permitido; y sólo si nadie lo reemplazó mientras tanto.
+    final store = _draftStore;
+    final left = store.mounted ? store.state : null;
+    if (!_leaving && left != null) {
+      Future.microtask(() {
+        if (store.mounted && identical(store.state, left)) store.state = null;
+      });
+    }
+    super.dispose();
+  }
+
+  void _onNameChanged(String value) {
+    _controller.rename(value);
+    setState(() {
+      _touched = true;
+      _nameError = null;
+    });
+  }
+
   PlanImportPreviewController get _controller =>
       ref.read(planImportPreviewControllerProvider);
 
@@ -75,7 +122,12 @@ class _PlanPdfImportPreviewScreenState
       ? context.pop()
       : context.go('/coach/athlete/${widget.athleteId}');
 
+  /// Hay una escritura en curso (asignar o crear propios): salir la dejaría
+  /// corriendo sin pantalla, y limpiar el borrador a mitad la rompe.
+  bool get _busy => _saving || _bulkRunning;
+
   Future<void> _handleBack() async {
+    if (_busy) return;
     if (_touched) {
       final l10n = AppL10n.of(context);
       final leave = await showTreinoConfirmDialog(
@@ -181,10 +233,14 @@ class _PlanPdfImportPreviewScreenState
   }
 
   Future<void> _assign() async {
+    // Dos taps en el mismo frame llegan los dos antes de que el botón se
+    // redibuje deshabilitado: sin esto, son dos rutinas.
+    if (_saving) return;
     final l10n = AppL10n.of(context);
     final draft = _controller.draft;
     final uid = ref.read(currentUidProvider);
-    if (draft == null || uid == null || uid.isEmpty) return;
+    if (draft == null || draft.athleteId != widget.athleteId) return;
+    if (uid == null || uid.isEmpty) return;
     setState(() {
       _saving = true;
       _error = null;
@@ -192,7 +248,7 @@ class _PlanPdfImportPreviewScreenState
     final outcome = await _controller.assign(
       athleteIds: [widget.athleteId],
       trainerUid: uid,
-      routineName: draft.name,
+      routineName: _nameController.text,
       level: _level,
     );
     if (!mounted) return;
@@ -221,6 +277,11 @@ class _PlanPdfImportPreviewScreenState
                 ),
         );
         return;
+      case PlanAssignModerationBlocked(:final campo) when campo == 'name':
+        // El nombre es lo único que se corrige acá: el foco va al campo,
+        // con el mensaje, y se reintenta sin volver a importar.
+        _nameError = l10n.moderationBlockedMessage;
+        _nameFocus.requestFocus();
       case PlanAssignModerationBlocked(:final campo):
         final where = ModerationGuard.ubicacionLegible(campo);
         _error = where == null
@@ -241,10 +302,13 @@ class _PlanPdfImportPreviewScreenState
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final draft = ref.watch(periodizedImportProvider);
+    final stored = ref.watch(periodizedImportProvider);
+    // Sólo el borrador de ESTE alumno: el de otro no se muestra ni se asigna.
+    final draft = stored?.athleteId == widget.athleteId ? stored : null;
 
     if (draft == null) {
-      // Entrada sin borrador (deep link, o se perdió): de vuelta a la ficha.
+      // Entrada sin borrador (deep link, o se perdió) o con el de otro
+      // alumno: de vuelta a la ficha.
       if (!_leaving) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && !_leaving) _back();
@@ -253,6 +317,10 @@ class _PlanPdfImportPreviewScreenState
       return Scaffold(backgroundColor: palette.bg);
     }
 
+    if (!_nameSeeded) {
+      _nameSeeded = true;
+      _nameController.text = draft.name;
+    }
     final plan = draft.plan;
     final week = _week.clamp(0, plan.numWeeks - 1);
     final days = plan.days.where((d) => d.rows.isNotEmpty).toList();
@@ -260,7 +328,7 @@ class _PlanPdfImportPreviewScreenState
     final bulk = _controller.bulkCustomGroups.length;
 
     return PopScope(
-      canPop: !_touched,
+      canPop: !_touched && !_busy,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _handleBack();
       },
@@ -315,11 +383,11 @@ class _PlanPdfImportPreviewScreenState
                     IconButton(
                       icon: Icon(TreinoIcon.back, color: palette.textPrimary),
                       tooltip: l10n.commonBack,
-                      onPressed: _handleBack,
+                      onPressed: _busy ? null : _handleBack,
                     ),
                     Expanded(
                       child: Text(
-                        draft.name.toUpperCase(),
+                        l10n.pdfImportPreviewTitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.barlowCondensed(
@@ -337,6 +405,23 @@ class _PlanPdfImportPreviewScreenState
                   style: importText(palette.textMuted),
                 ),
                 const SizedBox(height: AppSpacing.s14),
+                TextField(
+                  key: const Key('pdf_import_name'),
+                  controller: _nameController,
+                  focusNode: _nameFocus,
+                  enabled: !_saving,
+                  maxLength: kPdfPlanNameMaxLength,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: importText(palette.textPrimary,
+                      size: AppTextSize.bodyLarge),
+                  decoration: InputDecoration(
+                    labelText: l10n.pdfImportNameLabel,
+                    errorText: _nameError,
+                    counterText: '',
+                  ),
+                  onChanged: _onNameChanged,
+                ),
+                const SizedBox(height: AppSpacing.s12),
                 TreinoSelectField<ExperienceLevel>(
                   value: _level,
                   sheetTitle: l10n.pdfImportLevel,

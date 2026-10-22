@@ -5490,5 +5490,9 @@
   "pdfImportAssignFailed": "No pudimos guardar el plan. Probá de nuevo.",
   "@pdfImportAssignFailed": {"description": "Falló la asignación: no se guardó nada."},
   "pdfImportLevel": "Nivel del plan",
-  "@pdfImportLevel": {"description": "Título del selector de nivel de la rutina importada."}
+  "@pdfImportLevel": {"description": "Título del selector de nivel de la rutina importada."},
+  "pdfImportPreviewTitle": "REVISAR PLAN",
+  "@pdfImportPreviewTitle": {"description": "Título de la vista previa del plan importado de PDF."},
+  "pdfImportNameLabel": "Nombre de la rutina",
+  "@pdfImportNameLabel": {"description": "Etiqueta del campo editable con el nombre de la rutina importada."}
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -48,6 +49,30 @@ class _PlanPdfImportUploadScreenState
   /// (chequeo local) o el resultado no exitoso del servicio.
   PdfImportResult? _failure;
 
+  /// Leído en [initState]: en [dispose] ya no se puede usar `ref`.
+  late final Future<void> Function() _cleanPickerCache;
+
+  @override
+  void initState() {
+    super.initState();
+    _cleanPickerCache = ref.read(pdfPickerCacheCleanerProvider);
+  }
+
+  @override
+  void dispose() {
+    // Salir sin procesar también deja la copia del picker en la caché.
+    unawaited(_clearPickerCache());
+    super.dispose();
+  }
+
+  /// Limpiar la caché es higiene: si falla (o la plataforma no lo
+  /// implementa), el flujo sigue igual.
+  Future<void> _clearPickerCache() async {
+    try {
+      await _cleanPickerCache();
+    } catch (_) {}
+  }
+
   Future<void> _pick() async {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -78,16 +103,28 @@ class _PlanPdfImportUploadScreenState
       _processing = true;
       _failure = null;
     });
-    final result = await ref.read(planPdfImportServiceProvider).importPdf(
-          bytes: Uint8List.fromList(bytes),
-          fileName: file.name,
-          athleteId: widget.athleteId,
-        );
+    final PdfImportResult result;
+    try {
+      result = await ref.read(planPdfImportServiceProvider).importPdf(
+            bytes: Uint8List.fromList(bytes),
+            fileName: file.name,
+            athleteId: widget.athleteId,
+          );
+    } finally {
+      // Salga bien o mal, la copia en disco ya no hace falta: «Reintentar»
+      // usa los bytes que quedaron en memoria. Esperada, no en segundo
+      // plano: si la app se va apenas navega, la copia no queda en disco.
+      // `_clearPickerCache` ya se traga los errores de la plataforma.
+      await _clearPickerCache();
+    }
     if (!mounted) return;
     if (result is PdfImportSuccess) {
       // La subida se reemplaza por la vista previa: «atrás» desde ahí
       // vuelve a la ficha, no a un archivo ya procesado.
-      ref.read(periodizedImportProvider.notifier).state = result.draft;
+      // Atado al alumno de esta ruta: la vista previa no muestra el
+      // borrador de otro.
+      ref.read(periodizedImportProvider.notifier).state =
+          result.draft.forAthlete(widget.athleteId);
       context.pushReplacement(planPdfImportPreviewPath(widget.athleteId));
       return;
     }

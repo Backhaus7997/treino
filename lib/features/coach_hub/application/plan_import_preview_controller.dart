@@ -387,6 +387,13 @@ class PlanImportPreviewController {
     );
   }
 
+  /// Cambia el nombre de la rutina del borrador.
+  void rename(String name) {
+    final current = draft;
+    if (current == null || current.name == name) return;
+    _ref.read(periodizedImportProvider.notifier).state = current.withName(name);
+  }
+
   /// Descarta el borrador (después de asignar, o al salir).
   void clear() => _ref.read(periodizedImportProvider.notifier).state = null;
 

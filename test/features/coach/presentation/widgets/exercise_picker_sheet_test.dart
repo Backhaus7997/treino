@@ -178,6 +178,47 @@ void main() {
     });
 
     testWidgets(
+        'single con varios pre-marcados: no arranca con ninguno y vuelve '
+        'a lo sumo uno', (tester) async {
+      tester.view.physicalSize = const Size(400, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      List<Exercise>? result;
+      await _openPicker(
+        tester,
+        single: true,
+        alreadySelectedIds: const {'bench-press', 'back-squat'},
+        onResult: (r) => result = r,
+      );
+
+      // Arranca sin selección: la CTA no se muestra con ningún conteo.
+      expect(find.text('Agregar 2 ejercicios'), findsNothing);
+      expect(find.text('Agregar 1 ejercicio'), findsNothing);
+
+      await tester.tap(find.text('Sentadilla con Barra'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar 1 ejercicio'));
+      await tester.pumpAndSettle();
+      expect(result!.map((e) => e.id), ['back-squat']);
+    });
+
+    testWidgets('single con un pre-marcado: lo conserva', (tester) async {
+      List<Exercise>? result;
+      await _openPicker(
+        tester,
+        single: true,
+        alreadySelectedIds: const {'bench-press'},
+        onResult: (r) => result = r,
+      );
+
+      await tester.tap(find.text('Agregar 1 ejercicio'));
+      await tester.pumpAndSettle();
+      expect(result!.map((e) => e.id), ['bench-press']);
+    });
+
+    testWidgets(
         'confirm: pops List<Exercise> with correct ids in selection order', (
       tester,
     ) async {

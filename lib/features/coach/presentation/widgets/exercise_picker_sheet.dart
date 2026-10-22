@@ -93,7 +93,17 @@ class _ExercisePickerSheetContentState
   @override
   void initState() {
     super.initState();
-    _selected = {...widget.alreadySelectedIds};
+    _selected = _initialSelection(widget.alreadySelectedIds, widget.single);
+  }
+
+  /// En modo [single] la selección inicial respeta el mismo contrato que la
+  /// salida: a lo sumo un ID. Con uno, se conserva. Con varios, ninguno: no
+  /// hay criterio para elegir cuál (el orden del Set lo decide quien llama,
+  /// no el usuario), y pre-marcar uno al azar haría que «Agregar 1 ejercicio»
+  /// confirme algo que nadie eligió. Vacío obliga a una elección explícita.
+  static Set<String> _initialSelection(Set<String> ids, bool single) {
+    if (!single) return {...ids};
+    return ids.length == 1 ? {...ids} : <String>{};
   }
 
   @override

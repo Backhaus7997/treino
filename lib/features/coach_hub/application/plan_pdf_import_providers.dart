@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart';
@@ -29,6 +30,17 @@ final planPdfImportServiceProvider = Provider<PlanPdfImportService>((ref) {
     ),
   );
 });
+
+/// Borra la copia del archivo que `file_picker` deja en la caché de la app
+/// al elegir (en Android e iOS copia el PDF ahí). El PDF del plan puede traer
+/// datos del alumno, y la spec promete que no se guarda: no tiene que quedar
+/// en el dispositivo después de procesarlo. En un provider para poder
+/// probarlo con un doble.
+final pdfPickerCacheCleanerProvider = Provider<Future<void> Function()>(
+  (ref) => () async {
+    await FilePicker.platform.clearTemporaryFiles();
+  },
+);
 
 /// Si el CTA «Importar de PDF» se muestra. Tres estados, sin colapsar «no
 /// sé» con «no hay»: mientras se resuelve la sesión o el documento es

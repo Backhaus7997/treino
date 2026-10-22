@@ -2474,5 +2474,7 @@
   "pdfImportAssigned": "Plan assigned.",
   "pdfImportOpenEditor": "OPEN EDITOR",
   "pdfImportAssignFailed": "We couldn't save the plan. Try again.",
-  "pdfImportLevel": "Plan level"
+  "pdfImportLevel": "Plan level",
+  "pdfImportPreviewTitle": "REVIEW PLAN",
+  "pdfImportNameLabel": "Routine name"
 }

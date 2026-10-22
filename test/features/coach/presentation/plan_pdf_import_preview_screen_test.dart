@@ -2,12 +2,15 @@
 // 4 a 6): los cuatro estados del ejercicio, «Crear N propios» con y sin
 // cupo, ASIGNAR bloqueado con pendientes y la asignación exitosa.
 
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/core/moderation/moderation_guard.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/coach/presentation/plan_pdf_import_preview_screen.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
@@ -169,6 +172,7 @@ void main() {
     WidgetTester tester,
     PeriodizedImportDraft draft, {
     CustomExerciseQuota quota = (limit: null, count: 0),
+    String? owner = kAthleteId,
   }) async {
     final router = GoRouter(
       initialLocation: '/coach/athlete/$kAthleteId',
@@ -193,7 +197,8 @@ void main() {
     );
     final container = ProviderContainer(overrides: [
       ...previewOverrides(routineRepo),
-      periodizedImportProvider.overrideWith((ref) => draft),
+      periodizedImportProvider.overrideWith(
+          (ref) => owner == null ? draft : draft.forAthlete(owner)),
       customExerciseRepositoryProvider.overrideWithValue(customRepo),
       customExerciseQuotaProvider.overrideWithValue(AsyncValue.data(quota)),
       customExercisesForTrainerStreamProvider(kTrainerUid)
@@ -412,6 +417,64 @@ void main() {
       expect(c.read(periodizedImportProvider), isNull);
     });
 
+    testWidgets(
+        'mientras guarda, ni el atrás de la barra ni el del sistema salen ni '
+        'limpian el borrador', (tester) async {
+      final pending = Completer<Routine>();
+      when(() => routineRepo.createAssigned(any()))
+          .thenAnswer((_) => pending.future);
+      final c = await pump(tester, _resolved());
+
+      await tester.tap(assignButton());
+      await tester.pump();
+
+      final back = find.byTooltip('Volver');
+      expect(
+          tester
+              .widget<IconButton>(
+                  find.ancestor(of: back, matching: find.byType(IconButton)))
+              .onPressed,
+          isNull);
+      await tester.tap(back, warnIfMissed: false);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.binding.handlePopRoute();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('FICHA'), findsNothing);
+      expect(find.text('¿Salir sin guardar el plan?'), findsNothing);
+      expect(c.read(periodizedImportProvider), isNotNull);
+
+      pending.complete(const Routine(
+          id: 'nuevo-1',
+          name: 'Plan de Ana',
+          level: ExperienceLevel.intermediate,
+          days: []));
+      await tester.pumpAndSettle();
+      expect(find.text('FICHA'), findsOneWidget);
+    });
+
+    testWidgets('dos taps en el mismo frame crean una sola rutina',
+        (tester) async {
+      final pending = Completer<Routine>();
+      when(() => routineRepo.createAssigned(any()))
+          .thenAnswer((_) => pending.future);
+      await pump(tester, _resolved());
+
+      // Sin pump entre los dos: el botón todavía está habilitado.
+      await tester.tap(assignButton());
+      await tester.tap(assignButton());
+      await tester.pump();
+
+      verify(() => routineRepo.createAssigned(any())).called(1);
+      pending.complete(const Routine(
+          id: 'nuevo-1',
+          name: 'Plan de Ana',
+          level: ExperienceLevel.intermediate,
+          days: []));
+      await tester.pumpAndSettle();
+      verifyNever(() => routineRepo.createAssigned(any()));
+    });
+
     testWidgets('si falla, el error queda en la pantalla y el plan también',
         (tester) async {
       when(() => routineRepo.createAssigned(any()))
@@ -425,6 +488,123 @@ void main() {
           findsOneWidget);
       expect(c.read(periodizedImportProvider), isNotNull);
       expect(find.text('FICHA'), findsNothing);
+    });
+  });
+
+  group('nombre de la rutina', () {
+    const bloqueado = 'Ese texto no se puede publicar porque incumple las '
+        'Normas de Comunidad. Revisalo y volvé a intentar.';
+    Finder nameField() => find.byKey(const Key('pdf_import_name'));
+
+    testWidgets(
+        'arranca con el del borrador y lo que escribe el PF es el nombre',
+        (tester) async {
+      final created = <Routine>[];
+      when(() => routineRepo.createAssigned(any())).thenAnswer((inv) async {
+        final r = inv.positionalArguments.first as Routine;
+        created.add(r);
+        return r.copyWith(id: 'nuevo-1');
+      });
+      final c = await pump(tester, _resolved());
+      expect(tester.widget<TextField>(nameField()).controller!.text,
+          'Plan de Ana');
+
+      await tester.enterText(nameField(), 'Fuerza bloque 1');
+      await tester.pump();
+      expect(c.read(periodizedImportProvider)!.name, 'Fuerza bloque 1');
+
+      await tester.tap(assignButton());
+      await tester.pumpAndSettle();
+      expect(created.single.name, 'Fuerza bloque 1');
+    });
+
+    testWidgets(
+        'si la moderación rechaza el nombre, el foco va al campo con el '
+        'mensaje y se reintenta sin volver a importar', (tester) async {
+      final created = <Routine>[];
+      var calls = 0;
+      when(() => routineRepo.createAssigned(any())).thenAnswer((inv) async {
+        calls++;
+        if (calls == 1) throw const ModerationBlockedException('name');
+        final r = inv.positionalArguments.first as Routine;
+        created.add(r);
+        return r.copyWith(id: 'nuevo-1');
+      });
+      final c = await pump(tester, _resolved());
+
+      await tester.tap(assignButton());
+      await tester.pumpAndSettle();
+
+      expect(find.descendant(of: nameField(), matching: find.text(bloqueado)),
+          findsOneWidget);
+      expect(tester.widget<TextField>(nameField()).focusNode!.hasFocus, isTrue);
+      // El borrador sigue: no hay que volver a importar.
+      expect(c.read(periodizedImportProvider), isNotNull);
+      expect(find.text('FICHA'), findsNothing);
+
+      await tester.enterText(nameField(), 'Plan de fuerza');
+      await tester.pump();
+      expect(find.text(bloqueado), findsNothing);
+
+      await tester.tap(assignButton());
+      await tester.pumpAndSettle();
+      expect(calls, 2);
+      expect(created.single.name, 'Plan de fuerza');
+      expect(find.text('FICHA'), findsOneWidget);
+    });
+  });
+
+  group('el borrador es de un alumno', () {
+    testWidgets('el de A abierto en la ruta de B no se muestra ni se asigna',
+        (tester) async {
+      final c = await pump(tester, _resolved(), owner: 'otro-alumno');
+
+      expect(find.byKey(const Key('pdf_import_assign')), findsNothing);
+      expect(find.text('Plan de Ana'), findsNothing);
+      expect(find.text('FICHA'), findsOneWidget);
+      verifyNever(() => routineRepo.createAssigned(any()));
+      // Y no queda colgado para la próxima vista previa.
+      expect(c.read(periodizedImportProvider), isNull);
+    });
+
+    testWidgets('sin alumno (el del Excel del Hub) tampoco', (tester) async {
+      await pump(tester, _resolved(), owner: null);
+      expect(find.byKey(const Key('pdf_import_assign')), findsNothing);
+      expect(find.text('FICHA'), findsOneWidget);
+    });
+
+    testWidgets('resolver a mano conserva el alumno del borrador',
+        (tester) async {
+      final c = await pump(tester, _draft());
+      await tester.tap(find.text('Confirmar').first);
+      await tester.pumpAndSettle();
+      expect(c.read(periodizedImportProvider)!.athleteId, kAthleteId);
+      expect(find.byKey(const Key('pdf_import_assign')), findsOneWidget);
+    });
+
+    testWidgets('si la ruta se cierra sin asignar, el borrador se descarta',
+        (tester) async {
+      final c = await pump(tester, _resolved());
+      GoRouter.of(tester.element(find.byKey(const Key('pdf_import_assign'))))
+          .go('/coach/athlete/$kAthleteId');
+      await tester.pumpAndSettle();
+
+      expect(find.text('FICHA'), findsOneWidget);
+      expect(c.read(periodizedImportProvider), isNull);
+    });
+
+    testWidgets(
+        'el atrás del sistema sin tocar nada sale y también descarta el '
+        'borrador', (tester) async {
+      final c = await pump(tester, _resolved());
+
+      // Sin cambios, PopScope deja salir: el pop es implícito (didPop true)
+      // y no pasa por _handleBack.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('FICHA'), findsOneWidget);
+      expect(c.read(periodizedImportProvider), isNull);
     });
   });
 }
