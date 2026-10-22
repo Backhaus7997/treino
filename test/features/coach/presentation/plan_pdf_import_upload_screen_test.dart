@@ -290,9 +290,10 @@ void main() {
     await _pump(tester, service);
     _pickReturns('plan.pdf', 1000);
     await _pickAndProcess(tester);
-    final resetsAt = DateTime(2026, 10, 26, 0, 0);
-    service.complete(PdfImportQuotaExhausted(
-        scope: PdfQuotaScope.week, resetsAt: resetsAt.toUtc()));
+    // Lunes 00:00 ART = 03:00 UTC: un instante fijo, no depende del TZ del host.
+    final resetsAt = DateTime.utc(2026, 10, 26, 3, 0);
+    service.complete(
+        PdfImportQuotaExhausted(scope: PdfQuotaScope.week, resetsAt: resetsAt));
     await tester.pumpAndSettle();
 
     expect(
