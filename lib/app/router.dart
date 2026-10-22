@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/utils/deep_link_destination.dart';
+import '../core/widgets/motion/scroll_follow_controller.dart';
 import '../core/widgets/treino_bottom_bar.dart';
 import '../features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart';
 import '../features/auth/application/auth_providers.dart';
@@ -1729,8 +1730,12 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
   /// Es un [AnimationController] (y no un `ValueNotifier`) porque además de
   /// seguir al scroll tiene que poder animarse solo: al soltar se asienta, y
   /// al volver al tope o cambiar de tab vuelve a 1. 1 = entera, 0 = compacta.
-  late final AnimationController _nav = AnimationController(
+  ///
+  /// Un fling no la hace saltar: [ScrollFollowController] la sigue 1:1 hasta
+  /// cierta velocidad y, por encima, la persigue con un resorte.
+  late final ScrollFollowController _nav = ScrollFollowController(
     vsync: this,
+    range: _collapseRange,
     value: 1,
   );
 
@@ -1743,8 +1748,7 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
   /// Lleva la barra a [target] animando (o de una si se pidió reducir
   /// movimiento).
   void _settleNav(double target) {
-    if (_nav.value == target && !_nav.isAnimating) return;
-    _nav.animateTo(
+    _nav.settleTo(
       target,
       duration: AppMotion.resolve(context, AppMotion.fast),
       curve: AppMotion.standard,
@@ -1772,8 +1776,11 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
     // Al soltar (y cuando termina la inercia) la barra no puede quedar a
     // medias: se asienta del lado que esté más cerca.
     if (notification is ScrollEndNotification) {
-      if (_nav.value > 0 && _nav.value < 1) {
-        _settleNav(_nav.value < 0.5 ? 0 : 1);
+      // Se mira el TARGET y no lo dibujado: si un fling la tiene persiguiendo
+      // hacia 0, a mitad de camino el valor dibujado no dice a dónde va.
+      final target = _nav.target;
+      if (target > 0 && target < 1) {
+        _settleNav(target < 0.5 ? 0 : 1);
       }
       return false;
     }
@@ -1797,10 +1804,13 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
     // de rango, la barra se queda como está.
     if (metrics.pixels > metrics.maxScrollExtent) return false;
 
-    // Sigue al dedo: cada px de scroll mueve la barra 1/_collapseRange. Si
-    // estaba asentándose, el dedo manda y la animación se corta.
-    if (_nav.isAnimating) _nav.stop();
-    _nav.value = (_nav.value - delta / _collapseRange).clamp(0.0, 1.0);
+    // Sigue al dedo: cada px de scroll mueve la barra 1/_collapseRange. Se
+    // acumula sobre el target, no sobre lo dibujado: durante una persecución
+    // lo dibujado va atrás y el scroll no se puede perder.
+    _nav.follow(
+      _nav.target - delta / _collapseRange,
+      reduceMotion: AppMotion.reduceMotion(context),
+    );
     return false;
   }
 
@@ -1830,7 +1840,7 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
         ),
       ),
       bottomNavigationBar: AnimatedBuilder(
-        animation: _nav,
+        animation: _nav.animation,
         builder: (context, _) => TreinoBottomBar(
           currentIndex: _currentIndex,
           coachUnreadCount: coachUnreadCount,
@@ -1853,7 +1863,7 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
                 .popUntil((route) => route is! PopupRoute);
             // Cambiar de tab arranca de cero: la pantalla nueva se ve desde
             // arriba, así que la barra tiene que estar entera.
-            _nav.value = 1;
+            _nav.jumpTo(1);
             context.go(_kTabs[i]);
           },
         ),
