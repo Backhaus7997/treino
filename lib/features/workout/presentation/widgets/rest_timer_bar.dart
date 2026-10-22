@@ -93,11 +93,16 @@ class _RestTimerBarState extends State<RestTimerBar> {
     super.dispose();
   }
 
-  int get _restante {
-    final ms = widget.endsAt.difference(clock.now()).inMilliseconds;
-    // Redondeo para ARRIBA: «0:01» se ve hasta que de verdad llega a cero.
-    return ms <= 0 ? 0 : (ms / 1000).ceil();
-  }
+  /// Redondeo para ARRIBA: «0:01» se ve hasta que de verdad llega a cero.
+  ///
+  /// Con la regla compartida con el reloj (#1616), al microsegundo. La cuenta
+  /// anterior truncaba la diferencia a milisegundos, y con un instante de fin
+  /// que no cae justo en el milisegundo la barra daba «terminó» hasta 1 ms
+  /// ANTES del fin. Ese `onDone` adelantado le llegaba a `RestEndAlerts` como
+  /// un fin todavía por venir —o sea, un SALTAR— y cancelaba la notificación
+  /// de #1617 en vez de dejarla salir.
+  int get _restante =>
+      RestRules.remaining(endsAt: widget.endsAt, now: clock.now());
 
   void _onTick() {
     if (!mounted) return;

@@ -19,6 +19,7 @@ import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_state.dart';
+import 'package:treino/features/workout/domain/rest_rules.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -61,6 +62,16 @@ SessionState _estado({required int series}) => SessionState(
 
 /// Las DOS notificaciones del descanso: el aviso final y la cuenta regresiva.
 const ambas = [kIdFinDeDescanso, kIdCuentaDeDescanso];
+
+/// El fin del descanso de [segundos] arrancado en [inicio], tal como lo calcula
+/// la pantalla.
+///
+/// Desde #1616 el fin se redondea al milisegundo —es la resolución con la que
+/// viaja en la sesión y lo lee el reloj—, así que `inicio + 90 s` puede diferir
+/// en una fracción de milisegundo del instante que se agenda. Se compara contra
+/// la MISMA regla que usa la pantalla, no contra una suma a mano.
+DateTime _fin(DateTime inicio, int segundos) =>
+    RestRules.endsAt(start: inicio.toUtc(), totalSeconds: segundos);
 
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
@@ -137,8 +148,7 @@ void main() {
     final a = falso.agendados.single;
     expect(a.id, kIdFinDeDescanso);
     expect(a.detalles.android!.channelId, kCanalDeAvisos);
-    expect(a.cuando.isAtSameMomentAs(inicio.add(const Duration(seconds: 90))),
-        isTrue);
+    expect(a.cuando.isAtSameMomentAs(_fin(inicio, 90)), isTrue);
     expect(a.titulo, 'Terminó el descanso');
     expect(a.cuerpo, 'Volvé a la serie');
 
@@ -149,8 +159,7 @@ void main() {
     expect(cuenta.titulo, 'Descanso');
     expect(cuenta.cuerpo, 'Volvé a la serie cuando llegue a cero');
     final c = cuenta.detalles.android!;
-    expect(
-        c.when, inicio.add(const Duration(seconds: 90)).millisecondsSinceEpoch);
+    expect(c.when, _fin(inicio, 90).millisecondsSinceEpoch);
     expect(c.usesChronometer && c.chronometerCountDown && c.silent, isTrue);
   });
 
@@ -189,12 +198,15 @@ void main() {
 
     expect(falso.agendados, hasLength(1));
     expect(
-        falso.agendados.single.cuando
-            .isAtSameMomentAs(inicio.add(const Duration(seconds: 105))),
+        falso.agendados.single.cuando.isAtSameMomentAs(
+            _fin(inicio, 90).add(const Duration(seconds: 15))),
         isTrue,
         reason: '90 s del slot + 15 s');
-    expect(falso.publicadas.single.detalles.android!.when,
-        inicio.add(const Duration(seconds: 105)).millisecondsSinceEpoch,
+    expect(
+        falso.publicadas.single.detalles.android!.when,
+        _fin(inicio, 90)
+            .add(const Duration(seconds: 15))
+            .millisecondsSinceEpoch,
         reason: 'la cuenta regresiva también sale con el fin corrido');
   });
 

@@ -47,6 +47,39 @@ void main() {
     expect(termino, 1);
   });
 
+  // #1616 × #1617: la barra NO dice «terminó» antes del instante de fin, ni
+  // por una fracción de milisegundo. Su `onDone` le llega a `RestEndAlerts`
+  // como `update(null)`, y con el fin todavía por venir eso es un SALTAR: la
+  // notificación se cancelaba justo cuando tenía que salir. Pasaba con los
+  // fines redondeados al milisegundo del descanso compartido, porque la cuenta
+  // truncaba la diferencia a ms y 0,4 ms daban «cero».
+  testWidgets('no termina mientras quede una fracción de milisegundo',
+      (tester) async {
+    final hasta =
+        clock.now().add(const Duration(seconds: 1, microseconds: 400));
+    var termino = 0;
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark(),
+      home: Scaffold(
+        body: RestTimerBar(
+          endsAt: hasta,
+          totalSeconds: 1,
+          onSkip: () {},
+          onAddSeconds: (_) {},
+          onDone: () => termino++,
+        ),
+      ),
+    ));
+
+    // El tick cae 400 µs ANTES del fin.
+    await tester.pump(const Duration(seconds: 1));
+    expect(termino, 0, reason: 'todavía no terminó');
+    expect(clock.now().isBefore(hasta), isTrue);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(termino, 1);
+  });
+
   // El lector de pantalla oye UN aviso al empezar y otro al terminar, no la
   // cuenta segundo a segundo (era un liveRegion con el número en el label).
   testWidgets('anuncia sólo al empezar y al terminar', (tester) async {
