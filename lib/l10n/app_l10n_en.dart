@@ -5806,4 +5806,65 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get sessionRestCountdownBody => 'Back to your set when it hits zero';
+
+  @override
+  String get pdfImportUploadTitle => 'IMPORT PLAN';
+
+  @override
+  String get pdfImportPrivacyNotice =>
+      'We use AI to read your PDF and build the plan. We don\'t keep the file. Only include the client details you need.';
+
+  @override
+  String get pdfImportPickFile => 'Choose PDF';
+
+  @override
+  String get pdfImportPickAnother => 'Choose another file';
+
+  @override
+  String get pdfImportProcess => 'PROCESS PLAN';
+
+  @override
+  String get pdfImportProcessingTitle => 'Reading your plan…';
+
+  @override
+  String get pdfImportProcessingHint =>
+      'It can take up to a couple of minutes. Keep this screen open.';
+
+  @override
+  String get pdfImportLeaveTitle => 'Leave while the plan is being read?';
+
+  @override
+  String get pdfImportLeaveBody =>
+      'This attempt already counts toward your quota, even if you leave.';
+
+  @override
+  String get pdfImportLeaveConfirm => 'Leave';
+
+  @override
+  String get pdfImportRetry => 'Try again';
+
+  @override
+  String get pdfImportErrorTooBig =>
+      'The file is larger than 5 MB. Choose a smaller one.';
+
+  @override
+  String get pdfImportErrorInternal =>
+      'We couldn\'t read the plan. Try again in a while.';
+
+  @override
+  String pdfImportReadSummary(int days, int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days days',
+      one: '1 day',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: '$weeks weeks',
+      one: '1 week',
+    );
+    return 'We read $_temp0 and $_temp1.';
+  }
 }

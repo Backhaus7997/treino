@@ -9912,6 +9912,90 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Volvé a la serie cuando llegue a cero'**
   String get sessionRestCountdownBody;
+
+  /// Título de la pantalla de subida del PDF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'IMPORTAR PLAN'**
+  String get pdfImportUploadTitle;
+
+  /// Aviso de privacidad de la pantalla de subida. Texto final aprobado por el dueño el 2026-10-22 (docs/plan-import-pdf.md, «Aviso en la pantalla de subida»): no se reescribe ni se agregan nombres de proveedores.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usamos IA para leer tu PDF y armar el plan. No guardamos el archivo. Subí solo los datos de tu alumno que sean necesarios.'**
+  String get pdfImportPrivacyNotice;
+
+  /// Botón que abre el selector de archivos (sólo .pdf).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegir PDF'**
+  String get pdfImportPickFile;
+
+  /// Acción para cambiar el PDF elegido, también la de los errores del archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegir otro archivo'**
+  String get pdfImportPickAnother;
+
+  /// Botón que manda el PDF a leer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PROCESAR PLAN'**
+  String get pdfImportProcess;
+
+  /// Estado de espera mientras el servidor lee el PDF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Leyendo tu plan…'**
+  String get pdfImportProcessingTitle;
+
+  /// Debajo del estado de espera: la extracción puede pasar del minuto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Puede tardar hasta un par de minutos. No cierres esta pantalla.'**
+  String get pdfImportProcessingHint;
+
+  /// Confirmación al querer salir con la lectura en curso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Salir mientras se lee el plan?'**
+  String get pdfImportLeaveTitle;
+
+  /// Cuerpo de esa confirmación. Es verdad: el servidor descuenta el cupo ANTES de llamar al modelo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este intento ya cuenta en tu cupo aunque salgas.'**
+  String get pdfImportLeaveBody;
+
+  /// Acción que confirma salir con la lectura en curso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Salir'**
+  String get pdfImportLeaveConfirm;
+
+  /// Acción de los errores que se arreglan reintentando.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get pdfImportRetry;
+
+  /// El PDF supera el tope de 5 MB (lo chequea el cliente antes de mandar y el servidor de nuevo).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El archivo pesa más de 5 MB. Elegí uno más liviano.'**
+  String get pdfImportErrorTooBig;
+
+  /// internal y todo lo que no es del contrato.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos leer el plan. Probá de nuevo en un rato.'**
+  String get pdfImportErrorInternal;
+
+  /// Resumen de lo que se leyó del PDF: días y semanas del plan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Leímos {days, plural, =1{1 día} other{{days} días}} y {weeks, plural, =1{1 semana} other{{weeks} semanas}}.'**
+  String pdfImportReadSummary(int days, int weeks);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

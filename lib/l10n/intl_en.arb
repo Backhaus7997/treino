@@ -2430,5 +2430,19 @@
   "sessionRestEndedTitle": "Rest is over",
   "sessionRestEndedBody": "Back to your set",
   "sessionRestCountdownTitle": "Rest",
-  "sessionRestCountdownBody": "Back to your set when it hits zero"
+  "sessionRestCountdownBody": "Back to your set when it hits zero",
+  "pdfImportUploadTitle": "IMPORT PLAN",
+  "pdfImportPrivacyNotice": "We use AI to read your PDF and build the plan. We don't keep the file. Only include the client details you need.",
+  "pdfImportPickFile": "Choose PDF",
+  "pdfImportPickAnother": "Choose another file",
+  "pdfImportProcess": "PROCESS PLAN",
+  "pdfImportProcessingTitle": "Reading your plan…",
+  "pdfImportProcessingHint": "It can take up to a couple of minutes. Keep this screen open.",
+  "pdfImportLeaveTitle": "Leave while the plan is being read?",
+  "pdfImportLeaveBody": "This attempt already counts toward your quota, even if you leave.",
+  "pdfImportLeaveConfirm": "Leave",
+  "pdfImportRetry": "Try again",
+  "pdfImportErrorTooBig": "The file is larger than 5 MB. Choose a smaller one.",
+  "pdfImportErrorInternal": "We couldn't read the plan. Try again in a while.",
+  "pdfImportReadSummary": "We read {days, plural, =1{1 day} other{{days} days}} and {weeks, plural, =1{1 week} other{{weeks} weeks}}."
 }
