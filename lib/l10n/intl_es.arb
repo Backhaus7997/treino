@@ -1325,5 +1325,18 @@
   "pdfImportRetry": "Reintentar",
   "pdfImportErrorTooBig": "El archivo pesa más de 5 MB. Elige uno más liviano.",
   "pdfImportErrorInternal": "No pudimos leer el plan. Prueba de nuevo en un rato.",
-  "pdfImportReadSummary": "Leímos {days, plural, =1{1 día} other{{days} días}} y {weeks, plural, =1{1 semana} other{{weeks} semanas}}."
+  "pdfImportReadSummary": "Leímos {days, plural, =1{1 día} other{{days} días}} y {weeks, plural, =1{1 semana} other{{weeks} semanas}}.",
+  "pdfImportErrorNotPdf": "El archivo no es un PDF válido.",
+  "pdfImportErrorTooManyPages": "El PDF tiene más de 20 páginas. Elige uno más corto.",
+  "pdfImportErrorEncrypted": "El PDF tiene contraseña. Expórtalo sin contraseña y elígelo de nuevo.",
+  "pdfImportErrorFileUnknown": "No pudimos usar este archivo. Prueba con otro.",
+  "pdfImportErrorQuotaWeek": "Usaste todas las importaciones de esta semana. Se renueva el {date} a las {time}.",
+  "pdfImportErrorQuotaDay": "Usaste todas las importaciones de hoy. Se renueva el {date} a las {time}.",
+  "pdfImportErrorQuotaUnknown": "Usaste todas las importaciones disponibles por ahora.",
+  "pdfImportErrorTimeout": "La lectura tardó demasiado. Prueba de nuevo; si el PDF es largo, prueba con menos páginas.",
+  "pdfImportErrorInvalidPlan": "Leímos el PDF pero no pudimos armar el plan. Este intento ya contó en tu cupo.",
+  "pdfImportErrorDisabled": "Importar de PDF no está disponible para tu cuenta.",
+  "pdfImportErrorUnavailable": "Importar de PDF no está disponible por un problema nuestro. No se descontó de tu cupo.",
+  "pdfImportErrorNotTrainer": "Solo los entrenadores pueden importar planes.",
+  "pdfImportErrorSignedOut": "Tu sesión se cerró. Vuelve a iniciar sesión."
 }

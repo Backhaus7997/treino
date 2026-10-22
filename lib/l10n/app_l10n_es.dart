@@ -5972,6 +5972,59 @@ class AppL10nEs extends AppL10n {
     );
     return 'Leímos $_temp0 y $_temp1.';
   }
+
+  @override
+  String get pdfImportErrorNotPdf => 'El archivo no es un PDF válido.';
+
+  @override
+  String get pdfImportErrorTooManyPages =>
+      'El PDF tiene más de 20 páginas. Elige uno más corto.';
+
+  @override
+  String get pdfImportErrorEncrypted =>
+      'El PDF tiene contraseña. Expórtalo sin contraseña y elígelo de nuevo.';
+
+  @override
+  String get pdfImportErrorFileUnknown =>
+      'No pudimos usar este archivo. Prueba con otro.';
+
+  @override
+  String pdfImportErrorQuotaWeek(String date, String time) {
+    return 'Usaste todas las importaciones de esta semana. Se renueva el $date a las $time.';
+  }
+
+  @override
+  String pdfImportErrorQuotaDay(String date, String time) {
+    return 'Usaste todas las importaciones de hoy. Se renueva el $date a las $time.';
+  }
+
+  @override
+  String get pdfImportErrorQuotaUnknown =>
+      'Usaste todas las importaciones disponibles por ahora.';
+
+  @override
+  String get pdfImportErrorTimeout =>
+      'La lectura tardó demasiado. Prueba de nuevo; si el PDF es largo, prueba con menos páginas.';
+
+  @override
+  String get pdfImportErrorInvalidPlan =>
+      'Leímos el PDF pero no pudimos armar el plan. Este intento ya contó en tu cupo.';
+
+  @override
+  String get pdfImportErrorDisabled =>
+      'Importar de PDF no está disponible para tu cuenta.';
+
+  @override
+  String get pdfImportErrorUnavailable =>
+      'Importar de PDF no está disponible por un problema nuestro. No se descontó de tu cupo.';
+
+  @override
+  String get pdfImportErrorNotTrainer =>
+      'Solo los entrenadores pueden importar planes.';
+
+  @override
+  String get pdfImportErrorSignedOut =>
+      'Tu sesión se cerró. Vuelve a iniciar sesión.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -11939,4 +11992,57 @@ class AppL10nEsAr extends AppL10nEs {
     );
     return 'Leímos $_temp0 y $_temp1.';
   }
+
+  @override
+  String get pdfImportErrorNotPdf => 'El archivo no es un PDF válido.';
+
+  @override
+  String get pdfImportErrorTooManyPages =>
+      'El PDF tiene más de 20 páginas. Elegí uno más corto.';
+
+  @override
+  String get pdfImportErrorEncrypted =>
+      'El PDF tiene contraseña. Exportalo sin contraseña y elegilo de nuevo.';
+
+  @override
+  String get pdfImportErrorFileUnknown =>
+      'No pudimos usar este archivo. Probá con otro.';
+
+  @override
+  String pdfImportErrorQuotaWeek(String date, String time) {
+    return 'Usaste todas las importaciones de esta semana. Se renueva el $date a las $time.';
+  }
+
+  @override
+  String pdfImportErrorQuotaDay(String date, String time) {
+    return 'Usaste todas las importaciones de hoy. Se renueva el $date a las $time.';
+  }
+
+  @override
+  String get pdfImportErrorQuotaUnknown =>
+      'Usaste todas las importaciones disponibles por ahora.';
+
+  @override
+  String get pdfImportErrorTimeout =>
+      'La lectura tardó demasiado. Probá de nuevo; si el PDF es largo, probá con menos páginas.';
+
+  @override
+  String get pdfImportErrorInvalidPlan =>
+      'Leímos el PDF pero no pudimos armar el plan. Este intento ya contó en tu cupo.';
+
+  @override
+  String get pdfImportErrorDisabled =>
+      'Importar de PDF no está disponible para tu cuenta.';
+
+  @override
+  String get pdfImportErrorUnavailable =>
+      'Importar de PDF no está disponible por un problema nuestro. No se descontó de tu cupo.';
+
+  @override
+  String get pdfImportErrorNotTrainer =>
+      'Solo los entrenadores pueden importar planes.';
+
+  @override
+  String get pdfImportErrorSignedOut =>
+      'Tu sesión se cerró. Volvé a iniciar sesión.';
 }

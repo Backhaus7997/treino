@@ -386,8 +386,9 @@ class _Processing extends StatelessWidget {
 
 typedef PdfImportFailureCopy = ({String message, bool pickAnother, bool retry});
 
-/// El texto de un resultado no exitoso, y si se arregla eligiendo otro
-/// archivo o reintentando.
+/// El texto de cada resultado no exitoso, y si se arregla eligiendo otro
+/// archivo o reintentando. Exhaustivo: una variante nueva del servicio no
+/// compila hasta tener su texto.
 PdfImportFailureCopy pdfImportFailureCopy(
   AppL10n l10n,
   PdfImportResult failure,
@@ -396,11 +397,45 @@ PdfImportFailureCopy pdfImportFailureCopy(
           {bool pick = false, bool retry = false}) =>
       (message: m, pickAnother: pick, retry: retry);
   return switch (failure) {
-    PdfImportInvalidFile(reason: PdfRejectReason.tooBig) =>
-      copy(l10n.pdfImportErrorTooBig, pick: true),
-    PdfImportInvalidFile() => copy(l10n.pdfImportErrorInternal, pick: true),
-    _ => copy(l10n.pdfImportErrorInternal, retry: true),
+    PdfImportInvalidFile(:final reason) => copy(
+        switch (reason) {
+          PdfRejectReason.tooBig => l10n.pdfImportErrorTooBig,
+          PdfRejectReason.notPdf => l10n.pdfImportErrorNotPdf,
+          PdfRejectReason.tooManyPages => l10n.pdfImportErrorTooManyPages,
+          PdfRejectReason.encrypted => l10n.pdfImportErrorEncrypted,
+          PdfRejectReason.unknown => l10n.pdfImportErrorFileUnknown,
+        },
+        pick: true,
+      ),
+    PdfImportQuotaExhausted(:final scope, :final resetsAt) =>
+      copy(_quotaMessage(l10n, scope, resetsAt)),
+    PdfImportTimeout() =>
+      copy(l10n.pdfImportErrorTimeout, pick: true, retry: true),
+    PdfImportInternal() => copy(l10n.pdfImportErrorInternal, retry: true),
+    PdfImportInvalidPlan() => copy(l10n.pdfImportErrorInvalidPlan, pick: true),
+    PdfImportDisabled() => copy(l10n.pdfImportErrorDisabled),
+    PdfImportStructuredOutputsDisabled() =>
+      copy(l10n.pdfImportErrorUnavailable),
+    PdfImportNotTrainer() => copy(l10n.pdfImportErrorNotTrainer),
+    PdfImportUnauthenticated() => copy(l10n.pdfImportErrorSignedOut),
+    PdfImportSuccess() => copy(''),
   };
+}
+
+/// Cupo agotado: cuándo vuelve, sólo si el servidor lo dijo. Sin fecha, no
+/// se inventa una.
+String _quotaMessage(AppL10n l10n, PdfQuotaScope scope, DateTime? resetsAt) {
+  if (resetsAt == null || scope == PdfQuotaScope.unknown) {
+    return l10n.pdfImportErrorQuotaUnknown;
+  }
+  String two(int n) => n.toString().padLeft(2, '0');
+  // Un instante real: en la hora del teléfono.
+  final at = resetsAt.toLocal();
+  final date = '${two(at.day)}/${two(at.month)}';
+  final time = '${two(at.hour)}:${two(at.minute)}';
+  return scope == PdfQuotaScope.week
+      ? l10n.pdfImportErrorQuotaWeek(date, time)
+      : l10n.pdfImportErrorQuotaDay(date, time);
 }
 
 class _FailurePanel extends StatelessWidget {

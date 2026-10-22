@@ -2444,5 +2444,18 @@
   "pdfImportRetry": "Try again",
   "pdfImportErrorTooBig": "The file is larger than 5 MB. Choose a smaller one.",
   "pdfImportErrorInternal": "We couldn't read the plan. Try again in a while.",
-  "pdfImportReadSummary": "We read {days, plural, =1{1 day} other{{days} days}} and {weeks, plural, =1{1 week} other{{weeks} weeks}}."
+  "pdfImportReadSummary": "We read {days, plural, =1{1 day} other{{days} days}} and {weeks, plural, =1{1 week} other{{weeks} weeks}}.",
+  "pdfImportErrorNotPdf": "The file isn't a valid PDF.",
+  "pdfImportErrorTooManyPages": "The PDF has more than 20 pages. Choose a shorter one.",
+  "pdfImportErrorEncrypted": "The PDF is password-protected. Export it without a password and choose it again.",
+  "pdfImportErrorFileUnknown": "We couldn't use this file. Try another one.",
+  "pdfImportErrorQuotaWeek": "You've used all of this week's imports. It resets on {date} at {time}.",
+  "pdfImportErrorQuotaDay": "You've used all of today's imports. It resets on {date} at {time}.",
+  "pdfImportErrorQuotaUnknown": "You've used all the imports available for now.",
+  "pdfImportErrorTimeout": "Reading took too long. Try again; if the PDF is long, try fewer pages.",
+  "pdfImportErrorInvalidPlan": "We read the PDF but couldn't build the plan. This attempt already counted toward your quota.",
+  "pdfImportErrorDisabled": "Import from PDF isn't available for your account.",
+  "pdfImportErrorUnavailable": "Import from PDF is unavailable because of a problem on our side. It didn't count toward your quota.",
+  "pdfImportErrorNotTrainer": "Only trainers can import plans.",
+  "pdfImportErrorSignedOut": "You've been signed out. Sign in again."
 }

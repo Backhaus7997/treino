@@ -193,14 +193,72 @@ void main() {
   // Cada error tipado, con su texto y su acción, en la pantalla.
   final casos = <(PdfImportResult, String, List<String>)>[
     (
+      const PdfImportInvalidFile(PdfRejectReason.notPdf),
+      'El archivo no es un PDF válido.',
+      ['Elegir otro archivo'],
+    ),
+    (
+      const PdfImportInvalidFile(PdfRejectReason.tooManyPages),
+      'El PDF tiene más de 20 páginas. Elegí uno más corto.',
+      ['Elegir otro archivo'],
+    ),
+    (
+      const PdfImportInvalidFile(PdfRejectReason.encrypted),
+      'El PDF tiene contraseña. Exportalo sin contraseña y elegilo de nuevo.',
+      ['Elegir otro archivo'],
+    ),
+    (
       const PdfImportInvalidFile(PdfRejectReason.tooBig),
       'El archivo pesa más de 5 MB. Elegí uno más liviano.',
       ['Elegir otro archivo'],
     ),
     (
+      const PdfImportInvalidFile(PdfRejectReason.unknown),
+      'No pudimos usar este archivo. Probá con otro.',
+      ['Elegir otro archivo'],
+    ),
+    (
+      const PdfImportQuotaExhausted(scope: PdfQuotaScope.unknown),
+      'Usaste todas las importaciones disponibles por ahora.',
+      [],
+    ),
+    (
+      const PdfImportTimeout(),
+      'La lectura tardó demasiado. Probá de nuevo; si el PDF es largo, '
+          'probá con menos páginas.',
+      ['Reintentar', 'Elegir otro archivo'],
+    ),
+    (
       const PdfImportInternal(code: 'internal'),
       'No pudimos leer el plan. Probá de nuevo en un rato.',
       ['Reintentar'],
+    ),
+    (
+      const PdfImportInvalidPlan(diagnostics: [], quota: null, model: 'm'),
+      'Leímos el PDF pero no pudimos armar el plan. Este intento ya contó en '
+          'tu cupo.',
+      ['Elegir otro archivo'],
+    ),
+    (
+      const PdfImportDisabled(),
+      'Importar de PDF no está disponible para tu cuenta.',
+      [],
+    ),
+    (
+      const PdfImportStructuredOutputsDisabled(),
+      'Importar de PDF no está disponible por un problema nuestro. No se '
+          'descontó de tu cupo.',
+      [],
+    ),
+    (
+      const PdfImportNotTrainer(),
+      'Solo los entrenadores pueden importar planes.',
+      [],
+    ),
+    (
+      const PdfImportUnauthenticated(),
+      'Tu sesión se cerró. Volvé a iniciar sesión.',
+      [],
     ),
   ];
   for (final (result, message, actions) in casos) {
@@ -225,6 +283,23 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     });
   }
+
+  testWidgets('cupo agotado de la semana dice cuándo se renueva',
+      (tester) async {
+    final service = _FakeService();
+    await _pump(tester, service);
+    _pickReturns('plan.pdf', 1000);
+    await _pickAndProcess(tester);
+    final resetsAt = DateTime(2026, 10, 26, 0, 0);
+    service.complete(PdfImportQuotaExhausted(
+        scope: PdfQuotaScope.week, resetsAt: resetsAt.toUtc()));
+    await tester.pumpAndSettle();
+
+    expect(
+        find.text('Usaste todas las importaciones de esta semana. Se renueva '
+            'el 26/10 a las 00:00.'),
+        findsOneWidget);
+  });
 
   testWidgets('Reintentar vuelve a mandar el mismo archivo', (tester) async {
     final service = _FakeService();
