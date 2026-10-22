@@ -10,7 +10,6 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 import '../../../app/theme/app_palette.dart';
-import '../../../core/analytics/analytics_service.dart';
 import '../../../core/moderation/moderation_guard.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -20,24 +19,15 @@ import '../../coach/domain/trainer_link_status.dart';
 import '../../profile/application/user_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/experience_level.dart';
-import '../../workout/application/custom_exercise_providers.dart';
 import '../../workout/application/exercise_filter.dart';
-import '../../workout/application/session_providers.dart'
-    show currentUidProvider;
-import '../../workout/domain/custom_exercise.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/domain/exercise.dart';
 import '../../workout/domain/muscle_group.dart';
-import '../../workout/application/routine_providers.dart';
-import '../../workout/domain/routine.dart';
-import '../../workout/domain/routine_source.dart';
-import '../../workout/domain/routine_visibility.dart';
 import '../../coach/presentation/custom_exercise_limit_gate.dart';
-import '../application/cf_providers.dart';
+import '../application/plan_import_preview_controller.dart';
 import '../application/plan_import_providers.dart';
 import '../data/exercise_matcher.dart';
 import '../data/periodized_import_draft.dart';
-import '../data/periodized_routine_mapper.dart';
 import '../domain/periodized_plan.dart';
 import 'widgets/create_custom_exercise_dialog.dart';
 import 'widgets/filter_chips/filter_chips.dart';
@@ -60,20 +50,6 @@ class CoachHubPlanPreviewScreen extends ConsumerStatefulWidget {
       _CoachHubPlanPreviewScreenState();
 }
 
-/// Resultado de intentar asignarle el plan importado a UN atleta, dentro del
-/// batch en paralelo de [_CoachHubPlanPreviewScreenState._assign]. `null` en
-/// el `Future.wait` sigue significando éxito — mismo criterio que antes de
-/// este fix, que sólo guardaba el `athleteId` en el fallo.
-///
-/// Antes de esto el catch-all devolvía nada más que el id y perdía la
-/// excepción real: un `ModerationBlockedException` (contenido vetado —
-/// reintentar no sirve NUNCA, el mismo plan vuelve a fallar igual) se
-/// mostraba con el mismo "Probá de nuevo" que un fallo de red (donde
-/// reintentar sí puede andar). Mismo patrón que `ResultadoDePublicar` en
-/// `routine_actions_provider.dart`: se preserva la categoría en el resultado
-/// del batch en vez de aplanarla en el `catch`.
-typedef _FalloAsignacion = ({String athleteId, String? campoBloqueo});
-
 class _CoachHubPlanPreviewScreenState
     extends ConsumerState<CoachHubPlanPreviewScreen> {
   final Set<String> _selectedAthleteIds = <String>{};
@@ -84,9 +60,6 @@ class _CoachHubPlanPreviewScreenState
   /// Used to warn before leaving the preview, since the parsed+mapped plan lives
   /// in an ephemeral autoDispose provider and is lost on back-navigation.
   bool _hasManualMappings = false;
-
-  /// Hay un «Crear como propio» en curso (quota, diálogo o guardado).
-  bool _creatingCustom = false;
 
   /// Semana mostrada en las tarjetas de día (0-based).
   int _week = 0;
@@ -180,155 +153,83 @@ class _CoachHubPlanPreviewScreenState
     });
   }
 
-  Future<void> _assign(PeriodizedImportDraft draft, String trainerUid) async {
-    // Bloquean la asignación (#1455): sugerencias sin confirmar y componentes
-    // sin match. Las celdas de semana vacías NO bloquean: son un aviso.
-    if (draft.unresolved.isNotEmpty) {
-      setState(() => _error = draft.pendingSuggestions > 0
-          ? 'Hay sugerencias pendientes. Confirmalas o cambialas antes de '
-              'continuar.'
-          : 'Hay ejercicios sin match. Vinculalos con la biblioteca o creá el propio antes de '
-              'continuar.');
-      return;
-    }
-    if (_selectedAthleteIds.isEmpty) {
-      setState(() => _error = 'Elegí al menos un atleta antes de asignar.');
-      return;
+  Future<void> _assign(String trainerUid) async {
+    final controller = ref.read(planImportPreviewControllerProvider);
+    final pending = controller.draft;
+    // Los bloqueos previos no prenden el spinner: se contestan en el acto.
+    if (pending != null &&
+        pending.unresolved.isEmpty &&
+        _selectedAthleteIds.isNotEmpty) {
+      setState(() {
+        _saving = true;
+        _error = null;
+      });
     }
 
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
-
-    final repo = ref.read(routineRepositoryProvider);
     final athleteIds = _selectedAthleteIds.toList();
-    final analytics = ref.read(analyticsServiceProvider);
-
-    // En PARALELO, no en serie.
-    //
-    // `createAssigned` termina en un `_collection.add(...)`, y ese future
-    // resuelve cuando el SERVIDOR confirma la escritura — no cuando entra en
-    // la caché local. Con un `for` y un `await` adentro, eso encadenaba una
-    // ida y vuelta de red POR ALUMNO: asignarle el plan a cinco costaba cinco
-    // esperas en fila cuando la red puede llevarlas juntas. Es el único lugar
-    // de las cuatro superficies de asignación donde el costo se multiplica,
-    // y por eso se arregla sin esperar la medición del resto: no hay número
-    // que pueda justificar serializarlas.
-    //
-    // Cada future atrapa SU error y devuelve el id del alumno que falló, o
-    // null si salió bien. `Future.wait` a secas aborta con el primer error y
-    // se perdería tanto el resultado de los demás como el detalle de CUÁL
-    // falló — que es justo lo que alimenta el reintento acotado de abajo.
-    // `Future.wait` preserva el orden de entrada, así que `failed` sigue
-    // saliendo en orden de selección, igual que con el loop.
-    // Tipo de retorno EXPLICITO a propósito: sin él, Dart tiene que inferir
-    // el tipo de la función a partir de tres `return` con formas distintas
-    // (`null`, un record con `campoBloqueo: String`, uno con
-    // `campoBloqueo: null`) y unificarlos de abajo hacia arriba. Anotado, cada
-    // `return` se chequea CONTRA `_FalloAsignacion?` en vez de aportar a esa
-    // inferencia — sin esto `campoBloqueo: null` podía terminar tipado `Null`
-    // en vez de `String?` y romper la forma que espera `_FalloAsignacion`.
-    Future<_FalloAsignacion?> intentarAsignar(String athleteId) async {
-      final routine = _buildRoutine(
-        draft: draft,
-        trainerUid: trainerUid,
-        athleteId: athleteId,
-      );
-      try {
-        // `plan_assigned` ya NO va acá: lo emite `createAssigned`, que es
-        // donde su dartdoc siempre dijo que estaba. `routine_created` sí se
-        // queda — lleva un `source` que sólo conoce el llamador.
-        await repo.createAssigned(routine);
-        analytics.logRoutineCreated(
-          source: RoutineCreationSource.trainerAssigned,
-          daysCount: routine.days.length,
-          weeksCount: routine.numWeeks,
-        );
-        return null;
-      } on ModerationBlockedException catch (e) {
-        // Rama propia y NO el catch-all de abajo: `_ensureRoutineTextIsClean`
-        // (routine_repository.dart) corre sobre el MISMO `plan`
-        // (name/split/summary/days) para los N atletas de este batch —
-        // si el guard bloquea a uno los bloquea a TODOS, con el mismo
-        // `campo`. Caer en el catch-all acá era justo el bug: mostraba
-        // "Probá de nuevo" sobre un plan que va a fallar siempre, sin
-        // ninguna guía de qué corregir.
-        return (athleteId: athleteId, campoBloqueo: e.campo);
-      } catch (_) {
-        return (athleteId: athleteId, campoBloqueo: null);
-      }
-    }
-
-    final resultados = await Future.wait(athleteIds.map(intentarAsignar));
-    final failed = resultados.whereType<_FalloAsignacion>().toList();
-
+    final outcome = await controller.assign(
+      athleteIds: athleteIds,
+      trainerUid: trainerUid,
+      routineName: _nameController.text,
+      level: _level,
+    );
     if (!mounted) return;
 
-    // Bloqueo del filtro de términos vetados: por el determinismo de arriba,
-    // si ALGUNO de los fallos trae `campoBloqueo` es porque TODOS los
-    // atletas de este batch comparten el mismo plan bloqueado. No hay
-    // subconjunto que reintentar -- "Probá de nuevo" es consejo falso acá -- y
-    // un mensaje por atleta repetiría N veces lo mismo cuando es un plan
-    // bloqueado, no N fallos independientes. `ubicacionLegible` le ahorra al
-    // PF adivinar cuál de hasta 40 notas (5 días x 8 slots) fue.
-    final campoBloqueado = failed
-        .map((f) => f.campoBloqueo)
-        .firstWhere((campo) => campo != null, orElse: () => null);
-    if (campoBloqueado != null) {
-      final l10n = AppL10n.of(context);
-      final ubicacion = ModerationGuard.ubicacionLegible(campoBloqueado);
-      setState(() {
-        _error = ubicacion == null
-            ? l10n.moderationBlockedMessage
-            : '$ubicacion: ${l10n.moderationBlockedMessage}';
-        _saving = false;
-      });
-      return;
+    switch (outcome) {
+      case PlanAssignBlockedUnresolved(:final pendingSuggestions):
+        setState(() => _error = pendingSuggestions > 0
+            ? 'Hay sugerencias pendientes. Confirmalas o cambialas antes de '
+                'continuar.'
+            : 'Hay ejercicios sin match. Vinculalos con la biblioteca o creá el propio antes de '
+                'continuar.');
+      case PlanAssignNoAthletes():
+        setState(() => _error = 'Elegí al menos un atleta antes de asignar.');
+      case PlanAssignModerationBlocked(:final campo):
+        // El mismo plan para todos los atletas: si lo vetó para uno, lo vetó
+        // para todos. «Probá de nuevo» sería consejo falso; la ubicación le
+        // ahorra al PF adivinar cuál de hasta 40 notas fue.
+        final l10n = AppL10n.of(context);
+        final ubicacion = ModerationGuard.ubicacionLegible(campo);
+        setState(() {
+          _error = ubicacion == null
+              ? l10n.moderationBlockedMessage
+              : '$ubicacion: ${l10n.moderationBlockedMessage}';
+          _saving = false;
+        });
+      case PlanAssignAllFailed():
+        // No se guardó nada: se conserva el plan y la selección para
+        // reintentar sin volver a subir el Excel.
+        setState(() {
+          _error = 'No pudimos guardar el plan. Probá de nuevo.';
+          _saving = false;
+        });
+      case PlanAssignPartial(:final assigned, :final failedAthleteIds):
+        // Quedan seleccionados sólo los que fallaron, para reintentar esos.
+        setState(() {
+          _selectedAthleteIds
+            ..clear()
+            ..addAll(failedAthleteIds);
+          _error = 'Plan asignado a $assigned atleta(s). '
+              '${failedAthleteIds.length} fallaron. '
+              'Quedaron seleccionados para reintentar.';
+          _saving = false;
+        });
+      case PlanAssignSuccess(:final assigned):
+        // La bandera va ANTES de limpiar: limpiar el plan dispara el rebuild
+        // con `plan == null`, y sin `_saliendoAlDashboard` la red de
+        // seguridad de `build` nos manda a `/upload-plan` pisando este `go`.
+        _saliendoAlDashboard = true;
+        controller.clear();
+        final msg = assigned == 1
+            ? 'Plan asignado correctamente.'
+            : 'Plan asignado a $assigned atletas.';
+        showTreinoToast(
+          context,
+          msg,
+          type: TreinoToastType.success,
+        );
+        context.go('/dashboard');
     }
-
-    // Total failure: nothing was saved. Keep the parsed plan and the current
-    // selection so the trainer can retry without re-uploading the Excel.
-    if (failed.length == athleteIds.length) {
-      setState(() {
-        _error = 'No pudimos guardar el plan. Probá de nuevo.';
-        _saving = false;
-      });
-      return;
-    }
-
-    // Partial failure: some assignments succeeded, others didn't. Keep the
-    // parsed plan in memory and stay on the preview, narrowing the selection
-    // to only the failed athletes so the trainer can retry just those without
-    // re-uploading and re-parsing the Excel.
-    if (failed.isNotEmpty) {
-      final ok = athleteIds.length - failed.length;
-      setState(() {
-        _selectedAthleteIds
-          ..clear()
-          ..addAll(failed.map((f) => f.athleteId));
-        _error = 'Plan asignado a $ok atleta(s). ${failed.length} fallaron. '
-            'Quedaron seleccionados para reintentar.';
-        _saving = false;
-      });
-      return;
-    }
-
-    // Full success: clear the parsed plan and move on to the dashboard.
-    // El orden importa menos que la bandera: limpiar el plan dispara el
-    // rebuild con `plan == null`, y sin `_saliendoAlDashboard` la red de
-    // seguridad de `build` nos manda a `/upload-plan` pisando este `go`.
-    _saliendoAlDashboard = true;
-    ref.read(periodizedImportProvider.notifier).state = null;
-    final msg = athleteIds.length == 1
-        ? 'Plan asignado correctamente.'
-        : 'Plan asignado a ${athleteIds.length} atletas.';
-    showTreinoToast(
-      context,
-      msg,
-      type: TreinoToastType.success,
-    );
-    context.go('/dashboard');
   }
 
   /// Abre un modal con el catálogo de ejercicios para que el PF asigne
@@ -355,154 +256,54 @@ class _CoachHubPlanPreviewScreenState
     );
     if (picked == null) return;
 
-    _resolveExercise(
-      key: key,
-      rowName: rowName,
-      exercise: MatcherExercise(
-        id: picked.id,
-        name: picked.name,
-        muscleGroup: picked.muscleGroup,
-      ),
-    );
+    _afterResolve(ref.read(planImportPreviewControllerProvider).resolve(
+          key,
+          MatcherExercise(
+            id: picked.id,
+            name: picked.name,
+            muscleGroup: picked.muscleGroup,
+          ),
+        ));
   }
 
-  /// «Crear como propio»: el ejercicio propio se crea acá, al confirmar el
-  /// formulario, NUNCA al subir el Excel. Mismo camino que el resto del Coach
-  /// Hub: el embudo del tope del plan y el diálogo de ejercicio propio (con el
-  /// texto original del PF precargado) sobre `CustomExerciseRepository`.
-  Future<void> _createCustomFor({
-    required ExerciseKey key,
-    required String rowName,
-  }) async {
-    // Un solo «Crear como propio» a la vez: el doble clic abría dos diálogos y
-    // el segundo guardado dejaba un ejercicio huérfano (la fila ya estaba
-    // resuelta) que consume el tope del plan del PF.
-    if (_creatingCustom) return;
-    if (ref.read(periodizedImportProvider)?.isResolved(key) ?? true) return;
-    _creatingCustom = true;
-    try {
-      // En el tope muestra el MISMO aviso que el resto de la app y corta: la
-      // fila queda en rojo y «Vincular con la biblioteca» sigue disponible.
-      final canCreate = await intentarCrearEjercicioPropio(context, ref);
-      if (!canCreate || !mounted) return;
-      // Durante el await de arriba la fila pudo resolverse por otro camino.
-      if (_isResolvedNow(key)) return;
-      final created = await showCreateCustomExerciseDialog(
-        context,
-        initialName: rowName,
-        // Último control antes de que el diálogo llame al repo: si la pantalla
-        // se desmontó o la fila ya está resuelta, no se crea nada.
-        canSave: () => mounted && !_isResolvedNow(key),
-      );
-      if (created == null || !mounted) return;
-
-      _resolveExercise(
-        key: key,
-        rowName: rowName,
-        exercise: MatcherExercise(
-          id: created.id,
-          name: created.name,
-          muscleGroup: created.muscleGroup,
-        ),
-        custom: true,
-      );
-    } finally {
-      _creatingCustom = false;
-    }
+  /// «Crear como propio»: el ejercicio propio se crea al confirmar el
+  /// formulario, NUNCA al subir el Excel. La orquestación (uno a la vez,
+  /// re-chequear que la fila siga sin resolver) es del controller; acá van el
+  /// embudo del tope del plan y el diálogo de ejercicio propio del Coach Hub.
+  Future<void> _createCustomFor({required ExerciseKey key}) async {
+    final resolved =
+        await ref.read(planImportPreviewControllerProvider).createCustomFor(
+              key,
+              // En el tope muestra el MISMO aviso que el resto de la app y
+              // corta: la fila queda en rojo y «Vincular con la biblioteca»
+              // sigue disponible.
+              canCreate: () async =>
+                  await intentarCrearEjercicioPropio(context, ref) && mounted,
+              openForm: (rawName, canSave) async {
+                final created = await showCreateCustomExerciseDialog(
+                  context,
+                  initialName: rawName,
+                  // Último control antes de que el diálogo llame al repo: si
+                  // la pantalla se desmontó o la fila ya está resuelta, no se
+                  // crea nada.
+                  canSave: () => mounted && canSave(),
+                );
+                return mounted ? created : null;
+              },
+            );
+    _afterResolve(resolved);
   }
 
-  bool _isResolvedNow(ExerciseKey key) =>
-      ref.read(periodizedImportProvider)?.isResolved(key) ?? true;
+  void _confirmSuggestion(ExerciseKey key) => _afterResolve(
+      ref.read(planImportPreviewControllerProvider).confirmSuggestion(key));
 
-  void _confirmSuggestion({
-    required ExerciseKey key,
-    required String rowName,
-  }) {
-    final suggestion = ref.read(periodizedImportProvider)?.suggestions[key];
-    if (suggestion == null) return;
-    // La sugerencia puede ser un ejercicio PROPIO del PF (entra al catálogo del
-    // matcher): no se registra alias, `addAlias` indexa sólo el global.
-    final uid = ref.read(currentUidProvider) ?? '';
-    final isCustom = uid.isNotEmpty &&
-        (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
-                const <CustomExercise>[])
-            .any((c) => c.id == suggestion.id);
-    _resolveExercise(
-      key: key,
-      rowName: rowName,
-      exercise: suggestion,
-      custom: isCustom,
-    );
-  }
-
-  void _resolveExercise({
-    required ExerciseKey key,
-    required String rowName,
-    required MatcherExercise exercise,
-    bool custom = false,
-  }) {
-    final current = ref.read(periodizedImportProvider);
-    if (current == null) return;
-
-    // Un componente ya resuelto no se resuelve dos veces: un doble tap llegaba
-    // hasta acá y volvía a llamar a addAlias.
-    if (current.isResolved(key)) return;
-
-    // Se resuelve por la clave EXACTA (día, fila, componente): keyed por el
-    // nombre solo se resolverían de una vez todos los renglones homónimos.
-    // Un ejercicio propio recién creado además resuelve los homónimos EXACTOS
-    // (mismo nombre normalizado): son el mismo ejercicio repetido en el plan.
-    ref.read(periodizedImportProvider.notifier).state = custom
-        ? current.resolveWithSameName(key, exercise)
-        : current.resolve(key, exercise);
+  /// Lo que la pantalla hace cuando el controller resolvió un componente.
+  void _afterResolve(bool resolved) {
+    if (!resolved || !mounted) return;
     setState(() {
       _error = null;
       _hasManualMappings = true;
     });
-    // Un ejercicio propio NO se registra como alias: `addAlias` indexa contra
-    // el catálogo global y el propio vive en `users/{uid}/customExercises`.
-    if (custom) return;
-    // FIRE-AND-FORGET: see ADR-CXP-006 // i18n: Fase 6 Etapa 5
-    unawaited(_addAlias(exercise.id, rowName));
-  }
-
-  /// Fire-and-forget side effect: sends the manually mapped alias to
-  /// the addAlias Cloud Function so future imports auto-match.
-  ///
-  /// Silent failure — any exception is swallowed and only logged via
-  /// debugPrint. Never blocks or shows UI feedback. ADR-CXP-009.
-  Future<void> _addAlias(String exerciseId, String rawName) async {
-    try {
-      await ref
-          .read(cloudFunctionsProvider)
-          .httpsCallable('addAlias')
-          .call(<String, dynamic>{'exerciseId': exerciseId, 'alias': rawName});
-    } catch (e) {
-      debugPrint('[addAlias] swallowed: $e');
-    }
-  }
-
-  Routine _buildRoutine({
-    required PeriodizedImportDraft draft,
-    required String trainerUid,
-    required String athleteId,
-  }) {
-    final name = _nameController.text.trim();
-    final routine = mapPeriodizedPlanToRoutine(
-      draft.plan,
-      draft.assignments,
-      routineId: '',
-      routineName: name.isEmpty ? 'Plan importado' : name,
-      level: _level,
-    );
-    // Procedencia: igual que la asignación de siempre.
-    return routine.copyWith(
-      split: 'Custom',
-      source: RoutineSource.trainerAssigned,
-      assignedBy: trainerUid,
-      assignedTo: athleteId,
-      visibility: RoutineVisibility.private,
-    );
   }
 
   @override
@@ -602,14 +403,11 @@ class _CoachHubPlanPreviewScreenState
                           day: d,
                           week: week,
                           draft: draft,
-                          onConfirmSuggestion: (key) {
-                            final raw = _rawNameOf(plan, key);
-                            _confirmSuggestion(key: key, rowName: raw);
-                          },
+                          onConfirmSuggestion: _confirmSuggestion,
                           onPickManual: (key, rawName) =>
                               _pickExerciseFor(key: key, rowName: rawName),
-                          onCreateCustom: (key, rawName) =>
-                              _createCustomFor(key: key, rowName: rawName),
+                          onCreateCustom: (key, _) =>
+                              _createCustomFor(key: key),
                         ),
                       ),
                     const SizedBox(height: AppSpacing.s8),
@@ -634,7 +432,7 @@ class _CoachHubPlanPreviewScreenState
                           : 'ASIGNAR PLAN',
                       expand: true,
                       loading: _saving,
-                      onPressed: () => _assign(draft, profile.uid),
+                      onPressed: () => _assign(profile.uid),
                     ),
                   ],
                 ),
@@ -644,21 +442,6 @@ class _CoachHubPlanPreviewScreenState
         ),
       ),
     );
-  }
-
-  /// Nombre tal cual lo escribió el PF para el componente [key] (es lo que se
-  /// guarda como alias al confirmar).
-  static String _rawNameOf(PeriodizedPlan plan, ExerciseKey key) {
-    for (final day in plan.days) {
-      if (day.dayNumber != key.dayNumber) continue;
-      for (final row in day.rows) {
-        if (row.position != key.row) continue;
-        for (final ex in row.exercises) {
-          if (ex.component == key.component) return ex.rawName;
-        }
-      }
-    }
-    return '';
   }
 }
 
