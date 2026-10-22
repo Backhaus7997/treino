@@ -156,8 +156,19 @@ Reglas:
 - `weeks.length == numWeeks`; lista vacía = semana sin carga para ese
   ejercicio.
 - Cada set mapea 1:1 a `SetSpec` (`lib/features/workout/domain/set_spec.dart`):
-  `type` ∈ valores de `SetType` (`set_enums.dart`); `reps` XOR
-  (`repsMin`, `repsMax`); topes reps ≤ 999, `weightKg` ≤ 500.
+  `type` ∈ valores de `SetType` (`set_enums.dart`); topes reps ≤ 999,
+  `weightKg` ≤ 500.
+- **Prescripción: a lo sumo UNA de cuatro**, los mismos modos que soporta
+  `SetSpec`: `reps`; el rango (`repsMin` + `repsMax`, siempre los dos juntos y
+  `repsMin ≤ repsMax`); `durationSeconds`; o `distanceMeters`. `weightKg` es
+  aparte y puede acompañar a cualquiera. **Ninguna** también es válida: un set
+  al fallo (`type: failure`) o una celda sin reps, que la vista previa marca en
+  rojo como en el Excel. Lo que se rechaza es mezclar dos modos (`reps` +
+  `durationSeconds`, `reps` + rango).
+  - El contrato compartido decía «`reps` XOR (`repsMin`,`repsMax`)». Leído
+    literal rechaza todo set por tiempo o distancia (los dos van con reps y
+    rango en null) y devolvería `internal` a cualquier PDF con planchas o
+    trote. Esta regla lo reemplaza.
 - `rawName` es **TEXTUAL** del PDF (nunca normalizado ni traducido).
   `sourceText` ≤ 300 caracteres.
 - RIR/RPE/tempo/%1RM y cualquier calificador no modelado van a `note`
