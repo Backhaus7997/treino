@@ -1311,5 +1311,19 @@
   "sessionRestEndedTitle": "Terminó el descanso",
   "sessionRestEndedBody": "Vuelve a la serie",
   "sessionRestCountdownTitle": "Descanso",
-  "sessionRestCountdownBody": "Vuelve a la serie cuando llegue a cero"
+  "sessionRestCountdownBody": "Vuelve a la serie cuando llegue a cero",
+  "pdfImportUploadTitle": "IMPORTAR PLAN",
+  "pdfImportPrivacyNotice": "Usamos IA para leer tu PDF y armar el plan. No guardamos el archivo. Sube solo los datos de tu alumno que sean necesarios.",
+  "pdfImportPickFile": "Elegir PDF",
+  "pdfImportPickAnother": "Elegir otro archivo",
+  "pdfImportProcess": "PROCESAR PLAN",
+  "pdfImportProcessingTitle": "Leyendo tu plan…",
+  "pdfImportProcessingHint": "Puede tardar hasta un par de minutos. No cierres esta pantalla.",
+  "pdfImportLeaveTitle": "¿Salir mientras se lee el plan?",
+  "pdfImportLeaveBody": "Este intento ya cuenta en tu cupo aunque salgas.",
+  "pdfImportLeaveConfirm": "Salir",
+  "pdfImportRetry": "Reintentar",
+  "pdfImportErrorTooBig": "El archivo pesa más de 5 MB. Elige uno más liviano.",
+  "pdfImportErrorInternal": "No pudimos leer el plan. Prueba de nuevo en un rato.",
+  "pdfImportReadSummary": "Leímos {days, plural, =1{1 día} other{{days} días}} y {weeks, plural, =1{1 semana} other{{weeks} semanas}}."
 }

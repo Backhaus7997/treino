@@ -5911,6 +5911,67 @@ class AppL10nEs extends AppL10n {
   @override
   String get sessionRestCountdownBody =>
       'Vuelve a la serie cuando llegue a cero';
+
+  @override
+  String get pdfImportUploadTitle => 'IMPORTAR PLAN';
+
+  @override
+  String get pdfImportPrivacyNotice =>
+      'Usamos IA para leer tu PDF y armar el plan. No guardamos el archivo. Sube solo los datos de tu alumno que sean necesarios.';
+
+  @override
+  String get pdfImportPickFile => 'Elegir PDF';
+
+  @override
+  String get pdfImportPickAnother => 'Elegir otro archivo';
+
+  @override
+  String get pdfImportProcess => 'PROCESAR PLAN';
+
+  @override
+  String get pdfImportProcessingTitle => 'Leyendo tu plan…';
+
+  @override
+  String get pdfImportProcessingHint =>
+      'Puede tardar hasta un par de minutos. No cierres esta pantalla.';
+
+  @override
+  String get pdfImportLeaveTitle => '¿Salir mientras se lee el plan?';
+
+  @override
+  String get pdfImportLeaveBody =>
+      'Este intento ya cuenta en tu cupo aunque salgas.';
+
+  @override
+  String get pdfImportLeaveConfirm => 'Salir';
+
+  @override
+  String get pdfImportRetry => 'Reintentar';
+
+  @override
+  String get pdfImportErrorTooBig =>
+      'El archivo pesa más de 5 MB. Elige uno más liviano.';
+
+  @override
+  String get pdfImportErrorInternal =>
+      'No pudimos leer el plan. Prueba de nuevo en un rato.';
+
+  @override
+  String pdfImportReadSummary(int days, int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days días',
+      one: '1 día',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: '$weeks semanas',
+      one: '1 semana',
+    );
+    return 'Leímos $_temp0 y $_temp1.';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -11817,4 +11878,65 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get sessionRestCountdownBody =>
       'Volvé a la serie cuando llegue a cero';
+
+  @override
+  String get pdfImportUploadTitle => 'IMPORTAR PLAN';
+
+  @override
+  String get pdfImportPrivacyNotice =>
+      'Usamos IA para leer tu PDF y armar el plan. No guardamos el archivo. Subí solo los datos de tu alumno que sean necesarios.';
+
+  @override
+  String get pdfImportPickFile => 'Elegir PDF';
+
+  @override
+  String get pdfImportPickAnother => 'Elegir otro archivo';
+
+  @override
+  String get pdfImportProcess => 'PROCESAR PLAN';
+
+  @override
+  String get pdfImportProcessingTitle => 'Leyendo tu plan…';
+
+  @override
+  String get pdfImportProcessingHint =>
+      'Puede tardar hasta un par de minutos. No cierres esta pantalla.';
+
+  @override
+  String get pdfImportLeaveTitle => '¿Salir mientras se lee el plan?';
+
+  @override
+  String get pdfImportLeaveBody =>
+      'Este intento ya cuenta en tu cupo aunque salgas.';
+
+  @override
+  String get pdfImportLeaveConfirm => 'Salir';
+
+  @override
+  String get pdfImportRetry => 'Reintentar';
+
+  @override
+  String get pdfImportErrorTooBig =>
+      'El archivo pesa más de 5 MB. Elegí uno más liviano.';
+
+  @override
+  String get pdfImportErrorInternal =>
+      'No pudimos leer el plan. Probá de nuevo en un rato.';
+
+  @override
+  String pdfImportReadSummary(int days, int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days días',
+      one: '1 día',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: '$weeks semanas',
+      one: '1 semana',
+    );
+    return 'Leímos $_temp0 y $_temp1.';
+  }
 }
