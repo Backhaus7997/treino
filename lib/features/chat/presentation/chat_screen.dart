@@ -31,6 +31,7 @@ import '../application/chat_media_send_controller.dart';
 import '../application/chat_providers.dart';
 import '../domain/media_type.dart';
 import '../domain/message.dart';
+import 'chat_actions.dart';
 import 'chat_image_bubble.dart';
 import 'chat_video_bubble.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
@@ -359,6 +360,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
         ),
+        actions: [
+          if (currentUid != null)
+            IconButton(
+              icon: Icon(TreinoIcon.dotsThree, color: palette.textPrimary),
+              tooltip: l10n.chatMoreActionsA11y,
+              onPressed: () => showChatActionsSheet(
+                context,
+                ref,
+                chatId: widget.chatId,
+                uid: currentUid,
+                archived: ref
+                        .read(chatByIdProvider(widget.chatId))
+                        .valueOrNull
+                        ?.isArchivedFor(currentUid) ??
+                    false,
+                onViewProfile:
+                    pubAsync.valueOrNull == null ? null : _openProfile,
+                // Archivado o eliminado, este chat ya no está en la bandeja
+                // de donde se abrió: volvemos a ella.
+                onLeft: _backToInbox,
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         child: Column(

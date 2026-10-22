@@ -14,14 +14,17 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-// Header del chat: avatar, nombre y relación, y tocar a la persona abre su
-// perfil público. Firestore falso con el repo REAL: un repo mockeado tapa lo
-// que escribe y lee de verdad.
+// Header del chat: tocar a la persona abre su perfil, y el ⋮ ofrece Ver
+// perfil, Archivar y Eliminar chat. Las escrituras van contra un Firestore
+// falso con el repo REAL: un repo mockeado tapa lo que escribe de verdad.
 
 const _chatPath = '/coach/chat/aaa_bbb?other=bbb';
 const _profilePath = '/coach/chat/aaa_bbb/profile/bbb';
 
 late FakeFirebaseFirestore _firestore;
+
+Future<Map<String, Object?>> _chatDoc() async =>
+    (await _firestore.collection('chats').doc('aaa_bbb').get()).data()!;
 
 /// Router con la bandeja debajo y el chat empujado encima, como llega en la
 /// app. La ruta del perfil replica la que cuelga del chat en `router.dart`.
@@ -94,6 +97,11 @@ const _nicolas = UserPublicProfile(
 
 String _location(GoRouter router) => router.state.uri.toString();
 
+Future<void> _openMenu(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('Opciones del chat'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUp(() async {
     _firestore = FakeFirebaseFirestore();
@@ -151,6 +159,90 @@ void main() {
       await tester.tap(find.text('USUARIO ELIMINADO'));
       await tester.pumpAndSettle();
       expect(_location(router), _chatPath);
+
+      await _openMenu(tester);
+      expect(find.text('Ver perfil'), findsNothing);
+      expect(find.text('Archivar'), findsOneWidget);
+    });
+  });
+
+  group('menú ⋮', () {
+    testWidgets('muestra Ver perfil, Archivar y Eliminar chat', (tester) async {
+      await _pumpChat(tester, other: _nicolas);
+      await _openMenu(tester);
+
+      expect(find.text('Ver perfil'), findsOneWidget);
+      expect(find.text('Archivar'), findsOneWidget);
+      expect(find.text('Eliminar chat'), findsOneWidget);
+    });
+
+    testWidgets('Ver perfil navega al perfil del otro', (tester) async {
+      final router = await _pumpChat(tester, other: _nicolas);
+      await _openMenu(tester);
+
+      await tester.tap(find.text('Ver perfil'));
+      await tester.pumpAndSettle();
+
+      expect(_location(router), _profilePath);
+      expect((await _chatDoc()).containsKey('archivedAt'), isFalse);
+    });
+
+    testWidgets(
+        'Archivar escribe sólo mi entrada, avisa con Deshacer y vuelve a la '
+        'bandeja', (tester) async {
+      final router = await _pumpChat(tester, other: _nicolas);
+      await _openMenu(tester);
+
+      await tester.tap(find.text('Archivar'));
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+
+      expect(((await _chatDoc())['archivedAt']! as Map).keys, ['aaa']);
+      expect(find.text('Chat archivado'), findsOneWidget);
+      expect(find.text('Deshacer'), findsOneWidget);
+      expect(_location(router), '/feed/messages');
+    });
+
+    testWidgets('un chat archivado ofrece Desarchivar', (tester) async {
+      await _firestore.collection('chats').doc('aaa_bbb').update({
+        'archivedAt.aaa': Timestamp.fromDate(DateTime.utc(2026, 10, 2)),
+      });
+      await _pumpChat(tester, other: _nicolas);
+      await _openMenu(tester);
+
+      expect(find.text('Desarchivar'), findsOneWidget);
+      await tester.tap(find.text('Desarchivar'));
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+
+      expect((await _chatDoc())['archivedAt'], isEmpty);
+    });
+
+    testWidgets(
+        'Eliminar pide confirmación: cancelar no escribe ni sale; confirmar '
+        'elimina y vuelve a la bandeja', (tester) async {
+      final router = await _pumpChat(tester, other: _nicolas);
+
+      await _openMenu(tester);
+      await tester.tap(find.text('Eliminar chat'));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Eliminar el chat?'), findsOneWidget);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect((await _chatDoc()).containsKey('hiddenBefore'), isFalse);
+      expect(_location(router), _chatPath);
+
+      await _openMenu(tester);
+      await tester.tap(find.text('Eliminar chat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+
+      expect(((await _chatDoc())['hiddenBefore']! as Map).keys, ['aaa']);
+      expect(find.text('Chat eliminado'), findsOneWidget);
+      expect(_location(router), '/feed/messages');
     });
   });
 }

@@ -587,6 +587,121 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Desarchivar'), findsOneWidget);
       });
+
+      group('swipe', () {
+        Future<void> swipeLeft(WidgetTester tester) async {
+          await tester.drag(find.text('Vale'), const Offset(-240, 0));
+          await tester.pumpAndSettle();
+        }
+
+        testWidgets('revela Archivar y Eliminar; Archivar escribe', (
+          tester,
+        ) async {
+          await pumpList(tester, [
+            _chat(lastMessageText: 'hola', lastMessageAt: last),
+          ]);
+          // Cerrada, las acciones no existen: no se ven a través de la fila.
+          expect(find.text('Archivar'), findsNothing);
+
+          await swipeLeft(tester);
+          expect(find.text('Archivar'), findsOneWidget);
+          expect(find.text('Eliminar chat'), findsOneWidget);
+
+          await tester.tap(find.text('Archivar'));
+          await tester.runAsync(() => pumpEventQueue());
+          await tester.pumpAndSettle();
+
+          expect(((await chatDoc())['archivedAt']! as Map).keys, ['aaa']);
+          expect(find.text('Chat archivado'), findsOneWidget);
+          expect(find.text('Deshacer'), findsOneWidget);
+        });
+
+        testWidgets('Eliminar pide confirmación antes de escribir', (
+          tester,
+        ) async {
+          await pumpList(tester, [
+            _chat(lastMessageText: 'hola', lastMessageAt: last),
+          ]);
+
+          await swipeLeft(tester);
+          await tester.tap(find.text('Eliminar chat'));
+          await tester.pumpAndSettle();
+          expect(find.text('¿Eliminar el chat?'), findsOneWidget);
+          await tester.tap(find.text('Cancelar'));
+          await tester.pumpAndSettle();
+          expect((await chatDoc()).containsKey('hiddenBefore'), isFalse);
+
+          await swipeLeft(tester);
+          await tester.tap(find.text('Eliminar chat'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Eliminar'));
+          await tester.runAsync(() => pumpEventQueue());
+          await tester.pumpAndSettle();
+          expect(((await chatDoc())['hiddenBefore']! as Map).keys, ['aaa']);
+        });
+
+        testWidgets('en Archivados el swipe ofrece Desarchivar', (
+          tester,
+        ) async {
+          await firestore
+              .collection('chats')
+              .doc('aaa_bbb')
+              .update({'archivedAt.aaa': Timestamp.fromDate(last)});
+          await pumpList(tester, [
+            _chat(
+              lastMessageText: 'hola',
+              lastMessageAt: last,
+              archivedAt: {'aaa': last.add(const Duration(minutes: 1))},
+            ),
+          ]);
+          await tester.tap(find.text('Archivados · 1'));
+          await tester.pumpAndSettle();
+
+          await swipeLeft(tester);
+          expect(find.text('Archivar'), findsNothing);
+          await tester.tap(find.text('Desarchivar'));
+          await tester.runAsync(() => pumpEventQueue());
+          await tester.pumpAndSettle();
+
+          expect((await chatDoc())['archivedAt'], isEmpty);
+          expect(find.text('Chat desarchivado'), findsOneWidget);
+        });
+
+        testWidgets('tocar una fila abierta la cierra en vez de abrir el chat',
+            (tester) async {
+          await pumpList(tester, [
+            _chat(lastMessageText: 'hola', lastMessageAt: last),
+          ]);
+
+          final y = tester.getCenter(find.text('Vale')).dy;
+          await swipeLeft(tester);
+          // Abierta, el nombre quedó fuera de pantalla: se toca lo visible.
+          await tester.tapAt(Offset(120, y));
+          await tester.pumpAndSettle();
+
+          expect(find.text('Archivar'), findsNothing);
+          expect((await chatDoc()).containsKey('archivedAt'), isFalse);
+        });
+
+        testWidgets(
+            'control negativo: un drag desde el borde izquierdo o hacia la '
+            'derecha no abre la fila', (tester) async {
+          await pumpList(tester, [
+            _chat(lastMessageText: 'hola', lastMessageAt: last),
+          ]);
+          final y = tester.getCenter(find.text('Vale')).dy;
+
+          // El borde es del gesto de volver de iOS.
+          await tester.dragFrom(Offset(8, y), const Offset(-240, 0));
+          await tester.pumpAndSettle();
+          expect(find.text('Archivar'), findsNothing);
+
+          await tester.drag(find.text('Vale'), const Offset(240, 0));
+          await tester.pumpAndSettle();
+          expect(find.text('Archivar'), findsNothing);
+          expect((await chatDoc()).containsKey('archivedAt'), isFalse);
+        });
+      });
     });
   });
 }

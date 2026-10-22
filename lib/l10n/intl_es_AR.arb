@@ -1502,6 +1502,8 @@
   "@chatDeleteConfirmTitle": {},
   "chatDeleteConfirmBody": "Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.",
   "@chatDeleteConfirmBody": {},
+  "chatActionViewProfile": "Ver perfil",
+  "@chatActionViewProfile": {},
   "chatHeaderProfileA11y": "Ver el perfil de {name}",
   "@chatHeaderProfileA11y": {
     "placeholders": {
@@ -1510,6 +1512,8 @@
       }
     }
   },
+  "chatMoreActionsA11y": "Opciones del chat",
+  "@chatMoreActionsA11y": {},
   "chatArchivedSectionTitle": "Archivados · {count}",
   "@chatArchivedSectionTitle": {"placeholders": {"count": {"type": "int"}}},
   "chatRelativeJustNow": "recién",
