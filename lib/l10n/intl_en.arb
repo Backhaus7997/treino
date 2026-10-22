@@ -2459,5 +2459,9 @@
   "pdfImportErrorNotTrainer": "Only trainers can import plans.",
   "pdfImportErrorSignedOut": "You've been signed out. Sign in again.",
   "pdfImportCta": "IMPORT FROM PDF",
-  "pdfImportQuotaRemaining": "{week} left this week, {day} today."
+  "pdfImportQuotaRemaining": "{week} left this week, {day} today.",
+  "pdfImportSourceShow": "Show PDF text",
+  "pdfImportSourceHide": "Hide PDF text",
+  "pdfImportAlternative": "Alternative: {name}",
+  "pdfImportUseAlternative": "Use alternative"
 }

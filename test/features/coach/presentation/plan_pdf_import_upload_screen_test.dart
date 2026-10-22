@@ -129,6 +129,31 @@ void main() {
     expect(find.textContaining('Te quedan'), findsNothing);
   });
 
+  testWidgets('pantalla chica y letra grande: sin desbordes', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final service = _FakeService();
+    await _pump(tester, service,
+        remaining: (week: 5, day: 2, limitWeekly: 7, limitDaily: 7));
+    _pickReturns('un-nombre-de-archivo-muy-largo-del-plan-de-mi-alumno.pdf', 9);
+    await tester.ensureVisible(find.text('Elegir PDF'));
+    await tester.tap(find.text('Elegir PDF'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('PROCESAR PLAN'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PROCESAR PLAN'));
+    await tester.pump(const Duration(milliseconds: 300));
+    service.complete(const PdfImportTimeout());
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(service.calls, hasLength(1));
+    expect(find.text('Reintentar'), findsOneWidget);
+  });
+
   testWidgets('un PDF de más de 5 MB se rechaza sin llamar al servidor',
       (tester) async {
     final service = _FakeService();

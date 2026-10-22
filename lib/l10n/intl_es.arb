@@ -1340,5 +1340,9 @@
   "pdfImportErrorNotTrainer": "Solo los entrenadores pueden importar planes.",
   "pdfImportErrorSignedOut": "Tu sesión se cerró. Vuelve a iniciar sesión.",
   "pdfImportCta": "IMPORTAR DE PDF",
-  "pdfImportQuotaRemaining": "Te quedan {week} esta semana y {day} hoy."
+  "pdfImportQuotaRemaining": "Te quedan {week} esta semana y {day} hoy.",
+  "pdfImportSourceShow": "Ver texto del PDF",
+  "pdfImportSourceHide": "Ocultar texto del PDF",
+  "pdfImportAlternative": "Alternativa: {name}",
+  "pdfImportUseAlternative": "Usar alternativa"
 }

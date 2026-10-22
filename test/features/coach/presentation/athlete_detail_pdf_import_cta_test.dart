@@ -74,6 +74,21 @@ void main() {
     expect(find.text('import:athlete-1'), findsOneWidget);
   });
 
+  testWidgets('pantalla chica y letra grande: los dos CTAs entran',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    await _pump(tester, PdfImportGate.enabled);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('IMPORTAR DE PDF'), findsOneWidget);
+    expect(find.text('CREAR PLAN'), findsOneWidget);
+  });
+
   for (final gate in [PdfImportGate.loading, PdfImportGate.disabled]) {
     testWidgets('${gate.name}: no hay CTA y CREAR PLAN ocupa el ancho',
         (tester) async {

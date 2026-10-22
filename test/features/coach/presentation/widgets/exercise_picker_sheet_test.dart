@@ -68,6 +68,7 @@ Future<void> _openPicker(
   WidgetTester tester, {
   List<Exercise>? exercises,
   Set<String> alreadySelectedIds = const {},
+  bool single = false,
   void Function(List<Exercise>?)? onResult,
   UserRole role = UserRole.trainer,
   AsyncValue<CustomExerciseQuota>? quota,
@@ -93,6 +94,7 @@ Future<void> _openPicker(
                 final result = await showExercisePicker(
                   ctx,
                   alreadySelectedIds: alreadySelectedIds,
+                  single: single,
                 );
                 onResult?.call(result);
               },
@@ -152,6 +154,27 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Agregar 1 ejercicio'), findsOneWidget);
+    });
+
+    testWidgets('single: elegir otro reemplaza al anterior y vuelve uno solo',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      List<Exercise>? result;
+      await _openPicker(tester, single: true, onResult: (r) => result = r);
+
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sentadilla con Barra'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Agregar 2 ejercicios'), findsNothing);
+      await tester.tap(find.text('Agregar 1 ejercicio'));
+      await tester.pumpAndSettle();
+      expect(result!.map((e) => e.id), ['back-squat']);
     });
 
     testWidgets(

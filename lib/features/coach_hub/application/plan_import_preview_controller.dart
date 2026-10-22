@@ -68,8 +68,12 @@ final class PlanAssignPartial extends PlanAssignOutcome {
 /// dónde navegar (si no, la red de seguridad de la pantalla —«sin borrador,
 /// volvé a subir»— le gana a la navegación del éxito).
 final class PlanAssignSuccess extends PlanAssignOutcome {
-  const PlanAssignSuccess(this.assigned);
+  const PlanAssignSuccess(this.assigned, {this.routineIds = const []});
   final int assigned;
+
+  /// Las rutinas creadas, en el orden de los alumnos: la UI mobile ofrece
+  /// abrir la del alumno en el editor.
+  final List<String> routineIds;
 }
 
 typedef _Fallo = ({String athleteId, String? campoBloqueo});
@@ -336,6 +340,8 @@ class PlanImportPreviewController {
     final repo = _ref.read(routineRepositoryProvider);
     final analytics = _ref.read(analyticsServiceProvider);
 
+    final creadas = <String, String>{};
+
     Future<_Fallo?> intentar(String athleteId) async {
       final routine = buildAssignedRoutine(
         current,
@@ -347,7 +353,7 @@ class PlanImportPreviewController {
       try {
         // `plan_assigned` lo emite `createAssigned`; `routine_created` va
         // acá porque lleva un `source` que sólo conoce el llamador.
-        await repo.createAssigned(routine);
+        creadas[athleteId] = (await repo.createAssigned(routine)).id;
         analytics.logRoutineCreated(
           source: RoutineCreationSource.trainerAssigned,
           daysCount: routine.days.length,
@@ -375,7 +381,10 @@ class PlanImportPreviewController {
         failedAthleteIds: [for (final f in failed) f.athleteId],
       );
     }
-    return PlanAssignSuccess(athleteIds.length);
+    return PlanAssignSuccess(
+      athleteIds.length,
+      routineIds: [for (final id in athleteIds) creadas[id]!],
+    );
   }
 
   /// Descarta el borrador (después de asignar, o al salir).
