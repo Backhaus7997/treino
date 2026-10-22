@@ -110,6 +110,17 @@ String importDiagnosticGroupTitle(ImportDiagnosticCode code) => switch (code) {
       ImportDiagnosticCode.qualifierSavedAsNote =>
         'Calificadores guardados como nota',
       ImportDiagnosticCode.mixedSetKinds => 'Modos mezclados entre semanas',
+      ImportDiagnosticCode.malformedPlan => 'El plan leído está incompleto',
+      ImportDiagnosticCode.weekCountMismatch =>
+        'Ejercicios con otra cantidad de semanas',
+      ImportDiagnosticCode.invalidSetType => 'Tipos de serie inválidos',
+      ImportDiagnosticCode.invalidReps => 'Reps inválidas',
+      ImportDiagnosticCode.invalidWeight => 'Pesos inválidos',
+      ImportDiagnosticCode.invalidComponent => 'Superseries mal numeradas',
+      ImportDiagnosticCode.mixedPrescription =>
+        'Series con más de una prescripción',
+      ImportDiagnosticCode.extractorWarning => 'Para revisar',
+      ImportDiagnosticCode.invalidOptionalField => 'Datos descartados',
     };
 
 /// Todos los diagnósticos, agrupados por código, cada uno con su celda

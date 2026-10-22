@@ -34,6 +34,15 @@ class RestState {
   /// El instante de fin sale de [RestRules.endsAt], la misma regla que usa el
   /// reloj de Apple: si cada lado lo calculara a mano, la diferencia recién se
   /// vería con los dos números a la vista.
+  ///
+  /// [start] se trunca al milisegundo ANTES de pasárselo. [RestRules.endsAt]
+  /// redondea el fin al milisegundo más cercano, y con un inicio de
+  /// microsegundos ≥ 500 eso deja el fin hasta 0,5 ms DESPUÉS de inicio + total:
+  /// en el instante de marcar faltaban 90,0004 s, el techo daba 91 y la barra
+  /// —que tickea cada segundo— mostraba «1:31» un segundo entero en un descanso
+  /// de 90, con el lector de pantalla anunciando «1 minuto 31 segundos». Con el
+  /// inicio ya en el milisegundo el redondeo no mueve nada y el fin cae justo
+  /// en inicio + total.
   factory RestState.startedAt({
     required String exerciseId,
     required int setNumber,
@@ -45,7 +54,13 @@ class RestState {
         exerciseId: exerciseId,
         setNumber: setNumber,
         totalSeconds: totalSeconds,
-        endsAt: RestRules.endsAt(start: start, totalSeconds: totalSeconds),
+        endsAt: RestRules.endsAt(
+          start: DateTime.fromMillisecondsSinceEpoch(
+            start.millisecondsSinceEpoch,
+            isUtc: true,
+          ),
+          totalSeconds: totalSeconds,
+        ),
         owner: owner,
       );
 

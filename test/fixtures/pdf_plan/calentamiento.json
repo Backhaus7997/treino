@@ -1,0 +1,42 @@
+{
+  "numWeeks": 1,
+  "days": [
+    {
+      "dayNumber": 1,
+      "title": "Full body",
+      "rows": [
+        {
+          "number": null,
+          "restSeconds": 0,
+          "exercises": [
+            {
+              "component": 1,
+              "rawName": "Bicicleta",
+              "note": "suave",
+              "weeks": [[{ "type": "warmup", "weightKg": null, "reps": null, "repsMin": null, "repsMax": null, "durationSeconds": 300, "distanceMeters": null }]],
+              "candidateExerciseId": null,
+              "candidateConfidence": null,
+              "sourceText": "Entrada en calor: 5' bici"
+            }
+          ]
+        },
+        {
+          "number": 1,
+          "restSeconds": 90,
+          "exercises": [
+            {
+              "component": 1,
+              "rawName": "Remo con barra",
+              "note": null,
+              "weeks": [[{ "type": "normal", "weightKg": 50, "reps": 10, "repsMin": null, "repsMax": null, "durationSeconds": null, "distanceMeters": null }]],
+              "candidateExerciseId": null,
+              "candidateConfidence": null,
+              "sourceText": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}
