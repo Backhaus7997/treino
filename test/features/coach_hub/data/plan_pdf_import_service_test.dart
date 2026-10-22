@@ -333,4 +333,31 @@ void main() {
       expect(result.code, 'unavailable');
     });
   });
+
+  group('nombre inicial a partir del archivo', () {
+    final casos = <String, String>{
+      'Plan Juan.pdf': 'Plan Juan',
+      'plan_fuerza-hipertrofia.PDF': 'plan fuerza hipertrofia',
+      'Plan Ana FINAL (2).pdf': 'Plan Ana',
+      'rutina_final_FINAL.pdf': 'rutina',
+      'Bloque 1 (3) final.pdf': 'Bloque 1',
+      '  __ - .pdf': 'Plan importado',
+      'FINAL.pdf': 'Plan importado',
+      // «final» en el medio es parte del nombre.
+      'final de temporada.pdf': 'final de temporada',
+    };
+    for (final MapEntry(key: archivo, value: nombre) in casos.entries) {
+      test('"$archivo" → "$nombre"', () {
+        expect(planNameFromFileName(archivo), nombre);
+      });
+    }
+
+    test('se acota al tope, cortando en una palabra entera', () {
+      final largo = List.filled(20, 'semana').join('_');
+      final nombre = planNameFromFileName('$largo.pdf');
+      expect(nombre.length, lessThanOrEqualTo(kPdfPlanNameMaxLength));
+      expect(nombre, startsWith('semana semana'));
+      expect(nombre.endsWith('semana'), isTrue);
+    });
+  });
 }

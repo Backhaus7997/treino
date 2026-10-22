@@ -1355,5 +1355,7 @@
   "pdfImportAssigned": "Plan asignado.",
   "pdfImportOpenEditor": "ABRIR EDITOR",
   "pdfImportAssignFailed": "No pudimos guardar el plan. Prueba de nuevo.",
-  "pdfImportLevel": "Nivel del plan"
+  "pdfImportLevel": "Nivel del plan",
+  "pdfImportPreviewTitle": "REVISAR PLAN",
+  "pdfImportNameLabel": "Nombre de la rutina"
 }

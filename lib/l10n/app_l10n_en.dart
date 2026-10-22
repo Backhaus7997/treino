@@ -5997,4 +5997,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get pdfImportLevel => 'Plan level';
+
+  @override
+  String get pdfImportPreviewTitle => 'REVIEW PLAN';
+
+  @override
+  String get pdfImportNameLabel => 'Routine name';
 }

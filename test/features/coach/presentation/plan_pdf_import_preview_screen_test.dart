@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/core/moderation/moderation_guard.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/coach/presentation/plan_pdf_import_preview_screen.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
@@ -425,6 +426,69 @@ void main() {
           findsOneWidget);
       expect(c.read(periodizedImportProvider), isNotNull);
       expect(find.text('FICHA'), findsNothing);
+    });
+  });
+
+  group('nombre de la rutina', () {
+    const bloqueado = 'Ese texto no se puede publicar porque incumple las '
+        'Normas de Comunidad. Revisalo y volvé a intentar.';
+    Finder nameField() => find.byKey(const Key('pdf_import_name'));
+
+    testWidgets(
+        'arranca con el del borrador y lo que escribe el PF es el nombre',
+        (tester) async {
+      final created = <Routine>[];
+      when(() => routineRepo.createAssigned(any())).thenAnswer((inv) async {
+        final r = inv.positionalArguments.first as Routine;
+        created.add(r);
+        return r.copyWith(id: 'nuevo-1');
+      });
+      final c = await pump(tester, _resolved());
+      expect(tester.widget<TextField>(nameField()).controller!.text,
+          'Plan de Ana');
+
+      await tester.enterText(nameField(), 'Fuerza bloque 1');
+      await tester.pump();
+      expect(c.read(periodizedImportProvider)!.name, 'Fuerza bloque 1');
+
+      await tester.tap(assignButton());
+      await tester.pumpAndSettle();
+      expect(created.single.name, 'Fuerza bloque 1');
+    });
+
+    testWidgets(
+        'si la moderación rechaza el nombre, el foco va al campo con el '
+        'mensaje y se reintenta sin volver a importar', (tester) async {
+      final created = <Routine>[];
+      var calls = 0;
+      when(() => routineRepo.createAssigned(any())).thenAnswer((inv) async {
+        calls++;
+        if (calls == 1) throw const ModerationBlockedException('name');
+        final r = inv.positionalArguments.first as Routine;
+        created.add(r);
+        return r.copyWith(id: 'nuevo-1');
+      });
+      final c = await pump(tester, _resolved());
+
+      await tester.tap(assignButton());
+      await tester.pumpAndSettle();
+
+      expect(find.descendant(of: nameField(), matching: find.text(bloqueado)),
+          findsOneWidget);
+      expect(tester.widget<TextField>(nameField()).focusNode!.hasFocus, isTrue);
+      // El borrador sigue: no hay que volver a importar.
+      expect(c.read(periodizedImportProvider), isNotNull);
+      expect(find.text('FICHA'), findsNothing);
+
+      await tester.enterText(nameField(), 'Plan de fuerza');
+      await tester.pump();
+      expect(find.text(bloqueado), findsNothing);
+
+      await tester.tap(assignButton());
+      await tester.pumpAndSettle();
+      expect(calls, 2);
+      expect(created.single.name, 'Plan de fuerza');
+      expect(find.text('FICHA'), findsOneWidget);
     });
   });
 }

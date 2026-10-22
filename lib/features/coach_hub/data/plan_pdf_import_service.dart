@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../domain/periodized_plan.dart';
 import '../domain/periodized_plan_json.dart';
@@ -237,7 +238,7 @@ class PlanPdfImportService {
       draft = await _matcher.matchDraft(
         plan: parsed.plan!,
         warnings: parsed.warnings,
-        name: _planName(fileName),
+        name: planNameFromFileName(fileName),
       );
     } catch (_) {
       // Sin catálogo no hay vista previa. El cupo ya se descontó.
@@ -294,11 +295,40 @@ Map<String, Object?> _stringKeys(Map raw) => {
       for (final e in raw.entries) e.key.toString(): e.value,
     };
 
-/// Nombre inicial de la rutina: el del archivo, sin la extensión.
-String _planName(String fileName) {
-  final base = fileName.trim();
-  final cut = base.toLowerCase().endsWith('.pdf')
-      ? base.substring(0, base.length - 4).trim()
-      : base;
-  return cut.isEmpty ? 'Plan importado' : cut;
+/// Tope del nombre de la rutina importada: el default y lo que el PF escriba
+/// en la vista previa. Las reglas no limitan `routines.name`; esto es para
+/// que entre en una tarjeta.
+const kPdfPlanNameMaxLength = 60;
+
+final _pdfExtension = RegExp(r'\.pdf$', caseSensitive: false);
+final _separators = RegExp(r'[_\-]+');
+final _spaces = RegExp(r'\s+');
+
+/// Lo que el sistema o el PF le cuelga al archivo y no es parte del nombre:
+/// «(2)» de las copias del navegador y «final»/«FINAL», al final.
+final _trailingNoise =
+    RegExp(r'\s*(\(\d+\)|\bfinal)\s*$', caseSensitive: false);
+
+/// Nombre inicial de la rutina a partir del archivo: sin la extensión, con
+/// `_` y `-` como espacios, sin «(2)» ni «final» al final y con el largo
+/// acotado. «plan_fuerza-FINAL (2).pdf» queda «plan fuerza».
+@visibleForTesting
+String planNameFromFileName(String fileName) {
+  var name = fileName.trim().replaceFirst(_pdfExtension, '');
+  name = name.replaceAll(_separators, ' ').replaceAll(_spaces, ' ').trim();
+  while (true) {
+    final next = name.replaceFirst(_trailingNoise, '').trim();
+    if (next == name) break;
+    name = next;
+  }
+  if (name.length > kPdfPlanNameMaxLength) {
+    final cut = name.substring(0, kPdfPlanNameMaxLength);
+    final lastSpace = cut.lastIndexOf(' ');
+    // Corta en la última palabra entera si no se pierde demasiado.
+    name = (lastSpace > kPdfPlanNameMaxLength ~/ 2
+            ? cut.substring(0, lastSpace)
+            : cut)
+        .trim();
+  }
+  return name.isEmpty ? 'Plan importado' : name;
 }

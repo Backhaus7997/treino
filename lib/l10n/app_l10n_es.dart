@@ -6105,6 +6105,12 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get pdfImportLevel => 'Nivel del plan';
+
+  @override
+  String get pdfImportPreviewTitle => 'REVISAR PLAN';
+
+  @override
+  String get pdfImportNameLabel => 'Nombre de la rutina';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -12205,4 +12211,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get pdfImportLevel => 'Nivel del plan';
+
+  @override
+  String get pdfImportPreviewTitle => 'REVISAR PLAN';
+
+  @override
+  String get pdfImportNameLabel => 'Nombre de la rutina';
 }

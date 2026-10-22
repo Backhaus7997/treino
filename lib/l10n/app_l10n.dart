@@ -10176,6 +10176,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Nivel del plan'**
   String get pdfImportLevel;
+
+  /// Título de la vista previa del plan importado de PDF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REVISAR PLAN'**
+  String get pdfImportPreviewTitle;
+
+  /// Etiqueta del campo editable con el nombre de la rutina importada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nombre de la rutina'**
+  String get pdfImportNameLabel;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -17,6 +17,8 @@ import '../../../l10n/app_l10n.dart';
 import '../../coach_hub/application/plan_import_preview_controller.dart';
 import '../../coach_hub/application/plan_import_providers.dart';
 import '../../coach_hub/data/exercise_matcher.dart';
+import '../../coach_hub/data/plan_pdf_import_service.dart'
+    show kPdfPlanNameMaxLength;
 import '../../coach_hub/domain/periodized_plan.dart';
 import '../../coach_hub/presentation/widgets/create_custom_exercise_dialog.dart';
 import '../../coach_hub/presentation/widgets/import_plan_widgets.dart';
@@ -67,6 +69,30 @@ class _PlanPdfImportPreviewScreenState
   /// sin plan, y la red de seguridad («sin borrador, volvé») no tiene que
   /// pisar esa navegación (mismo bug que la vista previa del Coach Hub).
   bool _leaving = false;
+
+  /// Nombre de la rutina, editable. Arranca con el del borrador (el del
+  /// archivo, saneado) y cada cambio vuelve al borrador con `withName`.
+  final TextEditingController _nameController = TextEditingController();
+  final FocusNode _nameFocus = FocusNode();
+  bool _nameSeeded = false;
+
+  /// La moderación rechazó el nombre: se muestra en el campo, no abajo.
+  String? _nameError;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _nameFocus.dispose();
+    super.dispose();
+  }
+
+  void _onNameChanged(String value) {
+    _controller.rename(value);
+    setState(() {
+      _touched = true;
+      _nameError = null;
+    });
+  }
 
   PlanImportPreviewController get _controller =>
       ref.read(planImportPreviewControllerProvider);
@@ -192,7 +218,7 @@ class _PlanPdfImportPreviewScreenState
     final outcome = await _controller.assign(
       athleteIds: [widget.athleteId],
       trainerUid: uid,
-      routineName: draft.name,
+      routineName: _nameController.text,
       level: _level,
     );
     if (!mounted) return;
@@ -221,6 +247,11 @@ class _PlanPdfImportPreviewScreenState
                 ),
         );
         return;
+      case PlanAssignModerationBlocked(:final campo) when campo == 'name':
+        // El nombre es lo único que se corrige acá: el foco va al campo,
+        // con el mensaje, y se reintenta sin volver a importar.
+        _nameError = l10n.moderationBlockedMessage;
+        _nameFocus.requestFocus();
       case PlanAssignModerationBlocked(:final campo):
         final where = ModerationGuard.ubicacionLegible(campo);
         _error = where == null
@@ -253,6 +284,10 @@ class _PlanPdfImportPreviewScreenState
       return Scaffold(backgroundColor: palette.bg);
     }
 
+    if (!_nameSeeded) {
+      _nameSeeded = true;
+      _nameController.text = draft.name;
+    }
     final plan = draft.plan;
     final week = _week.clamp(0, plan.numWeeks - 1);
     final days = plan.days.where((d) => d.rows.isNotEmpty).toList();
@@ -319,7 +354,7 @@ class _PlanPdfImportPreviewScreenState
                     ),
                     Expanded(
                       child: Text(
-                        draft.name.toUpperCase(),
+                        l10n.pdfImportPreviewTitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.barlowCondensed(
@@ -337,6 +372,23 @@ class _PlanPdfImportPreviewScreenState
                   style: importText(palette.textMuted),
                 ),
                 const SizedBox(height: AppSpacing.s14),
+                TextField(
+                  key: const Key('pdf_import_name'),
+                  controller: _nameController,
+                  focusNode: _nameFocus,
+                  enabled: !_saving,
+                  maxLength: kPdfPlanNameMaxLength,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: importText(palette.textPrimary,
+                      size: AppTextSize.bodyLarge),
+                  decoration: InputDecoration(
+                    labelText: l10n.pdfImportNameLabel,
+                    errorText: _nameError,
+                    counterText: '',
+                  ),
+                  onChanged: _onNameChanged,
+                ),
+                const SizedBox(height: AppSpacing.s12),
                 TreinoSelectField<ExperienceLevel>(
                   value: _level,
                   sheetTitle: l10n.pdfImportLevel,
