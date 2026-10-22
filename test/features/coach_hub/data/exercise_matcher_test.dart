@@ -255,4 +255,53 @@ void main() {
       expect(result.days.single.items.single.exerciseId, 'back-squat');
     });
   });
+
+  group('veto público y candidatos externos', () {
+    final catalog = [
+      MatcherExercise(
+        id: 'banca-barra',
+        name: 'Press banca con barra',
+        aliases: const ['Bench press'],
+      ),
+      MatcherExercise(id: 'banca-manc', name: 'Press banca con mancuernas'),
+      MatcherExercise(id: 'rumano', name: 'Peso muerto rumano'),
+    ];
+
+    test('isCompatibleLabel normaliza y veta equipo y variante', () {
+      expect(isCompatibleLabel('PRESS BANCA c/ barra', 'Press banca'), isFalse);
+      expect(
+          isCompatibleLabel('Press banca barbell', 'Press con barra'), isTrue);
+      expect(isCompatibleLabel('Peso muerto', 'Peso muerto rumano'), isFalse);
+    });
+
+    test('candidato compatible: se devuelve como sugerencia', () {
+      final m = ExerciseNameMatcher(catalog);
+      expect(
+        m
+            .suggestFromCandidate('banca-barra', 'Press banca plano con barra')
+            ?.id,
+        isNull, // "plano" es variante y la etiqueta no la declara
+      );
+      expect(m.suggestFromCandidate('banca-barra', 'Banca con barra')?.id,
+          'banca-barra');
+    });
+
+    test('alcanza con que UNA etiqueta pase el veto', () {
+      final m = ExerciseNameMatcher(catalog);
+      // "Bench press" no declara equipo, pero el query tampoco.
+      expect(m.suggestFromCandidate('banca-barra', 'Bench press')?.id,
+          'banca-barra');
+    });
+
+    test('equipo distinto: vetado', () {
+      final m = ExerciseNameMatcher(catalog);
+      expect(m.suggestFromCandidate('banca-manc', 'Press banca con barra'),
+          isNull);
+    });
+
+    test('id que no existe en el catálogo: null', () {
+      final m = ExerciseNameMatcher(catalog);
+      expect(m.suggestFromCandidate('inventado', 'Press banca'), isNull);
+    });
+  });
 }
