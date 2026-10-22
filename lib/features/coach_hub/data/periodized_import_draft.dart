@@ -14,6 +14,7 @@ class PeriodizedImportDraft {
     required this.name,
     required this.assignments,
     required this.suggestions,
+    this.alternatives = const {},
   });
 
   /// Arma el borrador a partir del veredicto del matcher: lo exacto o por
@@ -53,6 +54,13 @@ class PeriodizedImportDraft {
   /// confirmó. Un componente con sugerencia NO está asignado.
   final Map<ExerciseKey, MatcherExercise> suggestions;
 
+  /// PDF: el candidato del extractor cuando pasó el veto pero el fuzzy
+  /// sugirió OTRO ejercicio. Se muestra la sugerencia del fuzzy (es
+  /// reproducible) y esta queda como alternativa para el picker
+  /// (docs/plan-import-pdf.md, «Matcheo»). Nunca se asigna sola. Vacío en el
+  /// Excel.
+  final Map<ExerciseKey, MatcherExercise> alternatives;
+
   bool isResolved(ExerciseKey key) => assignments.containsKey(key);
 
   /// Componentes que bloquean la asignación: con sugerencia pendiente o sin
@@ -79,6 +87,7 @@ class PeriodizedImportDraft {
       name: name,
       assignments: {...assignments, key: exercise},
       suggestions: {...suggestions}..remove(key),
+      alternatives: {...alternatives}..remove(key),
     );
   }
 
@@ -120,6 +129,8 @@ class PeriodizedImportDraft {
       name: name,
       assignments: next,
       suggestions: nextSuggestions,
+      alternatives: {...alternatives}
+        ..removeWhere((k, _) => next.containsKey(k)),
     );
   }
 
@@ -129,5 +140,6 @@ class PeriodizedImportDraft {
         name: value,
         assignments: assignments,
         suggestions: suggestions,
+        alternatives: alternatives,
       );
 }
