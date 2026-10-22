@@ -37,15 +37,15 @@ const int kTermsVersion = 3;
 ///
 /// Entero monotonico e independiente por documento:
 /// bumpear uno NUNCA obliga a tocar el otro.
-const int kPrivacyVersion = 4;
+const int kPrivacyVersion = 5;
 
-/// Fecha (UTC) en la que la version 4 del
+/// Fecha (UTC) en la que la version 5 del
 /// texto de Política de Privacidad entro en vigencia.
 ///
 /// Machine-comparable, a diferencia del String de display
 /// de arriba. Se actualiza UNA sola vez por bump de
 /// version, no en cada edicion menor.
-final DateTime kPrivacyV4PublishedAt = DateTime.utc(2026, 9, 3);
+final DateTime kPrivacyV5PublishedAt = DateTime.utc(2026, 10, 22);
 
 /// Email de contacto para consultas legales / de privacidad.
 const String kLegalContactEmail = 'treino@gettreino.com';
@@ -331,7 +331,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         '• Facturación: Sólo para quien tiene una suscripción paga, entrenador o atleta\n'
         '• Importar planes desde PDF: Sólo si sos entrenador y usás esa función: leer el PDF que subís para extraer el plan de entrenamiento (ver sección 6.3)\n'
         '\n'
-        'Lo que NO hacemos: no vendemos tus datos, no mostramos publicidad de terceros, no cedemos información a data brokers, no cruzamos tu actividad con fuentes externas para perfilarte, y no usamos tus datos de salud para nada que no sea mostrarte tu progreso y —si vos lo habilitás— compartirlo con tu entrenador.',
+        'Lo que NO hacemos: no vendemos tus datos, no mostramos publicidad de terceros, no cedemos información a data brokers, no cruzamos tu actividad con fuentes externas para perfilarte, y no usamos tus datos de salud para nada que no sea mostrarte tu progreso y —si vos lo habilitás— compartirlo con tu entrenador. La única excepción la origina tu entrenador, no la app: si importa tu plan desde un PDF que incluye datos de salud tuyos —lesiones, observaciones—, ese PDF se procesa con la única finalidad de extraer el plan de entrenamiento, y no se guarda (ver sección 6.3).',
   ),
   LegalSection(
     '5. BASE LEGAL DEL TRATAMIENTO',

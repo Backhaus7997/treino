@@ -6,11 +6,10 @@
 // backfill, TODA cuenta anterior al feature tiene ese campo en null, así que
 // no distingue a nadie. La única evidencia que existe hoy en producción es
 // `termsAcceptedAt`, y por eso la comparación es contra
-// `kPrivacyV4PublishedAt`.
+// `kLegacyPrivacyNoticeCutoff`.
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/profile/application/legacy_privacy_notice_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -50,8 +49,8 @@ Future<void> _settle(ProviderContainer c) async {
 }
 
 void main() {
-  final before = kPrivacyV4PublishedAt.subtract(const Duration(days: 30));
-  final after = kPrivacyV4PublishedAt.add(const Duration(days: 1));
+  final before = kLegacyPrivacyNoticeCutoff.subtract(const Duration(days: 30));
+  final after = kLegacyPrivacyNoticeCutoff.add(const Duration(days: 1));
 
   group('R4: a quién le corresponde el aviso de política actualizada', () {
     test('atleta que aceptó ANTES de la política vigente ⇒ sí', () async {

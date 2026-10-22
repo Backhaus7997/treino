@@ -2,17 +2,21 @@
 slug: privacidad
 title: Política de Privacidad
 dart: kPrivacySections
-# 4 y no 1, por el mismo motivo que los Terminos: es lo que hoy se sella en
-# `acceptedPrivacyVersion`. Ver el front matter de terminos-y-condiciones.md.
-version: 4
-# OJO — esta fecha venia apareada al nombre `kPrivacyV1PublishedAt` mientras
-# la version en produccion ya era 4. Al generar, el nombre pasa a
-# `kPrivacyV4PublishedAt` (regla `kPrivacy` + `V{version}` + `PublishedAt`) y
-# el gate del aviso legacy se actualiza con el. La FECHA no se toco: el gate
-# compara contra el mismo 2026-09-03 de siempre y ningun usuario cambia de
-# lado. Que la fecha de v1 quedara colgada de la version 4 es deuda heredada
-# del archivo escrito a mano, y conviene revisarla aparte.
-published: 2026-09-03
+# Es lo que se sella en `acceptedPrivacyVersion`. Ver el front matter de
+# terminos-y-condiciones.md.
+#
+# 5 desde el 2026-10-22: se sumo Vertex AI como encargado del import de planes
+# desde PDF (secciones 4, 6.3 y 8). Sin el bump, las aceptaciones del texto
+# viejo y del nuevo quedaban selladas con el mismo 4 e indistinguibles.
+#
+# El bump NO dispara ningun aviso ni re-consentimiento: ningun codigo compara
+# `acceptedPrivacyVersion` contra `kPrivacyVersion`, y el aviso legacy del
+# atleta ya no lee la fecha de esta version — tiene su propio corte fijo,
+# `kLegacyPrivacyNoticeCutoff` (2026-09-03), en
+# `legacy_privacy_notice_providers.dart`. Antes lo leia de aca, y subir la
+# version lo habria mandado a todos los atletas.
+version: 5
+published: 2026-10-22
 -->
 
 # Política de Privacidad de TREINO
@@ -201,7 +205,11 @@ financiero visible para cualquier usuario de la app. Cargalo sabiendo eso.
 **Lo que NO hacemos:** no vendemos tus datos, no mostramos publicidad de terceros, no cedemos
 información a data brokers, no cruzamos tu actividad con fuentes externas para
 perfilarte, y no usamos tus datos de salud para nada que no sea mostrarte tu
-progreso y —si vos lo habilitás— compartirlo con tu entrenador.
+progreso y —si vos lo habilitás— compartirlo con tu entrenador. La única
+excepción la origina tu entrenador, no la app: si importa tu plan desde un PDF
+que incluye datos de salud tuyos —lesiones, observaciones—, ese PDF se procesa
+con la única finalidad de extraer el plan de entrenamiento, y no se guarda (ver
+sección 6.3).
 
 ---
 
