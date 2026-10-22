@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/moderation/moderation_guard.dart';
+import '../../coach/application/custom_exercise_quota_provider.dart';
 import '../../profile/domain/experience_level.dart';
 import '../../workout/application/custom_exercise_providers.dart';
 import '../../workout/application/routine_providers.dart';
@@ -72,6 +73,47 @@ final class PlanAssignSuccess extends PlanAssignOutcome {
 }
 
 typedef _Fallo = ({String athleteId, String? campoBloqueo});
+
+/// Un propio a crear en bloque: el nombre de su primera aparición y la clave
+/// de esa aparición (resolverla resuelve también los homónimos).
+typedef BulkCustomGroup = ({String name, ExerciseKey firstKey});
+
+/// Pre-chequeo de «Crear N propios» contra el tope del plan.
+sealed class BulkCustomCheck {
+  const BulkCustomCheck(this.total);
+
+  /// N: nombres distintos sin candidato.
+  final int total;
+}
+
+/// [allowed] de [total] entran en el tope: igual = entran todos; 0 = el PF
+/// está en el tope; en el medio, la UI pregunta «Te alcanza para X de N».
+final class BulkCustomReady extends BulkCustomCheck {
+  const BulkCustomReady({required int total, required this.allowed})
+      : super(total);
+  final int allowed;
+}
+
+/// No se pudo saber la cuenta o el tope (cargando demasiado, o error). A
+/// diferencia del «crear uno», acá NO se deja pasar: una ráfaga de N creates
+/// con el tope desconocido es justo lo que el pre-chequeo existe para frenar.
+final class BulkCustomQuotaUnknown extends BulkCustomCheck {
+  const BulkCustomQuotaUnknown(super.total);
+}
+
+/// Resultado de [PlanImportPreviewController.createCustomInBulk]. [error] es
+/// el que cortó la ráfaga (p. ej. el `permission-denied` de la regla del
+/// tope); lo creado antes queda creado y resuelto.
+class BulkCustomResult {
+  const BulkCustomResult({
+    required this.created,
+    required this.requested,
+    this.error,
+  });
+  final int created;
+  final int requested;
+  final Object? error;
+}
 
 /// Orquestación de la vista previa de un plan importado (Excel en el Coach
 /// Hub, PDF en mobile): resolver componentes, confirmar sugerencias, crear
@@ -167,6 +209,104 @@ class PlanImportPreviewController {
       );
     } finally {
       _creatingCustom = false;
+    }
+  }
+
+  /// Los propios que crearía «Crear N propios», en orden de aparición: uno
+  /// por nombre normalizado (mayúsculas, tildes y espacios no cuentan), sólo
+  /// de componentes sin resolver y SIN sugerencia — crear un propio encima de
+  /// una sugerencia sería adivinar al revés.
+  List<BulkCustomGroup> get bulkCustomGroups {
+    final current = draft;
+    if (current == null) return const [];
+    final seen = <String>{};
+    final groups = <BulkCustomGroup>[];
+    for (final day in current.plan.days) {
+      for (final row in day.rows) {
+        for (final ex in row.exercises) {
+          final key = exerciseKeyOf(day, row, ex);
+          if (current.isResolved(key) || current.suggestions.containsKey(key)) {
+            continue;
+          }
+          final normalized = normalize(ex.rawName);
+          if (normalized.isEmpty || !seen.add(normalized)) continue;
+          groups.add((name: ex.rawName.trim(), firstKey: key));
+        }
+      }
+    }
+    return groups;
+  }
+
+  /// Cuántos de los [bulkCustomGroups] entran en el tope de propios del
+  /// plan: `restantes = tope − usados`, con la cuenta de
+  /// [customExerciseQuotaProvider] (la misma del embudo de «crear uno»).
+  Future<BulkCustomCheck> checkBulkCustom() async {
+    final total = bulkCustomGroups.length;
+    final quota = await _settledQuota();
+    if (quota == null) return BulkCustomQuotaUnknown(total);
+    final limit = quota.limit;
+    final left = limit == null ? total : (limit - quota.count).clamp(0, total);
+    return BulkCustomReady(total: total, allowed: left);
+  }
+
+  /// Crea como propios los primeros [max] de [bulkCustomGroups] —con el
+  /// nombre del PF, sin músculo ni equipo— y resuelve cada uno con sus
+  /// homónimos. [max] sale de [checkBulkCustom]: el contador de propios lo
+  /// mantiene un trigger asíncrono, así que una ráfaga no puede confiar en
+  /// que la regla la frene a mitad de camino. Sin alias: el propio es
+  /// privado del PF.
+  Future<BulkCustomResult> createCustomInBulk({required int max}) async {
+    final groups = bulkCustomGroups.take(max < 0 ? 0 : max).toList();
+    final uid = _ref.read(currentUidProvider);
+    if (groups.isEmpty || uid == null || uid.isEmpty || _creatingCustom) {
+      return BulkCustomResult(created: 0, requested: groups.length);
+    }
+    _creatingCustom = true;
+    var created = 0;
+    try {
+      final repo = _ref.read(customExerciseRepositoryProvider);
+      for (final g in groups) {
+        // Pudo resolverse por otro camino mientras se creaban los anteriores.
+        if (isResolved(g.firstKey)) continue;
+        final CustomExercise ex;
+        try {
+          ex = await repo.create(trainerId: uid, name: g.name);
+        } catch (e) {
+          return BulkCustomResult(
+              created: created, requested: groups.length, error: e);
+        }
+        created++;
+        resolve(
+          g.firstKey,
+          MatcherExercise(
+              id: ex.id, name: ex.name, muscleGroup: ex.muscleGroup),
+          custom: true,
+        );
+      }
+      return BulkCustomResult(created: created, requested: groups.length);
+    } finally {
+      _creatingCustom = false;
+    }
+  }
+
+  /// La cuota ya resuelta, o null si no se supo en 5 s o terminó en error.
+  /// Escucha en vez de leer: [customExerciseQuotaProvider] es autoDispose y
+  /// una lectura suelta lo encontraría siempre cargando.
+  Future<CustomExerciseQuota?> _settledQuota() async {
+    final done = Completer<CustomExerciseQuota?>();
+    final sub = _ref.listen<AsyncValue<CustomExerciseQuota>>(
+      customExerciseQuotaProvider,
+      (_, next) {
+        if (next.isLoading || done.isCompleted) return;
+        done.complete(next.hasError ? null : next.value);
+      },
+      fireImmediately: true,
+    );
+    try {
+      return await done.future
+          .timeout(const Duration(seconds: 5), onTimeout: () => null);
+    } finally {
+      sub.close();
     }
   }
 
