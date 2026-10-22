@@ -19,7 +19,7 @@ import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_state.dart';
-import 'package:treino/features/workout/domain/rest_rules.dart';
+import 'package:treino/features/workout/domain/rest_state.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -69,9 +69,17 @@ const ambas = [kIdFinDeDescanso, kIdCuentaDeDescanso];
 /// Desde #1616 el fin se redondea al milisegundo —es la resolución con la que
 /// viaja en la sesión y lo lee el reloj—, así que `inicio + 90 s` puede diferir
 /// en una fracción de milisegundo del instante que se agenda. Se compara contra
-/// la MISMA regla que usa la pantalla, no contra una suma a mano.
-DateTime _fin(DateTime inicio, int segundos) =>
-    RestRules.endsAt(start: inicio.toUtc(), totalSeconds: segundos);
+/// la MISMA regla que usa la pantalla, no contra una suma a mano: la fábrica
+/// [RestState.startedAt], que además trunca el inicio al milisegundo. Llamar a
+/// `RestRules.endsAt` directo se salteaba ese truncado y difería en 1 ms en la
+/// mitad de las corridas.
+DateTime _fin(DateTime inicio, int segundos) => RestState.startedAt(
+      exerciseId: 'e1',
+      setNumber: 1,
+      totalSeconds: segundos,
+      start: inicio.toUtc(),
+      owner: RestOwner.telefono,
+    ).endsAt;
 
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
