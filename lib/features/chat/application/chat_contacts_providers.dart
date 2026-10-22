@@ -191,3 +191,31 @@ final chatContactsProvider =
     ),
   );
 });
+
+/// Qué relación tiene el usuario actual con [otherUid] —su PF, su alumno, o
+/// alguien a quien sigue—, para la línea secundaria del header del chat.
+///
+/// Mismo criterio que [chatContactsFrom], sin excluir a quien ya tiene chat
+/// (justamente es el caso del header). Es PRESENTACIÓN: mientras las fuentes
+/// cargan, o si fallan, devuelve `null` y el header cae al gym, que es un
+/// dato y no una afirmación sobre la relación.
+final chatPartnerReasonProvider =
+    Provider.autoDispose.family<ChatContactReason?, String>((ref, otherUid) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null || otherUid.isEmpty) return null;
+  final contacts = chatContactsFrom(
+    selfUid: uid,
+    links: [
+      ...?ref.watch(chatContactLinksAsAthleteProvider).valueOrNull,
+      ...?ref.watch(chatContactLinksAsTrainerProvider).valueOrNull,
+    ],
+    followingUids:
+        ref.watch(chatContactFollowingProvider).valueOrNull ?? const <String>[],
+    blockedUids: const [],
+    chatPartnerUids: const [],
+  );
+  for (final c in contacts) {
+    if (c.uid == otherUid) return c.reason;
+  }
+  return null;
+});

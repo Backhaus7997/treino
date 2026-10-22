@@ -592,6 +592,7 @@
   "chatActionError": "",
   "chatDeleteConfirmTitle": "",
   "chatDeleteConfirmBody": "",
+  "chatHeaderProfileA11y": "View {name}'s profile",
   "chatArchivedSectionTitle": "{count}",
   "chatRelativeJustNow": "",
   "chatRelativeMinutes": "",

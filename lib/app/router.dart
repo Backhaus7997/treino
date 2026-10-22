@@ -826,6 +826,22 @@ GoRouter buildRouter({
           final otherUid = state.uri.queryParameters['other'] ?? '';
           return _withBg(ChatScreen(chatId: chatId, otherUid: otherUid));
         },
+        routes: [
+          // Perfil público del otro, abierto desde el header del chat. Es la
+          // misma pantalla de `/feed/profile/:uid`, colgada de acá porque el
+          // chat es top-level: empujar una ruta del shell desde una ruta
+          // top-level clona el shell entero encima del stack. Las listas de
+          // seguidores la siguen sola (`matchedLocation` + `/follows`, y de
+          // ahí `_shellBranch` vuelve a este prefijo).
+          GoRoute(
+            path: 'profile/:uid',
+            builder: (context, state) {
+              final uid = state.pathParameters['uid']!;
+              return _withBgEdgeToEdge(PublicProfileScreen(targetUid: uid));
+            },
+            routes: [_followListRoute],
+          ),
+        ],
       ),
       GoRoute(
         // Statistics hub — fullscreen, no bottom nav. Reached from Home's

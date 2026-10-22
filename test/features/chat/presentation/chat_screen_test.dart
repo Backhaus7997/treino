@@ -215,7 +215,8 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Coach Joe'), findsOneWidget);
+      // Heading del header: Barlow Condensed en mayúsculas (AGENTS.md §2).
+      expect(find.text('COACH JOE'), findsOneWidget);
     });
 
     testWidgets('tap en send escribe el mensaje vía repo y limpia el textfield',
