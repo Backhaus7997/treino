@@ -12,6 +12,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/presentation/plan_pdf_import_upload_screen.dart';
+import 'package:treino/features/coach_hub/application/pdf_import_quota_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -49,6 +50,7 @@ Future<void> _go(WidgetTester tester, String location) async {
     userProfileProvider.overrideWith((ref) => Stream.value(_profile())),
     authStateChangesProvider.overrideWith((_) => Stream.value(null)),
     currentUidProvider.overrideWithValue('u1'),
+    pdfImportRemainingProvider.overrideWithValue(null),
   ]);
   addTearDown(container.dispose);
   await container.read(authNotifierProvider.future);

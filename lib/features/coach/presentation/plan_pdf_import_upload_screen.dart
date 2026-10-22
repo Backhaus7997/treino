@@ -14,6 +14,7 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_confirm_dialog.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../coach_hub/application/pdf_import_quota_provider.dart';
 import '../../coach_hub/application/plan_import_providers.dart';
 import '../../coach_hub/application/plan_pdf_import_providers.dart';
 import '../../coach_hub/data/periodized_import_draft.dart';
@@ -189,6 +190,7 @@ class _PlanPdfImportUploadScreenState
                         AppSpacing.s12, AppSpacing.s20, AppSpacing.s20),
                     children: [
                       _Notice(text: l10n.pdfImportPrivacyNotice),
+                      const _QuotaLine(),
                       const SizedBox(height: AppSpacing.s18),
                       TreinoStateSwitcher(childKey: stateKey, child: state),
                     ],
@@ -232,6 +234,27 @@ class _Notice extends StatelessWidget {
           const SizedBox(width: AppSpacing.s12),
           Expanded(child: Text(text, style: _body(palette.textPrimary))),
         ],
+      ),
+    );
+  }
+}
+
+/// El cupo, sólo si se sabe: mientras carga, o si el tier no se puede
+/// afirmar, no hay línea (ni un «0» inventado).
+class _QuotaLine extends ConsumerWidget {
+  const _QuotaLine();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final remaining = ref.watch(pdfImportRemainingProvider);
+    if (remaining == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.s12),
+      child: Text(
+        AppL10n.of(context)
+            .pdfImportQuotaRemaining(remaining.week, remaining.day),
+        key: const Key('pdf_import_quota'),
+        style: _body(AppPalette.of(context).textMuted),
       ),
     );
   }

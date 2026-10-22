@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/presentation/plan_pdf_import_upload_screen.dart';
+import 'package:treino/features/coach_hub/application/pdf_import_quota_provider.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
 import 'package:treino/features/coach_hub/application/plan_pdf_import_providers.dart';
 import 'package:treino/features/coach_hub/data/periodized_import_draft.dart';
@@ -63,8 +64,9 @@ PeriodizedImportDraft _draft() => const PeriodizedImportDraft(
 
 Future<ProviderContainer> _pump(
   WidgetTester tester,
-  _FakeService service,
-) async {
+  _FakeService service, {
+  PdfImportRemaining? remaining,
+}) async {
   final router = GoRouter(
     initialLocation: '/home',
     routes: [
@@ -83,6 +85,7 @@ Future<ProviderContainer> _pump(
   );
   final container = ProviderContainer(overrides: [
     planPdfImportServiceProvider.overrideWithValue(service),
+    pdfImportRemainingProvider.overrideWithValue(remaining),
   ]);
   addTearDown(container.dispose);
   await tester.pumpWidget(UncontrolledProviderScope(
@@ -112,6 +115,18 @@ void main() {
       (tester) async {
     await _pump(tester, _FakeService());
     expect(find.text(_aviso), findsOneWidget);
+  });
+
+  testWidgets('el cupo sale sólo si se sabe', (tester) async {
+    await _pump(tester, _FakeService(),
+        remaining: (week: 5, day: 2, limitWeekly: 7, limitDaily: 7));
+    expect(find.text('Te quedan 5 esta semana y 2 hoy.'), findsOneWidget);
+  });
+
+  testWidgets('sin cupo conocido no hay ningún número', (tester) async {
+    await _pump(tester, _FakeService());
+    expect(find.byKey(const Key('pdf_import_quota')), findsNothing);
+    expect(find.textContaining('Te quedan'), findsNothing);
   });
 
   testWidgets('un PDF de más de 5 MB se rechaza sin llamar al servidor',

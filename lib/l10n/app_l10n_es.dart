@@ -6025,6 +6025,14 @@ class AppL10nEs extends AppL10n {
   @override
   String get pdfImportErrorSignedOut =>
       'Tu sesión se cerró. Vuelve a iniciar sesión.';
+
+  @override
+  String get pdfImportCta => 'IMPORTAR DE PDF';
+
+  @override
+  String pdfImportQuotaRemaining(int week, int day) {
+    return 'Te quedan $week esta semana y $day hoy.';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -12045,4 +12053,12 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get pdfImportErrorSignedOut =>
       'Tu sesión se cerró. Volvé a iniciar sesión.';
+
+  @override
+  String get pdfImportCta => 'IMPORTAR DE PDF';
+
+  @override
+  String pdfImportQuotaRemaining(int week, int day) {
+    return 'Te quedan $week esta semana y $day hoy.';
+  }
 }
