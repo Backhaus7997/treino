@@ -24,6 +24,11 @@
 //     propios por tier, docs/limite-ejercicios-pf.md PR3).
 //   • `TIER_TEMPLATE_LIMITS` ↔ `kTierTemplateLimits` (plantillas por tier,
 //     docs/limite-plantillas-pf.md PR3).
+//
+// Y una cuarta con otra forma: `TIER_PDF_IMPORT_LIMITS` ↔
+// `kTierPdfImportLimits` (cupo semanal y diario de imports de PDF). Es
+// `Record<SubscriptionTier, { weekly: number; daily: number }>`, sin `null`,
+// así que tiene su propio lector.
 
 import 'dart:io';
 
@@ -63,6 +68,45 @@ Map<String, int?>? _limitesDelTypeScript(String fuente, String nombre) {
   const tiersEsperados = {'free', 'plan1', 'plan2', 'plan3'};
   if (!tiersEsperados.every(mapa.containsKey)) return null;
 
+  return mapa;
+}
+
+/// Lee `export const <nombre>: Record<SubscriptionTier, { weekly: number;
+/// daily: number }> = {...};` y devuelve `tier -> (weekly, daily)`. Mismo
+/// contrato que [_limitesDelTypeScript]: `null` si el guard quedaría ciego.
+Map<String, ({int weekly, int daily})>? _cuposDelTypeScript(
+  String fuente,
+  String nombre,
+) {
+  final bloque = RegExp(
+    'export const $nombre: Record<\\s*SubscriptionTier,\\s*'
+    r'\{\s*weekly: number; daily: number \}\s*> = \{'
+    r'(.*?)\n\};',
+    dotAll: true,
+  ).firstMatch(fuente);
+  if (bloque == null) return null;
+
+  final cuerpo = bloque
+      .group(1)!
+      .replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), '')
+      .replaceAll(RegExp(r'//[^\n]*'), '');
+
+  final entradas = RegExp(
+    r'(\w+)\s*:\s*\{\s*weekly\s*:\s*(\d+)\s*,\s*daily\s*:\s*(\d+)\s*\}',
+  ).allMatches(cuerpo);
+  final mapa = <String, ({int weekly, int daily})>{
+    for (final e in entradas)
+      e.group(1)!: (
+        weekly: int.parse(e.group(2)!),
+        daily: int.parse(e.group(3)!),
+      ),
+  };
+
+  const tiersEsperados = {'free', 'plan1', 'plan2', 'plan3'};
+  if (mapa.length != tiersEsperados.length ||
+      !tiersEsperados.every(mapa.containsKey)) {
+    return null;
+  }
   return mapa;
 }
 
@@ -190,6 +234,52 @@ void main() {
             'divergen, el gate del cliente bloquea (o deja pasar) en un '
             'número distinto del que hace cumplir el servidor.',
       );
+    });
+  });
+  group('TIER_PDF_IMPORT_LIMITS: Dart y TypeScript dicen lo mismo', () {
+    test('la tabla se puede leer del TypeScript', () {
+      expect(
+        _cuposDelTypeScript(ts.readAsStringSync(), 'TIER_PDF_IMPORT_LIMITS'),
+        isNotNull,
+        reason: 'no pude leer `export const TIER_PDF_IMPORT_LIMITS: '
+            'Record<SubscriptionTier, { weekly: number; daily: number }> = '
+            '{...};` en ${ts.path}. Arreglá el regex o el archivo — no borres '
+            'el test.',
+      );
+    });
+
+    test('EL TEST QUE IMPORTA: los dos valen lo mismo', () {
+      final delTs = _cuposDelTypeScript(
+        ts.readAsStringSync(),
+        'TIER_PDF_IMPORT_LIMITS',
+      )!;
+      final delDart = {
+        for (final e in kTierPdfImportLimits.entries) e.key.toJson(): e.value,
+      };
+
+      expect(
+        delDart,
+        equals(delTs),
+        reason: 'kTierPdfImportLimits (Dart) y TIER_PDF_IMPORT_LIMITS '
+            '(TypeScript) no coinciden:\n'
+            '  Dart:       $delDart\n'
+            '  TypeScript: $delTs\n\n'
+            'El servidor descuenta el cupo en parsePlanPdf; si divergen, la '
+            'UI promete imports que el servidor rebota (o al revés).',
+      );
+    });
+
+    test('control negativo: el lector rechaza una tabla incompleta', () {
+      const sinPlan3 = '''
+export const TIER_PDF_IMPORT_LIMITS: Record<
+  SubscriptionTier,
+  { weekly: number; daily: number }
+> = {
+  free: { weekly: 2, daily: 2 },
+  plan1: { weekly: 7, daily: 7 },
+  plan2: { weekly: 15, daily: 10 },
+};''';
+      expect(_cuposDelTypeScript(sinPlan3, 'TIER_PDF_IMPORT_LIMITS'), isNull);
     });
   });
 }
