@@ -5867,4 +5867,56 @@ class AppL10nEn extends AppL10n {
     );
     return 'We read $_temp0 and $_temp1.';
   }
+
+  @override
+  String get pdfImportErrorNotPdf => 'The file isn\'t a valid PDF.';
+
+  @override
+  String get pdfImportErrorTooManyPages =>
+      'The PDF has more than 20 pages. Choose a shorter one.';
+
+  @override
+  String get pdfImportErrorEncrypted =>
+      'The PDF is password-protected. Export it without a password and choose it again.';
+
+  @override
+  String get pdfImportErrorFileUnknown =>
+      'We couldn\'t use this file. Try another one.';
+
+  @override
+  String pdfImportErrorQuotaWeek(String date, String time) {
+    return 'You\'ve used all of this week\'s imports. It resets on $date at $time.';
+  }
+
+  @override
+  String pdfImportErrorQuotaDay(String date, String time) {
+    return 'You\'ve used all of today\'s imports. It resets on $date at $time.';
+  }
+
+  @override
+  String get pdfImportErrorQuotaUnknown =>
+      'You\'ve used all the imports available for now.';
+
+  @override
+  String get pdfImportErrorTimeout =>
+      'Reading took too long. Try again; if the PDF is long, try fewer pages.';
+
+  @override
+  String get pdfImportErrorInvalidPlan =>
+      'We read the PDF but couldn\'t build the plan. This attempt already counted toward your quota.';
+
+  @override
+  String get pdfImportErrorDisabled =>
+      'Import from PDF isn\'t available for your account.';
+
+  @override
+  String get pdfImportErrorUnavailable =>
+      'Import from PDF is unavailable because of a problem on our side. It didn\'t count toward your quota.';
+
+  @override
+  String get pdfImportErrorNotTrainer => 'Only trainers can import plans.';
+
+  @override
+  String get pdfImportErrorSignedOut =>
+      'You\'ve been signed out. Sign in again.';
 }

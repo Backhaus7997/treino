@@ -9996,6 +9996,84 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Leímos {days, plural, =1{1 día} other{{days} días}} y {weeks, plural, =1{1 semana} other{{weeks} semanas}}.'**
   String pdfImportReadSummary(int days, int weeks);
+
+  /// invalid-argument con reason not_pdf.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El archivo no es un PDF válido.'**
+  String get pdfImportErrorNotPdf;
+
+  /// invalid-argument con reason too_many_pages.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El PDF tiene más de 20 páginas. Elegí uno más corto.'**
+  String get pdfImportErrorTooManyPages;
+
+  /// invalid-argument con reason encrypted.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El PDF tiene contraseña. Exportalo sin contraseña y elegilo de nuevo.'**
+  String get pdfImportErrorEncrypted;
+
+  /// invalid-argument con una reason que no conocemos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos usar este archivo. Probá con otro.'**
+  String get pdfImportErrorFileUnknown;
+
+  /// resource-exhausted con scope week. date = dd/mm, time = HH:mm, en la hora local del teléfono.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usaste todas las importaciones de esta semana. Se renueva el {date} a las {time}.'**
+  String pdfImportErrorQuotaWeek(String date, String time);
+
+  /// resource-exhausted con scope day.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usaste todas las importaciones de hoy. Se renueva el {date} a las {time}.'**
+  String pdfImportErrorQuotaDay(String date, String time);
+
+  /// resource-exhausted sin scope o sin resetsAt legible: no se inventa la fecha.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usaste todas las importaciones disponibles por ahora.'**
+  String get pdfImportErrorQuotaUnknown;
+
+  /// deadline-exceeded (servidor) o timeout del cliente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La lectura tardó demasiado. Probá de nuevo; si el PDF es largo, probá con menos páginas.'**
+  String get pdfImportErrorTimeout;
+
+  /// El cliente rechazó el plan que devolvió el servidor: el cupo ya se descontó.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Leímos el PDF pero no pudimos armar el plan. Este intento ya contó en tu cupo.'**
+  String get pdfImportErrorInvalidPlan;
+
+  /// failed-precondition sin reason: kill switch apagado para este uid.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Importar de PDF no está disponible para tu cuenta.'**
+  String get pdfImportErrorDisabled;
+
+  /// failed-precondition con reason structured_outputs_disabled: el servidor devuelve el cupo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Importar de PDF no está disponible por un problema nuestro. No se descontó de tu cupo.'**
+  String get pdfImportErrorUnavailable;
+
+  /// permission-denied.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solo los entrenadores pueden importar planes.'**
+  String get pdfImportErrorNotTrainer;
+
+  /// unauthenticated.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu sesión se cerró. Volvé a iniciar sesión.'**
+  String get pdfImportErrorSignedOut;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
