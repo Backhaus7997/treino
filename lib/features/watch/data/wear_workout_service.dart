@@ -91,6 +91,26 @@ class WearWorkoutService {
     );
   }
 
+  /// Pone el descanso nativo a terminar dentro de [remaining] (#1616).
+  ///
+  /// Es el ESPEJO del descanso anotado en la sesión: el teléfono escribe un
+  /// instante de fin en tiempo de pared y acá se convierte en lo que falta.
+  /// Va al milisegundo y no en segundos como [startRest] porque lo que se
+  /// busca es que la muñeca vibre EN EL MISMO INSTANTE que el teléfono:
+  /// redondear a segundos correría el aviso hasta uno entero.
+  ///
+  /// Reemplaza el descanso que hubiera —y su alarma—, que es justamente lo que
+  /// hace falta cuando el otro aparato sumó +15 s. Con [remaining] en cero o
+  /// menos cancela, por el mismo motivo que [startRest].
+  Future<void> startRestFor(Duration remaining) {
+    final ms = remaining.inMilliseconds;
+    if (ms <= 0) return cancelRest();
+    return _channel.invokeMethod<void>(
+      'startRest',
+      {'millis': ms, 'wakeLock': true},
+    );
+  }
+
   Future<void> cancelRest() => _channel.invokeMethod<void>('cancelRest');
 
   // ── Temporizador del ejercicio por tiempo ─────────────────────────────────

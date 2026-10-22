@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
+import '../../domain/rest_rules.dart';
 
 /// Cuenta regresiva del descanso entre series, en el teléfono (#1510).
 ///
@@ -44,8 +45,10 @@ class RestTimerBar extends StatefulWidget {
   /// Llegó a cero. Ya vibró; el llamador saca la barra.
   final VoidCallback onDone;
 
-  /// Cuánto se suma con el botón «+15 s».
-  static const int extraSeconds = 15;
+  /// Cuánto se suma con el botón «+15 s». Sale de la regla compartida con el
+  /// reloj (#1616): el +15 s del teléfono se ve en la muñeca, y si cada lado
+  /// sumara su propio número dejarían de coincidir.
+  static const int extraSeconds = RestRules.extraSeconds;
 
   @override
   State<RestTimerBar> createState() => _RestTimerBarState();
@@ -90,11 +93,16 @@ class _RestTimerBarState extends State<RestTimerBar> {
     super.dispose();
   }
 
-  int get _restante {
-    final ms = widget.endsAt.difference(clock.now()).inMilliseconds;
-    // Redondeo para ARRIBA: «0:01» se ve hasta que de verdad llega a cero.
-    return ms <= 0 ? 0 : (ms / 1000).ceil();
-  }
+  /// Redondeo para ARRIBA: «0:01» se ve hasta que de verdad llega a cero.
+  ///
+  /// Con la regla compartida con el reloj (#1616), al microsegundo. La cuenta
+  /// anterior truncaba la diferencia a milisegundos, y con un instante de fin
+  /// que no cae justo en el milisegundo la barra daba «terminó» hasta 1 ms
+  /// ANTES del fin. Ese `onDone` adelantado le llegaba a `RestEndAlerts` como
+  /// un fin todavía por venir —o sea, un SALTAR— y cancelaba la notificación
+  /// de #1617 en vez de dejarla salir.
+  int get _restante =>
+      RestRules.remaining(endsAt: widget.endsAt, now: clock.now());
 
   void _onTick() {
     if (!mounted) return;

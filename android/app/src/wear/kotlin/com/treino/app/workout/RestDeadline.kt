@@ -69,5 +69,16 @@ data class RestDeadline(
         /** Arranca un descanso de [durationMs] a partir de [nowElapsedMs]. */
         fun startingAt(nowElapsedMs: Long, durationMs: Long): RestDeadline =
             RestDeadline(endsAtElapsedMs = nowElapsedMs + durationMs, totalMs = durationMs)
+
+        /**
+         * Cuánto dura el descanso que pide Dart, en ms.
+         *
+         * [millis] gana cuando viene: es el ESPEJO del descanso compartido
+         * (#1616), lo que falta del instante de fin que anotó el otro aparato.
+         * Sin él, [seconds] es el descanso que arranca este reloj. Nunca
+         * negativo: el que llama trata 0 como "no hay descanso".
+         */
+        fun durationMsFrom(millis: Long?, seconds: Long?): Long =
+            (millis ?: ((seconds ?: 0L) * 1000L)).coerceAtLeast(0L)
     }
 }
