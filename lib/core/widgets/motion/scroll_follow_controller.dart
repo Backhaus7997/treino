@@ -60,6 +60,12 @@ class ScrollFollowController {
     ratio: 1,
   );
 
+  /// Cuándo se da por llegado el resorte: a 0,005 de carrera (~0,3 px) y casi
+  /// quieto. La tolerancia por defecto (0,001 y 0,001/s) estira la cola
+  /// ~120 ms más moviendo fracciones de píxel que nadie ve.
+  static const Tolerance _chaseTolerance =
+      Tolerance(distance: 0.005, velocity: 0.05);
+
   /// Si entre dos frames pasó más que esto, el scroll estuvo quieto: la
   /// velocidad se mide como si hubiera pasado este tiempo, para que el primer
   /// evento después de una pausa no cuente como lento ni como rápido de más.
@@ -89,7 +95,7 @@ class ScrollFollowController {
   double _anchorValue;
 
   static Duration _frameClock() =>
-      SchedulerBinding.instance.currentFrameTimeStamp;
+      SchedulerBinding.instance.currentSystemFrameTimeStamp;
 
   double get value => animation.value;
 
@@ -176,6 +182,7 @@ class ScrollFollowController {
         // Hereda la velocidad que traía: re-apuntar no frena en seco.
         animation.isAnimating ? animation.velocity : 0,
         snapToEnd: true,
+        tolerance: _chaseTolerance,
       ),
     );
   }

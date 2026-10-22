@@ -111,6 +111,8 @@ Future<void> _pumpShell(WidgetTester tester, String location) async {
 bool _collapsed(WidgetTester tester) =>
     tester.widget<TreinoBottomBar>(find.byType(TreinoBottomBar)).collapsed;
 
+const _frame = Duration(milliseconds: 16);
+
 void main() {
   group('Nav bar — compactar al scrollear', () {
     testWidgets('scrollear hacia abajo la compacta y hacia arriba la devuelve',
@@ -216,11 +218,16 @@ void main() {
 
     /// Mueve el dedo apoyado (sin soltar) en pasos de 4 px, como un dedo real:
     /// con un solo `moveBy` Flutter sólo reconoce el arranque del drag.
+    ///
+    /// Un paso por frame de 16 ms = 250 px/s, un scroll de lectura: muy por
+    /// debajo de [ScrollFollowController.maxTrackingSpeed], así que la barra
+    /// sigue 1:1. Sin el tiempo entre pasos, todos caerían en el mismo
+    /// instante y contarían como un salto infinitamente rápido.
     Future<void> move(WidgetTester tester, TestGesture g, double dy) async {
       final steps = (dy.abs() / 4).ceil();
       for (var i = 0; i < steps; i++) {
         await g.moveBy(Offset(0, dy / steps));
-        await tester.pump();
+        await tester.pump(_frame);
       }
     }
 
@@ -263,6 +270,60 @@ void main() {
       await g.up();
       await tester.pumpAndSettle();
       expect(expansion(tester), anyOf(0.0, 1.0));
+    });
+
+    testWidgets('un scroll muy rápido no la compacta de golpe: la persigue',
+        (tester) async {
+      // Feedback de device: el 1:1 está bien, pero con un scroll muy rápido
+      // la barra se iba en un frame y se sentía seco.
+      await _pumpShell(tester, '/feed');
+      final g = await holdPastTop(tester);
+      expect(expansion(tester), 1);
+
+      // 64 px en dos frames de 8 ms = 4000 px/s. A 1:1 ya estaría en 0.
+      const fast = Duration(milliseconds: 8);
+      await g.moveBy(const Offset(0, -32));
+      await tester.pump(fast);
+      await g.moveBy(const Offset(0, -32));
+      await tester.pump(fast);
+      expect(expansion(tester), greaterThan(0.5),
+          reason: 'arrancó a perseguir, no saltó');
+
+      // Con el dedo quieto llega igual, sin escalones.
+      var antes = expansion(tester);
+      var frames = 0;
+      while (expansion(tester) > 0) {
+        await tester.pump(fast);
+        expect(antes - expansion(tester), lessThan(0.25),
+            reason: 'frame $frames: ningún salto de más de un cuarto');
+        antes = expansion(tester);
+        expect(++frames, lessThan(60));
+      }
+      expect(frames, greaterThan(10),
+          reason: 'una animación de verdad, no dos o tres frames');
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(_collapsed(tester), isTrue);
+    });
+
+    testWidgets('con «reducir movimiento» el scroll rápido va directo',
+        (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      await _pumpShell(tester, '/feed');
+      final g = await holdPastTop(tester);
+
+      const fast = Duration(milliseconds: 8);
+      await g.moveBy(const Offset(0, -32));
+      await tester.pump(fast);
+      await g.moveBy(const Offset(0, -32));
+      await tester.pump(fast);
+      expect(expansion(tester), lessThan(0.1),
+          reason: 'sin resorte: sigue al scroll aunque sea rápido');
+      await g.up();
+      await tester.pumpAndSettle();
     });
   });
 }
