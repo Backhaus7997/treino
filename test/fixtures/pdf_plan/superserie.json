@@ -1,0 +1,36 @@
+{
+  "numWeeks": 1,
+  "days": [
+    {
+      "dayNumber": 1,
+      "title": "Brazos",
+      "rows": [
+        {
+          "number": 1,
+          "restSeconds": 75,
+          "exercises": [
+            {
+              "component": 2,
+              "rawName": "Extensión de tríceps en polea",
+              "note": null,
+              "weeks": [[{ "type": "normal", "weightKg": 20, "reps": 12, "repsMin": null, "repsMax": null, "durationSeconds": null, "distanceMeters": null }]],
+              "candidateExerciseId": null,
+              "candidateConfidence": null,
+              "sourceText": "B2) Extensión tríceps polea 3x12"
+            },
+            {
+              "component": 1,
+              "rawName": "Curl de bíceps con mancuernas",
+              "note": null,
+              "weeks": [[{ "type": "normal", "weightKg": 12, "reps": 12, "repsMin": null, "repsMax": null, "durationSeconds": null, "distanceMeters": null }]],
+              "candidateExerciseId": null,
+              "candidateConfidence": null,
+              "sourceText": "B1) Curl mancuernas 3x12"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

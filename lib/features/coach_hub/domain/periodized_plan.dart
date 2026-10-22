@@ -8,6 +8,10 @@ import '../../workout/domain/set_spec.dart';
 /// Son clases planas y no freezed a propósito: no se serializan ni se
 /// persisten, sólo viajan del parser al mapper y a la vista previa.
 
+/// Techos del producto (`athlete_entitlement.dart`), comunes al Excel y al PDF.
+const int kMaxImportDays = 7;
+const int kMaxImportWeeks = 16;
+
 /// Gravedad de un diagnóstico. Los errores bloquean la subida; los avisos no.
 enum ImportDiagnosticSeverity { error, warning }
 
@@ -37,6 +41,19 @@ enum ImportDiagnosticCode {
   emptyWeek,
   qualifierSavedAsNote,
   mixedSetKinds,
+  // ── Import de PDF (JSON del extractor) ────────────────────────────────────
+  /// Errores: falta un campo, tiene otro tipo o el JSON no tiene la forma.
+  malformedPlan,
+  weekCountMismatch,
+  invalidSetType,
+  invalidReps,
+  invalidWeight,
+  invalidComponent,
+
+  /// Avisos: lo que el extractor reportó como dudoso, y datos opcionales
+  /// descartados (candidato del catálogo, texto fuente).
+  extractorWarning,
+  invalidOptionalField,
 }
 
 /// Un hallazgo del parser, con la ubicación para que el PF lo encuentre: la
@@ -103,6 +120,9 @@ class PeriodizedExercise {
     required this.weeks,
     this.note,
     this.emptyWeeks = const <int>{},
+    this.sourceText,
+    this.candidateExerciseId,
+    this.candidateConfidence,
   });
 
   /// Posición dentro del renglón (0 si no es superserie).
@@ -121,6 +141,16 @@ class PeriodizedExercise {
   /// Semanas (0-based) cuya celda estaba vacía: salen en rojo en la vista
   /// previa ("falta cargar reps").
   final Set<int> emptyWeeks;
+
+  /// PDF: el texto del que salió el ejercicio, para mostrarlo en la vista
+  /// previa. Null en el Excel.
+  final String? sourceText;
+
+  /// PDF: id del catálogo que propone el extractor y su confianza (0–1). Es
+  /// SÓLO un candidato: hay que pasarlo por
+  /// `ExerciseNameMatcher.suggestFromCandidate`, nunca se autoasigna.
+  final String? candidateExerciseId;
+  final double? candidateConfidence;
 }
 
 /// Un renglón del plan: uno o varios ejercicios (superserie).

@@ -1,0 +1,80 @@
+{
+  "numWeeks": 2,
+  "days": [
+    {
+      "dayNumber": 2,
+      "title": "Pierna",
+      "rows": [
+        {
+          "number": 1,
+          "restSeconds": 120,
+          "exercises": [
+            {
+              "component": 1,
+              "rawName": "Sentadilla con barra",
+              "note": null,
+              "weeks": [
+                [{ "type": "normal", "weightKg": 80, "reps": 5, "repsMin": null, "repsMax": null, "durationSeconds": null, "distanceMeters": null }],
+                [{ "type": "normal", "weightKg": 82.5, "reps": 5, "repsMin": null, "repsMax": null, "durationSeconds": null, "distanceMeters": null }]
+              ],
+              "candidateExerciseId": null,
+              "candidateConfidence": null,
+              "sourceText": "Sentadilla 1x5 @80/82.5"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "restSeconds": 60,
+          "exercises": [
+            {
+              "component": 1,
+              "rawName": "Plancha",
+              "note": null,
+              "weeks": [
+                [{ "type": "normal", "weightKg": null, "reps": null, "repsMin": null, "repsMax": null, "durationSeconds": 45, "distanceMeters": null }],
+                []
+              ],
+              "candidateExerciseId": null,
+              "candidateConfidence": null,
+              "sourceText": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "dayNumber": 1,
+      "title": "Torso A",
+      "rows": [
+        {
+          "number": 1,
+          "restSeconds": 90,
+          "exercises": [
+            {
+              "component": 1,
+              "rawName": "Press banca plano con barra",
+              "note": "RIR 2, tempo 3-0-1",
+              "weeks": [
+                [
+                  { "type": "warmup", "weightKg": 40, "reps": 10, "repsMin": null, "repsMax": null, "durationSeconds": null, "distanceMeters": null },
+                  { "type": "normal", "weightKg": 60, "reps": null, "repsMin": 8, "repsMax": 10, "durationSeconds": null, "distanceMeters": null }
+                ],
+                [
+                  { "type": "normal", "weightKg": 62.5, "reps": null, "repsMin": 8, "repsMax": 10, "durationSeconds": null, "distanceMeters": null },
+                  { "type": "failure", "weightKg": 50, "reps": null, "repsMin": null, "repsMax": null, "durationSeconds": null, "distanceMeters": null }
+                ]
+              ],
+              "candidateExerciseId": "bench-press",
+              "candidateConfidence": 0.9,
+              "sourceText": "Press banca 4x8-10 @60kg RIR2"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    { "code": "ambiguous_reps", "message": "No queda claro si la plancha es por lado.", "page": 2 }
+  ]
+}
