@@ -86,7 +86,9 @@ Future<bool> confirmAndDeleteChat(
 /// [onViewProfile] agrega «Ver perfil» arriba de todo (el ⋮ del chat; en la
 /// bandeja la fila ya es la persona). [onLeft] corre cuando el chat dejó de
 /// estar donde estaba —archivado, desarchivado o eliminado—, para que el
-/// chat abierto pueda volver a la bandeja.
+/// chat abierto pueda volver a la bandeja. Sólo corre si [context] sigue
+/// montado: si la persona salió durante la escritura, ya no hay a dónde
+/// volver.
 Future<void> showChatActionsSheet(
   BuildContext context,
   WidgetRef ref, {
@@ -148,7 +150,9 @@ Future<void> showChatActionsSheet(
               final pending = archived
                   ? unarchiveChat(context, ref, chatId: chatId, uid: uid)
                   : archiveChat(context, ref, chatId: chatId, uid: uid);
-              if (await pending) onLeft?.call();
+              // La escritura puede tardar y la persona irse del chat en el
+              // medio: con el chat ya cerrado no hay a dónde volver.
+              if (await pending && context.mounted) onLeft?.call();
             },
           ),
           tile(
@@ -163,7 +167,7 @@ Future<void> showChatActionsSheet(
                 chatId: chatId,
                 uid: uid,
               );
-              if (ok) onLeft?.call();
+              if (ok && context.mounted) onLeft?.call();
             },
           ),
         ],

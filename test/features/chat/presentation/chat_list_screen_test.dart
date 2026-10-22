@@ -1,3 +1,5 @@
+import 'dart:async' show StreamController;
+
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +12,7 @@ import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/data/chat_repository.dart';
 import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/chat/presentation/chat_list_screen.dart';
+import 'package:treino/features/chat/presentation/chat_swipe_actions.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -589,6 +592,81 @@ void main() {
       });
 
       group('swipe', () {
+        testWidgets(
+            'P1 de Codex: con la fila abierta, si la bandeja se reordena las '
+            'acciones siguen a SU chat y no al que quedó en ese lugar', (
+          tester,
+        ) async {
+          await firestore.collection('chats').doc('aaa_ccc').set({
+            'chatId': 'aaa_ccc',
+            'members': ['aaa', 'ccc'],
+            'createdAt': Timestamp.fromDate(DateTime.utc(2026, 9, 1)),
+            'lastMessageAt': Timestamp.fromDate(last),
+          });
+          final chats = StreamController<List<Chat>>();
+          addTearDown(chats.close);
+          await tester.pumpWidget(
+            _wrap(
+              const ChatListScreen(),
+              overrides: [
+                currentUidProvider.overrideWith((_) => 'aaa'),
+                chatsForCurrentUserProvider.overrideWith((ref) => chats.stream),
+                chatRepositoryProvider
+                    .overrideWithValue(ChatRepository(firestore: firestore)),
+                userPublicProfileProvider('bbb')
+                    .overrideWith((_) => Stream.value(_pub('bbb', 'Vale'))),
+                userPublicProfileProvider('ccc')
+                    .overrideWith((_) => Stream.value(_pub('ccc', 'Ceci'))),
+              ],
+            ),
+          );
+          final vale = _chat(lastMessageText: 'hola', lastMessageAt: last);
+          Chat ceci(DateTime at) => _chat(
+                chatId: 'aaa_ccc',
+                members: const ['aaa', 'ccc'],
+                lastMessageText: 'che',
+                lastMessageAt: at,
+              );
+          chats.add([vale, ceci(last.subtract(const Duration(hours: 1)))]);
+          await tester.pumpAndSettle();
+
+          // Vale arriba, con el swipe abierto.
+          await tester.drag(find.text('Vale'), const Offset(-240, 0));
+          await tester.pumpAndSettle();
+          expect(find.text('Archivar'), findsOneWidget);
+
+          // Le llega un mensaje a Ceci: pasa arriba, Vale baja.
+          chats.add([ceci(last.add(const Duration(hours: 1))), vale]);
+          await tester.pumpAndSettle();
+          expect(
+            tester.getTopLeft(find.text('Ceci')).dy,
+            lessThan(tester.getTopLeft(find.text('Vale')).dy),
+          );
+
+          // La fila abierta sigue siendo la de Vale, y archivar archiva a Vale.
+          expect(find.text('Archivar'), findsOneWidget);
+          final valeRow = tester.getRect(find.ancestor(
+            of: find.text('Vale'),
+            matching: find.byType(ChatSwipeActions),
+          ));
+          expect(
+            valeRow.contains(
+              Offset(valeRow.center.dx,
+                  tester.getCenter(find.text('Archivar')).dy),
+            ),
+            isTrue,
+          );
+          await tester.tap(find.text('Archivar'));
+          await tester.runAsync(() => pumpEventQueue());
+          await tester.pumpAndSettle();
+
+          expect(((await chatDoc())['archivedAt']! as Map).keys, ['aaa']);
+          final ceciDoc =
+              (await firestore.collection('chats').doc('aaa_ccc').get())
+                  .data()!;
+          expect(ceciDoc.containsKey('archivedAt'), isFalse);
+        });
+
         Future<void> swipeLeft(WidgetTester tester) async {
           await tester.drag(find.text('Vale'), const Offset(-240, 0));
           await tester.pumpAndSettle();

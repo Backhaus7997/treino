@@ -105,6 +105,13 @@ class _ChatSwipeActionsState extends State<ChatSwipeActions>
   @override
   void didUpdateWidget(ChatSwipeActions old) {
     super.didUpdateWidget(old);
+    // Defensa: si esta fila pasa a ser OTRO chat, las acciones abiertas
+    // serían del chat equivocado. Se cierra sin animar. No se toca
+    // [openRow]: avisaría a las otras filas en medio de un build.
+    if (old.rowId != widget.rowId) {
+      _offset.stop();
+      _offset.value = 0;
+    }
     if (old.openRow != widget.openRow) {
       old.openRow.removeListener(_onOpenRowChanged);
       widget.openRow.addListener(_onOpenRowChanged);

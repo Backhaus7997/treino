@@ -142,6 +142,16 @@ class ChatListScreen extends ConsumerWidget {
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: entries.length,
+                // Las filas de chat se identifican por chat, no por posición.
+                // La bandeja se reordena sola (`lastMessageAt`) y sin esto el
+                // estado del swipe —la fila abierta, con sus acciones— se
+                // quedaba en el ÍNDICE: un mensaje nuevo en otro chat lo
+                // corría arriba y las acciones abiertas pasaban a archivar o
+                // eliminar ese otro chat (Codex, #1623).
+                findChildIndexCallback: (key) {
+                  final i = entries.indexWhere((e) => _entryKey(e) == key);
+                  return i < 0 ? null : i;
+                },
                 itemBuilder: (_, i) {
                   final entry = entries[i];
                   // Divisor entre filas consecutivas del mismo tipo, igual
@@ -170,12 +180,18 @@ class ChatListScreen extends ConsumerWidget {
                         ),
                       ),
                   };
-                  if (!divided) return row;
+                  final key = _entryKey(entry);
+                  if (!divided && key == null) return row;
+                  // Misma raíz con o sin divisor: una fila que se mueve y
+                  // gana o pierde el divisor cambiaría de tipo y se remontaría
+                  // aunque la key sea la misma, y el swipe abierto se perdería.
                   return Column(
+                    key: key,
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Divider(height: 1, color: palette.border, indent: 76),
+                      if (divided)
+                        Divider(height: 1, color: palette.border, indent: 76),
                       row,
                     ],
                   );
@@ -203,6 +219,14 @@ final class _ChatEntry extends _Entry {
   /// Fila de Archivados: el long-press ofrece desarchivar.
   final bool archived;
 }
+
+/// Key estable de las filas de chat de la lista. Un chat puede estar en la
+/// bandeja o en Archivados, así que la sección entra en la key.
+Key? _entryKey(_Entry entry) => switch (entry) {
+      _ChatEntry(:final chat, :final archived) =>
+        ValueKey<String>('chat:${chat.chatId}:$archived'),
+      _ => null,
+    };
 
 final class _ArchivedHeaderEntry extends _Entry {
   const _ArchivedHeaderEntry(this.count);
@@ -370,6 +394,7 @@ class _ChatRow extends ConsumerWidget {
       ),
     );
     return ChatSwipeActions(
+      key: ValueKey(chat.chatId),
       rowId: chat.chatId,
       openRow: ref.watch(_openSwipeRowProvider),
       actions: [archiveAction, deleteAction],

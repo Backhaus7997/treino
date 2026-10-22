@@ -94,6 +94,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  /// Después de archivar o eliminar: a Mensajes, SIEMPRE con un `go`.
+  ///
+  /// No es un pop: al chat también se entra empujado desde el detalle del
+  /// alumno y desde un perfil público, y ahí el pop deja a la persona en esa
+  /// pantalla con un chat que acaba de desaparecer (Codex, #1623). Tampoco se
+  /// decide mirando qué hay debajo: el pop saca el match recién cuando el
+  /// Navigator suelta la página, así que `state.uri` justo después no es
+  /// confiable. Si la bandeja queda sola, su `PopScope` ya vuelve a `/feed`.
+  void _leaveToInbox() {
+    // El sheet corre este callback después de una escritura: puede llegar
+    // con el chat ya cerrado (ver `showChatActionsSheet`).
+    if (!mounted) return;
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      Navigator.of(context).maybePop();
+    } else {
+      router.go('/feed/messages');
+    }
+  }
+
   /// Abre el perfil público del otro, la misma pantalla del Feed. Cuelga de
   /// la ruta del chat y no de `/feed/profile/:uid` a propósito: el chat es
   /// una ruta top-level, y empujar desde acá una del shell clona el shell
@@ -377,9 +397,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     false,
                 onViewProfile:
                     pubAsync.valueOrNull == null ? null : _openProfile,
-                // Archivado o eliminado, este chat ya no está en la bandeja
-                // de donde se abrió: volvemos a ella.
-                onLeft: _backToInbox,
+                // Archivado o eliminado, este chat ya no está donde estaba:
+                // volvemos a la bandeja.
+                onLeft: _leaveToInbox,
               ),
             ),
         ],
