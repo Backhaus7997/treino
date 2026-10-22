@@ -2,6 +2,8 @@
 // 4 a 6): los cuatro estados del ejercicio, «Crear N propios» con y sin
 // cupo, ASIGNAR bloqueado con pendientes y la asignación exitosa.
 
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -411,6 +413,42 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('FICHA'), findsOneWidget);
       expect(c.read(periodizedImportProvider), isNull);
+    });
+
+    testWidgets(
+        'mientras guarda, ni el atrás de la barra ni el del sistema salen ni '
+        'limpian el borrador', (tester) async {
+      final pending = Completer<Routine>();
+      when(() => routineRepo.createAssigned(any()))
+          .thenAnswer((_) => pending.future);
+      final c = await pump(tester, _resolved());
+
+      await tester.tap(assignButton());
+      await tester.pump();
+
+      final back = find.byTooltip('Volver');
+      expect(
+          tester
+              .widget<IconButton>(
+                  find.ancestor(of: back, matching: find.byType(IconButton)))
+              .onPressed,
+          isNull);
+      await tester.tap(back, warnIfMissed: false);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.binding.handlePopRoute();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('FICHA'), findsNothing);
+      expect(find.text('¿Salir sin guardar el plan?'), findsNothing);
+      expect(c.read(periodizedImportProvider), isNotNull);
+
+      pending.complete(const Routine(
+          id: 'nuevo-1',
+          name: 'Plan de Ana',
+          level: ExperienceLevel.intermediate,
+          days: []));
+      await tester.pumpAndSettle();
+      expect(find.text('FICHA'), findsOneWidget);
     });
 
     testWidgets('si falla, el error queda en la pantalla y el plan también',

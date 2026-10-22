@@ -101,7 +101,12 @@ class _PlanPdfImportPreviewScreenState
       ? context.pop()
       : context.go('/coach/athlete/${widget.athleteId}');
 
+  /// Hay una escritura en curso (asignar o crear propios): salir la dejaría
+  /// corriendo sin pantalla, y limpiar el borrador a mitad la rompe.
+  bool get _busy => _saving || _bulkRunning;
+
   Future<void> _handleBack() async {
+    if (_busy) return;
     if (_touched) {
       final l10n = AppL10n.of(context);
       final leave = await showTreinoConfirmDialog(
@@ -295,7 +300,7 @@ class _PlanPdfImportPreviewScreenState
     final bulk = _controller.bulkCustomGroups.length;
 
     return PopScope(
-      canPop: !_touched,
+      canPop: !_touched && !_busy,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _handleBack();
       },
@@ -350,7 +355,7 @@ class _PlanPdfImportPreviewScreenState
                     IconButton(
                       icon: Icon(TreinoIcon.back, color: palette.textPrimary),
                       tooltip: l10n.commonBack,
-                      onPressed: _handleBack,
+                      onPressed: _busy ? null : _handleBack,
                     ),
                     Expanded(
                       child: Text(
