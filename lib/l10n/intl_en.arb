@@ -2423,5 +2423,7 @@
   "agendaOverrideDeleteTitle": "Delete this exception?",
   "onboardingCustomExerciseNotNow": "NOT NOW",
   "authSignOutConfirmTitle": "Sign out?",
-  "authSignOutConfirmAction": "Sign out"
+  "authSignOutConfirmAction": "Sign out",
+  "sessionRestEndedTitle": "Rest is over",
+  "sessionRestEndedBody": "Back to your set"
 }

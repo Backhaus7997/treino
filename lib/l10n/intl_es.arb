@@ -1304,5 +1304,7 @@
   "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?",
   "onboardingCustomExerciseNotNow": "AHORA NO",
   "authSignOutConfirmTitle": "¿Cerrar sesión?",
-  "authSignOutConfirmAction": "Salir"
+  "authSignOutConfirmAction": "Salir",
+  "sessionRestEndedTitle": "Terminó el descanso",
+  "sessionRestEndedBody": "Vuelve a la serie"
 }

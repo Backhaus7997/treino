@@ -9870,6 +9870,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Salir'**
   String get authSignOutConfirmAction;
+
+  /// Título de la notificación del sistema que avisa que terminó el descanso entre series, cuando la app está en segundo plano o la pantalla bloqueada (#1617). Corto: se lee en la pantalla de bloqueo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Terminó el descanso'**
+  String get sessionRestEndedTitle;
+
+  /// Cuerpo de esa misma notificación. Una instrucción, no un dato: el atleta la lee con el teléfono en el bolsillo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volvé a la serie'**
+  String get sessionRestEndedBody;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
