@@ -48,12 +48,16 @@ class _FakeService implements PlanPdfImportService {
 /// Doble de la limpieza de la caché del picker: cuenta las llamadas y, si
 /// [fails], falla como lo haría una plataforma que no la implementa.
 class _Cleaner {
-  _Cleaner({this.fails = false});
+  _Cleaner({this.fails = false, this.gate});
   final bool fails;
+
+  /// Si está, la limpieza no termina hasta que se complete.
+  final Completer<void>? gate;
   int calls = 0;
 
   Future<void> call() async {
     calls++;
+    if (gate != null) await gate!.future;
     if (fails) throw UnimplementedError('clearTemporaryFiles');
   }
 }
@@ -405,6 +409,27 @@ void main() {
       expect(find.text('preview:ath-1'), findsOneWidget);
       // Y otra vez al desmontarse la subida: es idempotente.
       expect(cleaner.calls, 2);
+    });
+
+    testWidgets('no sale a la vista previa hasta que el borrado termina',
+        (tester) async {
+      final service = _FakeService();
+      final gate = Completer<void>();
+      final cleaner = _Cleaner(gate: gate);
+      await _pump(tester, service, cleaner: cleaner);
+      _pickReturns('plan.pdf', 1000);
+      await _pickAndProcess(tester);
+
+      service
+          .complete(PdfImportSuccess(draft: _draft(), quota: null, model: 'm'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(cleaner.calls, 1);
+      expect(find.text('preview:ath-1'), findsNothing);
+
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('preview:ath-1'), findsOneWidget);
     });
 
     testWidgets('se borra si falla, y la pantalla sigue ahí', (tester) async {

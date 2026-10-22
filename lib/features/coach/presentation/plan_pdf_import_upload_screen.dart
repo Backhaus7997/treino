@@ -112,8 +112,10 @@ class _PlanPdfImportUploadScreenState
           );
     } finally {
       // Salga bien o mal, la copia en disco ya no hace falta: «Reintentar»
-      // usa los bytes que quedaron en memoria.
-      unawaited(_clearPickerCache());
+      // usa los bytes que quedaron en memoria. Esperada, no en segundo
+      // plano: si la app se va apenas navega, la copia no queda en disco.
+      // `_clearPickerCache` ya se traga los errores de la plataforma.
+      await _clearPickerCache();
     }
     if (!mounted) return;
     if (result is PdfImportSuccess) {
