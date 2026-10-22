@@ -144,10 +144,25 @@ ExerciseMode _modeOf(List<List<SetSpec>> weeks) {
   return ExerciseMode.reps;
 }
 
+/// Rango si alguna serie de alguna semana trae `repsMin`/`repsMax`. Como el
+/// modo, el modo de reps es por slot: una serie con reps fijas en un slot de
+/// rango pasa a `N-N` para no perder el dato.
+bool _isRange(List<List<SetSpec>> weeks) =>
+    weeks.any((w) => w.any((s) => s.repsMin != null || s.repsMax != null));
+
 /// Deja en la serie sólo los campos del modo del slot (el modo es por slot,
-/// no por semana), como `toSpec` del editor web.
-SetSpec _coerce(SetSpec s, ExerciseMode mode) => switch (mode) {
-      ExerciseMode.reps => SetSpec(type: s.type, reps: s.reps),
+/// no por semana), como `toSpec` del editor web: en reps conserva el peso y
+/// las reps fijas o el rango.
+SetSpec _coerce(SetSpec s, ExerciseMode mode, {required bool range}) =>
+    switch (mode) {
+      ExerciseMode.reps when range => SetSpec(
+          type: s.type,
+          repsMin: s.repsMin ?? s.reps,
+          repsMax: s.repsMax ?? s.reps,
+          weightKg: s.weightKg,
+        ),
+      ExerciseMode.reps =>
+        SetSpec(type: s.type, reps: s.reps, weightKg: s.weightKg),
       ExerciseMode.duration =>
         SetSpec(type: s.type, durationSeconds: s.durationSeconds),
       ExerciseMode.distance =>
@@ -159,6 +174,8 @@ SetSpec _coerce(SetSpec s, ExerciseMode mode) => switch (mode) {
 /// serie normal/calentamiento sin ningún valor.
 bool _weekHasPrescription(List<SetSpec> week) => week.any((s) =>
     s.reps != null ||
+    s.repsMin != null ||
+    s.repsMax != null ||
     s.durationSeconds != null ||
     s.distanceMeters != null ||
     s.weightKg != null ||
@@ -173,8 +190,10 @@ RoutineSlot _mapSlot(
   required int restSeconds,
 }) {
   final mode = _modeOf(ex.weeks);
+  final range = mode == ExerciseMode.reps && _isRange(ex.weeks);
   final weeks = [
-    for (final w in ex.weeks) [for (final s in w) _coerce(s, mode)],
+    for (final w in ex.weeks)
+      [for (final s in w) _coerce(s, mode, range: range)],
   ];
   // Campos legacy = la primera semana CON prescripción (normalmente SEMANA 1,
   // como el editor): los consumidores que no conocen `weeklySets` leen sólo
@@ -193,6 +212,13 @@ RoutineSlot _mapSlot(
       durationSeconds = week0.isEmpty ? null : week0.first.durationSeconds;
     case ExerciseMode.distance:
       break;
+    case ExerciseMode.reps when range:
+      final mins = week0.map((s) => s.repsMin ?? 0).toList();
+      final maxs = week0.map((s) => s.repsMax ?? 0).toList();
+      if (week0.isNotEmpty) {
+        targetRepsMin = mins.reduce((a, b) => a < b ? a : b);
+        targetRepsMax = maxs.reduce((a, b) => a > b ? a : b);
+      }
     case ExerciseMode.reps:
       final reps = week0.map((s) => s.reps ?? 0).toList();
       targetReps = reps;
@@ -210,11 +236,15 @@ RoutineSlot _mapSlot(
     targetRepsMin: targetRepsMin,
     targetRepsMax: targetRepsMax,
     restSeconds: restSeconds,
+    targetWeightKg: mode == ExerciseMode.reps && week0.isNotEmpty
+        ? week0.first.weightKg
+        : null,
     supersetGroup: supersetGroup,
     notes: ex.note,
     targetReps: targetReps,
     durationSeconds: durationSeconds,
     exerciseMode: mode,
+    repMode: range ? RepMode.range : RepMode.single,
     sets: week0,
     // Igual que el editor: un plan de UNA semana deja weeklySets vacío.
     weeklySets: numWeeks > 1 ? weeks : const [],

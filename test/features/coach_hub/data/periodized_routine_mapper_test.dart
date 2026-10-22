@@ -241,4 +241,70 @@ void main() {
       expect(slot.durationSeconds, isNull);
     });
   });
+
+  // El Excel nunca trae pesos ni rangos, pero el import de PDF sí: el mapper
+  // los tiene que conservar (antes se perdían en `_coerce`).
+  group('pesos y rangos', () {
+    RoutineSlot slotFrom(List<List<SetSpec>> weeks) {
+      final plan = PeriodizedPlan(numWeeks: weeks.length, days: [
+        PeriodizedDay(dayNumber: 1, headerRow: 1, rows: [
+          PeriodizedRow(excelRow: 1, number: 1, restSeconds: 90, exercises: [
+            PeriodizedExercise(component: 0, rawName: 'x', weeks: weeks),
+          ]),
+        ]),
+      ]);
+      final key = (dayNumber: 1, row: 1, component: 0);
+      return mapPeriodizedPlanToRoutine(plan, {key: _catalog().first},
+              routineId: 'r', routineName: 'n', level: ExperienceLevel.beginner)
+          .days
+          .single
+          .slots
+          .single;
+    }
+
+    test('reps fijas con peso: conserva weightKg y targetWeightKg', () {
+      final slot = slotFrom([
+        const [SetSpec(reps: 8, weightKg: 60), SetSpec(reps: 6, weightKg: 70)],
+        const [SetSpec(reps: 8, weightKg: 62.5)],
+      ]);
+      expect(slot.repMode, RepMode.single);
+      expect(slot.sets, const [
+        SetSpec(reps: 8, weightKg: 60),
+        SetSpec(reps: 6, weightKg: 70),
+      ]);
+      expect(slot.weeklySets[1], const [SetSpec(reps: 8, weightKg: 62.5)]);
+      expect(slot.targetWeightKg, 60);
+      expect(slot.targetReps, [8, 6]);
+      expect([slot.targetRepsMin, slot.targetRepsMax], [6, 8]);
+    });
+
+    test('rango: RepMode.range, repsMin/repsMax y sin targetReps', () {
+      final slot = slotFrom([
+        const [
+          SetSpec(repsMin: 8, repsMax: 10, weightKg: 60),
+          SetSpec(repsMin: 6, repsMax: 8, weightKg: 65),
+        ],
+        const [SetSpec(repsMin: 10, repsMax: 12)],
+      ]);
+      expect(slot.repMode, RepMode.range);
+      expect(slot.sets, const [
+        SetSpec(repsMin: 8, repsMax: 10, weightKg: 60),
+        SetSpec(repsMin: 6, repsMax: 8, weightKg: 65),
+      ]);
+      expect(slot.weeklySets[1], const [SetSpec(repsMin: 10, repsMax: 12)]);
+      expect([slot.targetRepsMin, slot.targetRepsMax], [6, 10]);
+      expect(slot.targetReps, isEmpty);
+      expect(slot.targetWeightKg, 60);
+    });
+
+    test('rango en una semana y reps fijas en otra: las fijas pasan a N-N', () {
+      final slot = slotFrom([
+        const [SetSpec(reps: 5, weightKg: 80)],
+        const [SetSpec(repsMin: 8, repsMax: 10)],
+      ]);
+      expect(slot.repMode, RepMode.range);
+      expect(slot.sets, const [SetSpec(repsMin: 5, repsMax: 5, weightKg: 80)]);
+      expect(slot.weeklySets[1], const [SetSpec(repsMin: 8, repsMax: 10)]);
+    });
+  });
 }
