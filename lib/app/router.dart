@@ -40,6 +40,7 @@ import '../features/workout/presentation/custom_exercise_editor_screen.dart';
 import '../features/workout/presentation/my_exercises_screen.dart';
 import '../features/workout/presentation/routine_editor_mode.dart';
 import '../features/workout/presentation/routine_editor_screen.dart';
+import '../features/coach/presentation/plan_pdf_import_preview_screen.dart';
 import '../features/coach/presentation/plan_pdf_import_upload_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
@@ -638,6 +639,14 @@ GoRouter buildRouter({
         // Scaffold propio. La barrera (rol, kill switch, cupo) es el servidor.
         path: '/workout/import-pdf/:athleteId',
         builder: (context, state) => PlanPdfImportUploadScreen(
+          athleteId: state.pathParameters['athleteId']!,
+        ),
+      ),
+      GoRoute(
+        // La vista previa del mismo import. Hermana y no hija: la subida la
+        // reemplaza al terminar, así «atrás» vuelve a la ficha del alumno.
+        path: '/workout/import-pdf/:athleteId/preview',
+        builder: (context, state) => PlanPdfImportPreviewScreen(
           athleteId: state.pathParameters['athleteId']!,
         ),
       ),

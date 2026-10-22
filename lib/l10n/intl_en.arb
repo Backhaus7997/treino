@@ -2463,5 +2463,16 @@
   "pdfImportSourceShow": "Show PDF text",
   "pdfImportSourceHide": "Hide PDF text",
   "pdfImportAlternative": "Alternative: {name}",
-  "pdfImportUseAlternative": "Use alternative"
+  "pdfImportUseAlternative": "Use alternative",
+  "pdfImportPending": "{count, plural, =1{1 exercise left to resolve: confirm the suggestion or link it.} other{{count} exercises left to resolve: confirm the suggestions or link them.}}",
+  "pdfImportBulkCreate": "{count, plural, =1{CREATE 1 CUSTOM} other{CREATE {count} CUSTOM}}",
+  "pdfImportBulkPartialTitle": "You have room for {allowed} of {total}",
+  "pdfImportBulkPartialBody": "The first ones in plan order are created. Link the rest from the library.",
+  "pdfImportBulkQuotaUnknown": "We couldn't check your custom exercise limit. Try again.",
+  "pdfImportBulkFailed": "{created} of {requested} were created. We couldn't create the rest.",
+  "pdfImportAssign": "ASSIGN PLAN",
+  "pdfImportAssigned": "Plan assigned.",
+  "pdfImportOpenEditor": "OPEN EDITOR",
+  "pdfImportAssignFailed": "We couldn't save the plan. Try again.",
+  "pdfImportLevel": "Plan level"
 }

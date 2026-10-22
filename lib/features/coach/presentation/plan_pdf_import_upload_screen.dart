@@ -17,8 +17,8 @@ import '../../../l10n/app_l10n.dart';
 import '../../coach_hub/application/pdf_import_quota_provider.dart';
 import '../../coach_hub/application/plan_import_providers.dart';
 import '../../coach_hub/application/plan_pdf_import_providers.dart';
-import '../../coach_hub/data/periodized_import_draft.dart';
 import '../../coach_hub/data/plan_pdf_import_service.dart';
+import 'plan_pdf_import_preview_screen.dart' show planPdfImportPreviewPath;
 
 /// Ruta de la pantalla de subida para [athleteId].
 String planPdfImportPath(String athleteId) => '/workout/import-pdf/$athleteId';
@@ -48,10 +48,6 @@ class _PlanPdfImportUploadScreenState
   /// (chequeo local) o el resultado no exitoso del servicio.
   PdfImportResult? _failure;
 
-  /// El plan leído en ESTA visita. No se lee de [periodizedImportProvider]:
-  /// ese guarda el último borrador de cualquier import.
-  PeriodizedImportDraft? _read;
-
   Future<void> _pick() async {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -65,7 +61,6 @@ class _PlanPdfImportUploadScreenState
       // servidor va a rechazar.
       final tooBig = file.size > kPdfImportMaxBytes;
       _file = tooBig ? null : file;
-      _read = null;
       _failure =
           tooBig ? const PdfImportInvalidFile(PdfRejectReason.tooBig) : null;
     });
@@ -89,14 +84,16 @@ class _PlanPdfImportUploadScreenState
           athleteId: widget.athleteId,
         );
     if (!mounted) return;
-    final draft = result is PdfImportSuccess ? result.draft : null;
-    if (draft != null) {
-      ref.read(periodizedImportProvider.notifier).state = draft;
+    if (result is PdfImportSuccess) {
+      // La subida se reemplaza por la vista previa: «atrás» desde ahí
+      // vuelve a la ficha, no a un archivo ya procesado.
+      ref.read(periodizedImportProvider.notifier).state = result.draft;
+      context.pushReplacement(planPdfImportPreviewPath(widget.athleteId));
+      return;
     }
     setState(() {
       _processing = false;
-      _read = draft;
-      _failure = draft == null ? result : null;
+      _failure = result;
     });
   }
 
@@ -119,7 +116,6 @@ class _PlanPdfImportUploadScreenState
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final read = _read;
 
     final Widget state;
     final Key stateKey;
@@ -134,13 +130,9 @@ class _PlanPdfImportUploadScreenState
         onRetry: _file == null ? null : _process,
       );
     } else {
-      stateKey = ValueKey('idle-${_file?.name}-${read != null}');
+      stateKey = ValueKey('idle-${_file?.name}');
       state = _Idle(
         file: _file,
-        summary: read == null
-            ? null
-            : l10n.pdfImportReadSummary(
-                read.plan.days.length, read.plan.numWeeks),
         onPick: _pick,
         onProcess: _file == null ? null : _process,
       );
@@ -322,13 +314,11 @@ class _Secondary extends StatelessWidget {
 class _Idle extends StatelessWidget {
   const _Idle({
     required this.file,
-    required this.summary,
     required this.onPick,
     required this.onProcess,
   });
 
   final PlatformFile? file;
-  final String? summary;
   final VoidCallback onPick;
   final VoidCallback? onProcess;
 
@@ -360,10 +350,6 @@ class _Idle extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.s14),
-        ],
-        if (summary != null) ...[
-          Text(summary!, style: _body(palette.accentText)),
           const SizedBox(height: AppSpacing.s14),
         ],
         _Secondary(

@@ -81,6 +81,11 @@ Future<ProviderContainer> _pump(
           ),
         ],
       ),
+      GoRoute(
+        path: '/workout/import-pdf/:athleteId/preview',
+        builder: (_, state) =>
+            Text('preview:${state.pathParameters['athleteId']}'),
+      ),
     ],
   );
   final container = ProviderContainer(overrides: [
@@ -215,7 +220,9 @@ void main() {
     service.complete(const PdfImportTimeout());
   });
 
-  testWidgets('éxito: el borrador queda para la vista previa', (tester) async {
+  testWidgets(
+      'éxito: el borrador queda para la vista previa, que reemplaza a la '
+      'subida', (tester) async {
     final service = _FakeService();
     final container = await _pump(tester, service);
     _pickReturns('plan.pdf', 1000);
@@ -226,8 +233,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(container.read(periodizedImportProvider), same(draft));
-    expect(find.text('Leímos 2 días y 4 semanas.'), findsOneWidget);
-    expect(find.byKey(const Key('pdf_import_error')), findsNothing);
+    expect(find.text('preview:ath-1'), findsOneWidget);
+    // Reemplaza: atrás desde la vista previa vuelve a la ficha.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('FICHA'), findsOneWidget);
   });
 
   // Cada error tipado, con su texto y su acción, en la pantalla.

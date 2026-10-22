@@ -10110,6 +10110,72 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Usar alternativa'**
   String get pdfImportUseAlternative;
+
+  /// Vista previa del PDF: pendientes que bloquean ASIGNAR (sugerencias sin confirmar y ejercicios sin match).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{Queda 1 ejercicio por resolver: confirmá la sugerencia o vinculalo.} other{Quedan {count} ejercicios por resolver: confirmá las sugerencias o vinculalos.}}'**
+  String pdfImportPending(int count);
+
+  /// Crea en bloque los ejercicios sin candidato como propios del PF, uno por nombre distinto (docs/plan-import-pdf.md, «Crear N propios»).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{CREAR 1 PROPIO} other{CREAR {count} PROPIOS}}'**
+  String pdfImportBulkCreate(int count);
+
+  /// El tope de ejercicios propios del plan no alcanza para todos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Te alcanza para {allowed} de {total}'**
+  String pdfImportBulkPartialTitle(int allowed, int total);
+
+  /// Cuerpo de esa confirmación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se crean los primeros en el orden del plan. El resto queda para vincular con la biblioteca.'**
+  String get pdfImportBulkPartialBody;
+
+  /// No se supo el tope: crear en bloque no se arriesga a pasarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos verificar tu tope de ejercicios propios. Probá de nuevo.'**
+  String get pdfImportBulkQuotaUnknown;
+
+  /// Una creación en bloque se cortó a mitad: lo creado queda creado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se crearon {created} de {requested}. No pudimos crear el resto.'**
+  String pdfImportBulkFailed(int created, int requested);
+
+  /// Asigna el plan al alumno. Deshabilitado mientras haya pendientes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ASIGNAR PLAN'**
+  String get pdfImportAssign;
+
+  /// Aviso al volver a la ficha del alumno después de asignar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan asignado.'**
+  String get pdfImportAssigned;
+
+  /// Acción del aviso: abre el plan recién asignado en el editor de rutina para ajustarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ABRIR EDITOR'**
+  String get pdfImportOpenEditor;
+
+  /// Falló la asignación: no se guardó nada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar el plan. Probá de nuevo.'**
+  String get pdfImportAssignFailed;
+
+  /// Título del selector de nivel de la rutina importada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nivel del plan'**
+  String get pdfImportLevel;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
