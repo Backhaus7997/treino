@@ -90,7 +90,7 @@ Errores (`HttpsError`):
 | `unauthenticated` | sin auth | no se toca |
 | `permission-denied` | no es `role == "trainer"` | no se toca |
 | `failed-precondition` | kill switch apagado | no se toca |
-| `invalid-argument` | no es PDF, > 5 MB o > 20 páginas; `details: { reason: "not_pdf" \| "too_big" \| "too_many_pages" }` | no se toca |
+| `invalid-argument` | no es PDF, > 5 MB, > 20 páginas o cifrado/con contraseña; `details: { reason: "not_pdf" \| "too_big" \| "too_many_pages" \| "encrypted" }` | no se toca |
 | `resource-exhausted` | sin cupo; `details: { scope: "week" \| "day", resetsAt: ISO }` | — |
 | `deadline-exceeded` | el LLM tardó demasiado | **se devuelve** |
 | `internal` | salida del LLM inválida tras validar | **se devuelve** |

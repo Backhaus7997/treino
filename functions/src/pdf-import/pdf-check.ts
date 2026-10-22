@@ -14,7 +14,12 @@ import { PDFDocument } from "pdf-lib";
 export const PDF_MAX_BYTES = 5 * 1024 * 1024;
 export const PDF_MAX_PAGES = 20;
 
-export type PdfRejectReason = "not_pdf" | "too_big" | "too_many_pages";
+/**
+ * `encrypted`: un PDF con contraseña o cifrado. pdf-lib lo abre con
+ * `ignoreEncryption` y cuenta paginas, pero el contenido no se puede leer, asi
+ * que el LLM recibiria un archivo ilegible y el PF gastaria un import en nada.
+ */
+export type PdfRejectReason = "not_pdf" | "too_big" | "too_many_pages" | "encrypted";
 
 export type PdfCheck =
   | { ok: true; bytes: Buffer; pages: number }
@@ -48,6 +53,7 @@ export async function checkPdf(pdfBase64: unknown): Promise<PdfCheck> {
   }
 
   let pages: number;
+  let encrypted: boolean;
   try {
     const doc = await PDFDocument.load(bytes, {
       ignoreEncryption: true,
@@ -55,9 +61,14 @@ export async function checkPdf(pdfBase64: unknown): Promise<PdfCheck> {
       throwOnInvalidObject: false,
     });
     pages = doc.getPageCount();
+    encrypted = doc.isEncrypted;
   } catch {
     return { ok: false, reason: "not_pdf" };
   }
+  // `ignoreEncryption` hace que el load no tire con un PDF cifrado: hay que
+  // preguntarlo explicito, y antes que las paginas (un cifrado de 30 paginas
+  // es un cifrado, no un PDF largo).
+  if (encrypted) return { ok: false, reason: "encrypted" };
   if (pages < 1) return { ok: false, reason: "not_pdf" };
   if (pages > PDF_MAX_PAGES) return { ok: false, reason: "too_many_pages" };
 
