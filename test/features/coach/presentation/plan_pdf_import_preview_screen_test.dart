@@ -592,5 +592,19 @@ void main() {
       expect(find.text('FICHA'), findsOneWidget);
       expect(c.read(periodizedImportProvider), isNull);
     });
+
+    testWidgets(
+        'el atrás del sistema sin tocar nada sale y también descarta el '
+        'borrador', (tester) async {
+      final c = await pump(tester, _resolved());
+
+      // Sin cambios, PopScope deja salir: el pop es implícito (didPop true)
+      // y no pasa por _handleBack.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('FICHA'), findsOneWidget);
+      expect(c.read(periodizedImportProvider), isNull);
+    });
   });
 }
