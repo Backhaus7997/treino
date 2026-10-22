@@ -16,6 +16,14 @@ class _MockPlugin extends Mock implements FlutterLocalNotificationsPlugin {}
 class _MockAndroid extends Mock
     implements AndroidFlutterLocalNotificationsPlugin {}
 
+/// Una llamada a `show` (una notificación publicada YA).
+typedef Publicada = ({
+  int id,
+  NotificationDetails detalles,
+  String? titulo,
+  String? cuerpo,
+});
+
 /// Una llamada a `zonedSchedule`.
 typedef Agendado = ({
   int id,
@@ -87,15 +95,35 @@ class PluginFalso {
       cancelados.add(i.namedArguments[#id] as int);
     });
 
+    // Con y sin `payload`: mocktail compara los argumentos con nombre que
+    // llegan, y `show` los pasa distinto según quién lo llame.
     when(() => plugin.show(
           id: any(named: 'id'),
           title: any(named: 'title'),
           body: any(named: 'body'),
           notificationDetails: any(named: 'notificationDetails'),
           payload: any(named: 'payload'),
-        )).thenAnswer((i) async {
-      mostrados.add(i.namedArguments[#id] as int);
-    });
+        )).thenAnswer(_registrarShow);
+    when(() => plugin.show(
+          id: any(named: 'id'),
+          title: any(named: 'title'),
+          body: any(named: 'body'),
+          notificationDetails: any(named: 'notificationDetails'),
+        )).thenAnswer(_registrarShow);
+  }
+
+  Future<void> _registrarShow(Invocation i) async {
+    final a = i.namedArguments;
+    final fallo = falloAlMostrar;
+    if (fallo != null) throw fallo;
+    eventos.add('mostrar:${a[#id]}');
+    mostrados.add(a[#id] as int);
+    publicadas.add((
+      id: a[#id] as int,
+      detalles: a[#notificationDetails] as NotificationDetails,
+      titulo: a[#title] as String?,
+      cuerpo: a[#body] as String?,
+    ));
   }
 
   final plugin = _MockPlugin();
@@ -108,10 +136,15 @@ class PluginFalso {
   /// pedido, para poder fallar sólo en el exacto.
   Object? Function(Object? modo)? falloAlAgendar;
 
-  /// Todo lo que cruzó hacia el sistema, EN ORDEN (`agendar:1`, `cancelar:1`).
+  /// Si no es null, `show` lo tira.
+  Object? falloAlMostrar;
+
+  /// Todo lo que cruzó hacia el sistema, EN ORDEN (`agendar:1`, `mostrar:2`,
+  /// `cancelar:1`).
   /// Para probar que una cancelación no la adelanta un agendado en vuelo.
   final eventos = <String>[];
   final agendados = <Agendado>[];
+  final publicadas = <Publicada>[];
   final cancelados = <int>[];
   final mostrados = <int>[];
 

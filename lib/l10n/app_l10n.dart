@@ -9882,6 +9882,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Volvé a la serie'**
   String get sessionRestEndedBody;
+
+  /// Título de la notificación con la cuenta regresiva en vivo del descanso, que se publica al pasar la app a segundo plano (#1617, sólo Android). El tiempo lo pone el sistema con un cronómetro; esto es lo que lo acompaña.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Descanso'**
+  String get sessionRestCountdownTitle;
+
+  /// Cuerpo de la notificación de cuenta regresiva. Silenciosa: el aviso que suena es el de «Terminó el descanso».
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volvé a la serie cuando llegue a cero'**
+  String get sessionRestCountdownBody;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -186,6 +186,131 @@ void main() {
     });
   });
 
+  // La cuenta regresiva en vivo (#1617): el número exacto cuando el aviso final
+  // puede llegar tarde. La dibuja el sistema con un cronómetro; la app sólo la
+  // publica con los flags correctos.
+  group('mostrarCuentaRegresiva', () {
+    final ahora = DateTime(2026, 10, 22, 10, 40);
+    final hasta = ahora.add(const Duration(seconds: 90));
+
+    Future<T> enReloj<T>(Future<T> Function() cuerpo) =>
+        withClock(Clock.fixed(ahora), cuerpo);
+
+    test('publica YA, con el cronómetro bajando hasta el fin', () async {
+      await enReloj(() async {
+        final falso = PluginFalso();
+        final servicio = await falso.servicio();
+
+        final ok = await servicio.mostrarCuentaRegresiva(
+          id: kIdCuentaDeDescanso,
+          hasta: hasta,
+          title: 'Descanso',
+          body: 'Volvé a la serie cuando llegue a cero',
+        );
+
+        expect(ok, isTrue);
+        expect(falso.publicadas, hasLength(1));
+        final p = falso.publicadas.single;
+        expect(p.id, kIdCuentaDeDescanso);
+        expect(p.titulo, 'Descanso');
+        expect(p.cuerpo, 'Volvé a la serie cuando llegue a cero');
+        final a = p.detalles.android!;
+        expect(a.channelId, kCanalDeAvisos);
+        expect(a.usesChronometer, isTrue);
+        expect(a.chronometerCountDown, isTrue);
+        expect(a.showWhen, isTrue);
+        expect(a.when, hasta.millisecondsSinceEpoch);
+        expect(a.ongoing, isTrue);
+        expect(a.onlyAlertOnce, isTrue);
+        expect(a.silent, isTrue);
+        expect(a.playSound, isFalse);
+        expect(a.enableVibration, isFalse);
+        expect(a.timeoutAfter, 90000,
+            reason: 'el sistema la saca exactamente al llegar a cero');
+      });
+    });
+
+    test('el id de la cuenta no pisa al aviso final ni al entrante', () {
+      expect({kIdCuentaDeDescanso, kIdFinDeDescanso, kIdAvisoEntrante},
+          hasLength(3));
+    });
+
+    test('republicar con el mismo id: el `when` y el timeout nuevos', () async {
+      await enReloj(() async {
+        final falso = PluginFalso();
+        final servicio = await falso.servicio();
+        await servicio.mostrarCuentaRegresiva(
+            id: kIdCuentaDeDescanso, hasta: hasta, title: 't', body: 'b');
+
+        final masQuince = hasta.add(const Duration(seconds: 15));
+        await servicio.mostrarCuentaRegresiva(
+            id: kIdCuentaDeDescanso, hasta: masQuince, title: 't', body: 'b');
+
+        expect(falso.publicadas.map((p) => p.id), [
+          kIdCuentaDeDescanso,
+          kIdCuentaDeDescanso,
+        ]);
+        final nueva = falso.publicadas.last.detalles.android!;
+        expect(nueva.when, masQuince.millisecondsSinceEpoch);
+        expect(nueva.timeoutAfter, 105000);
+      });
+    });
+
+    // Con el fin ya pasado un cronómetro bajando se vería en negativo.
+    test('no publica si el fin ya pasó (ni si es justo ahora)', () async {
+      await enReloj(() async {
+        final falso = PluginFalso();
+        final servicio = await falso.servicio();
+
+        for (final h in [ahora, ahora.subtract(const Duration(seconds: 5))]) {
+          expect(
+            await servicio.mostrarCuentaRegresiva(
+                id: kIdCuentaDeDescanso, hasta: h, title: 't', body: 'b'),
+            isFalse,
+          );
+        }
+        expect(falso.publicadas, isEmpty);
+      });
+    });
+
+    // En iOS no hay cronómetro en las notificaciones, y un `show` ahí dibujaría
+    // un banner con sonido ya mismo. El aviso agendado es puntual por su cuenta.
+    test('en iOS no publica nada', () async {
+      await enReloj(() async {
+        final falso = PluginFalso(esAndroid: false);
+        final servicio = await falso.servicio();
+
+        expect(
+          await servicio.mostrarCuentaRegresiva(
+              id: kIdCuentaDeDescanso, hasta: hasta, title: 't', body: 'b'),
+          isFalse,
+        );
+        expect(falso.publicadas, isEmpty);
+      });
+    });
+
+    test('sin init no publica, y un fallo del plugin no propaga', () async {
+      await enReloj(() async {
+        final falso = PluginFalso();
+        expect(
+          await LocalNotificationsService(plugin: falso.plugin)
+              .mostrarCuentaRegresiva(
+                  id: kIdCuentaDeDescanso, hasta: hasta, title: 't', body: 'b'),
+          isFalse,
+        );
+        expect(falso.publicadas, isEmpty);
+
+        falso.falloAlMostrar = Exception('canal');
+        final servicio = await falso.servicio();
+        expect(
+          await servicio.mostrarCuentaRegresiva(
+              id: kIdCuentaDeDescanso, hasta: hasta, title: 't', body: 'b'),
+          isFalse,
+        );
+      });
+    });
+  });
+
   group('cancelar', () {
     test('cancela por id, la agendada y la que ya se mostró', () async {
       final falso = PluginFalso();
@@ -225,6 +350,23 @@ void main() {
 
     // Control negativo: un filtro que descartara TODOS los taps pasaría el test
     // de arriba y dejaría mudas las notificaciones de chat.
+    test('lo mismo con la cuenta regresiva', () async {
+      final falso = PluginFalso();
+      final taps = <String?>[];
+      final servicio = await falso.servicio(onTap: taps.add);
+
+      falso.alTocar!(_toque(id: kIdCuentaDeDescanso, payload: ''));
+      expect(taps, isEmpty);
+
+      when(() => falso.plugin.getNotificationAppLaunchDetails()).thenAnswer(
+        (_) async => NotificationAppLaunchDetails(
+          true,
+          notificationResponse: _toque(id: kIdCuentaDeDescanso, payload: ''),
+        ),
+      );
+      expect(await servicio.deepLinkDeArranque(), isNull);
+    });
+
     test('el tap de otra notificación sigue navegando', () async {
       final falso = PluginFalso();
       final taps = <String?>[];

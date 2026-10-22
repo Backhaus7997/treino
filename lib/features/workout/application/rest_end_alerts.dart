@@ -10,8 +10,15 @@ import '../../../l10n/app_l10n.dart';
 import '../../notifications/application/notification_providers.dart';
 import '../../notifications/data/local_notifications_service.dart';
 
-/// Título y cuerpo de la notificación de fin de descanso.
-typedef TextosDelAviso = ({String titulo, String cuerpo});
+/// Los textos de las dos notificaciones del descanso: el aviso final
+/// ([titulo]/[cuerpo]) y la cuenta regresiva en vivo ([cuentaTitulo]/
+/// [cuentaCuerpo]).
+typedef TextosDelAviso = ({
+  String titulo,
+  String cuerpo,
+  String cuentaTitulo,
+  String cuentaCuerpo,
+});
 
 /// Avisa con una notificación del sistema que terminó el descanso, SI la app
 /// está en segundo plano (#1617).
@@ -27,10 +34,22 @@ typedef TextosDelAviso = ({String titulo, String cuerpo});
 ///   (`RestTimerBar`, que vibra al llegar a cero), y una notificación encima
 ///   sería el mismo aviso dos veces;
 /// - al pasar a segundo plano (`paused`/`hidden`/`detached`) agenda el aviso
-///   para [update]`.endsAt`;
-/// - al volver (`resumed`) lo cancela, y con él saca de la bandeja el que ya
-///   haya salido;
-/// - si el instante cambia mientras está agendado, reagenda.
+///   final para [update]`.endsAt` y, en Android, publica YA una cuenta
+///   regresiva en vivo hasta ese instante (ver abajo);
+/// - al volver (`resumed`) cancela las dos, y con ellas saca de la bandeja lo
+///   que ya haya salido;
+/// - si el instante cambia mientras está agendado, reagenda y republica.
+///
+/// ## Dos notificaciones, dos ids
+///
+/// El aviso final es una alarma: exacta si hay permiso, inexacta si no, y desde
+/// Android 14 el permiso viene denegado por defecto, así que puede llegar tarde.
+/// La cuenta regresiva (`kIdCuentaDeDescanso`) no depende de ninguna alarma: la
+/// publica la app al pasar a segundo plano y el cronómetro lo dibuja el sistema,
+/// así que el número es exacto aunque el «ding» se demore. Es silenciosa y se
+/// retira sola al llegar a cero; el que suena es el aviso final
+/// (`kIdFinDeDescanso`). En iOS no hay cronómetro en las notificaciones: sólo
+/// sale el aviso agendado, que ahí sí es puntual.
 ///
 /// ## El fin natural del descanso NO cancela
 ///
@@ -167,25 +186,40 @@ class RestEndAlerts with WidgetsBindingObserver {
     if (fin == null || !fin.isAfter(clock.now())) {
       final habiaAlgo = _agendado != null;
       _agendado = null;
-      if (habiaAlgo) await _notificaciones.cancelar(kIdFinDeDescanso);
+      if (habiaAlgo) await _retirar();
       return;
     }
 
     final textos = _textos();
+    // Primero la cuenta, que es inmediata y lo que el atleta ve; después el
+    // aviso final. Cada una puede fallar sola (la cuenta ni existe en iOS).
+    final cuenta = await _notificaciones.mostrarCuentaRegresiva(
+      id: kIdCuentaDeDescanso,
+      hasta: fin,
+      title: textos.cuentaTitulo,
+      body: textos.cuentaCuerpo,
+    );
     final agendada = await _notificaciones.agendar(
       id: kIdFinDeDescanso,
       cuando: fin,
       title: textos.titulo,
       body: textos.cuerpo,
     );
-    if (agendada) {
-      _agendado = fin;
-      return;
+    if (!agendada) {
+      // No se pudo agendar el instante nuevo. Si había uno anterior, seguiría
+      // vivo y sonaría a una hora que ya no es la del descanso: se lo retira.
+      await _notificaciones.cancelar(kIdFinDeDescanso);
     }
-    // No se pudo agendar el instante nuevo. Si había uno anterior, seguiría
-    // vivo y sonaría a una hora que ya no es la del descanso: se lo retira.
-    _agendado = null;
+    // Con la cuenta publicada hay algo que limpiar al volver aunque el aviso
+    // final no haya quedado.
+    _agendado = (agendada || cuenta) ? fin : null;
+  }
+
+  /// Las DOS notificaciones del descanso: el aviso final (agendado y, si ya
+  /// salió, publicado) y la cuenta regresiva.
+  Future<void> _retirar() async {
     await _notificaciones.cancelar(kIdFinDeDescanso);
+    await _notificaciones.cancelar(kIdCuentaDeDescanso);
   }
 }
 
@@ -210,5 +244,7 @@ TextosDelAviso _textosDelSistema() {
   return (
     titulo: l10n.sessionRestEndedTitle,
     cuerpo: l10n.sessionRestEndedBody,
+    cuentaTitulo: l10n.sessionRestCountdownTitle,
+    cuentaCuerpo: l10n.sessionRestCountdownBody,
   );
 }

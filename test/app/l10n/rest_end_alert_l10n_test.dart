@@ -16,6 +16,8 @@ void main() {
       final l10n = lookupAppL10n(locale);
       expect(l10n.sessionRestEndedTitle.trim(), isNotEmpty);
       expect(l10n.sessionRestEndedBody.trim(), isNotEmpty);
+      expect(l10n.sessionRestCountdownTitle.trim(), isNotEmpty);
+      expect(l10n.sessionRestCountdownBody.trim(), isNotEmpty);
     });
   }
 
@@ -23,5 +25,9 @@ void main() {
     final l10n = lookupAppL10n(const Locale('es', 'AR'));
     expect(l10n.sessionRestEndedTitle, 'Terminó el descanso');
     expect(l10n.sessionRestEndedBody, 'Volvé a la serie');
+    // La cuenta regresiva en vivo; los textos del aviso final no cambian.
+    expect(l10n.sessionRestCountdownTitle, 'Descanso');
+    expect(
+        l10n.sessionRestCountdownBody, 'Volvé a la serie cuando llegue a cero');
   });
 }

@@ -47,14 +47,28 @@ const kIdAvisoEntrante = 0;
 /// clave para el tap: ver [LocalNotificationsService.agendar].
 const kIdFinDeDescanso = 1;
 
+/// Id de la notificación con la CUENTA REGRESIVA en vivo del descanso (#1617).
+///
+/// ## Por qué NO comparte id con [kIdFinDeDescanso]
+///
+/// Compartirlo habría sido más prolijo —el aviso final reemplaza a la cuenta—,
+/// pero depende de algo que NO se pudo verificar: la cuenta lleva
+/// `timeoutAfter`, y no se pudo comprobar qué hace el sistema con ese timeout
+/// cuando otra notificación con la MISMA clave la reemplaza. Si el timeout viejo
+/// sobreviviera, borraría al aviso final justo cuando es puntual (alarma exacta:
+/// los dos a la misma hora), con el mismo síntoma que el bug anterior de este
+/// issue: el aviso no se ve. Con ids distintos no hay forma de que una pise a la
+/// otra; el costo es cancelar las dos al volver (ver `RestEndAlerts`).
+const kIdCuentaDeDescanso = 2;
+
 /// Notificaciones cuyo tap sólo trae la app al frente, sin navegar a ningún
 /// lado.
 ///
-/// `goDeepLink` manda a `/coach` cuando el payload viene vacío, y una
-/// notificación agendada no lleva payload. Para el aviso de fin de descanso eso
+/// `goDeepLink` manda a `/coach` cuando el payload viene vacío, y estas no
+/// llevan payload. Para el aviso de fin de descanso (y su cuenta regresiva) eso
 /// sería sacar al atleta del player en plena sesión justo cuando vuelve a la
 /// serie.
-const _idsQueSoloAbrenLaApp = {kIdFinDeDescanso};
+const _idsQueSoloAbrenLaApp = {kIdFinDeDescanso, kIdCuentaDeDescanso};
 
 /// Muestra notificaciones del SISTEMA operativo con la app en primer plano.
 ///
@@ -281,7 +295,8 @@ class LocalNotificationsService {
   /// ## El tap
   ///
   /// No lleva payload y [kIdFinDeDescanso] está en [_idsQueSoloAbrenLaApp]: tocar
-  /// el aviso trae la app al frente y nada más.
+  /// el aviso trae la app al frente y nada más. Lo mismo vale para la cuenta
+  /// regresiva de [mostrarCuentaRegresiva].
   Future<bool> agendar({
     required int id,
     required DateTime cuando,
@@ -323,6 +338,74 @@ class LocalNotificationsService {
       return true;
     } catch (e) {
       debugPrint('[local-notif] agendar() FALLÓ — $e');
+      return false;
+    }
+  }
+
+  /// Publica YA una notificación con el cronómetro del sistema BAJANDO hasta
+  /// [hasta] (#1617). Sólo Android.
+  ///
+  /// Es lo que le da al atleta el número exacto en vivo cuando el aviso final
+  /// puede llegar tarde: desde Android 14 la alarma exacta viene denegada por
+  /// defecto, la inexacta se demora, y el cronómetro lo dibuja el sistema sin
+  /// alarmas ni permisos.
+  ///
+  /// - **Silenciosa**: `silent`, `onlyAlertOnce` y prioridad baja. El que suena
+  ///   es el aviso final de [agendar]. Que `silent` alcance con un canal de
+  ///   importancia alta depende de la versión de Android: no se probó en
+  ///   aparato.
+  /// - **`ongoing`**: no se descarta con un deslizamiento; se va sola.
+  /// - **`timeoutAfter` = lo que falta**: el sistema la saca exactamente al
+  ///   llegar a cero, para que no se vea en negativo. Sólo tiene efecto desde
+  ///   Android 8.
+  /// - Mismo canal que el resto, `treino_avisos`.
+  ///
+  /// Con el mismo [id] republicar REEMPLAZA la anterior, con el `when` y el
+  /// timeout nuevos: así se mueve con el «+15 s».
+  ///
+  /// Devuelve `true` si se publicó. `false` en iOS (no hay cronómetro en las
+  /// notificaciones, y `show` ahí mostraría un banner ya mismo), con [hasta] ya
+  /// pasado, sin init o ante un fallo del plugin. Nunca tira.
+  Future<bool> mostrarCuentaRegresiva({
+    required int id,
+    required DateTime hasta,
+    required String title,
+    required String body,
+  }) async {
+    if (!_inicializado) return false;
+    final falta = hasta.difference(clock.now());
+    if (falta <= Duration.zero) return false;
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (android == null) return false;
+      await _plugin.show(
+        id: id,
+        title: title.isEmpty ? null : title,
+        body: body.isEmpty ? null : body,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            kCanalDeAvisos,
+            kNombreDelCanal,
+            importance: Importance.low,
+            priority: Priority.low,
+            playSound: false,
+            enableVibration: false,
+            silent: true,
+            onlyAlertOnce: true,
+            ongoing: true,
+            showWhen: true,
+            when: hasta.millisecondsSinceEpoch,
+            usesChronometer: true,
+            chronometerCountDown: true,
+            timeoutAfter: falta.inMilliseconds,
+          ),
+        ),
+      );
+      debugPrint('[local-notif] cuenta regresiva id=$id hasta $hasta');
+      return true;
+    } catch (e) {
+      debugPrint('[local-notif] mostrarCuentaRegresiva() FALLÓ — $e');
       return false;
     }
   }

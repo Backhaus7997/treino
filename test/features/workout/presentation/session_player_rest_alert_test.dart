@@ -59,6 +59,9 @@ SessionState _estado({required int series}) => SessionState(
       elapsedSeconds: 0,
     );
 
+/// Las DOS notificaciones del descanso: el aviso final y la cuenta regresiva.
+const ambas = [kIdFinDeDescanso, kIdCuentaDeDescanso];
+
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -138,6 +141,17 @@ void main() {
         isTrue);
     expect(a.titulo, 'Terminó el descanso');
     expect(a.cuerpo, 'Volvé a la serie');
+
+    // Y la cuenta regresiva en vivo, publicada YA y hasta el mismo instante.
+    expect(falso.publicadas, hasLength(1));
+    final cuenta = falso.publicadas.single;
+    expect(cuenta.id, kIdCuentaDeDescanso);
+    expect(cuenta.titulo, 'Descanso');
+    expect(cuenta.cuerpo, 'Volvé a la serie cuando llegue a cero');
+    final c = cuenta.detalles.android!;
+    expect(
+        c.when, inicio.add(const Duration(seconds: 90)).millisecondsSinceEpoch);
+    expect(c.usesChronometer && c.chronometerCountDown && c.silent, isTrue);
   });
 
   testWidgets('volver a la app cancela el aviso: no se avisa dos veces',
@@ -148,7 +162,7 @@ void main() {
 
     await volver(tester);
 
-    expect(falso.cancelados, [kIdFinDeDescanso]);
+    expect(falso.cancelados, ambas);
   });
 
   testWidgets(
@@ -179,6 +193,9 @@ void main() {
             .isAtSameMomentAs(inicio.add(const Duration(seconds: 105))),
         isTrue,
         reason: '90 s del slot + 15 s');
+    expect(falso.publicadas.single.detalles.android!.when,
+        inicio.add(const Duration(seconds: 105)).millisecondsSinceEpoch,
+        reason: 'la cuenta regresiva también sale con el fin corrido');
   });
 
   testWidgets('sin descanso en curso, irse no agenda nada', (tester) async {
@@ -214,7 +231,7 @@ void main() {
     notifier.registrar(makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'));
     await tester.pump();
 
-    expect(falso.cancelados, [kIdFinDeDescanso]);
+    expect(falso.cancelados, ambas);
   });
 
   // Medido en un emulador: la barra llega a cero con la app en segundo plano
@@ -238,7 +255,7 @@ void main() {
 
     await volver(tester);
 
-    expect(falso.cancelados, [kIdFinDeDescanso]);
+    expect(falso.cancelados, ambas);
     // Y la barra se fue sola: el `onDone` sí corrió (el test no es vacuo).
     expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
   });
@@ -263,7 +280,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
 
-    expect(falso.cancelados, [kIdFinDeDescanso]);
+    expect(falso.cancelados, ambas);
   });
 
   testWidgets(
@@ -287,6 +304,6 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
 
-    expect(falso.cancelados, [kIdFinDeDescanso]);
+    expect(falso.cancelados, ambas);
   });
 }

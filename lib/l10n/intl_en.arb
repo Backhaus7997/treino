@@ -2425,5 +2425,7 @@
   "authSignOutConfirmTitle": "Sign out?",
   "authSignOutConfirmAction": "Sign out",
   "sessionRestEndedTitle": "Rest is over",
-  "sessionRestEndedBody": "Back to your set"
+  "sessionRestEndedBody": "Back to your set",
+  "sessionRestCountdownTitle": "Rest",
+  "sessionRestCountdownBody": "Back to your set when it hits zero"
 }

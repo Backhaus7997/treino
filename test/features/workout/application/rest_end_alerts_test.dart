@@ -16,6 +16,9 @@ import 'package:treino/features/workout/application/rest_end_alerts.dart';
 import '../../notifications/data/plugin_falso.dart';
 import 'ciclo_de_vida.dart';
 
+/// Las DOS notificaciones del descanso: el aviso final y la cuenta regresiva.
+const ambas = [kIdFinDeDescanso, kIdCuentaDeDescanso];
+
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -28,14 +31,22 @@ void main() {
   /// Deja correr las llamadas asíncronas al plugin.
   Future<void> reposo() => pumpEventQueue();
 
-  Future<void> armar({bool alarmasExactas = true}) async {
+  Future<void> armar({
+    bool alarmasExactas = true,
+    bool esAndroid = true,
+  }) async {
     // El binding es uno solo para todo el archivo: se arranca siempre en primer
     // plano y ANTES de crear el observador.
     primerPlano();
-    falso = PluginFalso(alarmasExactas: alarmasExactas);
+    falso = PluginFalso(alarmasExactas: alarmasExactas, esAndroid: esAndroid);
     alertas = RestEndAlerts(
       notificaciones: await falso.servicio(),
-      textos: () => (titulo: 'Terminó el descanso', cuerpo: 'Volvé a la serie'),
+      textos: () => (
+        titulo: 'Terminó el descanso',
+        cuerpo: 'Volvé a la serie',
+        cuentaTitulo: 'Descanso',
+        cuentaCuerpo: 'Volvé a la serie cuando llegue a cero',
+      ),
     );
   }
 
@@ -180,7 +191,7 @@ void main() {
       primerPlano();
       await reposo();
 
-      expect(falso.cancelados, [kIdFinDeDescanso]);
+      expect(falso.cancelados, ambas);
     });
 
     test('con SALTAR (el descanso pasa a null)', () async {
@@ -192,7 +203,7 @@ void main() {
       alertas.update(null);
       await reposo();
 
-      expect(falso.cancelados, [kIdFinDeDescanso]);
+      expect(falso.cancelados, ambas);
     });
 
     test('al terminar la sesión (dispose)', () async {
@@ -204,7 +215,7 @@ void main() {
       alertas.dispose();
       await reposo();
 
-      expect(falso.cancelados, [kIdFinDeDescanso]);
+      expect(falso.cancelados, ambas);
     });
 
     test('y después de dispose deja de mirar el ciclo de vida', () async {
@@ -235,8 +246,14 @@ void main() {
       primerPlano(); // sin esperar entre medio
       await reposo();
 
-      expect(falso.eventos,
-          ['agendar:$kIdFinDeDescanso', 'cancelar:$kIdFinDeDescanso'],
+      expect(
+          falso.eventos,
+          [
+            'mostrar:$kIdCuentaDeDescanso',
+            'agendar:$kIdFinDeDescanso',
+            'cancelar:$kIdFinDeDescanso',
+            'cancelar:$kIdCuentaDeDescanso'
+          ],
           reason: 'la última palabra la tiene el regreso');
     });
 
@@ -284,7 +301,8 @@ void main() {
         alertas.update(fin);
         segundoPlano();
         await reposo();
-        expect(falso.eventos, ['agendar:$kIdFinDeDescanso']);
+        expect(falso.eventos,
+            ['mostrar:$kIdCuentaDeDescanso', 'agendar:$kIdFinDeDescanso']);
 
         // El reloj llega al cero: el tick de la barra (o el proceso al
         // descongelarse) avisa que el descanso terminó.
@@ -297,7 +315,7 @@ void main() {
         // Y recién al volver se retira, junto con la que ya haya salido.
         primerPlano();
         await reposo();
-        expect(falso.cancelados, [kIdFinDeDescanso]);
+        expect(falso.cancelados, ambas);
       });
     });
 
@@ -316,7 +334,7 @@ void main() {
         alertas.update(null);
         await reposo();
 
-        expect(falso.cancelados, [kIdFinDeDescanso]);
+        expect(falso.cancelados, ambas);
       });
     });
 
@@ -356,8 +374,12 @@ void main() {
         alertas.update(otro);
         await reposo();
 
-        expect(falso.eventos,
-            ['agendar:$kIdFinDeDescanso', 'agendar:$kIdFinDeDescanso']);
+        expect(falso.eventos, [
+          'mostrar:$kIdCuentaDeDescanso',
+          'agendar:$kIdFinDeDescanso',
+          'mostrar:$kIdCuentaDeDescanso',
+          'agendar:$kIdFinDeDescanso'
+        ]);
         expect(falso.agendados.last.cuando.isAtSameMomentAs(otro), isTrue);
       });
     });
@@ -379,7 +401,7 @@ void main() {
         alertas.cancel();
         await reposo();
 
-        expect(falso.cancelados, [kIdFinDeDescanso]);
+        expect(falso.cancelados, ambas);
       });
     });
 
@@ -393,6 +415,172 @@ void main() {
         await reposo();
 
         expect(falso.eventos, isEmpty);
+      });
+    });
+  });
+
+  // La cuenta regresiva en vivo (#1617). Desde Android 14 la alarma exacta
+  // viene denegada por defecto y la inexacta se demora (medido: hasta el 75 % de
+  // lo que faltaba): el cronómetro del sistema da el número exacto mientras el
+  // «ding» final llega cuando llega.
+  group('cuenta regresiva', () {
+    Future<T> conReloj<T>(DateTime ahora, Future<T> Function() cuerpo) =>
+        withClock(Clock.fixed(ahora), cuerpo);
+    final t0 = DateTime(2026, 10, 22, 10, 40);
+
+    test('al pasar a segundo plano se publica YA, además del aviso final',
+        () async {
+      await conReloj(t0, () async {
+        await armar();
+        final fin = t0.add(const Duration(seconds: 199));
+        alertas.update(fin);
+        segundoPlano();
+        await reposo();
+
+        expect(falso.eventos, [
+          'mostrar:$kIdCuentaDeDescanso',
+          'agendar:$kIdFinDeDescanso',
+        ]);
+        final p = falso.publicadas.single;
+        expect(p.titulo, 'Descanso');
+        expect(p.cuerpo, 'Volvé a la serie cuando llegue a cero');
+        final a = p.detalles.android!;
+        expect(a.when, fin.millisecondsSinceEpoch);
+        expect(a.timeoutAfter, 199000);
+        expect(a.usesChronometer && a.chronometerCountDown, isTrue);
+        expect(a.ongoing && a.silent && a.onlyAlertOnce, isTrue);
+        // El aviso final conserva sus textos, y NO es la cuenta.
+        final agendada = falso.agendados.single;
+        expect(agendada.titulo, 'Terminó el descanso');
+        expect(agendada.cuerpo, 'Volvé a la serie');
+        expect(agendada.detalles.android!.usesChronometer, isFalse);
+        expect(agendada.detalles.android!.silent, isFalse);
+      });
+    });
+
+    test('con la app en primer plano no se publica', () async {
+      await conReloj(t0, () async {
+        await armar();
+        alertas.update(t0.add(const Duration(seconds: 90)));
+        await reposo();
+
+        expect(falso.publicadas, isEmpty);
+      });
+    });
+
+    test('volver las cancela a las DOS: nunca queda una colgada', () async {
+      await conReloj(t0, () async {
+        await armar();
+        alertas.update(t0.add(const Duration(seconds: 90)));
+        segundoPlano();
+        await reposo();
+
+        primerPlano();
+        await reposo();
+
+        expect(falso.cancelados, unorderedEquals(ambas));
+      });
+    });
+
+    test('se republica con el `when` nuevo y se reagenda (+15 s)', () async {
+      await conReloj(t0, () async {
+        await armar();
+        final fin = t0.add(const Duration(seconds: 90));
+        alertas.update(fin);
+        segundoPlano();
+        await reposo();
+
+        final masQuince = fin.add(const Duration(seconds: 15));
+        alertas.update(masQuince);
+        await reposo();
+
+        expect(falso.publicadas, hasLength(2));
+        expect(falso.publicadas.last.id, kIdCuentaDeDescanso);
+        final a = falso.publicadas.last.detalles.android!;
+        expect(a.when, masQuince.millisecondsSinceEpoch);
+        expect(a.timeoutAfter, 105000);
+        expect(falso.agendados, hasLength(2));
+        expect(falso.agendados.last.cuando.isAtSameMomentAs(masQuince), isTrue);
+        expect(falso.cancelados, isEmpty,
+            reason: 'republicar con el mismo id reemplaza, no se cancela');
+      });
+    });
+
+    test('un descanso nuevo desde otro origen (reloj, #1616) también',
+        () async {
+      await conReloj(t0, () async {
+        await armar();
+        segundoPlano();
+        await reposo();
+        expect(falso.publicadas, isEmpty);
+
+        alertas.update(t0.add(const Duration(seconds: 60)));
+        await reposo();
+
+        expect(falso.publicadas, hasLength(1));
+        expect(falso.agendados, hasLength(1));
+      });
+    });
+
+    test('el fin natural NO la cancela: la saca sola el timeout', () async {
+      await conReloj(t0, () async {
+        await armar();
+        final fin = t0.add(const Duration(seconds: 90));
+        alertas.update(fin);
+        segundoPlano();
+        await reposo();
+
+        await withClock(Clock.fixed(fin), () async {
+          alertas.update(null);
+          await reposo();
+        });
+
+        expect(falso.cancelados, isEmpty);
+      });
+    });
+
+    test('en iOS sólo sale el aviso agendado', () async {
+      await conReloj(t0, () async {
+        await armar(esAndroid: false);
+        alertas.update(t0.add(const Duration(seconds: 90)));
+        segundoPlano();
+        await reposo();
+
+        expect(falso.publicadas, isEmpty);
+        expect(falso.eventos, ['agendar:$kIdFinDeDescanso']);
+      });
+    });
+
+    test(
+        'si la cuenta salió pero el aviso final no se pudo agendar, volver '
+        'igual la limpia', () async {
+      await conReloj(t0, () async {
+        await armar();
+        falso.falloAlAgendar = (_) => Exception('canal');
+        alertas.update(t0.add(const Duration(seconds: 90)));
+        segundoPlano();
+        await reposo();
+        expect(falso.publicadas, hasLength(1));
+        falso.cancelados.clear();
+
+        primerPlano();
+        await reposo();
+
+        expect(falso.cancelados, contains(kIdCuentaDeDescanso));
+      });
+    });
+
+    test('si no se puede publicar la cuenta, el aviso final sale igual',
+        () async {
+      await conReloj(t0, () async {
+        await armar();
+        falso.falloAlMostrar = Exception('canal');
+        alertas.update(t0.add(const Duration(seconds: 90)));
+        segundoPlano();
+        await reposo();
+
+        expect(falso.publicadas, isEmpty);
+        expect(falso.agendados, hasLength(1));
       });
     });
   });
