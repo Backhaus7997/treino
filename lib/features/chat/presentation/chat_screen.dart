@@ -31,6 +31,7 @@ import '../application/chat_media_send_controller.dart';
 import '../application/chat_providers.dart';
 import '../domain/media_type.dart';
 import '../domain/message.dart';
+import 'chat_actions.dart';
 import 'chat_image_bubble.dart';
 import 'chat_video_bubble.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
@@ -88,6 +89,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       Navigator.of(context).maybePop();
     } else if (router.canPop()) {
       router.pop();
+    } else {
+      router.go('/feed/messages');
+    }
+  }
+
+  /// Después de archivar o eliminar: a Mensajes, SIEMPRE con un `go`.
+  ///
+  /// No es un pop: al chat también se entra empujado desde el detalle del
+  /// alumno y desde un perfil público, y ahí el pop deja a la persona en esa
+  /// pantalla con un chat que acaba de desaparecer (Codex, #1623). Tampoco se
+  /// decide mirando qué hay debajo: el pop saca el match recién cuando el
+  /// Navigator suelta la página, así que `state.uri` justo después no es
+  /// confiable. Si la bandeja queda sola, su `PopScope` ya vuelve a `/feed`.
+  void _leaveToInbox() {
+    // El sheet corre este callback después de una escritura: puede llegar
+    // con el chat ya cerrado (ver `showChatActionsSheet`).
+    if (!mounted) return;
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      Navigator.of(context).maybePop();
     } else {
       router.go('/feed/messages');
     }
@@ -359,6 +380,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
         ),
+        actions: [
+          if (currentUid != null)
+            IconButton(
+              icon: Icon(TreinoIcon.dotsThree, color: palette.textPrimary),
+              tooltip: l10n.chatMoreActionsA11y,
+              onPressed: () => showChatActionsSheet(
+                context,
+                ref,
+                chatId: widget.chatId,
+                uid: currentUid,
+                archived: ref
+                        .read(chatByIdProvider(widget.chatId))
+                        .valueOrNull
+                        ?.isArchivedFor(currentUid) ??
+                    false,
+                onViewProfile:
+                    pubAsync.valueOrNull == null ? null : _openProfile,
+                // Archivado o eliminado, este chat ya no está donde estaba:
+                // volvemos a la bandeja.
+                onLeft: _leaveToInbox,
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         child: Column(

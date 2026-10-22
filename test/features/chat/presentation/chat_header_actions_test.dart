@@ -1,3 +1,5 @@
+import 'dart:async' show Completer;
+
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/chat/data/chat_repository.dart';
 import 'package:treino/features/chat/domain/message.dart';
 import 'package:treino/features/chat/presentation/chat_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -14,24 +17,57 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-// Header del chat: avatar, nombre y relación, y tocar a la persona abre su
-// perfil público. Firestore falso con el repo REAL: un repo mockeado tapa lo
-// que escribe y lee de verdad.
+// Header del chat: tocar a la persona abre su perfil, y el ⋮ ofrece Ver
+// perfil, Archivar y Eliminar chat. Las escrituras van contra un Firestore
+// falso con el repo REAL: un repo mockeado tapa lo que escribe de verdad.
 
 const _chatPath = '/coach/chat/aaa_bbb?other=bbb';
 const _profilePath = '/coach/chat/aaa_bbb/profile/bbb';
 
 late FakeFirebaseFirestore _firestore;
 
-/// Router con la bandeja debajo y el chat empujado encima, como llega en la
-/// app. La ruta del perfil replica la que cuelga del chat en `router.dart`.
-GoRouter _router() {
+Future<Map<String, Object?>> _chatDoc() async =>
+    (await _firestore.collection('chats').doc('aaa_bbb').get()).data()!;
+
+/// Repo real salvo archivar y eliminar, que quedan colgados hasta que el
+/// test completa [gate]: una escritura lenta, para salir del chat en el medio.
+class _GatedChatRepository extends ChatRepository {
+  _GatedChatRepository({required super.firestore, required this.gate});
+
+  final Completer<void> gate;
+
+  @override
+  Future<void> archive({required String chatId, required String uid}) async {
+    await gate.future;
+    return super.archive(chatId: chatId, uid: uid);
+  }
+
+  @override
+  Future<void> hideForUser({
+    required String chatId,
+    required String uid,
+  }) async {
+    await gate.future;
+    return super.hideForUser(chatId: chatId, uid: uid);
+  }
+}
+
+const _athletePath = '/coach/athlete/bbb';
+
+/// Router con el chat empujado encima de [from], como llega en la app: por
+/// default desde la bandeja, o desde el detalle del alumno. La ruta del
+/// perfil replica la que cuelga del chat en `router.dart`.
+GoRouter _router({String from = '/feed/messages'}) {
   final router = GoRouter(
-    initialLocation: '/feed/messages',
+    initialLocation: from,
     routes: [
       GoRoute(
         path: '/feed/messages',
         builder: (_, __) => const Scaffold(body: Text('BANDEJA')),
+      ),
+      GoRoute(
+        path: _athletePath,
+        builder: (_, __) => const Scaffold(body: Text('ALUMNO')),
       ),
       GoRoute(
         path: '/coach/chat/:chatId',
@@ -56,12 +92,15 @@ GoRouter _router() {
 Future<GoRouter> _pumpChat(
   WidgetTester tester, {
   UserPublicProfile? other,
+  String from = '/feed/messages',
+  ChatRepository? repo,
 }) async {
-  final router = _router();
+  final router = _router(from: from);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         firestoreProvider.overrideWithValue(_firestore),
+        if (repo != null) chatRepositoryProvider.overrideWithValue(repo),
         currentUidProvider.overrideWith((_) => 'aaa'),
         messagesProvider('aaa_bbb').overrideWith(
           (_) => Stream.value(const <Message>[]),
@@ -93,6 +132,11 @@ const _nicolas = UserPublicProfile(
 );
 
 String _location(GoRouter router) => router.state.uri.toString();
+
+Future<void> _openMenu(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('Opciones del chat'));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   setUp(() async {
@@ -151,6 +195,156 @@ void main() {
       await tester.tap(find.text('USUARIO ELIMINADO'));
       await tester.pumpAndSettle();
       expect(_location(router), _chatPath);
+
+      await _openMenu(tester);
+      expect(find.text('Ver perfil'), findsNothing);
+      expect(find.text('Archivar'), findsOneWidget);
     });
+  });
+
+  group('menú ⋮', () {
+    testWidgets('muestra Ver perfil, Archivar y Eliminar chat', (tester) async {
+      await _pumpChat(tester, other: _nicolas);
+      await _openMenu(tester);
+
+      expect(find.text('Ver perfil'), findsOneWidget);
+      expect(find.text('Archivar'), findsOneWidget);
+      expect(find.text('Eliminar chat'), findsOneWidget);
+    });
+
+    testWidgets('Ver perfil navega al perfil del otro', (tester) async {
+      final router = await _pumpChat(tester, other: _nicolas);
+      await _openMenu(tester);
+
+      await tester.tap(find.text('Ver perfil'));
+      await tester.pumpAndSettle();
+
+      expect(_location(router), _profilePath);
+      expect((await _chatDoc()).containsKey('archivedAt'), isFalse);
+    });
+
+    testWidgets(
+        'Archivar escribe sólo mi entrada, avisa con Deshacer y vuelve a la '
+        'bandeja', (tester) async {
+      final router = await _pumpChat(tester, other: _nicolas);
+      await _openMenu(tester);
+
+      await tester.tap(find.text('Archivar'));
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+
+      expect(((await _chatDoc())['archivedAt']! as Map).keys, ['aaa']);
+      expect(find.text('Chat archivado'), findsOneWidget);
+      expect(find.text('Deshacer'), findsOneWidget);
+      expect(_location(router), '/feed/messages');
+    });
+
+    testWidgets('un chat archivado ofrece Desarchivar', (tester) async {
+      await _firestore.collection('chats').doc('aaa_bbb').update({
+        'archivedAt.aaa': Timestamp.fromDate(DateTime.utc(2026, 10, 2)),
+      });
+      await _pumpChat(tester, other: _nicolas);
+      await _openMenu(tester);
+
+      expect(find.text('Desarchivar'), findsOneWidget);
+      await tester.tap(find.text('Desarchivar'));
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+
+      expect((await _chatDoc())['archivedAt'], isEmpty);
+    });
+
+    testWidgets(
+        'Eliminar pide confirmación: cancelar no escribe ni sale; confirmar '
+        'elimina y vuelve a la bandeja', (tester) async {
+      final router = await _pumpChat(tester, other: _nicolas);
+
+      await _openMenu(tester);
+      await tester.tap(find.text('Eliminar chat'));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Eliminar el chat?'), findsOneWidget);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect((await _chatDoc()).containsKey('hiddenBefore'), isFalse);
+      expect(_location(router), _chatPath);
+
+      await _openMenu(tester);
+      await tester.tap(find.text('Eliminar chat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+
+      expect(((await _chatDoc())['hiddenBefore']! as Map).keys, ['aaa']);
+      expect(find.text('Chat eliminado'), findsOneWidget);
+      expect(_location(router), '/feed/messages');
+    });
+
+    testWidgets(
+        'entrado desde el detalle del alumno, archivar va a Mensajes y no '
+        'vuelve al alumno', (tester) async {
+      final router =
+          await _pumpChat(tester, other: _nicolas, from: _athletePath);
+      await _openMenu(tester);
+
+      await tester.tap(find.text('Archivar'));
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+
+      expect(_location(router), '/feed/messages');
+      expect(find.text('BANDEJA'), findsOneWidget);
+    });
+
+    testWidgets('entrado desde el detalle del alumno, eliminar va a Mensajes',
+        (tester) async {
+      final router =
+          await _pumpChat(tester, other: _nicolas, from: _athletePath);
+      await _openMenu(tester);
+      await tester.tap(find.text('Eliminar chat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.runAsync(() => pumpEventQueue());
+      await tester.pumpAndSettle();
+
+      expect(_location(router), '/feed/messages');
+    });
+
+    for (final (label, accion) in [
+      ('Archivar', 'archivar'),
+      ('Eliminar chat', 'eliminar'),
+    ]) {
+      testWidgets(
+          '$accion lento: si la persona sale del chat durante la escritura, '
+          'no la arrastra a Mensajes ni usa un context muerto', (tester) async {
+        final gate = Completer<void>();
+        final router = await _pumpChat(
+          tester,
+          other: _nicolas,
+          from: _athletePath,
+          repo: _GatedChatRepository(firestore: _firestore, gate: gate),
+        );
+        await _openMenu(tester);
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
+        if (label == 'Eliminar chat') {
+          await tester.tap(find.text('Eliminar'));
+          await tester.pumpAndSettle();
+        }
+
+        // La escritura sigue colgada y la persona vuelve al alumno.
+        router.pop();
+        await tester.pumpAndSettle();
+        expect(_location(router), _athletePath);
+
+        gate.complete();
+        await tester.runAsync(() => pumpEventQueue());
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(_location(router), _athletePath);
+        expect(find.text('ALUMNO'), findsOneWidget);
+      });
+    }
   });
 }

@@ -2269,9 +2269,15 @@ class AppL10nEs extends AppL10n {
       'Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.';
 
   @override
+  String get chatActionViewProfile => 'Ver perfil';
+
+  @override
   String chatHeaderProfileA11y(String name) {
     return 'Ver el perfil de $name';
   }
+
+  @override
+  String get chatMoreActionsA11y => 'Opciones del chat';
 
   @override
   String chatArchivedSectionTitle(int count) {
@@ -8159,9 +8165,15 @@ class AppL10nEsAr extends AppL10nEs {
       'Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.';
 
   @override
+  String get chatActionViewProfile => 'Ver perfil';
+
+  @override
   String chatHeaderProfileA11y(String name) {
     return 'Ver el perfil de $name';
   }
+
+  @override
+  String get chatMoreActionsA11y => 'Opciones del chat';
 
   @override
   String chatArchivedSectionTitle(int count) {
