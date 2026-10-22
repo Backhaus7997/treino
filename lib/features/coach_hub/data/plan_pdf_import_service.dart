@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:characters/characters.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
@@ -321,8 +322,10 @@ String planNameFromFileName(String fileName) {
     if (next == name) break;
     name = next;
   }
-  if (name.length > kPdfPlanNameMaxLength) {
-    final cut = name.substring(0, kPdfPlanNameMaxLength);
+  // En graphemes, como cuenta `TextField.maxLength`: cortar por unidades
+  // UTF-16 parte un emoji a la mitad y deja un surrogate suelto en el nombre.
+  if (name.characters.length > kPdfPlanNameMaxLength) {
+    final cut = name.characters.take(kPdfPlanNameMaxLength).toString();
     final lastSpace = cut.lastIndexOf(' ');
     // Corta en la última palabra entera si no se pierde demasiado.
     name = (lastSpace > kPdfPlanNameMaxLength ~/ 2

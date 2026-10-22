@@ -359,5 +359,18 @@ void main() {
       expect(nombre, startsWith('semana semana'));
       expect(nombre.endsWith('semana'), isTrue);
     });
+
+    test('no parte un emoji que cruza el tope', () {
+      // 59 letras y un emoji fuera del BMP (dos unidades UTF-16) en la
+      // posición 60: cortar por code units deja medio surrogate.
+      final nombre = planNameFromFileName('${'a' * 59}😀b.pdf');
+      expect(nombre, '${'a' * 59}😀');
+      expect(nombre.runes.any((r) => r >= 0xD800 && r <= 0xDFFF), isFalse);
+    });
+
+    test('cuenta graphemes, no code units: un emoji ocupa uno', () {
+      final nombre = planNameFromFileName('${'👨‍👩‍👧' * 70}.pdf');
+      expect(nombre, '👨‍👩‍👧' * kPdfPlanNameMaxLength);
+    });
   });
 }
