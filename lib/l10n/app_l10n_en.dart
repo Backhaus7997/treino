@@ -2224,6 +2224,11 @@ class AppL10nEn extends AppL10n {
   String get chatDeleteConfirmBody => '';
 
   @override
+  String chatHeaderProfileA11y(String name) {
+    return 'View $name\'s profile';
+  }
+
+  @override
   String chatArchivedSectionTitle(int count) {
     return '$count';
   }

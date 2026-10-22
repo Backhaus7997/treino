@@ -4064,6 +4064,12 @@ abstract class AppL10n {
   /// **'Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.'**
   String get chatDeleteConfirmBody;
 
+  /// No description provided for @chatHeaderProfileA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver el perfil de {name}'**
+  String chatHeaderProfileA11y(String name);
+
   /// No description provided for @chatArchivedSectionTitle.
   ///
   /// In es_AR, this message translates to:
