@@ -17,7 +17,7 @@
  */
 import AnthropicVertex from "@anthropic-ai/vertex-sdk";
 import { APIConnectionTimeoutError, APIUserAbortError } from "@anthropic-ai/sdk";
-import { buildSystemPrompt, buildUserText, CatalogEntry } from "./prompt";
+import { buildSystemPrompt, CatalogEntry, USER_TEXT } from "./prompt";
 import { PDF_PLAN_EXTRACTION_SCHEMA } from "./extraction";
 
 export const SUPPORTED_MODELS = [
@@ -34,7 +34,6 @@ export const DEFAULT_EFFORT: Effort = "medium";
 
 export interface ExtractRequest {
   pdfBase64: string;
-  fileName: string;
   catalog: readonly CatalogEntry[];
   model: SupportedModel;
   effort: Effort;
@@ -111,7 +110,7 @@ export function vertexPlanExtractor(projectId: string): PlanExtractor {
                       data: req.pdfBase64,
                     },
                   },
-                  { type: "text", text: buildUserText(req.fileName) },
+                  { type: "text", text: USER_TEXT },
                 ],
               },
             ],

@@ -250,7 +250,9 @@ describe("camino feliz", () => {
     expect(await usage()).toMatchObject({ weekKey: WEEK, weekCount: 1, dayKey: DAY, dayCount: 1 });
 
     expect(f.calls).toHaveLength(1);
-    expect(f.calls[0]).toMatchObject({ pdfBase64: pdf1, fileName: "plan.pdf", effort: "medium" });
+    expect(f.calls[0]).toMatchObject({ pdfBase64: pdf1, effort: "medium" });
+    // El nombre del archivo no viaja al proveedor (prompt injection).
+    expect(JSON.stringify(f.calls[0])).not.toContain("plan.pdf");
   });
 
   it("el modelo y el effort salen de app_config, sin redeploy", async () => {

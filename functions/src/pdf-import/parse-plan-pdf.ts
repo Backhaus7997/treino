@@ -201,7 +201,9 @@ export async function runParsePlanPdf(
   if (!pdf.ok) {
     throw new HttpsError("invalid-argument", "Invalid PDF.", { reason: pdf.reason });
   }
-  const fileName = typeof data.fileName === "string" ? data.fileName : "plan.pdf";
+  // El nombre del archivo NO viaja al modelo (ver `USER_TEXT` en prompt.ts):
+  // solo va al log, recortado.
+  const fileName = typeof data.fileName === "string" ? data.fileName.slice(0, 200) : null;
 
   // ── 4. cupo ───────────────────────────────────────────────────────────────
   const { state } = toSubscriptionState(userSnap.data(), uid);
@@ -214,7 +216,6 @@ export async function runParsePlanPdf(
     const result = await withDeadline(
       deps.extractor.extract({
         pdfBase64: data.pdfBase64 as string,
-        fileName,
         catalog,
         model: config.model,
         effort: config.effort,
@@ -238,6 +239,7 @@ export async function runParsePlanPdf(
       uid,
       tier,
       model: result.model,
+      fileName,
       pages: pdf.pages,
       days: validation.plan.days.length,
       warnings: validation.plan.warnings.length,

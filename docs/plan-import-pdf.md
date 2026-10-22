@@ -306,7 +306,15 @@ el import existe para evitar. Por eso, además de «Crear como propio» por fila
 
 ## Kill switch
 
-Documento **`app_config/pdf_import`** con `{ enabled: bool }`.
+Documento **`app_config/pdf_import`** con `{ enabled: bool, allowlistUids?: string[], model?, effort? }`.
+
+- **`allowlistUids`** es la lista de prueba: con `enabled: false`, el callable
+  igual atiende a esos uids (con el rol y el cupo aplicados igual) y rechaza al
+  resto. Sirve para evaluar con PDFs reales en producción sin abrirlo a todos
+  los PF. Con `enabled: true` no cambia nada.
+- **`model`** (`claude-opus-5-5` por defecto, `claude-sonnet-5-5`,
+  `claude-haiku-5-5`) y **`effort`** (`low`, `medium` por defecto, `high`) se
+  cambian sin redeploy; un valor desconocido cae al default.
 
 - **Apagado** hasta terminar la evaluación del rollout.
 - Lo lee el servidor en cada llamada (`failed-precondition` si está apagado o
@@ -355,7 +363,8 @@ el PDF lo dice la política de privacidad, que sí nombra a los encargados
    (sin redeploy) al más barato que no pierda calidad **en lo que el PF no
    puede corregir fácil** (estructura de días y semanas); los errores de una
    celda la vista previa los muestra.
-6. **Encender** `app_config/pdf_import.enabled` con OK del dueño.
+6. **Encender** `app_config/pdf_import.enabled` con OK del dueño. Hasta entonces la
+   evaluación de los pasos 4 y 5 corre desde las cuentas de `allowlistUids`.
 
 ## Riesgos
 
