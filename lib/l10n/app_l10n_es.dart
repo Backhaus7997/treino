@@ -6033,6 +6033,20 @@ class AppL10nEs extends AppL10n {
   String pdfImportQuotaRemaining(int week, int day) {
     return 'Te quedan $week esta semana y $day hoy.';
   }
+
+  @override
+  String get pdfImportSourceShow => 'Ver texto del PDF';
+
+  @override
+  String get pdfImportSourceHide => 'Ocultar texto del PDF';
+
+  @override
+  String pdfImportAlternative(String name) {
+    return 'Alternativa: $name';
+  }
+
+  @override
+  String get pdfImportUseAlternative => 'Usar alternativa';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -12061,4 +12075,18 @@ class AppL10nEsAr extends AppL10nEs {
   String pdfImportQuotaRemaining(int week, int day) {
     return 'Te quedan $week esta semana y $day hoy.';
   }
+
+  @override
+  String get pdfImportSourceShow => 'Ver texto del PDF';
+
+  @override
+  String get pdfImportSourceHide => 'Ocultar texto del PDF';
+
+  @override
+  String pdfImportAlternative(String name) {
+    return 'Alternativa: $name';
+  }
+
+  @override
+  String get pdfImportUseAlternative => 'Usar alternativa';
 }

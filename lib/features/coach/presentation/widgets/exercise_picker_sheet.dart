@@ -40,9 +40,13 @@ import 'muscle_filter_sheet.dart';
 /// case/diacritics and tokenizes multi-word queries: every word must appear
 /// in the name, in any order ("press banca" → "Press de Banca (Barra)").
 
+///
+/// Con [single] elegir uno reemplaza al anterior: la lista que vuelve tiene
+/// a lo sumo un ejercicio (resolver una fila del import de PDF).
 Future<List<Exercise>?> showExercisePicker(
   BuildContext context, {
   Set<String> alreadySelectedIds = const {},
+  bool single = false,
 }) {
   // Pantalla completa en vez de bottom sheet: con la foto real de cada
   // ejercicio (#565) la lista merece toda la altura y una vista clara
@@ -51,8 +55,10 @@ Future<List<Exercise>?> showExercisePicker(
   return Navigator.of(context, rootNavigator: true).push<List<Exercise>>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) =>
-          _ExercisePickerSheetContent(alreadySelectedIds: alreadySelectedIds),
+      builder: (_) => _ExercisePickerSheetContent(
+        alreadySelectedIds: alreadySelectedIds,
+        single: single,
+      ),
     ),
   );
 }
@@ -60,9 +66,13 @@ Future<List<Exercise>?> showExercisePicker(
 // ── Sheet content ─────────────────────────────────────────────────────────────
 
 class _ExercisePickerSheetContent extends ConsumerStatefulWidget {
-  const _ExercisePickerSheetContent({required this.alreadySelectedIds});
+  const _ExercisePickerSheetContent({
+    required this.alreadySelectedIds,
+    this.single = false,
+  });
 
   final Set<String> alreadySelectedIds;
+  final bool single;
 
   @override
   ConsumerState<_ExercisePickerSheetContent> createState() =>
@@ -115,6 +125,7 @@ class _ExercisePickerSheetContentState
       if (_selected.contains(id)) {
         _selected.remove(id);
       } else {
+        if (widget.single) _selected.clear();
         _selected.add(id);
       }
     });

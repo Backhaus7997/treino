@@ -224,6 +224,22 @@ void main() {
     PeriodizedImportDraft resolved() =>
         _draft(['Press de banca'], assignments: {_k(1): _press});
 
+    test('devuelve los ids creados en el orden de los alumnos', () async {
+      when(() => routines.createAssigned(any())).thenAnswer((inv) async {
+        final r = inv.positionalArguments.single as Routine;
+        // El primero termina último: el orden no es el de llegada.
+        if (r.assignedTo == 'a1') {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        return r.copyWith(id: 'r-${r.assignedTo}');
+      });
+      final c = container(resolved());
+
+      final outcome = await assign(c);
+
+      expect((outcome as PlanAssignSuccess).routineIds, ['r-a1', 'r-a2']);
+    });
+
     test('a todos: crea una rutina asignada por alumno', () async {
       final saved = <Routine>[];
       when(() => routines.createAssigned(any())).thenAnswer((inv) async {

@@ -10086,6 +10086,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Te quedan {week} esta semana y {day} hoy.'**
   String pdfImportQuotaRemaining(int week, int day);
+
+  /// Despliega el texto del PDF del que salió el ejercicio, para compararlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver texto del PDF'**
+  String get pdfImportSourceShow;
+
+  /// Pliega ese texto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ocultar texto del PDF'**
+  String get pdfImportSourceHide;
+
+  /// El candidato del extractor cuando pasó el veto pero el matcher sugirió otro ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Alternativa: {name}'**
+  String pdfImportAlternative(String name);
+
+  /// Asigna la alternativa en vez de la sugerencia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usar alternativa'**
+  String get pdfImportUseAlternative;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

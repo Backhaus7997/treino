@@ -5927,4 +5927,18 @@ class AppL10nEn extends AppL10n {
   String pdfImportQuotaRemaining(int week, int day) {
     return '$week left this week, $day today.';
   }
+
+  @override
+  String get pdfImportSourceShow => 'Show PDF text';
+
+  @override
+  String get pdfImportSourceHide => 'Hide PDF text';
+
+  @override
+  String pdfImportAlternative(String name) {
+    return 'Alternative: $name';
+  }
+
+  @override
+  String get pdfImportUseAlternative => 'Use alternative';
 }

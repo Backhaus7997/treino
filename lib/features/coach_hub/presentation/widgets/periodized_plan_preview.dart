@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
+import '../../../../app/theme/app_motion.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../workout/domain/set_enums.dart';
 import '../../../workout/domain/set_spec.dart';
 import '../../data/periodized_import_draft.dart';
@@ -93,6 +95,7 @@ class PeriodizedDayPreviewCard extends StatelessWidget {
     required this.onConfirmSuggestion,
     required this.onPickManual,
     required this.onCreateCustom,
+    this.onUseAlternative,
   });
 
   final PeriodizedDay day;
@@ -106,6 +109,10 @@ class PeriodizedDayPreviewCard extends StatelessWidget {
   /// «Crear como propio»: el padre pasa por el tope del plan y abre el
   /// formulario de ejercicio propio con [rawName] precargado.
   final void Function(ExerciseKey key, String rawName) onCreateCustom;
+
+  /// PDF: usar la alternativa del extractor ([PeriodizedImportDraft.alternatives])
+  /// en vez de la sugerencia. Null = no se ofrece (el Excel no tiene).
+  final void Function(ExerciseKey key)? onUseAlternative;
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +142,7 @@ class PeriodizedDayPreviewCard extends StatelessWidget {
               onConfirmSuggestion: onConfirmSuggestion,
               onPickManual: onPickManual,
               onCreateCustom: onCreateCustom,
+              onUseAlternative: onUseAlternative,
             ),
         ],
       ),
@@ -151,6 +159,7 @@ class _RowBlock extends StatelessWidget {
     required this.onConfirmSuggestion,
     required this.onPickManual,
     required this.onCreateCustom,
+    required this.onUseAlternative,
   });
 
   final PeriodizedDay day;
@@ -163,6 +172,7 @@ class _RowBlock extends StatelessWidget {
   /// «Crear como propio»: el padre pasa por el tope del plan y abre el
   /// formulario de ejercicio propio con [rawName] precargado.
   final void Function(ExerciseKey key, String rawName) onCreateCustom;
+  final void Function(ExerciseKey key)? onUseAlternative;
 
   @override
   Widget build(BuildContext context) {
@@ -178,6 +188,7 @@ class _RowBlock extends StatelessWidget {
           onConfirmSuggestion: onConfirmSuggestion,
           onPickManual: onPickManual,
           onCreateCustom: onCreateCustom,
+          onUseAlternative: onUseAlternative,
         ),
     ];
 
@@ -238,6 +249,7 @@ class _ExerciseLine extends StatelessWidget {
     required this.onConfirmSuggestion,
     required this.onPickManual,
     required this.onCreateCustom,
+    required this.onUseAlternative,
   });
 
   final ExerciseKey exKey;
@@ -250,11 +262,15 @@ class _ExerciseLine extends StatelessWidget {
   /// «Crear como propio»: el padre pasa por el tope del plan y abre el
   /// formulario de ejercicio propio con [rawName] precargado.
   final void Function(ExerciseKey key, String rawName) onCreateCustom;
+  final void Function(ExerciseKey key)? onUseAlternative;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final assigned = draft.assignments[exKey];
+    final alternative =
+        onUseAlternative == null ? null : draft.alternatives[exKey];
+    final source = exercise.sourceText;
     final suggestion = draft.suggestions[exKey];
     final resolved = assigned != null;
     final emptyWeek = exercise.emptyWeeks.contains(week);
@@ -269,23 +285,26 @@ class _ExerciseLine extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          // Wrap y no Row: en un teléfono angosto, o con la letra grande, el
+          // chip no entra al lado del nombre y baja de renglón (en una Row
+          // desbordaba).
+          Wrap(
+            spacing: AppSpacing.s8,
+            runSpacing: AppSpacing.hairline,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Flexible(
-                child: Text(
-                  resolved ? assigned.name : exercise.rawName,
-                  style: importText(nameColor, weight: AppFonts.w600),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              Text(
+                resolved ? assigned.name : exercise.rawName,
+                style: importText(nameColor, weight: AppFonts.w600),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              if (!resolved) ...[
-                const SizedBox(width: AppSpacing.s8),
+              if (!resolved)
                 ImportChip(
                   label:
                       suggestion != null ? 'sugerencia pendiente' : 'sin match',
                   color: palette.warning,
                 ),
-              ],
             ],
           ),
           const SizedBox(height: AppSpacing.hairline),
@@ -331,6 +350,14 @@ class _ExerciseLine extends StatelessWidget {
               ),
             ),
           ],
+          if (!resolved && alternative != null) ...[
+            const SizedBox(height: AppSpacing.hairline),
+            Text(
+              AppL10n.of(context).pdfImportAlternative(alternative.name),
+              style: importText(palette.textMuted,
+                  size: AppTextSize.bodyDense, weight: AppFonts.w600),
+            ),
+          ],
           if (!resolved) ...[
             const SizedBox(height: AppSpacing.s8),
             Wrap(
@@ -353,6 +380,13 @@ class _ExerciseLine extends StatelessWidget {
                   size: TreinoButtonSize.sm,
                   onPressed: () => onPickManual(exKey, exercise.rawName),
                 ),
+                if (alternative != null)
+                  TreinoButton(
+                    label: AppL10n.of(context).pdfImportUseAlternative,
+                    variant: TreinoButtonVariant.ghostAccent,
+                    size: TreinoButtonSize.sm,
+                    onPressed: () => onUseAlternative!(exKey),
+                  ),
                 // Sólo sin candidato: con una sugerencia el camino es
                 // confirmarla o cambiarla.
                 if (suggestion == null)
@@ -366,6 +400,8 @@ class _ExerciseLine extends StatelessWidget {
               ],
             ),
           ],
+          if (source != null && source.trim().isNotEmpty)
+            _SourceText(key: ValueKey('src-$exKey'), text: source),
         ],
       ),
     );
@@ -389,5 +425,56 @@ class _ExerciseLine extends StatelessWidget {
       for (final m in distances) ImportChip(label: m),
       if (note != null && note.isNotEmpty) ImportChip(label: note),
     ];
+  }
+}
+
+/// PDF: el texto del que salió el ejercicio, plegado, para que el PF lo
+/// compare con lo que se leyó sin que la tarjeta crezca de entrada. El
+/// estado abierto/cerrado es de presentación: `setState` alcanza.
+class _SourceText extends StatefulWidget {
+  const _SourceText({super.key, required this.text});
+  final String text;
+
+  @override
+  State<_SourceText> createState() => _SourceTextState();
+}
+
+class _SourceTextState extends State<_SourceText> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TreinoButton(
+          label: _open ? l10n.pdfImportSourceHide : l10n.pdfImportSourceShow,
+          icon: _open ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+          variant: TreinoButtonVariant.ghost,
+          size: TreinoButtonSize.xs,
+          onPressed: () => setState(() => _open = !_open),
+        ),
+        AnimatedSize(
+          duration: AppMotion.resolve(context, AppMotion.fast),
+          curve: AppMotion.standard,
+          alignment: Alignment.topLeft,
+          child: _open
+              ? Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.hairline),
+                  child: Text(
+                    widget.text,
+                    style: importText(
+                      palette.textMuted,
+                      size: AppTextSize.caption,
+                      height: 1.4,
+                    ).copyWith(fontStyle: FontStyle.italic),
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
+        ),
+      ],
+    );
   }
 }

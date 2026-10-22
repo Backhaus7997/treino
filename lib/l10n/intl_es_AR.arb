@@ -5460,5 +5460,13 @@
   "pdfImportCta": "IMPORTAR DE PDF",
   "@pdfImportCta": {"description": "CTA en la ficha del alumno, al lado de CREAR PLAN. Sólo si el kill switch de app_config/pdf_import habilita al PF (docs/plan-import-pdf.md)."},
   "pdfImportQuotaRemaining": "Te quedan {week} esta semana y {day} hoy.",
-  "@pdfImportQuotaRemaining": {"description": "Cupo restante de imports de PDF. Sólo se muestra si se sabe: nunca un número inventado.", "placeholders": {"week": {"type": "int"}, "day": {"type": "int"}}}
+  "@pdfImportQuotaRemaining": {"description": "Cupo restante de imports de PDF. Sólo se muestra si se sabe: nunca un número inventado.", "placeholders": {"week": {"type": "int"}, "day": {"type": "int"}}},
+  "pdfImportSourceShow": "Ver texto del PDF",
+  "@pdfImportSourceShow": {"description": "Despliega el texto del PDF del que salió el ejercicio, para compararlo."},
+  "pdfImportSourceHide": "Ocultar texto del PDF",
+  "@pdfImportSourceHide": {"description": "Pliega ese texto."},
+  "pdfImportAlternative": "Alternativa: {name}",
+  "@pdfImportAlternative": {"description": "El candidato del extractor cuando pasó el veto pero el matcher sugirió otro ejercicio.", "placeholders": {"name": {"type": "String"}}},
+  "pdfImportUseAlternative": "Usar alternativa",
+  "@pdfImportUseAlternative": {"description": "Asigna la alternativa en vez de la sugerencia."}
 }
