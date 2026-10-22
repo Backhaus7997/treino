@@ -5320,6 +5320,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Cupo de imports de plan desde PDF (`parsePlanPdf`,
+    // functions/src/pdf-import/): un doc por PF con lo usado en la semana
+    // (lunes a domingo, hora de Buenos Aires) y en el día. Lo lee SOLO su
+    // dueño, con `get` (para mostrar "N/límite"); listar la colección se
+    // deniega, porque mostraría quién importa y cuánto. Lo escribe SOLO la
+    // Cloud Function, con el Admin SDK, dentro de una transacción: si el PF
+    // pudiera escribirlo, se borraría el contador y el cupo sería decorativo.
+    match /pdfImportUsage/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
     // ── Moderación: bloqueo de usuario (change `moderacion-reporte-y-bloqueo`) ──
     //
     // blocks/{blockerUid}_{blockedUid} — copia el molde de `follows` (:103,
