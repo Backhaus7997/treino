@@ -565,6 +565,71 @@ jobs:
       - name: Logica de permisos de Salud
         run: bash scripts/test_watch_swift.sh
 
+  # Typecheck de TODO el código del reloj contra el SDK de watchOS (#1616).
+  #
+  # Los dos jobs de arriba corren en ubuntu y compilan sólo funciones PURAS
+  # —las que importan Foundation y nada más—. Todo lo demás del reloj
+  # (WorkoutCoordinator, HistorySync, FirestoreREST, las vistas) no lo
+  # compilaba NADIE antes del merge: necesita el SDK de watchOS, y ese SDK sólo
+  # existe en macOS. Un cambio en esos archivos llegaba a `develop` escrito a
+  # ciegas, y el error recién aparecía en el build de Xcode de quien sacara el
+  # TestFlight. #1616 tocó tres de esos archivos desde una máquina Windows, sin
+  # poder compilarlos.
+  #
+  # Este SÍ va en macOS, y no contradice el "diez veces más caro" de
+  # `watch-capabilities`: el repo es PÚBLICO, y en un repo público los runners
+  # estándar de GitHub —macOS incluido— no consumen minutos. Lo que sigue
+  # pesando es el TIEMPO de cola y de arranque, y por eso esto es un typecheck
+  # (`swiftc -typecheck` con los flags del target, ver
+  # `scripts/typecheck_watch.sh`) y no un `xcodebuild`: no linkea, no firma ni
+  # corre nada en la muñeca, pero agarra todo lo que agarra el compilador, en
+  # un par de minutos y no en veinte.
+  #
+  # Si el repo deja de ser público, este job pasa a costar minutos macOS
+  # (x10): revisarlo antes de cambiar la visibilidad.
+  #
+  # Sin `continue-on-error` a propósito: si el reloj no compila, el PR no entra.
+  watch-typecheck:
+    name: Typecheck del reloj (watchOS)
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # El target exige watchOS 26.2 (`WATCHOS_DEPLOYMENT_TARGET` en
+      # project.pbxproj). La imagen trae varios Xcode y su default cambia sin
+      # aviso, así que no se confía en él: se elige el 26.x más nuevo
+      # (`sort -V`) y se verifica que su SDK de watchOS alcance. Las betas se
+      # descartan: un typecheck que se pone rojo por un compilador en preview
+      # no dice nada del código.
+      - name: Elegir un Xcode con el SDK de watchOS >= 26.2
+        run: |
+          set -euo pipefail
+          echo "Xcode instalados en la imagen:"
+          ls -d /Applications/Xcode*.app
+          XCODE="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -v -i beta | sort -V | tail -n 1 || true)"
+          if [[ -z "${XCODE}" ]]; then
+            echo "::error::La imagen no trae ningún Xcode 26.x. El reloj necesita el SDK de watchOS 26.2 o más nuevo."
+            exit 1
+          fi
+          export DEVELOPER_DIR="${XCODE}/Contents/Developer"
+          SDK="$(xcrun --sdk watchos --show-sdk-version 2>/dev/null || true)"
+          if [[ -z "${SDK}" ]]; then
+            echo "::error::${XCODE} no tiene instalada la plataforma watchOS."
+            exit 1
+          fi
+          MINIMO="26.2"
+          if [[ "$(printf '%s\n%s\n' "${MINIMO}" "${SDK}" | sort -V | head -n 1)" != "${MINIMO}" ]]; then
+            echo "::error::El Xcode 26.x más nuevo (${XCODE}) trae el SDK de watchOS ${SDK}, menor que ${MINIMO}."
+            exit 1
+          fi
+          echo "Elegido: ${XCODE} — SDK de watchOS ${SDK}"
+          echo "DEVELOPER_DIR=${DEVELOPER_DIR}" >> "${GITHUB_ENV}"
+
+      - name: Typecheck de todo el código del reloj
+        run: bash scripts/typecheck_watch.sh
+
   # Gate de compilación para las Cloud Functions (functions/, Node 22 + TS).
   # Antes NADIE compilaba functions en CI: flutter analyze/test no ven functions/,
   # así que un error de tipos o de compilación en functions/src podía entrar a
