@@ -157,6 +157,9 @@
   "chatActionError": "No pudimos actualizar el chat. Probá de nuevo.",
   "chatDeleteConfirmTitle": "¿Eliminar el chat?",
   "chatDeleteConfirmBody": "Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.",
+  "chatActionViewProfile": "Ver perfil",
+  "chatHeaderProfileA11y": "Ver el perfil de {name}",
+  "chatMoreActionsA11y": "Opciones del chat",
   "chatArchivedSectionTitle": "Archivados · {count}",
   "chatRelativeJustNow": "recién",
   "chatRelativeMinutes": "hace {minutes}m",
@@ -1304,5 +1307,9 @@
   "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?",
   "onboardingCustomExerciseNotNow": "AHORA NO",
   "authSignOutConfirmTitle": "¿Cerrar sesión?",
-  "authSignOutConfirmAction": "Salir"
+  "authSignOutConfirmAction": "Salir",
+  "sessionRestEndedTitle": "Terminó el descanso",
+  "sessionRestEndedBody": "Vuelve a la serie",
+  "sessionRestCountdownTitle": "Descanso",
+  "sessionRestCountdownBody": "Vuelve a la serie cuando llegue a cero"
 }

@@ -430,6 +430,10 @@ Definida durante Etapa 8 y reemplazada por el import periodizado: contrato en `d
 
 **Polish entregado** (Fase 6 Etapa 5, 2026-06-09 via SDD `coach-excel-polish`): anchos de columna del template + hoja "Instrucciones" con guía de columnas y valores válidos (`principiante / intermedio / avanzado`) + ejemplo pre-cargado. Validation dropdown nativo del paquete `excel: ^4.0.6` no existe → reemplazado por texto referencial en Instrucciones (scope tradeoff documentado). Archive en `openspec/changes/archive/2026-06-09-coach-excel-polish/`.
 
+### Import de plan desde PDF (app mobile)
+
+Aprobado 2026-10-22, en implementación con el kill switch apagado: el PF sube el PDF de su plan desde la ficha del alumno, Claude en Vertex AI lo lee dentro de la Cloud Function `parsePlanPdf`, se matchea con el catálogo y el PF revisa una vista previa antes de guardar. Reemplaza la idea de «AI parsing con Gemini» de arriba. Spec, contrato, cupos y rollout en [`docs/plan-import-pdf.md`](./plan-import-pdf.md).
+
 ## Fase 6 — desglose en 8 etapas
 
 Producto-ready para beta. Fase 5 dejó el core del producto funcional end-to-end; Fase 6 cierra los gaps de UX, telemetría y configurabilidad que separan "demo que funciona" de "app que se puede usar en producción real con PFs reales".

@@ -1,0 +1,205 @@
+{
+  "rule": "rest-timer",
+  "source_of_truth": "lib/features/workout/domain/rest_rules.dart",
+  "description": "El descanso entre series COMPARTIDO entre el teléfono y el reloj (#1616). Es estado de la sesión: un instante de fin en tiempo de pared que cada aparato espeja contra su propio reloj. Cubre la aritmética (cuánto falta, cuándo termina, +15 s), la decisión de espejo (adoptar, cortar o dejar) y el formato con el que viaja en el documento. Contrato entre la implementación Dart (teléfono y Wear OS) y la Swift del Apple Watch (`RestRules.swift`).",
+  "why_this_exists": "Antes cada aparato tenía su descanso y no sabía del otro: el teléfono contaba contra un instante de fin local, el Apple Watch decrementaba un contador por ticks y el Wear OS contaba en `elapsedRealtime`, que no significa nada fuera de ese reloj. Con los dos aparatos encima corrían DOS descansos: SALTAR o +15 s en uno no se veía en el otro, y cada uno vibraba por su cuenta. Al compartir el descanso, las tres implementaciones tienen que derivar EL MISMO número del mismo instante y decidir lo mismo ante el mismo documento; si una cuenta o decide distinto, la muñeca y la mano vuelven a separarse sin que nada se ponga rojo.",
+  "ops": {
+    "remaining": "Cuánto falta y si terminó. Misma aritmética que `duration_timer.json`: contra el reloj de pared, redondeando hacia ARRIBA.",
+    "start": "Cuándo termina un descanso de `totalSeconds` arrancado en `startMs`.",
+    "extend": "El botón «+15 s»: corre el fin y el total. Sobre un descanso vencido no hace nada (`expect.none`).",
+    "mirror": "Qué hace un aparato con el descanso de la sesión. `localEndsAtMs` es el que muestra (null = ninguno), `remoteEndsAtMs` el de la sesión (null = no hay), `localPending` un cambio local todavía sin escribir. Resultado: `adopt` (pasar a mostrar el de la sesión), `stop` (cortar el propio) o `keep` (nada).",
+    "decode": "Qué descanso se lee de los campos del documento de sesión, y que al volver a escribirlo salga EXACTAMENTE lo mismo. Los valores van como los entrega el SDK de Dart; el corredor Swift los envuelve como la REST API (`integerValue` como string, `stringValue`) antes de leerlos."
+  },
+  "inputs": {
+    "note": "Todos los instantes son milisegundos ABSOLUTOS desde epoch UTC. Rondan 1,8e12 y NO entran en 32 bits: en watchOS `Int` es de 32 bits (arm64_32), así que una implementación que los lea como `Int` se rompe en la muñeca aunque pase en el host. El fixture los mantiene absolutos para que esa presión exista.",
+    "tolerance": "Dos instantes de fin a 500 ms o menos son EL MISMO descanso (`RestRules.mirrorTolerance`). Existe por Wear OS: su descanso vive en el nativo y para compararlo con la sesión se lo pasa a tiempo de pared con una resta que corre unos milisegundos. Sin tolerancia, el eco de la escritura propia reiniciaría la alarma nativa en cada lectura."
+  },
+  "cases": [
+    {
+      "name": "recién arrancado faltan 90",
+      "op": "remaining",
+      "given": { "endsAtMs": 1800000090000, "nowMs": 1800000000000 },
+      "expect": { "remaining": 90, "finished": false }
+    },
+    {
+      "name": "con 400 ms restantes todavía falta 1",
+      "why": "Hacia ARRIBA, igual que el ejercicio por tiempo: si un lado mostrara 0 y el otro 1, la muñeca y la mano se contradirían justo en el segundo en que el atleta mira.",
+      "op": "remaining",
+      "given": { "endsAtMs": 1800000090000, "nowMs": 1800000089600 },
+      "expect": { "remaining": 1, "finished": false }
+    },
+    {
+      "name": "en el instante de fin terminó",
+      "op": "remaining",
+      "given": { "endsAtMs": 1800000090000, "nowMs": 1800000090000 },
+      "expect": { "remaining": 0, "finished": true }
+    },
+    {
+      "name": "pasado el fin nunca da negativo",
+      "op": "remaining",
+      "given": { "endsAtMs": 1800000090000, "nowMs": 1800000150000 },
+      "expect": { "remaining": 0, "finished": true }
+    },
+    {
+      "name": "un descanso de 90 s termina 90 s después",
+      "op": "start",
+      "given": { "startMs": 1800000000000, "totalSeconds": 90 },
+      "expect": { "endsAtMs": 1800000090000 }
+    },
+    {
+      "name": "el instante de fin conserva los milisegundos del arranque",
+      "why": "Viaja al milisegundo. Si un lado redondeara a segundos, el eco de su propia escritura volvería distinto de lo que escribió.",
+      "op": "start",
+      "given": { "startMs": 1800000000123, "totalSeconds": 120 },
+      "expect": { "endsAtMs": 1800000120123 }
+    },
+    {
+      "name": "+15 a mitad del descanso corre el fin y el total",
+      "why": "El total crece con el fin: es lo que llena la barra de progreso, y si no creciera la barra arrancaría el estiramiento más allá del 100 %.",
+      "op": "extend",
+      "given": { "endsAtMs": 1800000090000, "totalSeconds": 90, "seconds": 15, "nowMs": 1800000030000 },
+      "expect": { "endsAtMs": 1800000105000, "totalSeconds": 105 }
+    },
+    {
+      "name": "+15 sobre uno ya estirado acumula",
+      "op": "extend",
+      "given": { "endsAtMs": 1800000105000, "totalSeconds": 105, "seconds": 15, "nowMs": 1800000030000 },
+      "expect": { "endsAtMs": 1800000120000, "totalSeconds": 120 }
+    },
+    {
+      "name": "+15 en el último milisegundo todavía estira",
+      "op": "extend",
+      "given": { "endsAtMs": 1800000090000, "totalSeconds": 90, "seconds": 15, "nowMs": 1800000089999 },
+      "expect": { "endsAtMs": 1800000105000, "totalSeconds": 105 }
+    },
+    {
+      "name": "+15 sobre uno que ya terminó no hace nada",
+      "why": "Sumarle 15 al fin de un descanso vencido da otro instante en el pasado: un botón que no hace nada y que además escribe en la sesión.",
+      "op": "extend",
+      "given": { "endsAtMs": 1800000090000, "totalSeconds": 90, "seconds": 15, "nowMs": 1800000090000 },
+      "expect": { "none": true }
+    },
+    {
+      "name": "marcar en el otro aparato arranca el descanso acá",
+      "op": "mirror",
+      "given": { "localEndsAtMs": null, "remoteEndsAtMs": 1800000090000, "localPending": false, "nowMs": 1800000000000 },
+      "expect": { "action": "adopt" }
+    },
+    {
+      "name": "el eco de la escritura propia no reinicia nada",
+      "why": "Cada aparato lee de vuelta lo que acaba de escribir. Si eso contara como un descanso nuevo, el Wear OS reprogramaría su alarma nativa en cada eco.",
+      "op": "mirror",
+      "given": { "localEndsAtMs": 1800000090000, "remoteEndsAtMs": 1800000090000, "localPending": false, "nowMs": 1800000000500 },
+      "expect": { "action": "keep" }
+    },
+    {
+      "name": "unos milisegundos de diferencia son el mismo descanso",
+      "why": "El Wear OS lleva su descanso nativo a tiempo de pared con una resta, y esa resta corre algunos ms.",
+      "op": "mirror",
+      "given": { "localEndsAtMs": 1800000090000, "remoteEndsAtMs": 1800000090300, "localPending": false, "nowMs": 1800000000500 },
+      "expect": { "action": "keep" }
+    },
+    {
+      "name": "justo en la tolerancia sigue siendo el mismo",
+      "op": "mirror",
+      "given": { "localEndsAtMs": 1800000090000, "remoteEndsAtMs": 1800000090500, "localPending": false, "nowMs": 1800000000500 },
+      "expect": { "action": "keep" }
+    },
+    {
+      "name": "+15 del otro lado se adopta",
+      "op": "mirror",
+      "given": { "localEndsAtMs": 1800000090000, "remoteEndsAtMs": 1800000105000, "localPending": false, "nowMs": 1800000030000 },
+      "expect": { "action": "adopt" }
+    },
+    {
+      "name": "SALTAR del otro lado corta el de acá",
+      "op": "mirror",
+      "given": { "localEndsAtMs": 1800000090000, "remoteEndsAtMs": null, "localPending": false, "nowMs": 1800000030000 },
+      "expect": { "action": "stop" }
+    },
+    {
+      "name": "si la sesión dice que terminó, acá también",
+      "why": "La sesión es el último valor que aceptó el servidor. Un descanso vivo acá contra uno vencido allá es uno que alguien reemplazó o cortó.",
+      "op": "mirror",
+      "given": { "localEndsAtMs": 1800000120000, "remoteEndsAtMs": 1800000090000, "localPending": false, "nowMs": 1800000095000 },
+      "expect": { "action": "stop" }
+    },
+    {
+      "name": "sin descanso en ningún lado no pasa nada",
+      "op": "mirror",
+      "given": { "localEndsAtMs": null, "remoteEndsAtMs": null, "localPending": false, "nowMs": 1800000000000 },
+      "expect": { "action": "keep" }
+    },
+    {
+      "name": "un descanso vencido en la sesión no se adopta",
+      "why": "El aparato que se abre tarde no tiene que mostrar un descanso que ya terminó ni vibrar por él.",
+      "op": "mirror",
+      "given": { "localEndsAtMs": null, "remoteEndsAtMs": 1800000090000, "localPending": false, "nowMs": 1800000095000 },
+      "expect": { "action": "keep" }
+    },
+    {
+      "name": "con el propio vencido se adopta el vivo de la sesión",
+      "op": "mirror",
+      "given": { "localEndsAtMs": 1800000010000, "remoteEndsAtMs": 1800000090000, "localPending": false, "nowMs": 1800000020000 },
+      "expect": { "action": "adopt" }
+    },
+    {
+      "name": "un cambio local todavía sin escribir le gana a la sesión",
+      "why": "El Apple Watch escribe por REST y puede tener un SALTAR en vuelo. Ese cambio es el más nuevo y va a ganar cuando llegue; adoptar mientras tanto lo que dice la sesión resucitaría el descanso que el atleta acaba de saltar.",
+      "op": "mirror",
+      "given": { "localEndsAtMs": null, "remoteEndsAtMs": 1800000090000, "localPending": true, "nowMs": 1800000030000 },
+      "expect": { "action": "keep" }
+    },
+    {
+      "name": "la carrera: los dos marcaron casi a la vez y gana el que escribió último",
+      "why": "El documento es un registro único y espejar nunca escribe, así que los dos aparatos convergen al último valor que aceptó el servidor. El que escribió primero adopta el del otro; la diferencia es lo que tardó en cruzar la red, y cualquiera de los dos descansos es correcto.",
+      "op": "mirror",
+      "given": { "localEndsAtMs": 1800000090000, "remoteEndsAtMs": 1800000091200, "localPending": false, "nowMs": 1800000001200 },
+      "expect": { "action": "adopt" }
+    },
+    {
+      "name": "el descanso que anota el teléfono",
+      "op": "decode",
+      "given": { "doc": { "restExerciseId": "press-banca", "restSetNumber": 2, "restTotalSeconds": 90, "restEndsAtMs": 1800000090000, "restOwner": "phone" } },
+      "expect": { "rest": { "exerciseId": "press-banca", "setNumber": 2, "totalSeconds": 90, "endsAtMs": 1800000090000, "owner": "phone" } }
+    },
+    {
+      "name": "el que anota un reloj",
+      "why": "Wear OS y Apple Watch escriben el mismo dueño: desde la sesión son la misma muñeca.",
+      "op": "decode",
+      "given": { "doc": { "restExerciseId": "sentadilla", "restSetNumber": 4, "restTotalSeconds": 180, "restEndsAtMs": 1800000180123, "restOwner": "watch" } },
+      "expect": { "rest": { "exerciseId": "sentadilla", "setNumber": 4, "totalSeconds": 180, "endsAtMs": 1800000180123, "owner": "watch" } }
+    },
+    {
+      "name": "una sesión sin descanso",
+      "op": "decode",
+      "given": { "doc": { "routineId": "r1" } },
+      "expect": { "rest": null }
+    },
+    {
+      "name": "sin dueño no se espeja",
+      "why": "Medio descanso no se espeja con confianza: mismo criterio que el cronómetro del ejercicio por tiempo.",
+      "op": "decode",
+      "given": { "doc": { "restExerciseId": "press-banca", "restSetNumber": 2, "restTotalSeconds": 90, "restEndsAtMs": 1800000090000 } },
+      "expect": { "rest": null }
+    },
+    {
+      "name": "un dueño desconocido no se espeja",
+      "op": "decode",
+      "given": { "doc": { "restExerciseId": "press-banca", "restSetNumber": 2, "restTotalSeconds": 90, "restEndsAtMs": 1800000090000, "restOwner": "tablet" } },
+      "expect": { "rest": null }
+    },
+    {
+      "name": "un total en cero no es un descanso",
+      "op": "decode",
+      "given": { "doc": { "restExerciseId": "press-banca", "restSetNumber": 2, "restTotalSeconds": 0, "restEndsAtMs": 1800000090000, "restOwner": "phone" } },
+      "expect": { "rest": null }
+    },
+    {
+      "name": "sin serie no hay identidad",
+      "op": "decode",
+      "given": { "doc": { "restExerciseId": "press-banca", "restSetNumber": 0, "restTotalSeconds": 90, "restEndsAtMs": 1800000090000, "restOwner": "phone" } },
+      "expect": { "rest": null }
+    }
+  ]
+}

@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/features/auth/presentation/legal/legal_content.dart';
+import 'package:treino/features/profile/application/legacy_privacy_notice_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -58,7 +58,7 @@ Widget _host(UserProfile profile, {required VoidCallback onTapBehind}) {
 }
 
 void main() {
-  final before = kPrivacyV4PublishedAt.subtract(const Duration(days: 30));
+  final before = kLegacyPrivacyNoticeCutoff.subtract(const Duration(days: 30));
 
   testWidgets('el aviso aparece para el atleta legacy', (tester) async {
     await tester.pumpWidget(
@@ -109,7 +109,7 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       _host(
-        _athlete(termsAcceptedAt: kPrivacyV4PublishedAt),
+        _athlete(termsAcceptedAt: kLegacyPrivacyNoticeCutoff),
         onTapBehind: () {},
       ),
     );

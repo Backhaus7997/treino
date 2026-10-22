@@ -13,18 +13,19 @@ import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../../core/persistence/shared_prefs_provider.dart';
 import '../../../core/widgets/treino_toast.dart';
 import '../application/chat_contacts_providers.dart';
-import '../../../core/widgets/treino_confirm_dialog.dart';
 import '../application/chat_providers.dart'
     show
         archivedChatsProvider,
         chatForOtherUidProvider,
         chatHasUnread,
-        chatRepositoryProvider,
         chatsForCurrentUserProvider,
         inboxChatsProvider;
 import '../domain/chat.dart';
+import 'chat_actions.dart';
+import 'chat_swipe_actions.dart';
 
 /// Pantalla que lista todos los chats del usuario actual.
 ///
@@ -118,6 +119,12 @@ class ChatListScreen extends ConsumerWidget {
               // armarlas todas de una abría un listener por seguido y por
               // chat al entrar a la pantalla.
               final archivedOpen = ref.watch(_archivedOpenProvider);
+              // El asomo del swipe va en el primer chat de la bandeja: es el
+              // que se ve sin scrollear y el que más se usa.
+              final hintChatId =
+                  ref.watch(_swipeHintPendingProvider) && chats.isNotEmpty
+                      ? chats.first.chatId
+                      : null;
               final entries = <_Entry>[
                 if (archived.isNotEmpty) ...[
                   _ArchivedHeaderEntry(archived.length),
@@ -135,6 +142,16 @@ class ChatListScreen extends ConsumerWidget {
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: entries.length,
+                // Las filas de chat se identifican por chat, no por posición.
+                // La bandeja se reordena sola (`lastMessageAt`) y sin esto el
+                // estado del swipe —la fila abierta, con sus acciones— se
+                // quedaba en el ÍNDICE: un mensaje nuevo en otro chat lo
+                // corría arriba y las acciones abiertas pasaban a archivar o
+                // eliminar ese otro chat (Codex, #1623).
+                findChildIndexCallback: (key) {
+                  final i = entries.indexWhere((e) => _entryKey(e) == key);
+                  return i < 0 ? null : i;
+                },
                 itemBuilder: (_, i) {
                   final entry = entries[i];
                   // Divisor entre filas consecutivas del mismo tipo, igual
@@ -148,6 +165,7 @@ class ChatListScreen extends ConsumerWidget {
                         chat: chat,
                         currentUid: currentUid ?? '',
                         archived: archived,
+                        hint: !archived && chat.chatId == hintChatId,
                       ),
                     _ArchivedHeaderEntry(:final count) =>
                       _ArchivedHeader(count: count, open: archivedOpen),
@@ -162,12 +180,18 @@ class ChatListScreen extends ConsumerWidget {
                         ),
                       ),
                   };
-                  if (!divided) return row;
+                  final key = _entryKey(entry);
+                  if (!divided && key == null) return row;
+                  // Misma raíz con o sin divisor: una fila que se mueve y
+                  // gana o pierde el divisor cambiaría de tipo y se remontaría
+                  // aunque la key sea la misma, y el swipe abierto se perdería.
                   return Column(
+                    key: key,
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Divider(height: 1, color: palette.border, indent: 76),
+                      if (divided)
+                        Divider(height: 1, color: palette.border, indent: 76),
                       row,
                     ],
                   );
@@ -196,6 +220,14 @@ final class _ChatEntry extends _Entry {
   final bool archived;
 }
 
+/// Key estable de las filas de chat de la lista. Un chat puede estar en la
+/// bandeja o en Archivados, así que la sección entra en la key.
+Key? _entryKey(_Entry entry) => switch (entry) {
+      _ChatEntry(:final chat, :final archived) =>
+        ValueKey<String>('chat:${chat.chatId}:$archived'),
+      _ => null,
+    };
+
 final class _ArchivedHeaderEntry extends _Entry {
   const _ArchivedHeaderEntry(this.count);
   final int count;
@@ -221,13 +253,18 @@ class _ChatRow extends ConsumerWidget {
     required this.chat,
     required this.currentUid,
     this.archived = false,
+    this.hint = false,
   });
 
   final Chat chat;
   final String currentUid;
 
-  /// Fila de la sección Archivados: el long-press ofrece desarchivar.
+  /// Fila de la sección Archivados: el long-press y el swipe ofrecen
+  /// desarchivar.
   final bool archived;
+
+  /// Asoma las acciones del swipe una vez, para enseñar el gesto.
+  final bool hint;
 
   String _otherUidOf(Chat c, String selfUid) {
     return c.members.firstWhere((m) => m != selfUid, orElse: () => '');
@@ -241,13 +278,13 @@ class _ChatRow extends ConsumerWidget {
     final pubAsync = ref.watch(userPublicProfileProvider(otherUid));
     final hasUnread = currentUid.isNotEmpty && chatHasUnread(chat, currentUid);
 
-    return InkWell(
+    final row = InkWell(
       onLongPress: currentUid.isEmpty
           ? null
-          : () => _showChatActions(
+          : () => showChatActionsSheet(
                 context,
                 ref,
-                chat: chat,
+                chatId: chat.chatId,
                 uid: currentUid,
                 archived: archived,
               ),
@@ -331,7 +368,68 @@ class _ChatRow extends ConsumerWidget {
         ),
       ),
     );
+    if (currentUid.isEmpty) return row;
+
+    // Mismas acciones que el long-press, a un gesto de distancia. Archivar
+    // usa el acento y eliminar el rojo, cada uno con su par de texto.
+    final archiveAction = ChatSwipeAction(
+      icon: TreinoIcon.archive,
+      label: archived ? l10n.chatActionUnarchive : l10n.chatActionArchive,
+      background: palette.accent,
+      foreground: TreinoButtonTokens.foreground(context),
+      onTap: () => archived
+          ? unarchiveChat(context, ref, chatId: chat.chatId, uid: currentUid)
+          : archiveChat(context, ref, chatId: chat.chatId, uid: currentUid),
+    );
+    final deleteAction = ChatSwipeAction(
+      icon: TreinoIcon.trash,
+      label: l10n.chatActionDelete,
+      background: palette.danger,
+      foreground: palette.onDanger,
+      onTap: () => confirmAndDeleteChat(
+        context,
+        ref,
+        chatId: chat.chatId,
+        uid: currentUid,
+      ),
+    );
+    return ChatSwipeActions(
+      key: ValueKey(chat.chatId),
+      rowId: chat.chatId,
+      openRow: ref.watch(_openSwipeRowProvider),
+      actions: [archiveAction, deleteAction],
+      hint: hint,
+      onHintShown: () => _markSwipeHintSeen(ref),
+      child: row,
+    );
   }
+}
+
+/// La fila de la bandeja con el swipe abierto. Una sola a la vez.
+final _openSwipeRowProvider =
+    Provider.autoDispose<ValueNotifier<Object?>>((ref) {
+  final notifier = ValueNotifier<Object?>(null);
+  ref.onDispose(notifier.dispose);
+  return notifier;
+});
+
+const _swipeHintSeenKey = 'chat.swipeHintSeen';
+
+/// Si falta enseñar el swipe de la bandeja. Se enseña UNA vez por
+/// instalación: es un asomo sutil, no un tour, y repetirlo sería ruido.
+///
+/// Sin preferencias resueltas no hay asomo: ante la duda, no molestar.
+final _swipeHintPendingProvider = Provider.autoDispose<bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider).valueOrNull;
+  return prefs != null && !(prefs.getBool(_swipeHintSeenKey) ?? false);
+});
+
+void _markSwipeHintSeen(WidgetRef ref) {
+  final prefs = ref.read(sharedPreferencesProvider).valueOrNull;
+  if (prefs == null) return;
+  prefs.setBool(_swipeHintSeenKey, true).then((_) {
+    ref.invalidate(_swipeHintPendingProvider);
+  }).catchError((Object _) {});
 }
 
 /// Qué rama del body se está pintando, para que [TreinoStateSwitcher] haga
@@ -348,123 +446,6 @@ String _bodyState(
   final c = contacts.valueOrNull;
   if (c == null) return 'loading';
   return c.isEmpty ? 'empty' : 'data';
-}
-
-/// Acciones de un chat por long-press: mismo look que el menú de moderación
-/// (`showModerationMenu`), la otra acción por long-press de esta feature.
-///
-/// Las dos son POR USUARIO (`Chat.archivedAt` / `Chat.hiddenBefore`): no
-/// cambian nada de lo que ve el otro participante.
-Future<void> _showChatActions(
-  BuildContext context,
-  WidgetRef ref, {
-  required Chat chat,
-  required String uid,
-  required bool archived,
-}) async {
-  final palette = AppPalette.of(context);
-  final l10n = AppL10n.of(context);
-  final messenger = ScaffoldMessenger.of(context);
-  final repo = ref.read(chatRepositoryProvider);
-
-  Future<void> run(
-    Future<void> Function() action, {
-    required String done,
-    Future<void> Function()? undo,
-  }) async {
-    try {
-      await action();
-      showTreinoToastOn(
-        messenger,
-        done,
-        type: TreinoToastType.success,
-        action: undo == null
-            ? null
-            : TreinoToastAction(
-                label: l10n.chatActionUndo,
-                onPressed: () => undo().catchError((Object _) {}),
-              ),
-      );
-    } catch (_) {
-      showTreinoToastOn(messenger, l10n.chatActionError,
-          type: TreinoToastType.error);
-    }
-  }
-
-  Widget tile({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    bool danger = false,
-  }) {
-    final color = danger ? palette.dangerText : palette.textPrimary;
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(
-        label,
-        style: GoogleFonts.barlow(
-          fontWeight: FontWeight.w400,
-          fontSize: AppTextSize.body,
-          color: color,
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
-
-  await showModalBottomSheet<void>(
-    context: context,
-    useRootNavigator: true,
-    backgroundColor: palette.bgCard,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-    ),
-    builder: (sheetContext) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          tile(
-            icon: TreinoIcon.archive,
-            label: archived ? l10n.chatActionUnarchive : l10n.chatActionArchive,
-            onTap: () {
-              Navigator.of(sheetContext).pop();
-              if (archived) {
-                run(
-                  () => repo.unarchive(chatId: chat.chatId, uid: uid),
-                  done: l10n.chatUnarchivedToast,
-                );
-              } else {
-                run(
-                  () => repo.archive(chatId: chat.chatId, uid: uid),
-                  done: l10n.chatArchivedToast,
-                  undo: () => repo.unarchive(chatId: chat.chatId, uid: uid),
-                );
-              }
-            },
-          ),
-          tile(
-            icon: TreinoIcon.trash,
-            label: l10n.chatActionDelete,
-            danger: true,
-            onTap: () async {
-              Navigator.of(sheetContext).pop();
-              final confirmed = await showTreinoConfirmDialog(
-                context,
-                title: l10n.chatDeleteConfirmTitle,
-                body: l10n.chatDeleteConfirmBody,
-                confirmLabel: l10n.commonDelete,
-              );
-              if (!confirmed) return;
-              await run(
-                () => repo.hideForUser(chatId: chat.chatId, uid: uid),
-                done: l10n.chatDeletedToast,
-              );
-            },
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
 /// Si «Archivados» está desplegada. Vive mientras la pantalla está montada.

@@ -9,6 +9,7 @@ import '../../app/theme/app_palette.dart';
 import '../../app/theme/app_theme.dart';
 import '../../app/theme/tokens/tokens.dart';
 import '../../l10n/app_l10n.dart';
+import 'motion/scroll_follow_controller.dart';
 import 'treino_icon.dart';
 
 /// Medidas de la barra superior de las pantallas de detalle.
@@ -175,11 +176,19 @@ class TreinoCollapsingTopBar extends StatefulWidget {
   State<TreinoCollapsingTopBar> createState() => _TreinoCollapsingTopBarState();
 }
 
-class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
-  /// 0 = barra invisible (arriba del todo), 1 = barra entera. Un notifier y
+class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar>
+    with SingleTickerProviderStateMixin {
+  /// 0 = barra invisible (arriba del todo), 1 = barra entera. Un controller y
   /// no `setState`: cambia en cada frame del scroll y sólo tiene que
   /// redibujar la barra, nunca el [TreinoCollapsingTopBar.body].
-  final _progress = ValueNotifier<double>(0);
+  ///
+  /// Sigue la posición 1:1 al scrollear normal; un fling que cruza los
+  /// [TreinoTopBarMetrics.revealDistance] px en un par de frames la hace
+  /// entrar con un resorte en vez de aparecer de golpe.
+  late final ScrollFollowController _progress = ScrollFollowController(
+    vsync: this,
+    range: TreinoTopBarMetrics.revealDistance,
+  );
 
   @override
   void dispose() {
@@ -191,8 +200,10 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
     if (n.metrics.axis != Axis.vertical) return false;
     const distance = TreinoTopBarMetrics.revealDistance;
     final start = widget.collapseOffset - distance;
-    _progress.value =
-        ((n.metrics.pixels - start) / distance).clamp(0.0, 1.0).toDouble();
+    _progress.follow(
+      (n.metrics.pixels - start) / distance,
+      reduceMotion: AppMotion.reduceMotion(context),
+    );
     return false;
   }
 
@@ -220,7 +231,7 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
           right: 0,
           height: top + TreinoTopBarMetrics.barHeight,
           child: ValueListenableBuilder<double>(
-            valueListenable: _progress,
+            valueListenable: _progress.animation,
             builder: (context, t, _) =>
                 _buildBar(context, palette, l10n, top, title, t, reduce),
           ),

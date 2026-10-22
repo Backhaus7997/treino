@@ -71,6 +71,64 @@ Widget _buildSheet({
   );
 }
 
+/// Notifier que pasa a AsyncLoading al tocar ELIMINAR y falla a pedido.
+class _ControlledNotifier extends AccountDeletionNotifier {
+  @override
+  Future<void> build() async {}
+
+  @override
+  Future<void> deleteAccount([BuildContext? context]) async {
+    state = const AsyncLoading();
+  }
+
+  void fail(AuthFailure failure) =>
+      state = AsyncError(failure, StackTrace.empty);
+}
+
+/// Opacidad efectiva de [finder]: producto de los fades que lo envuelven
+/// (`AnimatedOpacity` y `AnimatedSwitcher` pintan con `FadeTransition`).
+double _opacityOf(WidgetTester tester, Finder finder) {
+  var opacity = 1.0;
+  final fades = find.ancestor(
+    of: finder,
+    matching: find.byWidgetPredicate(
+      (w) => w is Opacity || w is FadeTransition,
+    ),
+  );
+  for (final w in tester.widgetList(fades)) {
+    opacity *= w is Opacity ? w.opacity : (w as FadeTransition).opacity.value;
+  }
+  return opacity;
+}
+
+/// El sheet abierto como en la app: modal, `isScrollControlled`, `bgCard`.
+Widget _buildModal(AccountDeletionNotifier notifier) {
+  return ProviderScope(
+    overrides: [
+      accountDeletionNotifierProvider.overrideWith(() => notifier),
+      userProfileProvider
+          .overrideWith((_) => Stream.value(_profile(UserRole.athlete))),
+    ],
+    child: TestAppWrapper(
+      child: Builder(
+        builder: (context) => TextButton(
+          onPressed: () => showModalBottomSheet<void>(
+            context: context,
+            useRootNavigator: true,
+            isScrollControlled: true,
+            builder: (_) => const EliminarCuentaSheet(),
+          ),
+          child: const Text('open'),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Más que el `AppMotion.base` (240 ms) del cross-fade. `pumpAndSettle` no
+/// sirve con el spinner girando.
+const _fade = Duration(milliseconds: 400);
+
 void main() {
   // SCENARIO-560
   testWidgets(
@@ -447,6 +505,151 @@ void main() {
         find.text('No pudimos eliminar tu cuenta. Probá de nuevo.'),
         findsOneWidget,
       );
+    });
+  });
+
+  // La carga se dibujaba ENCIMA de la confirmación con un velo `bg` al 85 %
+  // sobre un sheet `bgCard`: título, párrafos y ELIMINAR se leían debajo del
+  // spinner. La carga tiene que REEMPLAZAR el contenido.
+  group('carga: reemplaza la confirmación', () {
+    final confirmacion = [
+      'Eliminar cuenta',
+      'ELIMINAR',
+      'CANCELAR',
+      'Si tenés una suscripción paga, se cancela y no se te vuelve a cobrar. '
+          'No se devuelve el dinero del período en curso.',
+    ];
+
+    testWidgets('en reposo: confirmación visible y sin carga', (tester) async {
+      await tester.pumpWidget(_buildModal(_ControlledNotifier()));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      for (final t in confirmacion) {
+        expect(_opacityOf(tester, find.text(t)), 1.0, reason: t);
+      }
+      expect(find.text('Eliminando tu cuenta...'), findsNothing);
+    });
+
+    testWidgets(
+        'cargando: la confirmación queda invisible y sin taps; la carga, visible',
+        (tester) async {
+      await tester.pumpWidget(_buildModal(_ControlledNotifier()));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('ELIMINAR'));
+      await tester.pump();
+      await tester.pump(_fade);
+
+      for (final t in confirmacion) {
+        expect(_opacityOf(tester, find.text(t)), 0.0, reason: t);
+      }
+      expect(find.text('ELIMINAR').hitTestable(), findsNothing);
+      expect(find.text('CANCELAR').hitTestable(), findsNothing);
+
+      for (final t in [
+        'Eliminando tu cuenta...',
+        'Esto puede tardar unos segundos.',
+      ]) {
+        expect(_opacityOf(tester, find.text(t)), 1.0, reason: t);
+      }
+      expect(
+        _opacityOf(tester, find.byType(CircularProgressIndicator)),
+        1.0,
+      );
+    });
+
+    testWidgets('cargando: el alto del sheet no cambia', (tester) async {
+      await tester.pumpWidget(_buildModal(_ControlledNotifier()));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      final antes = tester.getSize(find.byType(EliminarCuentaSheet));
+
+      await tester.tap(find.text('ELIMINAR'));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 60));
+        expect(tester.getSize(find.byType(EliminarCuentaSheet)), antes);
+      }
+    });
+
+    // Control del control: el mismo drag y el mismo tap afuera SÍ cierran el
+    // sheet en reposo. Sin esto, «no se cerró» podría ser un gesto que nunca
+    // llegó.
+    testWidgets('en reposo: el drag hacia abajo cierra el sheet',
+        (tester) async {
+      await tester.pumpWidget(_buildModal(_ControlledNotifier()));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.fling(
+        find.text('Eliminar cuenta'),
+        const Offset(0, 500),
+        2000,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(EliminarCuentaSheet), findsNothing);
+    });
+
+    testWidgets('en reposo: el tap afuera cierra el sheet', (tester) async {
+      await tester.pumpWidget(_buildModal(_ControlledNotifier()));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+      expect(find.byType(EliminarCuentaSheet), findsNothing);
+    });
+
+    testWidgets('cargando: ni el drag ni el tap afuera cierran el sheet',
+        (tester) async {
+      await tester.pumpWidget(_buildModal(_ControlledNotifier()));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ELIMINAR'));
+      await tester.pump();
+      await tester.pump(_fade);
+
+      await tester.fling(
+        find.text('Eliminando tu cuenta...'),
+        const Offset(0, 500),
+        2000,
+      );
+      await tester.pump();
+      await tester.pump(_fade);
+      expect(find.byType(EliminarCuentaSheet), findsOneWidget, reason: 'drag');
+
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pump();
+      await tester.pump(_fade);
+      expect(find.byType(EliminarCuentaSheet), findsOneWidget,
+          reason: 'tap afuera');
+    });
+
+    testWidgets('si falla, vuelve la confirmación con el error adentro',
+        (tester) async {
+      final notifier = _ControlledNotifier();
+      await tester.pumpWidget(_buildModal(notifier));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ELIMINAR'));
+      await tester.pump();
+      await tester.pump(_fade);
+
+      notifier.fail(const AuthFailure.deletionFailed());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Eliminando tu cuenta...'), findsNothing);
+      for (final t in confirmacion) {
+        expect(_opacityOf(tester, find.text(t)), 1.0, reason: t);
+      }
+      final error = find.descendant(
+        of: find.byType(EliminarCuentaSheet),
+        matching: find.text('No pudimos eliminar tu cuenta. Probá de nuevo.'),
+      );
+      expect(error, findsOneWidget);
+      expect(_opacityOf(tester, error), 1.0);
+      expect(find.text('ELIMINAR').hitTestable(), findsOneWidget);
     });
   });
 

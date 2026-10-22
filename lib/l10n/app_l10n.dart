@@ -4064,6 +4064,24 @@ abstract class AppL10n {
   /// **'Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.'**
   String get chatDeleteConfirmBody;
 
+  /// No description provided for @chatActionViewProfile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver perfil'**
+  String get chatActionViewProfile;
+
+  /// No description provided for @chatHeaderProfileA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver el perfil de {name}'**
+  String chatHeaderProfileA11y(String name);
+
+  /// No description provided for @chatMoreActionsA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opciones del chat'**
+  String get chatMoreActionsA11y;
+
   /// No description provided for @chatArchivedSectionTitle.
   ///
   /// In es_AR, this message translates to:
@@ -9870,6 +9888,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Salir'**
   String get authSignOutConfirmAction;
+
+  /// Título de la notificación del sistema que avisa que terminó el descanso entre series, cuando la app está en segundo plano o la pantalla bloqueada (#1617). Corto: se lee en la pantalla de bloqueo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Terminó el descanso'**
+  String get sessionRestEndedTitle;
+
+  /// Cuerpo de esa misma notificación. Una instrucción, no un dato: el atleta la lee con el teléfono en el bolsillo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volvé a la serie'**
+  String get sessionRestEndedBody;
+
+  /// Título de la notificación con la cuenta regresiva en vivo del descanso, que se publica al pasar la app a segundo plano (#1617, sólo Android). El tiempo lo pone el sistema con un cronómetro; esto es lo que lo acompaña.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Descanso'**
+  String get sessionRestCountdownTitle;
+
+  /// Cuerpo de la notificación de cuenta regresiva. Silenciosa: el aviso que suena es el de «Terminó el descanso».
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volvé a la serie cuando llegue a cero'**
+  String get sessionRestCountdownBody;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

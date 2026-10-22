@@ -592,6 +592,9 @@
   "chatActionError": "",
   "chatDeleteConfirmTitle": "",
   "chatDeleteConfirmBody": "",
+  "chatActionViewProfile": "View profile",
+  "chatHeaderProfileA11y": "View {name}'s profile",
+  "chatMoreActionsA11y": "Chat options",
   "chatArchivedSectionTitle": "{count}",
   "chatRelativeJustNow": "",
   "chatRelativeMinutes": "",
@@ -2423,5 +2426,9 @@
   "agendaOverrideDeleteTitle": "Delete this exception?",
   "onboardingCustomExerciseNotNow": "NOT NOW",
   "authSignOutConfirmTitle": "Sign out?",
-  "authSignOutConfirmAction": "Sign out"
+  "authSignOutConfirmAction": "Sign out",
+  "sessionRestEndedTitle": "Rest is over",
+  "sessionRestEndedBody": "Back to your set",
+  "sessionRestCountdownTitle": "Rest",
+  "sessionRestCountdownBody": "Back to your set when it hits zero"
 }

@@ -146,14 +146,25 @@ struct FirestoreREST {
     /// A diferencia de `setDocument`, que pisa el doc entero: aca hace falta
     /// preservar lo que ya estaba (routineId, startedAt, dayNumber...) y
     /// cambiar unos pocos campos. Se logra con `updateMask.fieldPaths`.
+    ///
+    /// `deleting` BORRA campos: van en la mascara y no en el cuerpo, que es
+    /// como la REST API expresa un `FieldValue.delete()`. Es lo que usa Saltar
+    /// el descanso compartido (#1616).
+    ///
+    /// `requireExists` agrega la precondicion `currentDocument.exists`. Sin
+    /// ella un PATCH sobre un documento que ya no esta lo CREA: un descanso
+    /// escrito sobre una sesion borrada la haria renacer con un solo campo.
     func patchFields(
         path: String,
         fields: [String: Any],
+        deleting: [String] = [],
+        requireExists: Bool = false,
         session: URLSession = .shared
     ) async throws {
-        let mask = fields.keys
+        var query = (Array(fields.keys) + deleting)
             .map { "updateMask.fieldPaths=\($0)" }
-            .joined(separator: "&")
+        if requireExists { query.append("currentDocument.exists=true") }
+        let mask = query.joined(separator: "&")
         var request = URLRequest(url: URL(string: "\(base)/\(path)?\(mask)")!)
         request.httpMethod = "PATCH"
         request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")

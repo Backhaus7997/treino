@@ -177,21 +177,53 @@ enum HistorySync {
         )
     }
 
-    /// Si la sesión ya está TERMINADA en el historial.
+    /// Lo que el reloj lee del documento de la sesion, en UNA sola lectura: si
+    /// ya está TERMINADA en el historial y el descanso compartido (#1616).
     ///
-    /// El reloj lo consulta para cerrarse solo cuando el atleta terminó el
+    /// Lo de terminada es para cerrarse solo cuando el atleta terminó el
     /// entreno desde el teléfono. Sin esto el reloj se quedaba con la pantalla
     /// de entreno abierta sobre una sesión que ya no existe.
-    static func isFinished(
+    ///
+    /// El descanso va en la misma lectura a proposito: era `isFinished`, y
+    /// `sync()` ya leia este documento para eso. Leer el descanso aparte seria
+    /// pagar otro viaje de red por el mismo documento.
+    static func sessionState(
         client: FirestoreREST,
         uid: String,
         sessionId: String
-    ) async throws -> Bool {
+    ) async throws -> (finished: Bool, rest: SharedRest?) {
         let doc = try await client.document("users/\(uid)/sessions/\(sessionId)")
         // Un doc que ya no está se trata como terminado: seguir mostrándolo
         // sería peor que cerrarlo.
-        guard let doc else { return true }
-        return FS.isPresent(doc["finishedAt"])
+        guard let doc else { return (finished: true, rest: nil) }
+        return (finished: FS.isPresent(doc["finishedAt"]), rest: RestRules.parse(fields: doc))
+    }
+
+    /// Anota el descanso compartido en la sesion, o lo BORRA con `nil` (#1616).
+    ///
+    /// Con `requireExists`: el descanso cuelga de una sesion que existe, y sin
+    /// la precondicion un PATCH sobre una sesion borrada la haria renacer.
+    static func writeRest(
+        client: FirestoreREST,
+        uid: String,
+        sessionId: String,
+        rest: SharedRest?
+    ) async throws {
+        let path = "users/\(uid)/sessions/\(sessionId)"
+        if let rest {
+            try await client.patchFields(
+                path: path,
+                fields: RestRules.encode(rest),
+                requireExists: true
+            )
+        } else {
+            try await client.patchFields(
+                path: path,
+                fields: [:],
+                deleting: RestRules.allFields,
+                requireExists: true
+            )
+        }
     }
 
     private static func parseTimestamp(_ field: Any?) -> Date? {

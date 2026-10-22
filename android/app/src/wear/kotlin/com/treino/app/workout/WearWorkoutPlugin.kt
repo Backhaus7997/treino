@@ -176,8 +176,27 @@ class WearWorkoutPlugin(
             }
 
             "startRest" -> {
-                val seconds = call.argument<Int>("seconds") ?: 0
-                val d = RestDeadline.startingAt(now, seconds * 1000L)
+                // `millis` es el ESPEJO del descanso compartido (#1616): lo que
+                // falta del instante de fin que anoto el otro aparato, al
+                // milisegundo para que las dos alarmas caigan juntas. Sin el,
+                // `seconds` es el descanso que arranca este reloj.
+                //
+                // `Number` y no `Int`: el codec de Flutter manda un `Long`
+                // cuando el valor no entra en 32 bits, y leerlo como `Int`
+                // tiraria ClassCastException.
+                val durationMs = RestDeadline.durationMsFrom(
+                    millis = call.argument<Number>("millis")?.toLong(),
+                    seconds = call.argument<Number>("seconds")?.toLong(),
+                )
+                if (durationMs <= 0L) {
+                    // Un descanso de cero nace vencido: mismo criterio que
+                    // `startExerciseTimer`. Dart ya lo filtra; esto es la red.
+                    restStore.clear()
+                    restAlarm.cancel()
+                    result.success(mapOf("ok" to false, "nowElapsedMs" to now))
+                    return
+                }
+                val d = RestDeadline.startingAt(now, durationMs)
                 restStore.save(d)
                 restAlarm.schedule(d, holdWakeLock = call.argument<Boolean>("wakeLock") ?: false)
                 deadlineReported = false

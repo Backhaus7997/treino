@@ -33,8 +33,10 @@ String normalize(String s) {
 }
 
 class _Index {
-  _Index._(this.byName, this.exercises);
+  _Index._(this.byName, this.exercises)
+      : byId = {for (final ex in exercises) ex.id: ex};
   final Map<String, MatcherExercise> byName;
+  final Map<String, MatcherExercise> byId;
   final List<MatcherExercise> exercises;
 
   factory _Index.build(List<MatcherExercise> exercises) {
@@ -173,6 +175,13 @@ bool _isCompatibleLabel(String query, String normalizedLabel) {
   );
 }
 
+/// Veto determinístico, público: [rawName] (lo que escribió el PF) y [label]
+/// (nombre o alias del catálogo) son compatibles si declaran el mismo equipo y
+/// las mismas variantes. Normaliza los dos lados. No mide parecido: sólo dice
+/// si la etiqueta NO puede ser ese ejercicio.
+bool isCompatibleLabel(String rawName, String label) =>
+    _isCompatibleLabel(normalize(rawName), normalize(label));
+
 bool _sameSet(Set<String> left, Set<String> right) =>
     left.length == right.length && left.containsAll(right);
 
@@ -229,5 +238,19 @@ class ExerciseNameMatcher {
     final exercise = _index.byName[key];
     if (exercise != null) return ExerciseNameMatch(exercise: exercise);
     return ExerciseNameMatch(suggestion: _bestFuzzySuggestion(key, _index));
+  }
+
+  /// Valida un candidato externo (p. ej. el que propone el LLM del import de
+  /// PDF) para [rawName]: devuelve el ejercicio si [id] existe en el catálogo
+  /// y alguna de sus etiquetas pasa el veto de [isCompatibleLabel]; si no,
+  /// null. El resultado es SÓLO una sugerencia por confirmar (#1455): nunca
+  /// se autoasigna.
+  MatcherExercise? suggestFromCandidate(String id, String rawName) {
+    final exercise = _index.byId[id];
+    if (exercise == null) return null;
+    final query = normalize(rawName);
+    final compatible = <String>[exercise.name, ...exercise.aliases]
+        .any((label) => _isCompatibleLabel(query, normalize(label)));
+    return compatible ? exercise : null;
   }
 }

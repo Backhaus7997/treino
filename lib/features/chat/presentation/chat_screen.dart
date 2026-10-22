@@ -11,6 +11,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../core/moderation/moderation_guard.dart';
 import '../../../l10n/app_l10n.dart';
@@ -22,12 +23,15 @@ import '../../moderation/presentation/moderation_actions.dart';
 import '../../paywall/application/athlete_entitlement_provider.dart'
     show chatMediaQuotaProvider;
 import '../../profile/application/user_public_profile_providers.dart';
+import '../../profile/domain/user_public_profile.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../application/chat_contacts_providers.dart';
 import '../application/chat_media_send_controller.dart';
 import '../application/chat_providers.dart';
 import '../domain/media_type.dart';
 import '../domain/message.dart';
+import 'chat_actions.dart';
 import 'chat_image_bubble.dart';
 import 'chat_video_bubble.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
@@ -76,6 +80,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       developer.log('markAsRead failed',
           name: 'chat', error: e, stackTrace: st);
     }
+  }
+
+  /// Vuelve a la bandeja. Ver el comentario de la flecha en [build].
+  void _backToInbox() {
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      Navigator.of(context).maybePop();
+    } else if (router.canPop()) {
+      router.pop();
+    } else {
+      router.go('/feed/messages');
+    }
+  }
+
+  /// Después de archivar o eliminar: a Mensajes, SIEMPRE con un `go`.
+  ///
+  /// No es un pop: al chat también se entra empujado desde el detalle del
+  /// alumno y desde un perfil público, y ahí el pop deja a la persona en esa
+  /// pantalla con un chat que acaba de desaparecer (Codex, #1623). Tampoco se
+  /// decide mirando qué hay debajo: el pop saca el match recién cuando el
+  /// Navigator suelta la página, así que `state.uri` justo después no es
+  /// confiable. Si la bandeja queda sola, su `PopScope` ya vuelve a `/feed`.
+  void _leaveToInbox() {
+    // El sheet corre este callback después de una escritura: puede llegar
+    // con el chat ya cerrado (ver `showChatActionsSheet`).
+    if (!mounted) return;
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      Navigator.of(context).maybePop();
+    } else {
+      router.go('/feed/messages');
+    }
+  }
+
+  /// Abre el perfil público del otro, la misma pantalla del Feed. Cuelga de
+  /// la ruta del chat y no de `/feed/profile/:uid` a propósito: el chat es
+  /// una ruta top-level, y empujar desde acá una del shell clona el shell
+  /// entero encima del stack (go_router 14, `_createNewMatchUntilIncompatible`).
+  void _openProfile() {
+    GoRouter.maybeOf(context)
+        ?.push('/coach/chat/${widget.chatId}/profile/${widget.otherUid}');
   }
 
   @override
@@ -301,6 +346,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        // El avatar arranca pegado a la flecha: con el `titleSpacing` de 16
+        // por defecto quedaba un hueco que separaba el header en dos.
+        titleSpacing: 0,
         leading: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           tooltip: l10n.commonBack,
@@ -308,8 +356,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           // (`abrirChatConStack`), así que esto es un pop. El `go` queda de
           // red por si el stack no se pudo armar y el chat quedó solo: mejor
           // la bandeja que un botón muerto.
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/feed/messages'),
+          onPressed: _backToInbox,
         ),
         title: TreinoStateSwitcher(
           childKey: ValueKey(pubAsync.when(
@@ -323,40 +370,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               l10n.chatScreenTitleFallback,
               style: TextStyle(color: palette.textPrimary, fontSize: 16),
             ),
-            data: (pub) {
-              // When userPublicProfiles/{uid} is deleted, pub is null →
-              // show "Usuario eliminado" per ADR-ACCDEL-005.
-              final name = pub?.displayName ?? l10n.chatListDeletedUser;
-              final avatar = pub?.avatarUrl;
-              return Row(
-                children: [
-                  Semantics(
-                    image: true,
-                    label: l10n.a11yAvatarLabel(name),
-                    child: PostAvatar(
-                      authorDisplayName: name,
-                      authorAvatarUrl: avatar,
-                      size: 36,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      name,
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              );
-            },
+            // When userPublicProfiles/{uid} is deleted, pub is null →
+            // show "Usuario eliminado" per ADR-ACCDEL-005, sin perfil que
+            // abrir.
+            data: (pub) => _ChatHeaderTitle(
+              otherUid: widget.otherUid,
+              pub: pub,
+              onTap: pub == null ? null : _openProfile,
+            ),
           ),
         ),
+        actions: [
+          if (currentUid != null)
+            IconButton(
+              icon: Icon(TreinoIcon.dotsThree, color: palette.textPrimary),
+              tooltip: l10n.chatMoreActionsA11y,
+              onPressed: () => showChatActionsSheet(
+                context,
+                ref,
+                chatId: widget.chatId,
+                uid: currentUid,
+                archived: ref
+                        .read(chatByIdProvider(widget.chatId))
+                        .valueOrNull
+                        ?.isArchivedFor(currentUid) ??
+                    false,
+                onViewProfile:
+                    pubAsync.valueOrNull == null ? null : _openProfile,
+                // Archivado o eliminado, este chat ya no está donde estaba:
+                // volvemos a la bandeja.
+                onLeft: _leaveToInbox,
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -436,6 +482,90 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 }
 
 // ── Private widgets ────────────────────────────────────────────────────────
+
+/// Avatar + nombre + relación del header. Todo el bloque es un solo blanco
+/// de toque que abre el perfil público: avatar y nombre juntos son "la
+/// persona", y dos blancos chicos pegados serían más difíciles de acertar.
+class _ChatHeaderTitle extends ConsumerWidget {
+  const _ChatHeaderTitle({
+    required this.otherUid,
+    required this.pub,
+    required this.onTap,
+  });
+
+  final String otherUid;
+  final UserPublicProfile? pub;
+
+  /// `null` → sin perfil que abrir (cuenta eliminada).
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final name = pub?.displayName ?? l10n.chatListDeletedUser;
+    final reason = ref.watch(chatPartnerReasonProvider(otherUid));
+    // La relación primero —es lo que la bandeja ya muestra en Contactos—, y
+    // si no hay o todavía no cargó, el gym.
+    final subtitle = switch (reason) {
+          ChatContactReason.coach => l10n.chatContactReasonCoach,
+          ChatContactReason.athlete => l10n.chatContactReasonAthlete,
+          ChatContactReason.following => l10n.chatContactReasonFollowing,
+          null => null,
+        } ??
+        pub?.gymName;
+
+    final content = Row(
+      children: [
+        PostAvatar(
+          authorDisplayName: name,
+          authorAvatarUrl: pub?.avatarUrl,
+          size: 40,
+        ),
+        const SizedBox(width: AppSpacing.s12),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name.toUpperCase(),
+                style: GoogleFonts.barlowCondensed(
+                  color: palette.textPrimary,
+                  fontSize: AppTextSize.titleLarge,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  height: 1.1,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (subtitle != null && subtitle.isNotEmpty)
+                Text(
+                  subtitle,
+                  style: GoogleFonts.barlow(
+                    color: palette.textMuted,
+                    fontSize: AppTextSize.bodyDense,
+                    fontWeight: FontWeight.w400,
+                    height: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    return Semantics(
+      button: onTap != null,
+      label: onTap != null ? l10n.chatHeaderProfileA11y(name) : name,
+      excludeSemantics: true,
+      child: TreinoTappable(onTap: onTap, child: content),
+    );
+  }
+}
 
 /// Routes to the correct bubble widget based on [message.mediaType].
 ///

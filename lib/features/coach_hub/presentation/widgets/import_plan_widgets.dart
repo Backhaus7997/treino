@@ -158,7 +158,7 @@ class ImportDiagnosticsList extends StatelessWidget {
   }
 
   static String _line(ImportDiagnostic d) {
-    final cell = d.cellRef;
+    final cell = d.location;
     final raw = d.rawValue;
     final value = (raw == null || raw.isEmpty) ? '' : '`$raw`: ';
     return cell == null ? d.message : '$cell — $value${d.message}';

@@ -652,7 +652,7 @@ class _CoachHubPlanPreviewScreenState
     for (final day in plan.days) {
       if (day.dayNumber != key.dayNumber) continue;
       for (final row in day.rows) {
-        if (row.excelRow != key.row) continue;
+        if (row.position != key.row) continue;
         for (final ex in row.exercises) {
           if (ex.component == key.component) return ex.rawName;
         }

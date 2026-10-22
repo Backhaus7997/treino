@@ -16,6 +16,7 @@ import 'wear_workout_view_model.dart';
 import 'wear_fitted_text.dart';
 import 'dart:async';
 import 'wear_exercise_timer_screen.dart';
+import '../../application/wear_rest_sync_providers.dart';
 import '../../application/wear_timer_sync_providers.dart';
 import '../../data/wear_workout_service.dart';
 
@@ -72,7 +73,6 @@ class WearWorkoutScreen extends ConsumerWidget {
     // mientras se resuelve haria saltar el layout al llegar el primer pulso.
     final effort = ref.watch(wearEffortProvider).valueOrNull ??
         const WatchEffortDisplay.nada();
-    final service = ref.read(wearWorkoutServiceProvider);
 
     // ── El ejercicio por tiempo se lleva la pantalla entera ──────────────────
     //
@@ -110,11 +110,20 @@ class WearWorkoutScreen extends ConsumerWidget {
         if (ref.read(wearTimerAjenoProvider) == t.endsAtElapsedMs) return;
 
         final n = snapshot.nextSetNumber;
-        if (n != null) onLogSet(snapshot.exerciseId, n);
         unawaited(ref.read(wearTimerSyncProvider).cancelar());
+        // Sin serie que marcar no hay descanso que arrancar: el descanso es
+        // el de una serie, y desde #1616 viaja con su identidad al teléfono.
+        if (n == null) return;
+        onLogSet(snapshot.exerciseId, n);
         // El descanso arranca igual que en una serie normal: terminar de
         // aguantar es terminar la serie.
-        ref.read(wearWorkoutServiceProvider).startRest(snapshot.restSeconds);
+        unawaited(
+          ref.read(wearRestSyncProvider).arrancar(
+                exerciseId: snapshot.exerciseId,
+                setNumber: n,
+                seconds: snapshot.restSeconds,
+              ),
+        );
       },
     );
 
@@ -166,7 +175,8 @@ class WearWorkoutScreen extends ConsumerWidget {
           _RestBar(
             remainingMs: rest.remainingMs,
             finished: rest.finished,
-            onSkip: service.cancelRest,
+            // Saltar acá lo salta también en el teléfono (#1616).
+            onSkip: () => unawaited(ref.read(wearRestSyncProvider).saltar()),
           ),
         ],
         const SizedBox(height: 8),
@@ -210,7 +220,16 @@ class WearWorkoutScreen extends ConsumerWidget {
             // snapshot y no se busca al marcar porque la última serie arranca
             // el descanso y acto seguido el cursor avanza: leerlo después daría
             // el del ejercicio siguiente.
-            service.startRest(snapshot.restSeconds);
+            //
+            // Y se anota en la sesión (#1616): el teléfono muestra el MISMO
+            // descanso y avisan juntos.
+            unawaited(
+              ref.read(wearRestSyncProvider).arrancar(
+                    exerciseId: snapshot.exerciseId,
+                    setNumber: setNumber,
+                    seconds: snapshot.restSeconds,
+                  ),
+            );
           },
         ),
         const SizedBox(height: 12),
