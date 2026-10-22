@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/presentation/legal/legal_content.dart';
 import '../domain/user_role.dart';
 import 'user_providers.dart';
 
@@ -27,6 +26,17 @@ class LegacyPrivacyNoticeDismissed extends Notifier<bool> {
   void markDismissed() => state = true;
 }
 
+/// Corte del aviso legacy: la publicación del texto de la política que
+/// corrigió la sección de ubicación (2026-09-03).
+///
+/// Es una constante PROPIA y no la fecha de la versión vigente
+/// (`kPrivacyV{N}PublishedAt` en `legal_content.dart`) a propósito. Este
+/// aviso existe por ESE cambio, y la fecha de la versión vigente se mueve con
+/// cada bump: cuando la política pasó a v5 (Vertex AI, 2026-10-22), leerla de
+/// ahí habría mandado el aviso a todos los atletas por un cambio que trata
+/// sobre entrenadores.
+final DateTime kLegacyPrivacyNoticeCutoff = DateTime.utc(2026, 9, 3);
+
 final legacyPrivacyNoticeDismissedProvider =
     NotifierProvider<LegacyPrivacyNoticeDismissed, bool>(
   LegacyPrivacyNoticeDismissed.new,
@@ -40,7 +50,7 @@ final legacyPrivacyNoticeDismissedProvider =
 /// `acceptedPrivacyVersion == null` — el campo no distingue a nadie hasta
 /// que la población rote. La única evidencia que ya existe hoy en
 /// producción es `termsAcceptedAt`, y por eso la comparación es contra
-/// [kPrivacyV4PublishedAt].
+/// [kLegacyPrivacyNoticeCutoff].
 ///
 /// **Por qué sólo atletas.** Al entrenador la sección "4. Ubicación" vieja
 /// le decía algo FALSO, y su camino es el sheet de re-consentimiento, que
@@ -70,5 +80,5 @@ final shouldShowLegacyPrivacyNoticeProvider = Provider<bool>((ref) {
   if (fields.role != UserRole.athlete) return false;
   final acceptedAt = fields.acceptedAt;
   if (acceptedAt == null) return false;
-  return acceptedAt.isBefore(kPrivacyV4PublishedAt);
+  return acceptedAt.isBefore(kLegacyPrivacyNoticeCutoff);
 });
