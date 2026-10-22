@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -113,6 +115,16 @@ final pdfImportRemainingProvider =
     Provider.autoDispose<PdfImportRemaining?>((ref) {
   final sub = ref.watch(_subscriptionRawProvider);
   final usage = ref.watch(_pdfImportUsageProvider);
+  // Las claves de día y semana cambian con el reloj, no con Firestore: sin
+  // esto, una pantalla abierta al cruzar la medianoche ART (o el lunes)
+  // seguiría mostrando el cupo de ayer. La medianoche del lunes también es
+  // un borde de día, así que un solo timer cubre los dos.
+  final artNow = argentinaNow();
+  final nextMidnight = DateTime.utc(artNow.year, artNow.month, artNow.day + 1);
+  final untilMidnight =
+      nextMidnight.difference(artNow) + const Duration(seconds: 1);
+  final timer = Timer(untilMidnight, ref.invalidateSelf);
+  ref.onDispose(timer.cancel);
   if (!sub.hasValue || !usage.hasValue || sub.hasError || usage.hasError) {
     return null;
   }
@@ -123,6 +135,6 @@ final pdfImportRemainingProvider =
   return pdfImportRemainingFrom(
     usage: usage.requireValue,
     tier: tier,
-    artNow: argentinaNow(),
+    artNow: artNow,
   );
 });
