@@ -529,7 +529,7 @@ class _ProgramParser {
     }
 
     return PeriodizedRow(
-      excelRow: r + 1,
+      position: r + 1,
       number: number,
       restSeconds: rest!.seconds!,
       exercises: exercises,
