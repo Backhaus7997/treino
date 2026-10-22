@@ -244,7 +244,7 @@ class _PlanPdfImportPreviewScreenState
     final draft = ref.watch(periodizedImportProvider);
 
     if (draft == null) {
-      // Entrada sin borrador (deep link, o se perdió): de vuelta a subir.
+      // Entrada sin borrador (deep link, o se perdió): de vuelta a la ficha.
       if (!_leaving) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && !_leaving) _back();

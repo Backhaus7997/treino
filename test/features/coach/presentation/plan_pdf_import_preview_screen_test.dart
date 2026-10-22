@@ -86,6 +86,19 @@ PeriodizedImportDraft _draft() {
   );
 }
 
+/// Todo resuelto menos la sugerencia de [_k2]: confirmarla habilita ASIGNAR
+/// y deja la pantalla «tocada» (salir pide confirmación).
+PeriodizedImportDraft _casiResuelto() {
+  final d = _resolved();
+  return PeriodizedImportDraft(
+    plan: d.plan,
+    warnings: const [],
+    name: d.name,
+    assignments: {...d.assignments}..remove(_k2),
+    suggestions: {_k2: _sentadilla},
+  );
+}
+
 /// Todo resuelto: ASIGNAR habilitado.
 PeriodizedImportDraft _resolved() {
   final d = _draft();
@@ -354,7 +367,12 @@ void main() {
         'editor', (tester) async {
       when(() => routineRepo.createAssigned(any())).thenAnswer((inv) async =>
           (inv.positionalArguments.first as Routine).copyWith(id: 'nuevo-1'));
-      final c = await pump(tester, _resolved());
+      final c = await pump(tester, _casiResuelto());
+      expect(assignEnabled(tester), isFalse);
+      // Resolver lo último a mano: desbloquea, y la pantalla queda «tocada»
+      // (su PopScope ya no deja salir sin preguntar). Igual tiene que volver.
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
       expect(assignEnabled(tester), isTrue);
 
       await tester.tap(assignButton());
@@ -371,6 +389,27 @@ void main() {
       await tester.tap(find.text('ABRIR EDITOR'));
       await tester.pumpAndSettle();
       expect(find.text('editor:$kAthleteId:nuevo-1'), findsOneWidget);
+    });
+
+    testWidgets('salir con cosas resueltas pregunta; «Salir igual» descarta',
+        (tester) async {
+      final c = await pump(tester, _casiResuelto());
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('¿Salir sin guardar el plan?'), findsOneWidget);
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(find.text('FICHA'), findsNothing);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Salir igual'));
+      await tester.pumpAndSettle();
+      expect(find.text('FICHA'), findsOneWidget);
+      expect(c.read(periodizedImportProvider), isNull);
     });
 
     testWidgets('si falla, el error queda en la pantalla y el plan también',
