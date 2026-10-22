@@ -4,6 +4,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
+import '../../workout/application/custom_exercise_providers.dart';
+import '../../workout/application/exercise_providers.dart';
+import '../../workout/application/session_providers.dart'
+    show currentUidProvider;
+import '../data/plan_draft_matcher.dart';
+import '../data/plan_pdf_import_service.dart';
+import 'cf_providers.dart';
+
+final planPdfImportServiceProvider = Provider<PlanPdfImportService>((ref) {
+  return PlanPdfImportService(
+    call: parsePlanPdfCallable(ref.watch(cloudFunctionsProvider)),
+    matcher: PlanDraftMatcher(
+      exerciseRepository: ref.watch(exerciseRepositoryProvider),
+      // Mismo criterio que el import de Excel: si los propios tardan, se
+      // matchea sólo con la biblioteca.
+      customExercises: () async {
+        final uid = ref.read(currentUidProvider);
+        if (uid == null || uid.isEmpty) return const [];
+        return ref
+            .read(customExercisesForTrainerStreamProvider(uid).future)
+            .timeout(const Duration(seconds: 5));
+      },
+    ),
+  );
+});
 
 /// Si el CTA «Importar de PDF» se muestra. Tres estados, sin colapsar «no
 /// sé» con «no hay»: mientras se resuelve la sesión o el documento es
