@@ -25,6 +25,7 @@ import '../application/session_init.dart';
 import '../application/session_notifier.dart';
 import '../application/session_providers.dart';
 import '../application/phone_duration_timer.dart';
+import '../application/rest_end_alerts.dart';
 import '../application/rest_sync_providers.dart';
 import '../application/session_state.dart';
 import '../application/workout_clock.dart';
@@ -222,10 +223,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   ///
   /// Desde #1616 el descanso es COMPARTIDO con el reloj: lo arranca marcar una
   /// serie acá ([_logSet]) o en la muñeca, y llega por la sesión
-  /// ([_onDescansoRemoto]). Las dos puntas terminan en [_ponerDescanso], que es
-  /// el ÚNICO lugar donde esto se asigna — así, lo que necesite enterarse de un
-  /// cambio de descanso (la notificación de #1617) se engancha ahí y cubre los
-  /// dos orígenes sin saber que existen.
+  /// ([_onDescansoRemoto]). Sólo se escribe en [_ponerDescanso], que es el
+  /// ÚNICO lugar donde cambia y el que le avisa a [_avisos] (#1617): así la
+  /// notificación sigue al descanso venga de donde venga.
   DateTime? _descansoHasta;
   int _descansoTotal = 0;
 
@@ -234,8 +234,23 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// sesión al estirarlo con +15 s.
   RestState? _descanso;
 
-  /// El único lugar que cambia el descanso de esta pantalla. Ver
-  /// [_descansoHasta].
+  /// La notificación de fin de descanso para cuando la app está en segundo
+  /// plano (#1617). Se toma en `initState` y no con `ref.read` al usarla porque
+  /// `dispose` también la necesita.
+  late final RestEndAlerts _avisos;
+
+  /// ÚNICO punto donde cambia el descanso. Pasan por acá las cuatro fuentes:
+  /// el arranque local, «+15 s» y SALTAR locales, llegar a cero, y lo que
+  /// llega del reloj por la sesión (adoptar o cortar). Así no hay un camino que
+  /// cambie la barra y deje la notificación agendada para la hora vieja.
+  ///
+  /// Cómo le llega cada fin a [_avisos] —la regla vive en `RestEndAlerts`, y
+  /// acá alcanza con decirle la verdad—:
+  /// - llegar a cero (`onDone` de la barra) es `update(null)` con el instante
+  ///   YA vencido: fin natural, NO cancela el aviso, que a esa hora está por
+  ///   salir. Tampoco se escribe en la sesión: el reloj llega a cero solo.
+  /// - SALTAR, acá o en el reloj, es `update(null)` con el fin TODAVÍA por
+  ///   venir: cancela.
   void _ponerDescanso(RestState? descanso) {
     if (!mounted) return;
     setState(() {
@@ -243,6 +258,24 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       _descansoHasta = descanso?.endsAt;
       _descansoTotal = descanso?.totalSeconds ?? 0;
     });
+    _sincronizarAviso();
+  }
+
+  /// Le dice a [_avisos] cuándo termina el descanso que la barra está mostrando
+  /// —o `null`—. Con la sesión completa la barra no se dibuja (no hay próxima
+  /// serie que esperar), y tampoco se avisa.
+  ///
+  /// Se llama desde [_ponerDescanso] y desde el listener de la sesión completa
+  /// (que puede cambiar DESPUÉS del descanso, porque `logSet` es asíncrono).
+  /// `dispose` no pasa por acá: no conviene leer providers mientras la pantalla
+  /// se desmonta, y no hace falta: le habla a [_avisos] directo, con `cancel`.
+  void _sincronizarAviso() {
+    final completa = ref
+            .read(sessionNotifierProvider(widget.init))
+            .value
+            ?.isFullyCompleted ??
+        false;
+    _avisos.update(completa ? null : _descansoHasta);
   }
 
   /// Arranca el descanso de la serie recién marcada y lo anota en la sesión.
@@ -295,6 +328,10 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   ///
   /// Espejar NUNCA escribe: si escribiera, cada aparato le contestaría al otro
   /// y el descanso rebotaría para siempre. Ver `rest_rules.dart`.
+  ///
+  /// La notificación de #1617 la mueve [_ponerDescanso], como en los caminos
+  /// locales: adoptar agenda el fin nuevo, y cortar un descanso que todavía no
+  /// venció la cancela.
   void _onDescansoRemoto(RestState? remoto) {
     final accion = RestRules.decide(
       local: _descansoHasta,
@@ -377,6 +414,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _avisos = ref.read(restEndAlertsProvider);
     // Diferido a post-frame: leer el provider y suscribirse al canal de error
     // recién cuando el árbol está montado, así el SnackBar tiene un
     // ScaffoldMessenger válido y no corremos ref.read durante initState.
@@ -394,6 +432,15 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       control.addListener(_onElRelojPideCancelar);
       _controlDelReloj = control;
       _onCronometroCambio();
+
+      // La sesión puede completarse DESPUÉS de arrancar el descanso (`logSet`
+      // es asíncrono): ahí el aviso del descanso ya no tiene sentido.
+      ref.listenManual<bool>(
+        sessionNotifierProvider(widget.init).select(
+          (s) => s.value?.isFullyCompleted ?? false,
+        ),
+        (_, __) => _sincronizarAviso(),
+      );
     });
   }
 
@@ -523,6 +570,11 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     _cronometro?.removeListener(_onCronometroCambio);
     _controlDelReloj?.removeListener(_onElRelojPideCancelar);
     _cronometroTick?.cancel();
+    // La pantalla se va (TERMINAR, ABANDONAR, volver atrás): ya no hay descanso
+    // que esperar, y una notificación agendada anunciaría «Volvé a la serie»
+    // de una sesión que ya terminó. `cancel` y no `update(null)`: éste toma un
+    // descanso ya vencido por «terminó solo» y no retira nada.
+    _avisos.cancel();
     super.dispose();
   }
 

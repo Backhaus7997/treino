@@ -1,0 +1,45 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Manifest del TELÉFONO. Se mergea SOLO en el flavor `phone`, en cualquier
+      build type. Es el espejo de src/wear/AndroidManifest.xml.
+
+      Lo que va acá y no en src/main es lo que el reloj NO debe heredar: el
+      manifest de wear declara a propósito que no usa SCHEDULE_EXACT_ALARM ni
+      USE_EXACT_ALARM (ver RestAlarm.kt), y con el permiso en main esa frase
+      sería falsa para el APK del reloj.
+    -->
+
+    <!-- Aviso de fin de descanso con la app en segundo plano (#1617): Dart agenda
+         una notificación con `zonedSchedule` y la dispara el sistema.
+
+         Con este permiso CONCEDIDO el aviso sale exacto (`exactAllowWhileIdle`);
+         sin él cae a `inexactAllowWhileIdle`. Es el permiso que la doc de
+         Android pide para las alarmas exactas, y el que el plugin chequea
+         (`canScheduleExactAlarms()`) antes de agendarlas.
+
+         Lo que NO hace: pedirlo. La app no manda al usuario a Ajustes. La doc
+         de Android 14 dice que el permiso «deja de» preconcederse a las apps
+         nuevas con target 33+, o sea que ahí queda DENEGADO salvo que el
+         usuario lo habilite a mano, y el aviso es inexacto. Tampoco se declara
+         USE_EXACT_ALARM: el README del plugin avisa que las tiendas pueden
+         auditarlo.
+
+         El otro permiso que el README lista para agendar —RECEIVE_BOOT_COMPLETED,
+         con su receiver de reinicio— NO se declara: el aviso dura segundos o
+         pocos minutos, y reagendarlo después de un reinicio sería avisar de un
+         descanso que ya no existe. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <application>
+        <!-- El receiver que el sistema invoca al vencer la alarma y que dibuja la
+             notificación agendada. El plugin NO lo declara en su propio manifest:
+             sin esta línea `zonedSchedule` agenda sin error y la notificación no
+             sale nunca.
+
+             Sale por el canal `treino_avisos` (kCanalDeAvisos), el mismo que las
+             de primer plano; lo fija el id de canal que Dart le pasa. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false" />
+    </application>
+</manifest>

@@ -274,11 +274,14 @@ void main() {
     // y termina ahí.
     const start = 100 - TreinoTopBarMetrics.revealDistance;
 
+    // Un `jumpTo` es un salto en un solo frame: más rápido que cualquier
+    // fling, así que la barra lo persigue con el resorte. Se deja asentar
+    // para medir a dónde LLEGA; cómo llega lo miden los tests de fling.
     Future<void> scrollTo(WidgetTester tester, double pixels) async {
       final pos =
           tester.state<ScrollableState>(find.byType(Scrollable)).position;
       pos.jumpTo(pixels);
-      await tester.pump();
+      await tester.pumpAndSettle();
     }
 
     testWidgets('a mitad del recorrido, la barra queda a mitad',
@@ -409,6 +412,55 @@ void main() {
 
       expect(find.byKey(scrim), findsNothing);
       expect(overlayStyle(tester), SystemUiOverlayStyle.dark);
+    });
+  });
+
+  group('fling: entra con resorte, no de golpe', () {
+    int framesIntermedios(WidgetTester tester) {
+      final opacidad = tester.widget<Opacity>(find.byKey(_surface)).opacity;
+      return opacidad > 0 && opacidad < 1 ? 1 : 0;
+    }
+
+    Future<int> flingYContar(WidgetTester tester) async {
+      await tester.fling(find.byType(ListView), const Offset(0, -300), 4000);
+      var intermedios = 0;
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 8));
+        if (find.byKey(_surface).evaluate().isNotEmpty) {
+          intermedios += framesIntermedios(tester);
+        }
+      }
+      await tester.pumpAndSettle();
+      return intermedios;
+    }
+
+    testWidgets('un fling la hace entrar a lo largo de varios frames',
+        (tester) async {
+      await _pump(tester, _screen());
+      final intermedios = await flingYContar(tester);
+
+      // A 4000 px/s los 72 px de aparición se cruzan en ~2 frames de 8 ms; con
+      // el resorte de 0,25 s la entrada dura ~35.
+      expect(intermedios, greaterThan(10));
+      expect(tester.widget<Opacity>(find.byKey(_surface)).opacity, 1);
+    });
+
+    testWidgets('con «reducir movimiento» el fling la pone directo',
+        (tester) async {
+      await _pump(
+        tester,
+        MediaQuery(
+          data: const MediaQueryData(
+            disableAnimations: true,
+            padding: EdgeInsets.only(top: _safeTop),
+          ),
+          child: _screen(),
+        ),
+      );
+      final intermedios = await flingYContar(tester);
+
+      expect(intermedios, lessThan(5));
+      expect(tester.widget<Opacity>(find.byKey(_surface)).opacity, 1);
     });
   });
 }

@@ -2269,6 +2269,17 @@ class AppL10nEs extends AppL10n {
       'Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.';
 
   @override
+  String get chatActionViewProfile => 'Ver perfil';
+
+  @override
+  String chatHeaderProfileA11y(String name) {
+    return 'Ver el perfil de $name';
+  }
+
+  @override
+  String get chatMoreActionsA11y => 'Opciones del chat';
+
+  @override
   String chatArchivedSectionTitle(int count) {
     return 'Archivados · $count';
   }
@@ -5887,6 +5898,19 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get authSignOutConfirmAction => 'Salir';
+
+  @override
+  String get sessionRestEndedTitle => 'Terminó el descanso';
+
+  @override
+  String get sessionRestEndedBody => 'Vuelve a la serie';
+
+  @override
+  String get sessionRestCountdownTitle => 'Descanso';
+
+  @override
+  String get sessionRestCountdownBody =>
+      'Vuelve a la serie cuando llegue a cero';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8152,6 +8176,17 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get chatDeleteConfirmBody =>
       'Se borra el historial sólo para vos: la otra persona lo sigue viendo. Si te vuelve a escribir, el chat reaparece desde ese mensaje.';
+
+  @override
+  String get chatActionViewProfile => 'Ver perfil';
+
+  @override
+  String chatHeaderProfileA11y(String name) {
+    return 'Ver el perfil de $name';
+  }
+
+  @override
+  String get chatMoreActionsA11y => 'Opciones del chat';
 
   @override
   String chatArchivedSectionTitle(int count) {
@@ -11769,4 +11804,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get authSignOutConfirmAction => 'Salir';
+
+  @override
+  String get sessionRestEndedTitle => 'Terminó el descanso';
+
+  @override
+  String get sessionRestEndedBody => 'Volvé a la serie';
+
+  @override
+  String get sessionRestCountdownTitle => 'Descanso';
+
+  @override
+  String get sessionRestCountdownBody =>
+      'Volvé a la serie cuando llegue a cero';
 }
