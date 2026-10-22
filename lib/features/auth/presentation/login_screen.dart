@@ -9,6 +9,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../app/theme/tokens/tokens.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../application/auth_notifier.dart';
 import '../application/auth_providers.dart';
 import '../../../l10n/app_l10n.dart';
 import '../domain/auth_failure.dart';
@@ -33,6 +34,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Qué botón social dispara el OAuth en curso (spinner en ese botón).
   AuthSocialProvider? _pendingProvider;
 
+  /// Error del último intento disparado DESDE ESTA pantalla. Es estado local a
+  /// propósito: el `AsyncError` de `authNotifierProvider` es global y sobrevive
+  /// a la navegación, así que leído directo pegaba «Email o contraseña
+  /// incorrectos» de Login en Registro hasta el próximo login exitoso (QA 07).
+  /// Al ser del `State`, se va con la pantalla: salir, volver atrás o cambiar
+  /// de pantalla de auth lo limpia sin tocar el notifier ni el router.
+  AuthFailure? _failure;
+
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -42,8 +51,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _emailCtrl.addListener(() => setState(() {}));
-    _passwordCtrl.addListener(() => setState(() {}));
+    _emailCtrl.addListener(_onFieldChanged);
+    _passwordCtrl.addListener(_onFieldChanged);
   }
 
   @override
@@ -53,6 +62,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _emailFocus.dispose();
     _passwordFocus.dispose();
     super.dispose();
+  }
+
+  String _lastEmail = '';
+  String _lastPassword = '';
+
+  /// Editar email o contraseña invalida el error del intento anterior. Sólo
+  /// cuenta el TEXTO: el controller también notifica cambios de selección
+  /// (tocar el campo), y eso no tiene por qué borrar el aviso.
+  void _onFieldChanged() {
+    final edited =
+        _emailCtrl.text != _lastEmail || _passwordCtrl.text != _lastPassword;
+    _lastEmail = _emailCtrl.text;
+    _lastPassword = _passwordCtrl.text;
+    setState(() {
+      if (edited) _failure = null;
+    });
+  }
+
+  /// Corre una acción del notifier y se queda con SU resultado. Se lee el
+  /// estado justo después del `await`, antes de que otra pantalla pueda
+  /// disparar nada, así que el error es el de este intento y no uno heredado.
+  Future<void> _attempt(Future<void> Function(AuthNotifier n) action) async {
+    setState(() => _failure = null);
+    await action(ref.read(authNotifierProvider.notifier));
+    if (!mounted) return;
+    final state = ref.read(authNotifierProvider);
+    setState(() {
+      _failure = state.hasError && state.error is AuthFailure
+          ? state.error as AuthFailure
+          : null;
+    });
   }
 
   bool get _fieldsEmpty =>
@@ -72,20 +112,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // Error prevention (Nielsen): validate format client-side before the
     // network round-trip, mirroring register_screen.dart.
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    await ref.read(authNotifierProvider.notifier).signIn(
-          email: _emailCtrl.text.trim(),
-          password: _passwordCtrl.text,
-        );
+    await _attempt(
+      (n) => n.signIn(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      ),
+    );
   }
 
   Future<void> _signInWithGoogle() async {
     setState(() => _pendingProvider = AuthSocialProvider.google);
-    await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+    await _attempt((n) => n.signInWithGoogle());
   }
 
   Future<void> _signInWithApple() async {
     setState(() => _pendingProvider = AuthSocialProvider.apple);
-    await ref.read(authNotifierProvider.notifier).signInWithApple();
+    await _attempt((n) => n.signInWithApple());
   }
 
   @override
@@ -96,9 +138,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // a "listo" en ese hueco lee como que el tap no hizo nada (issue #499).
     // Estando logueado en una ruta pública el único desenlace es el redirect.
     final isLoading = authState.isLoading || authState.valueOrNull != null;
-    final failure = authState.hasError && authState.error is AuthFailure
-        ? authState.error as AuthFailure
-        : null;
+    final failure = _failure;
 
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
