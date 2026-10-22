@@ -49,6 +49,7 @@ enum ImportDiagnosticCode {
   invalidReps,
   invalidWeight,
   invalidComponent,
+  mixedPrescription,
 
   /// Avisos: lo que el extractor reportó como dudoso, y datos opcionales
   /// descartados (candidato del catálogo, texto fuente).

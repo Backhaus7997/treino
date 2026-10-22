@@ -220,9 +220,32 @@ void main() {
       _rejects(r, ImportDiagnosticCode.invalidNumber);
     });
 
-    test('reps fijas Y rango en la misma serie: invalidReps', () {
-      final r = periodizedPlanFromJson(_valid((j) => _pressSet(j)['reps'] = 8));
-      _rejects(r, ImportDiagnosticCode.invalidReps);
+    test('dos prescripciones en la misma serie: mixedPrescription', () {
+      final mezclas = <void Function(Map<String, dynamic>)>[
+        (set) => set['reps'] = 8, // reps fijas y rango
+        (set) => set['durationSeconds'] = 30, // rango y duración
+        (set) => set
+          ..['repsMin'] = null
+          ..['repsMax'] = null
+          ..['reps'] = 10
+          ..['distanceMeters'] = 400, // reps y distancia
+      ];
+      for (final mezclar in mezclas) {
+        final r = periodizedPlanFromJson(_valid((j) => mezclar(_pressSet(j))));
+        _rejects(r, ImportDiagnosticCode.mixedPrescription);
+      }
+    });
+
+    test('una sola prescripción por serie, de cualquier modo, es válida', () {
+      for (final campo in ['durationSeconds', 'distanceMeters']) {
+        final r = periodizedPlanFromJson(_valid((j) {
+          _pressSet(j)
+            ..['repsMin'] = null
+            ..['repsMax'] = null
+            ..[campo] = 30;
+        }));
+        expect(r.errors, isEmpty, reason: '${r.diagnostics}');
+      }
     });
 
     test('rango a medias: invalidReps', () {
@@ -310,6 +333,40 @@ void main() {
       expect(r.canImport, isFalse);
       expect(r.plan!.days.last.rows.map((row) => row.position), [2]);
       expect(r.errors.single.message, startsWith('Día 2, renglón 1'));
+    });
+  });
+
+  group('hallazgos de Codex en #1628', () {
+    test('modos mezclados entre series del ejercicio: aviso mixedSetKinds', () {
+      final r = periodizedPlanFromJson(_valid((j) {
+        // Semana 2 del press: una serie por tiempo en vez de por reps.
+        _press(j)['weeks'][1]
+            [1] = _set(type: 'normal')..['durationSeconds'] = 40;
+      }));
+      expect(r.canImport, isTrue, reason: '${r.diagnostics}');
+      final w = r.warnings
+          .singleWhere((w) => w.code == ImportDiagnosticCode.mixedSetKinds);
+      expect(w.message, contains('Press banca plano con barra'));
+      expect(w.message, contains('reps y duración'));
+    });
+
+    test('un solo modo: sin aviso de modos mezclados', () {
+      final r = periodizedPlanFromJson(_fixture('valido'));
+      expect(r.warnings.map((w) => w.code),
+          isNot(contains(ImportDiagnosticCode.mixedSetKinds)));
+    });
+
+    test('semana vacía de un calentamiento conserva el tipo warmup', () {
+      final j = _fixture('calentamiento') as Map<String, dynamic>;
+      j['numWeeks'] = 2;
+      for (final row in j['days'][0]['rows'] as List) {
+        (row['exercises'][0]['weeks'] as List).add([]);
+      }
+      final rows = periodizedPlanFromJson(j).plan!.days.single.rows;
+      expect(rows.first.exercises.single.weeks[1],
+          const [SetSpec(type: SetType.warmup)]);
+      // Un renglón numerado no es calentamiento: su vacía es normal.
+      expect(rows.last.exercises.single.weeks[1], const [SetSpec()]);
     });
   });
 

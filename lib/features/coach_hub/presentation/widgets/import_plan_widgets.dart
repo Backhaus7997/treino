@@ -117,6 +117,8 @@ String importDiagnosticGroupTitle(ImportDiagnosticCode code) => switch (code) {
       ImportDiagnosticCode.invalidReps => 'Reps inválidas',
       ImportDiagnosticCode.invalidWeight => 'Pesos inválidos',
       ImportDiagnosticCode.invalidComponent => 'Superseries mal numeradas',
+      ImportDiagnosticCode.mixedPrescription =>
+        'Series con más de una prescripción',
       ImportDiagnosticCode.extractorWarning => 'Para revisar',
       ImportDiagnosticCode.invalidOptionalField => 'Datos descartados',
     };

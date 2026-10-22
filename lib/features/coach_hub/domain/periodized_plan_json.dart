@@ -208,7 +208,7 @@ class _PlanJsonReader {
     }
     final exercises = <PeriodizedExercise>[];
     for (final e in rawExercises) {
-      final ex = _readExercise(where, e, weeks);
+      final ex = _readExercise(where, e, weeks, warmup: number.value == null);
       if (ex != null) exercises.add(ex);
     }
     exercises.sort((a, b) => a.component.compareTo(b.component));
@@ -234,7 +234,12 @@ class _PlanJsonReader {
     );
   }
 
-  PeriodizedExercise? _readExercise(String row, Object? raw, int weeks) {
+  PeriodizedExercise? _readExercise(
+    String row,
+    Object? raw,
+    int weeks, {
+    required bool warmup,
+  }) {
     if (raw is! Map) {
       _error(ImportDiagnosticCode.malformedPlan,
           '$row: un ejercicio no tiene la forma esperada.');
@@ -277,10 +282,13 @@ class _PlanJsonReader {
           continue;
         }
         // Semana sin carga: como la celda vacía del Excel, una serie sin
-        // valores que la vista previa marca en rojo.
+        // valores que la vista previa marca en rojo. En un calentamiento la
+        // serie es de calentamiento: si no, al cargarla después quedaría
+        // como serie efectiva.
         if (week.isEmpty) {
           emptyWeeks.add(w);
-          parsedWeeks.add(const [SetSpec()]);
+          parsedWeeks
+              .add([SetSpec(type: warmup ? SetType.warmup : SetType.normal)]);
           continue;
         }
         final sets = <SetSpec>[];
@@ -294,6 +302,7 @@ class _PlanJsonReader {
     }
 
     if (_errorCount > errorsBefore) return null;
+    _warnMixedKinds(where, parsedWeeks);
 
     final note = raw['note'];
     final candidate = _candidate(
@@ -360,10 +369,7 @@ class _PlanJsonReader {
     final repsMin = _repsField(where, 'el mínimo de reps', raw['repsMin']);
     final repsMax = _repsField(where, 'el máximo de reps', raw['repsMax']);
     final hasRange = repsMin != null || repsMax != null;
-    if (reps != null && hasRange) {
-      _error(ImportDiagnosticCode.invalidReps,
-          '$where: van reps fijas o un rango, no las dos cosas.');
-    } else if (hasRange && (repsMin == null || repsMax == null)) {
+    if (hasRange && (repsMin == null || repsMax == null)) {
       _error(ImportDiagnosticCode.invalidReps,
           '$where: el rango necesita mínimo y máximo.');
     } else if (hasRange && repsMin! > repsMax!) {
@@ -385,6 +391,22 @@ class _PlanJsonReader {
           raw: raw['distanceMeters']);
     }
 
+    // A lo sumo UNA prescripción por serie (el peso va aparte). Ninguna
+    // también vale: al fallo, o sin reps.
+    final prescriptions = [
+      if (reps != null) 'reps',
+      if (hasRange) 'rango',
+      if (duration.value != null) 'duración',
+      if (distance.value != null) 'distancia',
+    ];
+    if (prescriptions.length > 1) {
+      _error(
+        ImportDiagnosticCode.mixedPrescription,
+        '$where: una serie lleva una sola prescripción, y esta trae '
+        '${prescriptions.join(' y ')}.',
+      );
+    }
+
     if (_errorCount > errorsBefore) return null;
     return SetSpec(
       type: type!,
@@ -395,6 +417,31 @@ class _PlanJsonReader {
       durationSeconds: duration.value,
       distanceMeters: distance.value,
     );
+  }
+
+  /// Avisa si un ejercicio mezcla distancia, duración y reps (fijas o rango)
+  /// entre series o semanas: el slot tiene UN solo modo y las series del otro
+  /// tipo quedan sin dato. Mismo aviso que el Excel (`mixedSetKinds`).
+  void _warnMixedKinds(String where, List<List<SetSpec>> weeks) {
+    final kinds = <String>{};
+    for (final week in weeks) {
+      for (final s in week) {
+        if (s.distanceMeters != null) {
+          kinds.add('distancia');
+        } else if (s.durationSeconds != null) {
+          kinds.add('duración');
+        } else if (s.reps != null || s.repsMin != null) {
+          kinds.add('reps');
+        }
+      }
+    }
+    if (kinds.length > 1) {
+      _warn(
+        ImportDiagnosticCode.mixedSetKinds,
+        '$where: mezcla ${kinds.join(' y ')} entre series; un ejercicio '
+        'tiene un solo modo y las series del otro tipo quedan sin dato.',
+      );
+    }
   }
 
   /// Un campo de reps: null si no vino; error si no es un entero de 1 a
