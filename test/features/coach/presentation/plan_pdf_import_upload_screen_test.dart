@@ -45,6 +45,19 @@ class _FakeService implements PlanPdfImportService {
   }
 }
 
+/// Doble de la limpieza de la caché del picker: cuenta las llamadas y, si
+/// [fails], falla como lo haría una plataforma que no la implementa.
+class _Cleaner {
+  _Cleaner({this.fails = false});
+  final bool fails;
+  int calls = 0;
+
+  Future<void> call() async {
+    calls++;
+    if (fails) throw UnimplementedError('clearTemporaryFiles');
+  }
+}
+
 void _pickReturns(String name, int size) {
   FilePicker.platform = FakeFilePicker(
     PlatformFile(name: name, size: size, bytes: Uint8List(8)),
@@ -66,6 +79,7 @@ Future<ProviderContainer> _pump(
   WidgetTester tester,
   _FakeService service, {
   PdfImportRemaining? remaining,
+  _Cleaner? cleaner,
 }) async {
   final router = GoRouter(
     initialLocation: '/home',
@@ -91,6 +105,8 @@ Future<ProviderContainer> _pump(
   final container = ProviderContainer(overrides: [
     planPdfImportServiceProvider.overrideWithValue(service),
     pdfImportRemainingProvider.overrideWithValue(remaining),
+    pdfPickerCacheCleanerProvider
+        .overrideWithValue((cleaner ?? _Cleaner()).call),
   ]);
   addTearDown(container.dispose);
   await tester.pumpWidget(UncontrolledProviderScope(
@@ -368,5 +384,70 @@ void main() {
     expect(service.calls, ['plan.pdf:ath-1', 'plan.pdf:ath-1']);
     service.complete(const PdfImportInternal());
     await tester.pumpAndSettle();
+  });
+
+  group('la copia del PDF no queda en la caché del picker', () {
+    testWidgets('se borra al terminar bien, antes de salir de la pantalla',
+        (tester) async {
+      final service = _FakeService();
+      final cleaner = _Cleaner();
+      await _pump(tester, service, cleaner: cleaner);
+      _pickReturns('plan.pdf', 1000);
+      await _pickAndProcess(tester);
+      expect(cleaner.calls, 0);
+
+      service
+          .complete(PdfImportSuccess(draft: _draft(), quota: null, model: 'm'));
+      await tester.pump();
+      expect(cleaner.calls, 1);
+
+      await tester.pumpAndSettle();
+      expect(find.text('preview:ath-1'), findsOneWidget);
+      // Y otra vez al desmontarse la subida: es idempotente.
+      expect(cleaner.calls, 2);
+    });
+
+    testWidgets('se borra si falla, y la pantalla sigue ahí', (tester) async {
+      final service = _FakeService();
+      final cleaner = _Cleaner();
+      await _pump(tester, service, cleaner: cleaner);
+      _pickReturns('plan.pdf', 1000);
+      await _pickAndProcess(tester);
+
+      service.complete(const PdfImportTimeout());
+      await tester.pumpAndSettle();
+      expect(cleaner.calls, 1);
+      expect(find.text('Reintentar'), findsOneWidget);
+    });
+
+    testWidgets('se borra al salir sin procesar', (tester) async {
+      final cleaner = _Cleaner();
+      await _pump(tester, _FakeService(), cleaner: cleaner);
+      _pickReturns('plan.pdf', 1000);
+      await tester.tap(find.text('Elegir PDF'));
+      await tester.pumpAndSettle();
+      expect(cleaner.calls, 0);
+
+      await tester.tap(find.byTooltip('Volver'));
+      await tester.pumpAndSettle();
+      expect(find.text('FICHA'), findsOneWidget);
+      expect(cleaner.calls, 1);
+    });
+
+    testWidgets('si la limpieza falla, el flujo sigue', (tester) async {
+      final service = _FakeService();
+      final cleaner = _Cleaner(fails: true);
+      final container = await _pump(tester, service, cleaner: cleaner);
+      _pickReturns('plan.pdf', 1000);
+      await _pickAndProcess(tester);
+
+      service
+          .complete(PdfImportSuccess(draft: _draft(), quota: null, model: 'm'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(cleaner.calls, greaterThanOrEqualTo(1));
+      expect(container.read(periodizedImportProvider), isNotNull);
+      expect(find.text('preview:ath-1'), findsOneWidget);
+    });
   });
 }
