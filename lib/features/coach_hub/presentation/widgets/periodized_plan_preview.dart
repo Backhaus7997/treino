@@ -170,7 +170,7 @@ class _RowBlock extends StatelessWidget {
     final lines = [
       for (final ex in row.exercises)
         _ExerciseLine(
-          key: ValueKey('ex-${day.dayNumber}-${row.excelRow}-${ex.component}'),
+          key: ValueKey('ex-${day.dayNumber}-${row.position}-${ex.component}'),
           exKey: exerciseKeyOf(day, row, ex),
           exercise: ex,
           week: week,
@@ -214,7 +214,7 @@ class _RowBlock extends StatelessWidget {
       child: row.isSuperset
           // Las superseries se agrupan con un borde de acento y un fondo propio: se leen como UN bloque con varios ejercicios.
           ? Container(
-              key: ValueKey('superset-${day.dayNumber}-${row.excelRow}'),
+              key: ValueKey('superset-${day.dayNumber}-${row.position}'),
               padding: const EdgeInsets.all(AppSpacing.s12),
               decoration: BoxDecoration(
                 color: palette.bg,

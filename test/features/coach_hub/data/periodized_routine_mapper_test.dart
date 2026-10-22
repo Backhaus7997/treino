@@ -247,13 +247,13 @@ void main() {
   group('pesos y rangos', () {
     RoutineSlot slotFrom(List<List<SetSpec>> weeks) {
       final plan = PeriodizedPlan(numWeeks: weeks.length, days: [
-        PeriodizedDay(dayNumber: 1, headerRow: 1, rows: [
-          PeriodizedRow(excelRow: 1, number: 1, restSeconds: 90, exercises: [
+        PeriodizedDay(dayNumber: 1, rows: [
+          PeriodizedRow(position: 1, number: 1, restSeconds: 90, exercises: [
             PeriodizedExercise(component: 0, rawName: 'x', weeks: weeks),
           ]),
         ]),
       ]);
-      final key = (dayNumber: 1, row: 1, component: 0);
+      const key = (dayNumber: 1, row: 1, component: 0);
       return mapPeriodizedPlanToRoutine(plan, {key: _catalog().first},
               routineId: 'r', routineName: 'n', level: ExperienceLevel.beginner)
           .days

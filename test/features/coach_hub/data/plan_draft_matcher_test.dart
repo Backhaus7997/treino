@@ -36,14 +36,14 @@ void main() {
           ],
         );
     final plan = PeriodizedPlan(numWeeks: 1, days: [
-      PeriodizedDay(dayNumber: 1, headerRow: 0, rows: [
+      PeriodizedDay(dayNumber: 1, rows: [
         PeriodizedRow(
-            excelRow: 1,
+            position: 1,
             number: 1,
             restSeconds: 60,
             exercises: [ex('Press de banca')]),
         PeriodizedRow(
-            excelRow: 2,
+            position: 2,
             number: 2,
             restSeconds: 60,
             exercises: [ex('Remo pendlay con barra')]),

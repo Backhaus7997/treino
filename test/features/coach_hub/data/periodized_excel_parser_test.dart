@@ -30,7 +30,7 @@ void main() {
       final rows = r.plan!.days.single.rows;
       expect(rows.map((e) => e.exercises.single.rawName),
           ['Ejercicio A', 'Ejercicio B']);
-      expect(rows.map((e) => e.excelRow), [2, 5]);
+      expect(rows.map((e) => e.position), [2, 5]);
     });
 
     test('renglones vacíos en cualquier lugar del bloque', () {

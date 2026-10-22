@@ -51,7 +51,7 @@ ExerciseKey exerciseKeyOf(
   PeriodizedRow row,
   PeriodizedExercise ex,
 ) =>
-    (dayNumber: day.dayNumber, row: row.excelRow, component: ex.component);
+    (dayNumber: day.dayNumber, row: row.position, component: ex.component);
 
 /// Claves del plan que todavía no tienen ejercicio asignado.
 List<ExerciseKey> unresolvedKeys(

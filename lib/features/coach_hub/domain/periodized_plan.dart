@@ -1,8 +1,9 @@
 import '../../workout/domain/set_spec.dart';
 
-/// Borrador del import de Excel periodizado (spec:
-/// docs/plan-import-excel-periodizado.md). Es el resultado de LEER la
-/// plantilla, antes de matchear contra el catálogo y de armar la `Routine`.
+/// Borrador del import de un plan periodizado: del Excel (spec:
+/// docs/plan-import-excel-periodizado.md) o del JSON que extrae el import de
+/// PDF. Es el resultado de LEER el plan, antes de matchear contra el catálogo
+/// y de armar la `Routine`.
 ///
 /// Son clases planas y no freezed a propósito: no se serializan ni se
 /// persisten, sólo viajan del parser al mapper y a la vista previa.
@@ -38,7 +39,10 @@ enum ImportDiagnosticCode {
   mixedSetKinds,
 }
 
-/// Un hallazgo del parser, con la celda exacta para que el PF lo encuentre.
+/// Un hallazgo del parser, con la ubicación para que el PF lo encuentre: la
+/// celda en el Excel ([sheet], [row], [column]) o la página en el PDF
+/// ([page]). Lo que no tiene celda ni página lleva la ubicación en el
+/// [message].
 class ImportDiagnostic {
   const ImportDiagnostic({
     required this.severity,
@@ -47,6 +51,7 @@ class ImportDiagnostic {
     this.sheet,
     this.row,
     this.column,
+    this.page,
     this.rawValue,
   });
 
@@ -54,14 +59,17 @@ class ImportDiagnostic {
   final ImportDiagnosticCode code;
   final String message;
 
-  /// Hoja del Excel. Null en los hallazgos del archivo entero.
+  /// Hoja del Excel. Null en los hallazgos del archivo entero y en el PDF.
   final String? sheet;
 
-  /// Fila de Excel, base 1.
+  /// Fila de Excel, base 1. Null en el PDF.
   final int? row;
 
-  /// Letra de columna de Excel (`A`, `B`, … `AA`).
+  /// Letra de columna de Excel (`A`, `B`, … `AA`). Null en el PDF.
   final String? column;
+
+  /// Página del PDF, base 1, si el extractor la informó. Null en el Excel.
+  final int? page;
 
   /// Lo que había en la celda, tal cual (sin normalizar).
   final String? rawValue;
@@ -72,15 +80,19 @@ class ImportDiagnostic {
   String? get cellRef =>
       (row == null || column == null) ? null : '${sheet ?? ''}!$column$row';
 
+  /// Dónde buscarlo: la celda del Excel, `página N` del PDF, o null.
+  String? get location => cellRef ?? (page == null ? null : 'página $page');
+
   @override
   String toString() =>
-      'ImportDiagnostic(${severity.name}/${code.name}, ${cellRef ?? '-'}, '
+      'ImportDiagnostic(${severity.name}/${code.name}, ${location ?? '-'}, '
       '"$rawValue": $message)';
 }
 
-/// Identifica un componente de un renglón: día, fila de Excel (base 1) e
-/// índice dentro del renglón (0 = primer ejercicio de la superserie). Es una
-/// record, así que tiene igualdad estructural y sirve de clave de Map.
+/// Identifica un componente de un renglón: día, [PeriodizedRow.position] del
+/// renglón (fila de Excel u ordinal del PDF) e índice dentro del renglón (0 =
+/// primer ejercicio de la superserie). Es una record, así que tiene igualdad
+/// estructural y sirve de clave de Map.
 typedef ExerciseKey = ({int dayNumber, int row, int component});
 
 /// UN ejercicio de un renglón, con su prescripción semana por semana.
@@ -111,17 +123,18 @@ class PeriodizedExercise {
   final Set<int> emptyWeeks;
 }
 
-/// Un renglón cargado del Excel: uno o varios ejercicios (superserie).
+/// Un renglón del plan: uno o varios ejercicios (superserie).
 class PeriodizedRow {
   const PeriodizedRow({
-    required this.excelRow,
+    required this.position,
     required this.number,
     required this.restSeconds,
     required this.exercises,
   });
 
-  /// Fila de Excel, base 1.
-  final int excelRow;
+  /// Identifica el renglón dentro del día, base 1: la fila de Excel en el
+  /// Excel; el ordinal del renglón en el día en el PDF (que no tiene filas).
+  final int position;
 
   /// Valor de la columna `N°`. Null = sin número = calentamiento.
   final int? number;
@@ -138,19 +151,19 @@ class PeriodizedRow {
 class PeriodizedDay {
   const PeriodizedDay({
     required this.dayNumber,
-    required this.headerRow,
+    this.headerRow,
     required this.rows,
   });
 
   final int dayNumber;
 
-  /// Fila de Excel (base 1) del encabezado `DÍA N`.
-  final int headerRow;
+  /// Fila de Excel (base 1) del encabezado `DÍA N`. Null en el PDF.
+  final int? headerRow;
 
   final List<PeriodizedRow> rows;
 }
 
-/// El plan leído: columnas SEMANA y bloques de día. Sin nada del catálogo.
+/// El plan leído: semanas y bloques de día. Sin nada del catálogo.
 class PeriodizedPlan {
   const PeriodizedPlan({required this.numWeeks, required this.days});
 
