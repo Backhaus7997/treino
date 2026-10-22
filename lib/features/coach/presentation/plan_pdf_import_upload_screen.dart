@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../app/theme/tokens/tokens.dart';
+import '../../../core/utils/argentina_time.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_confirm_dialog.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -429,8 +430,8 @@ String _quotaMessage(AppL10n l10n, PdfQuotaScope scope, DateTime? resetsAt) {
     return l10n.pdfImportErrorQuotaUnknown;
   }
   String two(int n) => n.toString().padLeft(2, '0');
-  // Un instante real: en la hora del teléfono.
-  final at = resetsAt.toLocal();
+  // El cupo se resetea en hora argentina (spec), no en la del teléfono.
+  final at = toArgentina(resetsAt.toUtc());
   final date = '${two(at.day)}/${two(at.month)}';
   final time = '${two(at.hour)}:${two(at.minute)}';
   return scope == PdfQuotaScope.week
