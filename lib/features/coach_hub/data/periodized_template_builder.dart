@@ -74,7 +74,10 @@ Uint8List buildPeriodizedTemplateBytes() {
 
   _buildInstructions(excel);
 
-  final bytes = excel.save();
+  // `encode()`, no `save()`: en web `save()` además dispara una descarga del
+  // navegador llamada «FlutterExcel.xlsx», y la pantalla descarga estos
+  // mismos bytes con su nombre. Ver `no_excel_save_scan_test.dart`.
+  final bytes = excel.encode();
   if (bytes == null) {
     throw StateError('No se pudo generar la plantilla.');
   }
