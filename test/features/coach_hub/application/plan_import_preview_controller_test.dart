@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/moderation/moderation_guard.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/application/plan_import_preview_controller.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
@@ -13,14 +14,18 @@ import 'package:treino/features/coach_hub/data/exercise_matcher.dart';
 import 'package:treino/features/coach_hub/data/periodized_import_draft.dart';
 import 'package:treino/features/coach_hub/domain/periodized_plan.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/data/custom_exercise_repository.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
 class _MockRoutineRepo extends Mock implements RoutineRepository {}
+
+class _MockCustomRepo extends Mock implements CustomExerciseRepository {}
 
 class _MockFunctions extends Mock implements FirebaseFunctions {}
 
@@ -105,8 +110,12 @@ void main() {
     });
   });
 
-  ProviderContainer container(PeriodizedImportDraft draft) {
+  ProviderContainer container(
+    PeriodizedImportDraft draft, {
+    List<Override> extra = const [],
+  }) {
     final c = ProviderContainer(overrides: [
+      ...extra,
       periodizedImportProvider.overrideWith((_) => draft),
       routineRepositoryProvider.overrideWithValue(routines),
       cloudFunctionsProvider.overrideWithValue(functions),
@@ -278,6 +287,122 @@ void main() {
       expect(await assign(container(resolved()), const []),
           isA<PlanAssignNoAthletes>());
       verifyNever(() => routines.createAssigned(any()));
+    });
+  });
+
+  group('crear N propios', () {
+    late _MockCustomRepo customs;
+    late List<String> createdNames;
+
+    setUp(() {
+      customs = _MockCustomRepo();
+      createdNames = [];
+      when(() => customs.create(
+          trainerId: any(named: 'trainerId'),
+          name: any(named: 'name'))).thenAnswer((inv) async {
+        final name = inv.namedArguments[#name] as String;
+        createdNames.add(name);
+        return _custom('c-${createdNames.length}', name);
+      });
+    });
+
+    /// Remo Pendlay ×2 (uno con otras mayúsculas), Face pull, Press banca con
+    /// sugerencia (no cuenta), Hip thrust: N = 3.
+    PeriodizedImportDraft plan() => _draft(
+          [
+            'Remo Pendlay',
+            'Face pull',
+            'REMO  pendlay',
+            'Press banca',
+            'Hip thrust',
+          ],
+          suggestions: {_k(4): _press},
+        );
+
+    ProviderContainer withQuota(AsyncValue<CustomExerciseQuota> quota) =>
+        container(plan(), extra: [
+          customExerciseRepositoryProvider.overrideWithValue(customs),
+          customExerciseQuotaProvider.overrideWithValue(quota),
+        ]);
+
+    test('N cuenta nombres distintos y deja afuera las sugerencias', () {
+      final ctrl = withQuota(const AsyncValue.data((limit: null, count: 0)))
+          .read(planImportPreviewControllerProvider);
+
+      expect(ctrl.bulkCustomGroups.map((g) => g.name),
+          ['Remo Pendlay', 'Face pull', 'Hip thrust']);
+    });
+
+    test('entran todos: crea los N y resuelve también los homónimos', () async {
+      final c = withQuota(const AsyncValue.data((limit: 20, count: 5)));
+      final ctrl = c.read(planImportPreviewControllerProvider);
+
+      final check = await ctrl.checkBulkCustom() as BulkCustomReady;
+      expect((check.total, check.allowed), (3, 3));
+      final result = await ctrl.createCustomInBulk(max: check.allowed);
+
+      expect(result.created, 3);
+      expect(createdNames, ['Remo Pendlay', 'Face pull', 'Hip thrust']);
+      final draft = ctrl.draft!;
+      expect(draft.assignments[_k(1)]!.id, 'c-1');
+      expect(draft.assignments[_k(3)]!.id, 'c-1');
+      // La sugerencia sigue pendiente: no se pisa con un propio.
+      expect(draft.unresolved, [_k(4)]);
+      expect(aliases, isEmpty);
+    });
+
+    test('te alcanza para X de N: crea los primeros X en orden', () async {
+      final c = withQuota(const AsyncValue.data((limit: 20, count: 19)));
+      final ctrl = c.read(planImportPreviewControllerProvider);
+
+      final check = await ctrl.checkBulkCustom() as BulkCustomReady;
+      expect((check.total, check.allowed), (3, 1));
+      await ctrl.createCustomInBulk(max: check.allowed);
+
+      expect(createdNames, ['Remo Pendlay']);
+      expect(ctrl.draft!.isResolved(_k(2)), isFalse);
+      expect(ctrl.draft!.isResolved(_k(5)), isFalse);
+    });
+
+    test('tope alcanzado: allowed 0 y no se crea nada', () async {
+      final c = withQuota(const AsyncValue.data((limit: 20, count: 20)));
+      final ctrl = c.read(planImportPreviewControllerProvider);
+
+      final check = await ctrl.checkBulkCustom() as BulkCustomReady;
+      final result = await ctrl.createCustomInBulk(max: check.allowed);
+
+      expect(check.allowed, 0);
+      expect(result.created, 0);
+      expect(createdNames, isEmpty);
+    });
+
+    test('cuota en error: «no sé», no «entran todos»', () async {
+      final c = withQuota(AsyncValue.error(StateError('x'), StackTrace.empty));
+
+      final check =
+          await c.read(planImportPreviewControllerProvider).checkBulkCustom();
+
+      expect(check, isA<BulkCustomQuotaUnknown>());
+      expect(check.total, 3);
+    });
+
+    test('si la regla rechaza a mitad, corta y conserva lo creado', () async {
+      var calls = 0;
+      when(() => customs.create(
+          trainerId: any(named: 'trainerId'),
+          name: any(named: 'name'))).thenAnswer((inv) async {
+        if (++calls == 2) throw StateError('permission-denied');
+        return _custom('c-$calls', inv.namedArguments[#name] as String);
+      });
+      final ctrl = withQuota(const AsyncValue.data((limit: null, count: 0)))
+          .read(planImportPreviewControllerProvider);
+
+      final result = await ctrl.createCustomInBulk(max: 3);
+
+      expect((result.created, result.requested), (1, 3));
+      expect(result.error, isA<StateError>());
+      expect(ctrl.draft!.isResolved(_k(1)), isTrue);
+      expect(ctrl.draft!.isResolved(_k(2)), isFalse);
     });
   });
 }
