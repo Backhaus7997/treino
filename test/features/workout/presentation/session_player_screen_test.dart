@@ -8,6 +8,7 @@
 // keyboard, reps non-editable, block gating).
 // SCENARIO-037: player renders correct week's set count via effectiveSetsForWeek.
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1275,27 +1276,42 @@ void main() {
   // #1510: el descanso configurado en la rutina sólo corría en el reloj. Al
   // marcar la serie en el teléfono ahora arranca la cuenta, y SALTAR la saca.
   group('#1510 descanso', () {
+    // El reloj falso de `testWidgets` NO es fijo: arranca en la hora REAL del
+    // runner (`FakeAsync()` toma `clock.now()`), y de ahí salen los microsegundos
+    // con los que arranca el descanso. Con ≥ 500 µs el fin redondeado quedaba
+    // pasado de inicio + 90 s y la barra mostraba «1:31» (#1633), así que el test
+    // caía según la hora a la que el runner arrancaba la prueba.
+    //
+    // Se fija un inicio propio y es el PEOR caso a propósito, 999 µs: sin el
+    // truncado de `RestState.startedAt` el test falla SIEMPRE, no a veces. El
+    // tiempo REAL del runner no cuenta —`clock` no avanza con él, sólo con
+    // `pump(duración)`—, así que un runner lento no puede dar «1:29». Alcanza
+    // `Clock.fixed` porque acá el tiempo no se adelanta.
+    final inicio = DateTime.utc(2026, 10, 22, 12, 0, 0, 0, 999);
+
     testWidgets('marcar una serie arranca el descanso del slot; SALTAR lo saca',
         (tester) async {
-      final notifier = _LoggingNotifier(_defaultState());
-      await tester.pumpWidget(_wrapProvider(
-        const SessionPlayerScreen(init: _kInit),
-        [sessionNotifierProvider.overrideWith(() => notifier)],
-      ));
-      await tester.pump();
-      expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+      await withClock(Clock.fixed(inicio), () async {
+        final notifier = _LoggingNotifier(_defaultState());
+        await tester.pumpWidget(_wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          [sessionNotifierProvider.overrideWith(() => notifier)],
+        ));
+        await tester.pump();
+        expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
 
-      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
-      await tester.pump();
+        await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+        await tester.pump();
 
-      expect(notifier.loggedSets, hasLength(1));
-      expect(find.byKey(const Key('rest_timer_bar')), findsOneWidget);
-      expect(find.text('1:30'), findsOneWidget,
-          reason: 'el slot trae 90 s de descanso');
+        expect(notifier.loggedSets, hasLength(1));
+        expect(find.byKey(const Key('rest_timer_bar')), findsOneWidget);
+        expect(find.text('1:30'), findsOneWidget,
+            reason: 'el slot trae 90 s de descanso');
 
-      await tester.tap(find.text('SALTAR'));
-      await tester.pump();
-      expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+        await tester.tap(find.text('SALTAR'));
+        await tester.pump();
+        expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+      });
     });
 
     testWidgets('sin descanso configurado no aparece nada', (tester) async {
