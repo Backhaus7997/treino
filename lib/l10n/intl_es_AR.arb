@@ -3190,7 +3190,7 @@
   },
   "trainerNotAcceptingExplanation": "{trainerName} no está tomando alumnos nuevos por ahora.",
   "@trainerNotAcceptingExplanation": {
-    "description": "Helper line under the disabled contact CTA, and the message of the invite dialog, when the trainer paused new athletes.",
+    "description": "Helper line under the disabled contact CTA on the trainer's public profile when the trainer paused new athletes.",
     "placeholders": {
       "trainerName": {
         "type": "String"

@@ -128,7 +128,12 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
     // La pausa cede ante el vínculo con ESTE PF, y le gana al de otro PF: a un
     // alumno que ya tiene entrenador le sirve más saber que éste no toma a
     // nadie que leer cómo terminar su vínculo actual para pedírselo.
-    final paused = !widget.acceptingAthletes && !linkedToThisTrainer;
+    // Sólo con el vínculo RESUELTO: mientras carga (o si falla) no sabemos si
+    // el alumno ya es de este PF, y decir "NO TOMA ALUMNOS" ahí le hacía
+    // parpadear la pausa antes de "TU PERSONAL TRAINER". El botón ya está
+    // deshabilitado mientras tanto por `!linkAsync.hasValue`.
+    final paused =
+        linkAsync.hasValue && !widget.acceptingAthletes && !linkedToThisTrainer;
     final disabled = widget.preview ||
         _submitting ||
         !linkAsync.hasValue ||

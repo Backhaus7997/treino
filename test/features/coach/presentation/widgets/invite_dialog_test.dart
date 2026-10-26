@@ -31,7 +31,11 @@ Future<void> _pump(
   InviteOutcome outcome, {
   required _MockRepo repo,
   bool pfTomaAlumnos = true,
+  // Pausa por lectura: la 1.ª es la del build, las siguientes las de
+  // `_vincular`. Si no se pasa, todas devuelven [pfTomaAlumnos].
+  bool Function(int lectura)? pfTomaAlumnosEnLectura,
 }) async {
+  var lecturas = 0;
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -41,7 +45,8 @@ Future<void> _pump(
           trainerByIdProvider(uid).overrideWith(
             (_) async => TrainerPublicProfile(
               uid: uid,
-              acceptingAthletes: pfTomaAlumnos,
+              acceptingAthletes:
+                  pfTomaAlumnosEnLectura?.call(lecturas++) ?? pfTomaAlumnos,
             ),
           ),
         // El nombre es decorativo: el diálogo tiene que andar sin él.
@@ -103,6 +108,34 @@ void main() {
             ));
       });
     }
+  });
+
+  // Regresión: `_vincular` decidía sobre el valor cacheado del build. Si el PF
+  // pausó con el diálogo abierto, terminaba el vínculo actual y la solicitud
+  // rebotaba: el alumno se quedaba sin entrenador.
+  testWidgets('caso E: una pausa nueva se ve ANTES de terminar el vínculo',
+      (tester) async {
+    final repo = _MockRepo();
+    await _pump(
+      tester,
+      InviteRequiereDesvincular(
+        nuevoTrainerId: 'pf-nuevo',
+        vinculoActual: _link('pf-viejo'),
+      ),
+      repo: repo,
+      pfTomaAlumnosEnLectura: (lectura) => lectura == 0,
+    );
+
+    expect(find.text('YA TENÉS ENTRENADOR'), findsOneWidget,
+        reason: 'al abrir, el PF todavía toma alumnos');
+    await tester.tap(find.text('Desvincular y continuar'));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => repo.terminate(any(), reason: any(named: 'reason')));
+    verifyNever(() => repo.request(
+          trainerId: any(named: 'trainerId'),
+          athleteId: any(named: 'athleteId'),
+        ));
   });
 
   group('caso D — ya vinculado con el MISMO PF', () {

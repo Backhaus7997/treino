@@ -37,7 +37,11 @@ TrainerLink _link(TrainerLinkStatus status, String trainerId) => TrainerLink(
       requestedAt: DateTime.utc(2026, 10, 1),
     );
 
-Widget _wrap({TrainerLink? existingLink, bool acceptingAthletes = false}) =>
+Widget _wrap({
+  TrainerLink? existingLink,
+  bool acceptingAthletes = false,
+  bool vinculoCargando = false,
+}) =>
     ProviderScope(
       overrides: [
         trainerByIdProvider(_trainerUid).overrideWith(
@@ -53,8 +57,11 @@ Widget _wrap({TrainerLink? existingLink, bool acceptingAthletes = false}) =>
             displayName: 'Coach Actual',
           ),
         ),
-        currentAthleteLinkAnyStatusProvider
-            .overrideWith((ref) => Stream.value(existingLink)),
+        currentAthleteLinkAnyStatusProvider.overrideWith(
+          (ref) => vinculoCargando
+              ? const Stream<TrainerLink?>.empty()
+              : Stream.value(existingLink),
+        ),
         currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         trainerReviewsProvider(_trainerUid)
             .overrideWith((ref) => Stream.value(const [])),
@@ -117,6 +124,16 @@ void main() {
         expect(find.text('NO TOMA ALUMNOS'), findsNothing);
       });
     }
+
+    // Regresión: con el vínculo sin resolver no se sabe si el alumno ya es de
+    // este PF, y la pausa parpadeaba antes de "TU PERSONAL TRAINER".
+    testWidgets('con el vínculo cargando no anuncia la pausa', (tester) async {
+      await tester.pumpWidget(_wrap(vinculoCargando: true));
+      await tester.pumpAndSettle();
+
+      expect(find.text('NO TOMA ALUMNOS'), findsNothing);
+      expect(_enabled(tester), isFalse, reason: 'deshabilitado mientras carga');
+    });
 
     testWidgets('con vínculo con OTRO PF, la pausa le gana a YA TENÉS UN PF',
         (tester) async {

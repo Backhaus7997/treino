@@ -6638,7 +6638,7 @@ abstract class AppL10n {
   /// **'NO TOMA ALUMNOS'**
   String get trainerNotAcceptingLabel;
 
-  /// Helper line under the disabled contact CTA, and the message of the invite dialog, when the trainer paused new athletes.
+  /// Helper line under the disabled contact CTA on the trainer's public profile when the trainer paused new athletes.
   ///
   /// In es_AR, this message translates to:
   /// **'{trainerName} no está tomando alumnos nuevos por ahora.'**

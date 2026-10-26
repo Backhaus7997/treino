@@ -63,6 +63,10 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
       // Un PF sin perfil público no tiene cómo decirlo (las rules lo leen de
       // `users`, que el alumno no puede leer); ahí decide el rechazo del
       // servidor, después del terminate.
+      // `invalidate` primero: el `watch` del build mantiene vivo el valor
+      // cacheado, y un `read` a secas decidiría sobre él — bloqueando a un PF
+      // que ya reanudó, o sin ver una pausa nueva justo antes del terminate.
+      ref.invalidate(trainerByIdProvider(_trainerId!));
       final pf = await ref.read(trainerByIdProvider(_trainerId!).future);
       if (pf?.acceptingAthletes == false) {
         if (mounted) {
