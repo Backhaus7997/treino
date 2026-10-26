@@ -7,6 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
+import 'package:treino/features/coach/application/limite_de_alumnos_provider.dart';
 import 'package:treino/features/coach/application/template_quota_provider.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
@@ -105,13 +106,15 @@ class FacturacionTab extends ConsumerWidget {
           palette: palette,
           canceladoHasta: vigencia.pagadoHasta,
         ),
-        // Con el cupo lleno, ofrecer pausar el perfil. Lee el MISMO `load` y
-        // `limit` que la card de arriba, para que la sugerencia nunca
-        // contradiga el número que el PF está viendo. Fuera del tope no
-        // dibuja nada, ni el espacio: lo trae el propio widget en su margen.
+        // Con el cupo lleno, ofrecer pausar el perfil. El tope NO es el
+        // `limit` de la card: ése sale del doc y de la tabla, y no sabe que
+        // `pending`/`paused` valen Free ni del piso prepago. Es el de
+        // `limiteDeAlumnosProvider` —el que el servidor HACE CUMPLIR, el mismo
+        // del medidor móvil—, así el Hub y el teléfono sugieren lo mismo.
+        // Fuera del tope no dibuja nada, ni el espacio: lo trae en su margen.
         PausarPorCupoSugerencia(
           carga: load,
-          tope: limit,
+          tope: ref.watch(limiteDeAlumnosProvider).tope,
           margin: const EdgeInsets.only(top: AppSpacing.s14),
         ),
         // ── La baja ──
