@@ -10,6 +10,8 @@ import '../../../core/moderation/moderation_guard.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/geohash.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../app/guardia_de_salida.dart';
+import '../../../core/widgets/discard_changes_dialog.dart';
 import '../../../core/widgets/form_scroll_to_error.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -83,12 +85,63 @@ class _ProfileEditTrainerScreenState
 
   /// Si el PF tocó el switch en ESTA pantalla. Ver el `_save()`.
   bool _acceptsInquiriesTocado = false;
+
+  /// Pausa de alumnos nuevos. Mismo default y misma regla de "tocado" que
+  /// [_acceptsInquiries]: el Coach Hub también lo edita y persiste al toque.
+  bool _acceptingAthletes = true;
+  bool _acceptingAthletesTocado = false;
   bool _initialized = false;
   bool _saving = false;
   String? _error;
 
+  /// Cómo estaba el form al abrir, para saber si hay cambios sin guardar. Las
+  /// ubicaciones se comparan aparte, contra [_locationsAlAbrir].
+  Object? _firmaAlAbrir;
+
+  /// Referencia guardada al montar: en `dispose` ya no se puede usar `ref`.
+  late final GuardiaDeSalida _guardia;
+
+  Object? _firma() => (
+        _bioController.text,
+        _priceController.text,
+        _aliasController.text,
+        _experienceController.text,
+        _specialty,
+        _offersOnline,
+        _acceptsInquiries,
+        _acceptingAthletes,
+      );
+
+  /// Hay algo tocado que no se guardó. Un PF apagó «Tomo alumnos nuevos», se
+  /// fue sin GUARDAR, y quedó convencido de que estaba pausado: salir así
+  /// tiene que preguntar, por atrás y por la barra de pestañas.
+  bool get _hayCambios =>
+      _initialized &&
+      (_firma() != _firmaAlAbrir || !listEquals(_locations, _locationsAlAbrir));
+
+  /// `true` si se puede salir: sin cambios, o el PF eligió descartarlos.
+  Future<bool> _confirmarSalida() async {
+    if (!_hayCambios || !mounted) return true;
+    return confirmDiscardChanges(context);
+  }
+
+  Future<void> _handleBack() async {
+    if (await _confirmarSalida() && mounted) context.pop();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _guardia = ref.read(guardiaDeSalidaProvider);
+    // En onboarding el router ya no deja salir: la guardia sólo sirve en edit.
+    if (widget.mode == ProfileEditTrainerMode.edit) {
+      _guardia.registrar(_confirmarSalida);
+    }
+  }
+
   @override
   void dispose() {
+    _guardia.liberar(_confirmarSalida);
     _bioController.dispose();
     _priceController.dispose();
     _aliasController.dispose();
@@ -112,6 +165,8 @@ class _ProfileEditTrainerScreenState
       ..addAll(profile.trainerLocations);
     _offersOnline = profile.trainerOffersOnline;
     _acceptsInquiries = profile.acceptsInquiries;
+    _acceptingAthletes = profile.acceptingAthletes;
+    _firmaAlAbrir = _firma();
     _initialized = true;
   }
 
@@ -354,6 +409,7 @@ class _ProfileEditTrainerScreenState
       // otro campo. `_initFromProfile` corre una sola vez, así que el valor
       // que tenemos en mano puede estar viejo y no hay forma de saberlo.
       if (_acceptsInquiriesTocado) 'acceptsInquiries': _acceptsInquiries,
+      if (_acceptingAthletesTocado) 'acceptingAthletes': _acceptingAthletes,
       // Limpiar legacy singular — este form trabaja con el modelo array-based.
       // Si no los nulleamos, quedan zombi en Firestore (de la migration original)
       // y el mapa los renderea como pin físico aunque el PF haya borrado
@@ -618,6 +674,19 @@ class _ProfileEditTrainerScreenState
                 _acceptsInquiriesTocado = true;
               }),
             ),
+            const SizedBox(height: 12),
+            // La pausa: la misma pregunta, más fuerte. Apagado, no aparecés en
+            // el discovery y no te llegan solicitudes ni consultas nuevas.
+            _ToggleCard(
+              palette: palette,
+              title: l10n.trainerAcceptingAthletesTitle,
+              subtitle: l10n.trainerAcceptingAthletesSubtitle,
+              value: _acceptingAthletes,
+              onChanged: (v) => setState(() {
+                _acceptingAthletes = v;
+                _acceptingAthletesTocado = true;
+              }),
+            ),
             if (_error != null) ...[
               const SizedBox(height: 14),
               Text(
@@ -668,13 +737,35 @@ class _ProfileEditTrainerScreenState
 
     // ADR-TPO-006: onboarding mode wraps body in PopScope to block OS back
     // gesture (iOS swipe-back, Android back button).
+    //
+    // En edit, PopScope frena atrás y el swipe de iOS si hay cambios sin
+    // guardar y pregunta (#1502). Lo de la barra de pestañas lo cubre la
+    // [GuardiaDeSalida]. El `context.pop()` del guardado es un pop forzado y
+    // no pasa por acá. El ListenableBuilder es porque los campos de texto no
+    // hacen setState: sin él, `canPop` quedaría viejo al tipear.
     final wrappedBody = widget.mode == ProfileEditTrainerMode.onboarding
         ? PopScope(
             canPop: false,
             onPopInvokedWithResult: (_, __) {},
             child: body,
           )
-        : body;
+        : ListenableBuilder(
+            listenable: Listenable.merge([
+              _bioController,
+              _priceController,
+              _aliasController,
+              _experienceController,
+            ]),
+            child: body,
+            builder: (context, body) => PopScope(
+              canPop: !_hayCambios,
+              onPopInvokedWithResult: (didPop, _) {
+                if (didPop) return;
+                _handleBack();
+              },
+              child: body!,
+            ),
+          );
 
     return TreinoStateSwitcher(
       childKey: const ValueKey('form'),

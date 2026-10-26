@@ -735,6 +735,33 @@ class AppL10nEn extends AppL10n {
       'Athletes can message you before requesting a link. Turn it off and no new inquiries reach you — conversations already open stay open.';
 
   @override
+  String get trainerAcceptingAthletesTitle => 'Taking new athletes';
+
+  @override
+  String get trainerAcceptingAthletesSubtitle =>
+      'Turn it off and you stop showing up in Find your coach, and no new requests or inquiries reach you. Your current athletes stay as they are.';
+
+  @override
+  String get trainerPlanLimitPauseTitle => 'YOU HIT YOUR PLAN\'S LIMIT';
+
+  @override
+  String get trainerPlanLimitPauseBody =>
+      'If you\'re not taking more athletes, pause your profile: you stop showing up in search and stop getting requests you can\'t accept.';
+
+  @override
+  String get trainerPlanLimitPauseAction => 'PAUSE PROFILE';
+
+  @override
+  String get trainerPausedNoticeTitle => 'YOUR PROFILE IS PAUSED';
+
+  @override
+  String get trainerPausedNoticeBody =>
+      'You don\'t show up in Find your coach and no new requests or inquiries reach you.';
+
+  @override
+  String get trainerPausedNoticeAction => 'RESUME';
+
+  @override
   String get athleteLinkUnconfirmed =>
       'We couldn\'t confirm your trainer link.';
 

@@ -16,6 +16,8 @@ import 'package:treino/features/coach_hub/presentation/sections/facturacion_plan
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/coach/application/limite_de_alumnos_provider.dart';
 
 UserProfile _trainer({TrainerSubscription? subscription}) => UserProfile(
       uid: 'pf1',
@@ -32,9 +34,14 @@ Widget _harness({
   UserProfile? profile,
   Stream<CustomExerciseQuota?>? usage,
   Stream<TemplateQuota?>? templateUsage,
+  // Tope que el servidor hace cumplir (`limiteDeAlumnosProvider`). Sin tope
+  // por default: la sugerencia de pausar no aparece salvo que el test la pida.
+  int? topeDelServidor,
 }) =>
     ProviderScope(
       overrides: [
+        limiteDeAlumnosProvider
+            .overrideWithValue((tope: topeDelServidor, tier: null)),
         userProfileProvider.overrideWith(
           (ref) => Stream<UserProfile?>.value(profile ?? _trainer()),
         ),
@@ -47,7 +54,12 @@ Widget _harness({
           (ref) => templateUsage ?? Stream<TemplateQuota?>.value(null),
         ),
       ],
-      child: const MaterialApp(home: Scaffold(body: FacturacionTab())),
+      child: const MaterialApp(
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: Locale('es', 'AR'),
+        home: Scaffold(body: FacturacionTab()),
+      ),
     );
 
 TrainerLink _link(String athleteId, TrainerLinkStatus status) => TrainerLink(
@@ -59,6 +71,41 @@ TrainerLink _link(String athleteId, TrainerLinkStatus status) => TrainerLink(
     );
 
 void main() {
+  // La sugerencia de pausar mira el tope del SERVIDOR, no el de la card. Un PF
+  // `paused` con Plan 2 en el doc: la card calcula 15, el servidor publica 2.
+  // Con 2 activos tiene que sugerir, igual que el medidor del móvil.
+  testWidgets('sugiere pausar con el tope del servidor, no con el de la card',
+      (tester) async {
+    await tester.pumpWidget(_harness(
+      links: [
+        _link('a', TrainerLinkStatus.active),
+        _link('b', TrainerLinkStatus.active),
+      ],
+      profile: _trainer(
+        subscription: const TrainerSubscription(
+          tier: SubscriptionTier.plan2,
+          status: SubscriptionStatus.paused,
+        ),
+      ),
+      topeDelServidor: 2,
+    ));
+    await tester.pump();
+
+    expect(find.byKey(const Key('pausar_por_cupo_sugerencia')), findsOneWidget);
+  });
+
+  testWidgets('sin tope del servidor no sugiere nada', (tester) async {
+    await tester.pumpWidget(_harness(
+      links: [
+        _link('a', TrainerLinkStatus.active),
+        _link('b', TrainerLinkStatus.active),
+      ],
+    ));
+    await tester.pump();
+
+    expect(find.byKey(const Key('pausar_por_cupo_sugerencia')), findsNothing);
+  });
+
   testWidgets('sin suscripción → Free, límite 2, uso 0', (tester) async {
     await tester.pumpWidget(_harness(links: const []));
     await tester.pump();

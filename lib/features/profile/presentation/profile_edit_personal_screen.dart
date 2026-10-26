@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
+import '../../../app/guardia_de_salida.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/moderation/moderation_guard.dart';
@@ -93,6 +94,20 @@ class _ProfileEditPersonalScreenState
     _heightCtrl = TextEditingController();
     // Attempt eager seeding — works in production where the stream is warm.
     _seedFromProfile(ref.read(userProfileProvider).valueOrNull);
+    // La barra de pestañas hace `go` y destruye esta pantalla sin pasar por
+    // el PopScope: se anota para que pregunte antes (ver [GuardiaDeSalida]).
+    _guardia = ref.read(guardiaDeSalidaProvider)..registrar(_confirmarSalida);
+  }
+
+  /// Referencia guardada al montar: en `dispose` ya no se puede usar `ref`.
+  late final GuardiaDeSalida _guardia;
+
+  /// `true` si se puede salir. Durante un guardado nunca: cortarlo deja el
+  /// avatar subido huérfano en Storage (ver el PopScope del build).
+  Future<bool> _confirmarSalida() async {
+    if (_isBusy) return false;
+    if (!_isDirty || !mounted) return true;
+    return _preguntarDescartar();
   }
 
   /// Seeds form controllers and selection state from [profile].
@@ -115,6 +130,7 @@ class _ProfileEditPersonalScreenState
 
   @override
   void dispose() {
+    _guardia.liberar(_confirmarSalida);
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _weightCtrl.dispose();
@@ -413,6 +429,13 @@ class _ProfileEditPersonalScreenState
   }
 
   Future<void> _showDiscardDialog() async {
+    if (await _preguntarDescartar() && mounted) context.pop();
+  }
+
+  /// El diálogo de descartar, sin navegar: `true` si eligió DESCARTAR. Lo usan
+  /// la flecha (que después hace pop) y la barra de pestañas (que navega
+  /// ella).
+  Future<bool> _preguntarDescartar() async {
     final palette = AppPalette.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -460,7 +483,7 @@ class _ProfileEditPersonalScreenState
         ],
       ),
     );
-    if (confirmed == true && mounted) context.pop();
+    return confirmed == true;
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -730,12 +753,23 @@ class _ProfileEditPersonalScreenState
     // disposes the screen mid-upload, losing the save and orphaning the
     // freshly-uploaded avatar in Storage. Block the pop while busy so the
     // in-flight save is the only thing that can end this route.
+    //
+    // Y con cambios sin guardar tampoco sale en silencio: antes el swipe de
+    // iOS los tiraba sin preguntar, porque sólo el back del header pasaba por
+    // el diálogo. Los campos de texto no hacen setState, así que se escuchan
+    // acá para que `canPop` esté al día al tipear.
     return TreinoStateSwitcher(
       childKey: const ValueKey('form'),
-      child: ValueListenableBuilder<_SaveState>(
-        valueListenable: _saveState,
-        builder: (context, _, child) => PopScope(
-          canPop: !_isBusy,
+      child: ListenableBuilder(
+        listenable: Listenable.merge(
+          [_saveState, _nameCtrl, _phoneCtrl, _weightCtrl, _heightCtrl],
+        ),
+        builder: (context, child) => PopScope(
+          canPop: !_isBusy && !_isDirty,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            _onBackTap();
+          },
           child: child!,
         ),
         child: content,

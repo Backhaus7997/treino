@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/features/coach/presentation/widgets/perfil_pausado_aviso.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_hero.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_kpi_strip.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_pending.dart';
@@ -130,6 +131,11 @@ class _DashboardContent extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Pausa del PF, arriba de todo. Sin pausa no dibuja nada, ni su
+        // margen: por eso no lleva un SizedBox afuera.
+        const PerfilPausadoAviso(
+          margin: EdgeInsets.only(bottom: AppSpacing.s18),
+        ),
         TreinoFadeSlideIn(
           delay: AppMotion.stagger(_bannerIndex),
           child: const DashboardAlertBanner(),

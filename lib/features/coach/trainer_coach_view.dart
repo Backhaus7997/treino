@@ -22,6 +22,7 @@ import 'domain/trainer_link_entitlement.dart';
 import 'domain/trainer_link_status.dart';
 import 'domain/weighted_load.dart';
 import 'presentation/trainer_agenda_tab.dart';
+import 'presentation/widgets/pausar_por_cupo_sugerencia.dart';
 import '../../core/widgets/treino_segmented_pill.dart';
 
 class TrainerCoachView extends StatelessWidget {
@@ -261,27 +262,42 @@ class _PlanQuotaHeader extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            TreinoIcon.users,
-            size: 14,
-            color: atLimit ? palette.highlight : palette.textMuted,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label, // i18n: Fase W3
-              key: const Key('plan-quota-header'),
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 0.8,
+          Row(
+            children: [
+              Icon(
+                TreinoIcon.users,
+                size: 14,
                 color: atLimit ? palette.highlight : palette.textMuted,
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label, // i18n: Fase W3
+                  key: const Key('plan-quota-header'),
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 0.8,
+                    color: atLimit ? palette.highlight : palette.textMuted,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
+          // Al tope, el medidor se pone en `highlight` y ahí mismo se le
+          // ofrece pausar: es el momento en que el aviso sirve. Se decide
+          // adentro (también mira si ya está pausado), así que fuera del tope
+          // no ocupa nada.
+          if (atLimit)
+            PausarPorCupoSugerencia(
+              carga: load,
+              tope: limit,
+              margin: const EdgeInsets.only(top: 12),
+            ),
         ],
       ),
     );

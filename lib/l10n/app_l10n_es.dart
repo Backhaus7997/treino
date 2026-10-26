@@ -745,6 +745,33 @@ class AppL10nEs extends AppL10n {
       'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.';
 
   @override
+  String get trainerAcceptingAthletesTitle => 'Acepto alumnos nuevos';
+
+  @override
+  String get trainerAcceptingAthletesSubtitle =>
+      'Si lo apagas, dejas de aparecer en Encuentra tu coach y no te llegan solicitudes ni consultas nuevas. Tus alumnos actuales siguen igual.';
+
+  @override
+  String get trainerPlanLimitPauseTitle => 'LLEGASTE AL LÍMITE DE TU PLAN';
+
+  @override
+  String get trainerPlanLimitPauseBody =>
+      'Si no vas a sumar alumnos, pausa tu perfil: dejas de aparecer en el buscador y no te llegan solicitudes que no podrás aceptar.';
+
+  @override
+  String get trainerPlanLimitPauseAction => 'PAUSAR PERFIL';
+
+  @override
+  String get trainerPausedNoticeTitle => 'TU PERFIL ESTÁ PAUSADO';
+
+  @override
+  String get trainerPausedNoticeBody =>
+      'No apareces en Encuentra tu coach y no te llegan solicitudes ni consultas nuevas.';
+
+  @override
+  String get trainerPausedNoticeAction => 'REANUDAR';
+
+  @override
   String get athleteLinkUnconfirmed =>
       'No pudimos confirmar tu vínculo con tu PF.';
 
@@ -6860,6 +6887,33 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get trainerAcceptsInquiriesSubtitle =>
       'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.';
+
+  @override
+  String get trainerAcceptingAthletesTitle => 'Tomo alumnos nuevos';
+
+  @override
+  String get trainerAcceptingAthletesSubtitle =>
+      'Si lo apagás, dejás de aparecer en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas. Tus alumnos actuales siguen igual.';
+
+  @override
+  String get trainerPlanLimitPauseTitle => 'LLEGASTE AL TOPE DE TU PLAN';
+
+  @override
+  String get trainerPlanLimitPauseBody =>
+      'Si no vas a sumar alumnos, pausá tu perfil: dejás de aparecer en el buscador y no te llegan solicitudes que no vas a poder aceptar.';
+
+  @override
+  String get trainerPlanLimitPauseAction => 'PAUSAR PERFIL';
+
+  @override
+  String get trainerPausedNoticeTitle => 'TU PERFIL ESTÁ PAUSADO';
+
+  @override
+  String get trainerPausedNoticeBody =>
+      'No aparecés en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas.';
+
+  @override
+  String get trainerPausedNoticeAction => 'REANUDAR';
 
   @override
   String get athleteLinkUnconfirmed =>
