@@ -138,7 +138,20 @@ mixin _$UserProfile {
   /// `.get('acceptsInquiries', true)`, o sea que un PF sin el campo ES
   /// consultable. Un `@Default(false)` acá le apagaría las consultas a
   /// TODOS los PF existentes sin que ninguno lo haya pedido.
-  bool get acceptsInquiries =>
+  bool get acceptsInquiries => throw _privateConstructorUsedError;
+
+  /// Pausa del PF para alumnos NUEVOS: `false` lo saca del discovery y
+  /// cierra las solicitudes de vínculo y las consultas previas.
+  ///
+  /// Es laboral, no social: no tiene nada que ver con el feed ni con
+  /// `hiddenFromDiscovery`, que es sólo de admin. Los alumnos que ya tiene
+  /// y las solicitudes `pending` que entraron antes de pausar no se tocan.
+  ///
+  /// Default `true` por la misma razón que [acceptsInquiries]: las rules lo
+  /// leen con `.get('acceptingAthletes', true)`, así que un PF sin el campo
+  /// está abierto. Con el cupo lleno la app SUGIERE pausar; nunca lo apaga
+  /// sola.
+  bool get acceptingAthletes =>
       throw _privateConstructorUsedError; // ── Athlete active routine (home today's card PR#2) ───────────────────
 // Points to the user-created routine the athlete picked as "the one I'm
 // currently training". Used by [todaysRoutineProvider] to resolve the home
@@ -247,6 +260,7 @@ abstract class $UserProfileCopyWith<$Res> {
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
       bool acceptsInquiries,
+      bool acceptingAthletes,
       String? activeRoutineId,
       TrainerSubscription? subscription,
       double? weightedLoad,
@@ -307,6 +321,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
     Object? acceptsInquiries = null,
+    Object? acceptingAthletes = null,
     Object? activeRoutineId = freezed,
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
@@ -448,6 +463,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.acceptsInquiries
           : acceptsInquiries // ignore: cast_nullable_to_non_nullable
               as bool,
+      acceptingAthletes: null == acceptingAthletes
+          ? _value.acceptingAthletes
+          : acceptingAthletes // ignore: cast_nullable_to_non_nullable
+              as bool,
       activeRoutineId: freezed == activeRoutineId
           ? _value.activeRoutineId
           : activeRoutineId // ignore: cast_nullable_to_non_nullable
@@ -547,6 +566,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
       bool acceptsInquiries,
+      bool acceptingAthletes,
       String? activeRoutineId,
       TrainerSubscription? subscription,
       double? weightedLoad,
@@ -607,6 +627,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
     Object? acceptsInquiries = null,
+    Object? acceptingAthletes = null,
     Object? activeRoutineId = freezed,
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
@@ -748,6 +769,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.acceptsInquiries
           : acceptsInquiries // ignore: cast_nullable_to_non_nullable
               as bool,
+      acceptingAthletes: null == acceptingAthletes
+          ? _value.acceptingAthletes
+          : acceptingAthletes // ignore: cast_nullable_to_non_nullable
+              as bool,
       activeRoutineId: freezed == activeRoutineId
           ? _value.activeRoutineId
           : activeRoutineId // ignore: cast_nullable_to_non_nullable
@@ -813,6 +838,7 @@ class _$UserProfileImpl implements _UserProfile {
       final List<String> trainerGeohashes = const <String>[],
       this.trainerOffersOnline = false,
       this.acceptsInquiries = true,
+      this.acceptingAthletes = true,
       this.activeRoutineId,
       this.subscription,
       this.weightedLoad,
@@ -999,6 +1025,21 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   @JsonKey()
   final bool acceptsInquiries;
+
+  /// Pausa del PF para alumnos NUEVOS: `false` lo saca del discovery y
+  /// cierra las solicitudes de vínculo y las consultas previas.
+  ///
+  /// Es laboral, no social: no tiene nada que ver con el feed ni con
+  /// `hiddenFromDiscovery`, que es sólo de admin. Los alumnos que ya tiene
+  /// y las solicitudes `pending` que entraron antes de pausar no se tocan.
+  ///
+  /// Default `true` por la misma razón que [acceptsInquiries]: las rules lo
+  /// leen con `.get('acceptingAthletes', true)`, así que un PF sin el campo
+  /// está abierto. Con el cupo lleno la app SUGIERE pausar; nunca lo apaga
+  /// sola.
+  @override
+  @JsonKey()
+  final bool acceptingAthletes;
 // ── Athlete active routine (home today's card PR#2) ───────────────────
 // Points to the user-created routine the athlete picked as "the one I'm
 // currently training". Used by [todaysRoutineProvider] to resolve the home
@@ -1102,7 +1143,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, acceptedTermsVersion: $acceptedTermsVersion, acceptedPrivacyVersion: $acceptedPrivacyVersion, trainerLocationConsentAt: $trainerLocationConsentAt, trainerLocationConsentPromptedAt: $trainerLocationConsentPromptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, emailVerification: $emailVerification, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, acceptedTermsVersion: $acceptedTermsVersion, acceptedPrivacyVersion: $acceptedPrivacyVersion, trainerLocationConsentAt: $trainerLocationConsentAt, trainerLocationConsentPromptedAt: $trainerLocationConsentPromptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, acceptingAthletes: $acceptingAthletes, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, emailVerification: $emailVerification, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
   }
 
   @override
@@ -1170,6 +1211,8 @@ class _$UserProfileImpl implements _UserProfile {
                 other.trainerOffersOnline == trainerOffersOnline) &&
             (identical(other.acceptsInquiries, acceptsInquiries) ||
                 other.acceptsInquiries == acceptsInquiries) &&
+            (identical(other.acceptingAthletes, acceptingAthletes) ||
+                other.acceptingAthletes == acceptingAthletes) &&
             (identical(other.activeRoutineId, activeRoutineId) ||
                 other.activeRoutineId == activeRoutineId) &&
             (identical(other.subscription, subscription) ||
@@ -1178,8 +1221,7 @@ class _$UserProfileImpl implements _UserProfile {
                 other.weightedLoad == weightedLoad) &&
             const DeepCollectionEquality()
                 .equals(other._emailVerification, _emailVerification) &&
-            const DeepCollectionEquality()
-                .equals(other._onboardingSeen, _onboardingSeen) &&
+            const DeepCollectionEquality().equals(other._onboardingSeen, _onboardingSeen) &&
             (identical(other.templatePreferences, templatePreferences) || other.templatePreferences == templatePreferences));
   }
 
@@ -1220,6 +1262,7 @@ class _$UserProfileImpl implements _UserProfile {
         const DeepCollectionEquality().hash(_trainerGeohashes),
         trainerOffersOnline,
         acceptsInquiries,
+        acceptingAthletes,
         activeRoutineId,
         subscription,
         weightedLoad,
@@ -1279,6 +1322,7 @@ abstract class _UserProfile implements UserProfile {
       final List<String> trainerGeohashes,
       final bool trainerOffersOnline,
       final bool acceptsInquiries,
+      final bool acceptingAthletes,
       final String? activeRoutineId,
       final TrainerSubscription? subscription,
       final double? weightedLoad,
@@ -1437,8 +1481,22 @@ abstract class _UserProfile implements UserProfile {
   /// consultable. Un `@Default(false)` acá le apagaría las consultas a
   /// TODOS los PF existentes sin que ninguno lo haya pedido.
   @override
+  bool get acceptsInquiries;
+
+  /// Pausa del PF para alumnos NUEVOS: `false` lo saca del discovery y
+  /// cierra las solicitudes de vínculo y las consultas previas.
+  ///
+  /// Es laboral, no social: no tiene nada que ver con el feed ni con
+  /// `hiddenFromDiscovery`, que es sólo de admin. Los alumnos que ya tiene
+  /// y las solicitudes `pending` que entraron antes de pausar no se tocan.
+  ///
+  /// Default `true` por la misma razón que [acceptsInquiries]: las rules lo
+  /// leen con `.get('acceptingAthletes', true)`, así que un PF sin el campo
+  /// está abierto. Con el cupo lleno la app SUGIERE pausar; nunca lo apaga
+  /// sola.
+  @override
   bool
-      get acceptsInquiries; // ── Athlete active routine (home today's card PR#2) ───────────────────
+      get acceptingAthletes; // ── Athlete active routine (home today's card PR#2) ───────────────────
 // Points to the user-created routine the athlete picked as "the one I'm
 // currently training". Used by [todaysRoutineProvider] to resolve the home
 // card when the user has multiple self-created routines and no trainer

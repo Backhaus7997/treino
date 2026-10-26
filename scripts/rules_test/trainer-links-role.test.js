@@ -173,3 +173,41 @@ test('SCENARIO-TL-04: a trainer CAN request a link to another trainer as the ath
     ),
   );
 });
+
+// ---------------------------------------------------------------------------
+// SCENARIO-TL-05/06: pausa del PF (`users/{uid}.acceptingAthletes`). Un PF
+// pausado no recibe solicitudes nuevas, tampoco por invitación: el doc es el
+// mismo en los dos caminos (ver el create de `trainer_links`). Se lee de
+// `users` y no del doc público, así que alcanza con que el PF NO haya
+// publicado nada — el caso de la invitación.
+// ---------------------------------------------------------------------------
+async function seedTrainer(uid, extra) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('users').doc(uid)
+      .set({ uid, role: 'trainer', ...extra });
+  });
+}
+
+test('SCENARIO-TL-05: athlete CANNOT request a link to a paused trainer', async () => {
+  await seedUserRole('alumno', 'athlete');
+  await seedTrainer('pausado', { acceptingAthletes: false });
+
+  const alumno = testEnv.authenticatedContext('alumno');
+  await assertFails(
+    alumno.firestore().collection('trainer_links').doc('pausaTL5').set(
+      linkDoc({ id: 'pausaTL5', trainerId: 'pausado', athleteId: 'alumno' }),
+    ),
+  );
+});
+
+test('SCENARIO-TL-06: acceptingAthletes true explícito sigue abierto', async () => {
+  await seedUserRole('alumno', 'athlete');
+  await seedTrainer('abierto', { acceptingAthletes: true });
+
+  const alumno = testEnv.authenticatedContext('alumno');
+  await assertSucceeds(
+    alumno.firestore().collection('trainer_links').doc('abiertoTL6').set(
+      linkDoc({ id: 'abiertoTL6', trainerId: 'abierto', athleteId: 'alumno' }),
+    ),
+  );
+});

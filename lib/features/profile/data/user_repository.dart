@@ -76,6 +76,9 @@ class UserRepository {
     // escribe en `users/{uid}` y NUNCA llega a `trainerPublicProfiles`, que es
     // el único doc que mira la rule. El interruptor quedaría mudo.
     'acceptsInquiries',
+    // Pausa del PF para alumnos nuevos — misma razón que la de arriba: las
+    // rules de `trainer_links` y de consultas leen el doc público.
+    'acceptingAthletes',
     // ADR-RV-005: CF-write-only — do not add averageRating or reviewCount here.
     // Those fields are written exclusively by the reviewAggregate Cloud Function
     // and must never be propagated by client dual-write.
@@ -290,6 +293,9 @@ class UserRepository {
     }
     if (partial.containsKey('acceptsInquiries')) {
       result['acceptsInquiries'] = partial['acceptsInquiries'];
+    }
+    if (partial.containsKey('acceptingAthletes')) {
+      result['acceptingAthletes'] = partial['acceptingAthletes'];
     }
     // ADR-TPO-001: include uid so the Firestore create rule passes on
     // the first-ever write. SetOptions(merge:true) makes this idempotent.

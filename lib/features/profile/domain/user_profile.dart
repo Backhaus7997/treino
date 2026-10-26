@@ -138,6 +138,19 @@ class UserProfile with _$UserProfile {
     /// TODOS los PF existentes sin que ninguno lo haya pedido.
     @Default(true) bool acceptsInquiries,
 
+    /// Pausa del PF para alumnos NUEVOS: `false` lo saca del discovery y
+    /// cierra las solicitudes de vínculo y las consultas previas.
+    ///
+    /// Es laboral, no social: no tiene nada que ver con el feed ni con
+    /// `hiddenFromDiscovery`, que es sólo de admin. Los alumnos que ya tiene
+    /// y las solicitudes `pending` que entraron antes de pausar no se tocan.
+    ///
+    /// Default `true` por la misma razón que [acceptsInquiries]: las rules lo
+    /// leen con `.get('acceptingAthletes', true)`, así que un PF sin el campo
+    /// está abierto. Con el cupo lleno la app SUGIERE pausar; nunca lo apaga
+    /// sola.
+    @Default(true) bool acceptingAthletes,
+
     // ── Athlete active routine (home today's card PR#2) ───────────────────
     // Points to the user-created routine the athlete picked as "the one I'm
     // currently training". Used by [todaysRoutineProvider] to resolve the home

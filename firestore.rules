@@ -205,6 +205,24 @@ service cloud.firestore {
       return u != null && u.data.get('role', '') == 'trainer';
     }
 
+    // ¿El PF está tomando alumnos NUEVOS? (`UserProfile.acceptingAthletes`).
+    //
+    // Se lee de `users/{uid}` y NO de `trainerPublicProfiles`, por dos
+    // razones. Una: el flujo de INVITACIÓN crea el vínculo hacia un PF que no
+    // necesariamente publicó su tarjeta de discovery (ver el create de
+    // `trainer_links`), y "sin doc público" no puede significar "pausado".
+    // Dos: es el MISMO doc que ya trae `tieneRolDePF`, y las reglas cachean
+    // los `get()` por request — la cláusula no paga ninguna lectura más.
+    //
+    // FALLA ABIERTO a propósito, como `acceptsInquiries`: un PF sin el campo
+    // está abierto. Lo contrario cerraría de golpe a todos los PF existentes.
+    // El "falla cerrado" de la identidad ya lo hace `tieneRolDePF`, que va
+    // ANTES en cada uso.
+    function pfTomaAlumnos(uid) {
+      let u = get(/databases/$(database)/documents/users/$(uid));
+      return u != null && u.data.get('acceptingAthletes', true) == true;
+    }
+
     // Edad mínima de cuenta — ver `ProfileSetupValidators.kMinAgeYears` y
     // `docs/legal/terminos-y-condiciones.md`.
     //
@@ -1617,6 +1635,13 @@ service cloud.firestore {
       // desde el link del PF y ese PF no necesariamente publicó su perfil de
       // discovery. Espeja la decisión AD-1 de Slice C ("ROLE-CHECK ONLY").
       // Fijado por SCENARIO-TL-03 en scripts/rules_test/trainer-links-role.test.js.
+      //
+      // PAUSA DEL PF (`pfTomaAlumnos`): un PF pausado no recibe solicitudes
+      // NUEVAS. Corta también las de INVITACIÓN, y no por descuido: el doc que
+      // crea `invite_dialog` es idéntico al del perfil público, y cualquier
+      // marca que los distinga (`via: 'invite'`) la escribe el mismo atleta,
+      // así que la pausa quedaría en nada. Si el PF quiere sumar a alguien,
+      // despausa. No toca las `pending` previas ni las transiciones de update.
       allow create: if request.auth != null
                     && request.auth.uid == request.resource.data.athleteId
                     && request.auth.uid != request.resource.data.trainerId
@@ -1624,7 +1649,8 @@ service cloud.firestore {
                     && request.resource.data.trainerId is string
                     && request.resource.data.trainerId.size() > 0
                     && request.resource.data.get('acceptedAt', null) == null
-                    && tieneRolDePF(request.resource.data.trainerId);
+                    && tieneRolDePF(request.resource.data.trainerId)
+                    && pfTomaAlumnos(request.resource.data.trainerId);
 
       // Update: members del vínculo pueden actualizar (decline / cancel /
       // terminate / pause). Fields `trainerId`, `athleteId`, `requestedAt`,
@@ -2940,6 +2966,9 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/trainerPublicProfiles/$(other))
           && get(/databases/$(database)/documents/users/$(other)).data.role == 'trainer'
           && get(/databases/$(database)/documents/trainerPublicProfiles/$(other)).data.get('acceptsInquiries', true) == true
+          // Pausa del PF: pausado tampoco recibe consultas. Mismo doc `users`
+          // del renglón de rol, así que no suma llamadas al presupuesto.
+          && pfTomaAlumnos(other)
         ) : (
           followAccepted(me, other)
           || get(/databases/$(database)/documents/userPublicProfiles/$(other))
