@@ -570,6 +570,18 @@
   "@trainerPlanLimitPauseAction": {
     "description": "Botón de la sugerencia: pone acceptingAthletes en false."
   },
+  "trainerPausedNoticeTitle": "TU PERFIL ESTÁ PAUSADO",
+  "@trainerPausedNoticeTitle": {
+    "description": "Aviso fijo en el panel del PF mientras acceptingAthletes == false."
+  },
+  "trainerPausedNoticeBody": "No aparecés en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas.",
+  "@trainerPausedNoticeBody": {
+    "description": "Cuerpo del aviso de perfil pausado."
+  },
+  "trainerPausedNoticeAction": "REANUDAR",
+  "@trainerPausedNoticeAction": {
+    "description": "Botón del aviso de perfil pausado: pone acceptingAthletes en true."
+  },
   "athleteLinkUnconfirmed": "No pudimos confirmar tu vínculo con tu PF.",
   "@athleteLinkUnconfirmed": {
     "description": "Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir."

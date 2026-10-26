@@ -752,6 +752,16 @@ class AppL10nEn extends AppL10n {
   String get trainerPlanLimitPauseAction => 'PAUSE PROFILE';
 
   @override
+  String get trainerPausedNoticeTitle => 'YOUR PROFILE IS PAUSED';
+
+  @override
+  String get trainerPausedNoticeBody =>
+      'You don\'t show up in Find your coach and no new requests or inquiries reach you.';
+
+  @override
+  String get trainerPausedNoticeAction => 'RESUME';
+
+  @override
   String get athleteLinkUnconfirmed =>
       'We couldn\'t confirm your trainer link.';
 

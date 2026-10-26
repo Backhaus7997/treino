@@ -762,6 +762,16 @@ class AppL10nEs extends AppL10n {
   String get trainerPlanLimitPauseAction => 'PAUSAR PERFIL';
 
   @override
+  String get trainerPausedNoticeTitle => 'TU PERFIL ESTÁ PAUSADO';
+
+  @override
+  String get trainerPausedNoticeBody =>
+      'No apareces en Encuentra tu coach y no te llegan solicitudes ni consultas nuevas.';
+
+  @override
+  String get trainerPausedNoticeAction => 'REANUDAR';
+
+  @override
   String get athleteLinkUnconfirmed =>
       'No pudimos confirmar tu vínculo con tu PF.';
 
@@ -6894,6 +6904,16 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get trainerPlanLimitPauseAction => 'PAUSAR PERFIL';
+
+  @override
+  String get trainerPausedNoticeTitle => 'TU PERFIL ESTÁ PAUSADO';
+
+  @override
+  String get trainerPausedNoticeBody =>
+      'No aparecés en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas.';
+
+  @override
+  String get trainerPausedNoticeAction => 'REANUDAR';
 
   @override
   String get athleteLinkUnconfirmed =>

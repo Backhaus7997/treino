@@ -1436,6 +1436,24 @@ abstract class AppL10n {
   /// **'PAUSAR PERFIL'**
   String get trainerPlanLimitPauseAction;
 
+  /// Aviso fijo en el panel del PF mientras acceptingAthletes == false.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU PERFIL ESTÁ PAUSADO'**
+  String get trainerPausedNoticeTitle;
+
+  /// Cuerpo del aviso de perfil pausado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No aparecés en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas.'**
+  String get trainerPausedNoticeBody;
+
+  /// Botón del aviso de perfil pausado: pone acceptingAthletes en true.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REANUDAR'**
+  String get trainerPausedNoticeAction;
+
   /// Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir.
   ///
   /// In es_AR, this message translates to:
