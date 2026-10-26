@@ -4,7 +4,10 @@ import '../../../core/utils/geohash.dart';
 import '../../../core/utils/haversine.dart';
 import '../../gyms/application/gym_providers.dart' show gymRepositoryProvider;
 import '../../gyms/domain/gym.dart' show Gym, kNoGymId;
-import '../../profile/application/user_providers.dart' show firestoreProvider;
+import '../../coach/domain/trainer_location.dart' show TrainerLocationType;
+import '../../profile/application/user_providers.dart'
+    show firestoreProvider, userProfileProvider;
+import '../../profile/domain/user_profile.dart';
 import '../../profile/domain/user_public_profile.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -41,6 +44,42 @@ List<UserPublicProfile> suggestedUsersAfterPost(
   final pageIndex = (postIndex + 1) ~/ _kSuggestedUsersPostCadence - 1;
   return suggestedUsersPage(candidates, pageIndex);
 }
+
+bool _isRealGymId(String? gymId) =>
+    gymId != null && gymId.isNotEmpty && gymId != kNoGymId;
+
+/// Gym desde el que se buscan las sugerencias de seguimiento, o `null` si no
+/// hay ninguno.
+///
+/// Primero el `gymId` del perfil. Si falta, el primer lugar de trabajo del PF
+/// que sea un gym del catálogo. Antes se miraba solo `gymId`, y un PF que
+/// eligió «OTRO/SIN GYM» en el setup —lo natural si da clases en varios
+/// lados— o una cuenta web promovida a entrenador, que nunca pasó por ese
+/// paso, no veía ninguna sugerencia: la sección desaparecía sin decir nada,
+/// aunque sus gyms estuvieran cargados en `trainerLocations`.
+///
+/// Un solo gym y no todos: la grilla de cercanía de [suggestedUsersProvider]
+/// ya cubre los alrededores, y la key de la family sigue siendo un [String].
+/// Un lugar `stale` también sirve: perdió sus coordenadas, no su `gymId`, y la
+/// distancia se mide desde el doc del gym.
+String? suggestionsOriginGymId(UserProfile? profile) {
+  if (profile == null) return null;
+  if (_isRealGymId(profile.gymId)) return profile.gymId;
+  for (final location in profile.trainerLocations) {
+    if (location.type == TrainerLocationType.gym &&
+        _isRealGymId(location.gymId)) {
+      return location.gymId;
+    }
+  }
+  return null;
+}
+
+/// [suggestionsOriginGymId] del usuario actual.
+final suggestionsOriginGymIdProvider = Provider.autoDispose<String?>(
+  (ref) => ref.watch(
+    userProfileProvider.select((p) => suggestionsOriginGymId(p.valueOrNull)),
+  ),
+);
 
 /// `true` si el perfil tiene un nombre que mostrar.
 ///
