@@ -1358,6 +1358,15 @@
       }
     }
   },
+  "trainerNotAcceptingLabel": "NOT TAKING ATHLETES",
+  "trainerNotAcceptingExplanation": "{trainerName} isn't taking new athletes right now.",
+  "@trainerNotAcceptingExplanation": {
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubPreviewDiscardTitle": "Leave without saving the plan?",
   "coachHubPreviewDiscardBody": "You'll lose the exercises you matched manually.",
   "coachHubPreviewDiscardConfirm": "Leave anyway",

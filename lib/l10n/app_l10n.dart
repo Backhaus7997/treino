@@ -6632,6 +6632,18 @@ abstract class AppL10n {
   /// **'Solo podés tener un PF activo. Terminá tu vínculo actual con {trainerName} para pedir uno nuevo.'**
   String trainerCtaExistingLinkExplanation(String trainerName);
 
+  /// Disabled contact CTA label on a trainer's public profile when the trainer paused new athletes (acceptingAthletes == false).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NO TOMA ALUMNOS'**
+  String get trainerNotAcceptingLabel;
+
+  /// Helper line under the disabled contact CTA on the trainer's public profile when the trainer paused new athletes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{trainerName} no está tomando alumnos nuevos por ahora.'**
+  String trainerNotAcceptingExplanation(String trainerName);
+
   /// Title of the confirm dialog shown when leaving the coach-hub plan preview screen with manually-mapped exercises that would be lost (finding 9).
   ///
   /// In es_AR, this message translates to:

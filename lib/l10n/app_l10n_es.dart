@@ -3786,6 +3786,14 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get trainerNotAcceptingLabel => 'NO TOMA ALUMNOS';
+
+  @override
+  String trainerNotAcceptingExplanation(String trainerName) {
+    return '$trainerName no está tomando alumnos nuevos por ahora.';
+  }
+
+  @override
   String get coachHubPreviewDiscardTitle => '¿Salir sin guardar el plan?';
 
   @override
@@ -9890,6 +9898,14 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String trainerCtaExistingLinkExplanation(String trainerName) {
     return 'Solo podés tener un PF activo. Terminá tu vínculo actual con $trainerName para pedir uno nuevo.';
+  }
+
+  @override
+  String get trainerNotAcceptingLabel => 'NO TOMA ALUMNOS';
+
+  @override
+  String trainerNotAcceptingExplanation(String trainerName) {
+    return '$trainerName no está tomando alumnos nuevos por ahora.';
   }
 
   @override
