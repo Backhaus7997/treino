@@ -21,7 +21,6 @@ import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
-import '../gyms/domain/gym.dart' show kNoGymId;
 import '../moderation/application/moderation_providers.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_public_profile.dart';
@@ -883,10 +882,8 @@ class _AmigosBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final gymId = ref.watch(
-      userProfileProvider.select((p) => p.valueOrNull?.gymId),
-    );
-    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+    final gymId = ref.watch(suggestionsOriginGymIdProvider);
+    final suggestions = gymId == null
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
 
@@ -960,10 +957,8 @@ class _MiGymBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final gymId = ref.watch(
-      userProfileProvider.select((p) => p.valueOrNull?.gymId),
-    );
-    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+    final gymId = ref.watch(suggestionsOriginGymIdProvider);
+    final suggestions = gymId == null
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
     final blockedUids = ref.watch(myBlockedUidsProvider);
@@ -1042,10 +1037,8 @@ class _PublicoBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = feedPaginationProvider(publicFeedPaginationKey);
-    final gymId = ref.watch(
-      userProfileProvider.select((p) => p.valueOrNull?.gymId),
-    );
-    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+    final gymId = ref.watch(suggestionsOriginGymIdProvider);
+    final suggestions = gymId == null
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
     final blockedUids = ref.watch(myBlockedUidsProvider);

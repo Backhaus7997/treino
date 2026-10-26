@@ -36,6 +36,7 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/coach/domain/trainer_location.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
@@ -111,7 +112,11 @@ Post _makePost({
       createdAt: createdAt ?? DateTime.now().subtract(const Duration(hours: 1)),
     );
 
-UserProfile _makeProfile({String? gymId, UserRole role = UserRole.athlete}) =>
+UserProfile _makeProfile({
+  String? gymId,
+  UserRole role = UserRole.athlete,
+  List<TrainerLocation> trainerLocations = const [],
+}) =>
     UserProfile(
       uid: 'u1',
       email: 'tincho@test.com',
@@ -120,6 +125,7 @@ UserProfile _makeProfile({String? gymId, UserRole role = UserRole.athlete}) =>
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
       gymId: gymId,
+      trainerLocations: trainerLocations,
       // These tests are about the feed, not onboarding (#627). Without this the
       // FEED card renders above the pill tabs and pushes content out of the
       // test viewport.
@@ -1336,6 +1342,7 @@ void main() {
 
     List<Override> overridesWith({
       required List<UserPublicProfile> candidates,
+      UserProfile? profile,
     }) =>
         [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
@@ -1343,7 +1350,7 @@ void main() {
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => manyPosts()),
           userProfileProvider.overrideWith(
-            (ref) => Stream.value(_makeProfile(gymId: 'gym-a')),
+            (ref) => Stream.value(profile ?? _makeProfile(gymId: 'gym-a')),
           ),
           suggestedUsersProvider('gym-a')
               .overrideWith((ref) async => candidates),
@@ -1390,6 +1397,43 @@ void main() {
           greaterThan(tester.getRect(post10).top),
         );
       }
+    });
+
+    testWidgets(
+        'PF sin gymId: las sugerencias salen del gym de sus trainerLocations', (
+      tester,
+    ) async {
+      // Regresión: el feed gateaba las sugerencias sólo por `gymId`, y un PF
+      // con «OTRO/SIN GYM» no veía nunca el carrusel aunque tuviera sus gyms
+      // cargados como lugares de trabajo.
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedScreen(),
+          overridesWith(
+            candidates: candidates(20),
+            profile: _makeProfile(
+              role: UserRole.trainer,
+              trainerLocations: const [
+                TrainerLocation(
+                  id: 'loc-1',
+                  type: TrainerLocationType.gym,
+                  gymId: 'gym-a',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        await scrollUntil(
+          tester,
+          find.byKey(const Key('suggested_users_section')),
+        ),
+        isTrue,
+        reason: 'el PF sin gymId no vio el carrusel',
+      );
     });
 
     testWidgets(
