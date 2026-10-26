@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/trainer_discovery_providers.dart'
+    show trainerByIdProvider;
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/domain/trainer_public_profile.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/invite_outcome.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -27,12 +30,20 @@ Future<void> _pump(
   WidgetTester tester,
   InviteOutcome outcome, {
   required _MockRepo repo,
+  bool pfTomaAlumnos = true,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         currentUidProvider.overrideWithValue('atleta'),
         trainerLinkRepositoryProvider.overrideWithValue(repo),
+        for (final uid in ['pf-nuevo', 'pf-1'])
+          trainerByIdProvider(uid).overrideWith(
+            (_) async => TrainerPublicProfile(
+              uid: uid,
+              acceptingAthletes: pfTomaAlumnos,
+            ),
+          ),
         // El nombre es decorativo: el diálogo tiene que andar sin él.
         userPublicProfileProvider('pf-nuevo')
             .overrideWith((_) => Stream.value(null)),
@@ -59,6 +70,39 @@ Future<void> _pump(
 void main() {
   setUpAll(() {
     registerFallbackValue(TrainerLinkStatus.pending);
+  });
+
+  // Pausa del PF: las rules rechazan el vínculo nuevo, y en el caso E el
+  // orden "terminar primero, pedir después" dejaba al alumno SIN entrenador.
+  group('PF pausado', () {
+    for (final (nombre, outcome) in [
+      ('caso C', const InvitePuedeVincular('pf-nuevo') as InviteOutcome),
+      (
+        'caso E',
+        InviteRequiereDesvincular(
+          nuevoTrainerId: 'pf-nuevo',
+          vinculoActual: _link('pf-viejo'),
+        ),
+      ),
+    ]) {
+      testWidgets('$nombre: avisa y no toca ninguna asociación',
+          (tester) async {
+        final repo = _MockRepo();
+        await _pump(tester, outcome, repo: repo, pfTomaAlumnos: false);
+
+        expect(find.text('NO ESTÁ TOMANDO ALUMNOS'), findsOneWidget);
+        expect(find.text('Desvincular y continuar'), findsNothing);
+        // El único botón es "Entendido": tocarlo cierra y no hace nada más.
+        await tester.tap(find.byKey(const Key('invite_dialog_confirm')));
+        await tester.pumpAndSettle();
+        expect(find.text('NO ESTÁ TOMANDO ALUMNOS'), findsNothing);
+        verifyNever(() => repo.terminate(any(), reason: any(named: 'reason')));
+        verifyNever(() => repo.request(
+              trainerId: any(named: 'trainerId'),
+              athleteId: any(named: 'athleteId'),
+            ));
+      });
+    }
   });
 
   group('caso D — ya vinculado con el MISMO PF', () {

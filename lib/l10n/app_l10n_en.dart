@@ -3724,6 +3724,14 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get trainerNotAcceptingLabel => 'NOT TAKING ATHLETES';
+
+  @override
+  String trainerNotAcceptingExplanation(String trainerName) {
+    return '$trainerName isn\'t taking new athletes right now.';
+  }
+
+  @override
   String get coachHubPreviewDiscardTitle => 'Leave without saving the plan?';
 
   @override

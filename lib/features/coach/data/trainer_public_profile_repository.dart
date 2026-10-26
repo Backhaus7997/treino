@@ -42,7 +42,13 @@ class TrainerPublicProfileRepository {
   /// `where('hiddenFromDiscovery', isEqualTo: false)` excluiría los docs que
   /// no tienen el campo (casi todos) y pediría un índice compuesto nuevo.
   /// Se aplica a TODO listado que ve el alumno; [getById] no lo usa.
-  static bool _isVisible(TrainerPublicProfile t) => !t.hiddenFromDiscovery;
+  ///
+  /// También saca al PF que pausó los alumnos nuevos (`acceptingAthletes`):
+  /// mostrarlo en el mapa sería ofrecer a alguien que no puede tomar a nadie.
+  /// Mismo motivo para filtrar en cliente, y [getById] tampoco lo aplica — el
+  /// perfil sigue abierto por link para sus alumnos y para el que ya lo tenía.
+  static bool _isVisible(TrainerPublicProfile t) =>
+      !t.hiddenFromDiscovery && t.acceptingAthletes;
 
   /// Returns trainers whose `trainerGeohash` starts with [prefix5].
   ///

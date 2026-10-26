@@ -7,6 +7,8 @@ import '../../../../app/theme/tokens/tokens.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../application/trainer_discovery_providers.dart'
+    show trainerByIdProvider;
 import '../../application/trainer_link_providers.dart';
 import '../../domain/invite_outcome.dart';
 
@@ -55,6 +57,20 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
       _error = null;
     });
     try {
+      // Se vuelve a mirar la pausa ACÁ, y no sólo en el build: el provider
+      // puede no haber resuelto cuando se tocó el botón, y con
+      // `terminarPrimero` equivocarse cuesta el vínculo actual del alumno.
+      // Un PF sin perfil público no tiene cómo decirlo (las rules lo leen de
+      // `users`, que el alumno no puede leer); ahí decide el rechazo del
+      // servidor, después del terminate.
+      final pf = await ref.read(trainerByIdProvider(_trainerId!).future);
+      if (pf?.acceptingAthletes == false) {
+        if (mounted) {
+          setState(() => _error =
+              'Este entrenador no está tomando alumnos nuevos.'); // i18n
+        }
+        return;
+      }
       final repo = ref.read(trainerLinkRepositoryProvider);
       // El orden importa y no es intercambiable: primero se libera el cupo,
       // después se pide el nuevo. Al revés, el `request` chocaría con el
@@ -91,8 +107,23 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
             ?.displayName;
     final quien =
         (nombre == null || nombre.isEmpty) ? 'este entrenador' : nombre;
+    final pausado = trainerId != null &&
+        ref
+                .watch(trainerByIdProvider(trainerId))
+                .valueOrNull
+                ?.acceptingAthletes ==
+            false;
 
     final (titulo, cuerpo, acciones) = switch (widget.outcome) {
+      // PF pausado: las rules rechazan el vínculo nuevo. Va ANTES que el caso
+      // de desvincular a propósito — si no, el alumno terminaba su vínculo
+      // actual, la solicitud rebotaba, y se quedaba sin ningún entrenador.
+      InvitePuedeVincular() || InviteRequiereDesvincular() when pausado => (
+          'NO ESTÁ TOMANDO ALUMNOS', // i18n
+          '$quien pausó los alumnos nuevos por ahora. Probá más tarde o '
+              'pedile que te avise cuando vuelva a tomar.', // i18n
+          [_primario('Entendido', _cerrar)], // i18n
+        ),
       InvitePuedeVincular() => (
           'TE INVITARON A ENTRENAR', // i18n
           '$quien te invitó a vincularte. Va a poder armarte rutinas y '

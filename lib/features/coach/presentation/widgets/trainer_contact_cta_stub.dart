@@ -39,10 +39,24 @@ class TrainerContactCtaStub extends ConsumerStatefulWidget {
     super.key,
     required this.trainerId,
     this.preview = false,
+    this.acceptingAthletes = true,
+    this.trainerName,
   });
 
   /// uid del PF a quien se le pide el vínculo.
   final String trainerId;
+
+  /// `false` si el PF pausó los alumnos nuevos: el botón queda deshabilitado
+  /// con "NO TOMA ALUMNOS" y una línea que lo explica. Las rules rechazarían
+  /// el create igual; esto evita que el alumno se coma el error.
+  ///
+  /// NO esconde el botón: es el mismo widget que le dice "TU PERSONAL
+  /// TRAINER" o "SOLICITUD PENDIENTE" al alumno que ya está, y ese estado
+  /// tiene prioridad sobre la pausa.
+  final bool acceptingAthletes;
+
+  /// Nombre del PF para la línea de la pausa. Null ⇒ fallback genérico.
+  final String? trainerName;
 
   /// Vista previa del propio PF (#1498): el botón se ve pero no actúa. Nadie
   /// se pide vínculo a sí mismo (`_onPressed` ya lo corta en silencio).
@@ -109,21 +123,31 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
     final hasActiveOrPending = existingLink != null &&
         (existingLink.status == TrainerLinkStatus.pending ||
             existingLink.status == TrainerLinkStatus.active);
+    final linkedToThisTrainer =
+        hasActiveOrPending && existingLink.trainerId == widget.trainerId;
+    // La pausa cede ante el vínculo con ESTE PF, y le gana al de otro PF: a un
+    // alumno que ya tiene entrenador le sirve más saber que éste no toma a
+    // nadie que leer cómo terminar su vínculo actual para pedírselo.
+    final paused = !widget.acceptingAthletes && !linkedToThisTrainer;
     final disabled = widget.preview ||
         _submitting ||
         !linkAsync.hasValue ||
-        hasActiveOrPending;
+        hasActiveOrPending ||
+        paused;
 
     // El atleta está bloqueado porque ya tiene un vínculo con OTRO PF: no
     // dejamos un botón disabled sin explicación. Mostramos una línea de ayuda
     // debajo del botón con el motivo y a quién terminar el vínculo (constraint
     // de un único PF activo a la vez en MVP).
-    final blockedByOtherTrainer =
-        hasActiveOrPending && existingLink.trainerId != widget.trainerId;
+    final blockedByOtherTrainer = !paused &&
+        hasActiveOrPending &&
+        existingLink.trainerId != widget.trainerId;
 
-    final label = hasActiveOrPending
-        ? _existingLinkLabel(existingLink)
-        : l10n.coachCtaLabel;
+    final label = paused
+        ? l10n.trainerNotAcceptingLabel
+        : hasActiveOrPending
+            ? _existingLinkLabel(existingLink)
+            : l10n.coachCtaLabel;
 
     final button = OutlinedButton(
       onPressed: disabled ? null : _onPressed,
@@ -159,6 +183,18 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
             ),
     );
 
+    if (paused) {
+      final name = widget.trainerName?.trim();
+      return _ButtonWithHelp(
+        button: button,
+        help: l10n.trainerNotAcceptingExplanation(
+          (name == null || name.isEmpty)
+              ? l10n.athleteCoachViewTrainerFallbackName
+              : name,
+        ),
+      );
+    }
+
     if (!blockedByOtherTrainer) return button;
 
     // Resolvemos el nombre del PF vinculado actual para la línea de ayuda.
@@ -172,6 +208,32 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
             ? l10n.athleteCoachViewTrainerFallbackName
             : currentTrainerName;
 
+    return _ButtonWithHelp(
+      button: button,
+      help: l10n.trainerCtaExistingLinkExplanation(trainerName),
+    );
+  }
+
+  String _existingLinkLabel(TrainerLink link) {
+    if (link.trainerId == widget.trainerId) {
+      return link.status == TrainerLinkStatus.pending
+          ? 'SOLICITUD PENDIENTE'
+          : 'TU PERSONAL TRAINER';
+    }
+    return 'YA TENÉS UN PF';
+  }
+}
+
+/// Botón deshabilitado + la línea que explica por qué. Un botón apagado sin
+/// motivo es un callejón sin salida.
+class _ButtonWithHelp extends StatelessWidget {
+  const _ButtonWithHelp({required this.button, required this.help});
+
+  final Widget button;
+  final String help;
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       // #637: `stretch`, no `center`. Con `center` el botón se encogía a su
@@ -184,25 +246,16 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
         Semantics(
           liveRegion: true,
           child: Text(
-            l10n.trainerCtaExistingLinkExplanation(trainerName),
+            help,
             textAlign: TextAlign.center,
             style: GoogleFonts.barlow(
               fontSize: 13,
-              color: palette.textMuted,
+              color: AppPalette.of(context).textMuted,
               height: 1.4,
             ),
           ),
         ),
       ],
     );
-  }
-
-  String _existingLinkLabel(TrainerLink link) {
-    if (link.trainerId == widget.trainerId) {
-      return link.status == TrainerLinkStatus.pending
-          ? 'SOLICITUD PENDIENTE'
-          : 'TU PERSONAL TRAINER';
-    }
-    return 'YA TENÉS UN PF';
   }
 }

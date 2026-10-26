@@ -3184,6 +3184,19 @@
       }
     }
   },
+  "trainerNotAcceptingLabel": "NO TOMA ALUMNOS",
+  "@trainerNotAcceptingLabel": {
+    "description": "Disabled contact CTA label on a trainer's public profile when the trainer paused new athletes (acceptingAthletes == false)."
+  },
+  "trainerNotAcceptingExplanation": "{trainerName} no está tomando alumnos nuevos por ahora.",
+  "@trainerNotAcceptingExplanation": {
+    "description": "Helper line under the disabled contact CTA, and the message of the invite dialog, when the trainer paused new athletes.",
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubPreviewDiscardTitle": "¿Salir sin guardar el plan?",
   "@coachHubPreviewDiscardTitle": {
     "description": "Title of the confirm dialog shown when leaving the coach-hub plan preview screen with manually-mapped exercises that would be lost (finding 9)."

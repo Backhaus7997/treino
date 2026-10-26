@@ -816,6 +816,15 @@
       }
     }
   },
+  "trainerNotAcceptingLabel": "NO TOMA ALUMNOS",
+  "trainerNotAcceptingExplanation": "{trainerName} no está tomando alumnos nuevos por ahora.",
+  "@trainerNotAcceptingExplanation": {
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubPreviewDiscardTitle": "¿Salir sin guardar el plan?",
   "coachHubPreviewDiscardBody": "Vas a perder los ejercicios que mapeaste manualmente.",
   "coachHubPreviewDiscardConfirm": "Salir igual",
