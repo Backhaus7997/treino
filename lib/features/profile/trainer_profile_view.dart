@@ -20,6 +20,7 @@ import '../notifications/presentation/notification_history_screen.dart'
     show kTabSolicitudes;
 import 'presentation/widgets/eliminar_cuenta_sheet.dart';
 import '../coach/domain/trainer_public_profile.dart';
+import '../coach/presentation/widgets/perfil_pausado_aviso.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/user_providers.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
@@ -74,6 +75,11 @@ class TrainerProfileView extends ConsumerWidget {
         links.where((l) => l.status == TrainerLinkStatus.pending).length;
     final pub = pubAsync.valueOrNull;
     final isVisible = pub != null;
+    // La pausa se lee del perfil PROPIO (`users/{uid}`, en vivo) y no de
+    // `pub`: `trainerByIdProvider` lee una sola vez, y el badge seguía
+    // diciendo VISIBLE después de pausar. Publicado y pausado es otra cosa que
+    // visible: no aparece en el discovery ni recibe solicitudes.
+    final pausado = profileAsync.valueOrNull?.acceptingAthletes == false;
 
     return ListView(
       // El inset inferior SUMA `MediaQuery.paddingOf(context).bottom`, no es
@@ -137,10 +143,15 @@ class TrainerProfileView extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
 
+        // Pausa del PF: arriba de la card que dice si se lo ve. Sin pausa no
+        // dibuja nada, ni su margen.
+        const PerfilPausadoAviso(margin: EdgeInsets.only(bottom: 14)),
+
         // Perfil público card
         _PerfilPublicoCard(
           uid: uid,
           isVisible: isVisible,
+          pausado: pausado,
           pub: pub,
           palette: palette,
         ),
@@ -437,17 +448,29 @@ class _PerfilPublicoCard extends StatelessWidget {
   const _PerfilPublicoCard({
     required this.uid,
     required this.isVisible,
+    required this.pausado,
     required this.pub,
     required this.palette,
   });
 
   final String uid;
+
+  /// Tiene perfil público (y por eso tiene sentido la preview).
   final bool isVisible;
+
+  /// Pausó los alumnos nuevos: publicado, pero fuera del discovery.
+  final bool pausado;
   final TrainerPublicProfile? pub;
   final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
+    // Tres estados, no dos: publicado y pausado NO es visible.
+    final (etiqueta, color) = !isVisible
+        ? ('OCULTO', palette.textMuted)
+        : pausado
+            ? ('PAUSADO', palette.highlight)
+            : ('VISIBLE', palette.accent);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -477,22 +500,21 @@ class _PerfilPublicoCard extends StatelessWidget {
                   vertical: 3,
                 ),
                 decoration: BoxDecoration(
-                  color: isVisible
-                      ? palette.accent.withAlpha(40)
-                      : palette.textMuted.withAlpha(40),
+                  color: color.withAlpha(40),
                   borderRadius: BorderRadius.circular(AppRadius.full),
                   border: Border.all(
-                    color: isVisible ? palette.accent : palette.border,
+                    color: isVisible ? color : palette.border,
                     width: 1,
                   ),
                 ),
                 child: Text(
-                  isVisible ? 'VISIBLE' : 'OCULTO',
+                  etiqueta,
+                  key: const Key('perfil_publico_estado'),
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 10,
                     letterSpacing: 1.0,
-                    color: isVisible ? palette.accent : palette.textMuted,
+                    color: color,
                   ),
                 ),
               ),

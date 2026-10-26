@@ -127,6 +127,30 @@ void main() {
       );
     });
 
+    // Completo no alcanza: con la pausa puesta no aparece en Discovery, y el
+    // subtítulo decía "visible" igual.
+    testWidgets('completo pero pausado no dice visible', (tester) async {
+      await tester.pumpWidget(_pump(overrides: [
+        authStateChangesProvider
+            .overrideWith((ref) => Stream.value(_userWithUid('test-uid'))),
+        userProfileProvider.overrideWith(
+          (ref) => Stream.value(_trainer(
+            bio: 'mi bio entrenando',
+            specialty: 'hipertrofia',
+            locations: [_customLoc()],
+            rate: 7000,
+          ).copyWith(acceptingAthletes: false)),
+        ),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Perfil completo · visible en Discovery'), findsNothing);
+      expect(
+        find.text('Perfil pausado · no aparecés en Discovery'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('subtitle lista campos faltantes cuando hay alguno vacío',
         (tester) async {
       await tester.pumpWidget(_pump(overrides: [
