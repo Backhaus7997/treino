@@ -4,7 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../../../app/theme/tokens/tokens.dart' show AppRadius, AppSpacing;
+import '../../../../app/theme/tokens/tokens.dart'
+    show AppRadius, AppSpacing, AppTextSize;
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_providers.dart';
 
@@ -82,7 +83,7 @@ class _PerfilPausadoAvisoState extends ConsumerState<PerfilPausadoAviso> {
                   l10n.trainerPausedNoticeTitle,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
-                    fontSize: 14,
+                    fontSize: AppTextSize.body,
                     letterSpacing: 0.8,
                     color: palette.highlight,
                   ),
@@ -91,7 +92,7 @@ class _PerfilPausadoAvisoState extends ConsumerState<PerfilPausadoAviso> {
                 Text(
                   l10n.trainerPausedNoticeBody,
                   style: GoogleFonts.barlow(
-                    fontSize: 13,
+                    fontSize: AppTextSize.bodyDense,
                     height: 1.4,
                     color: palette.textMuted,
                   ),
