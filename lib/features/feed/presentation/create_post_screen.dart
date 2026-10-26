@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/guardia_de_salida.dart';
+import '../../../core/widgets/discard_changes_dialog.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -14,6 +16,8 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
 import '../application/create_post_notifier.dart';
 import '../domain/post.dart';
+import '../domain/post_privacy.dart';
+import '../domain/routine_tag.dart';
 import 'routine_tag_picker_sheet.dart';
 import 'widgets/post_privacy_selector.dart';
 import '../../gyms/domain/gym.dart' show hasRealGym;
@@ -198,14 +202,38 @@ class _CreatePostBody extends ConsumerStatefulWidget {
 class _CreatePostBodyState extends ConsumerState<_CreatePostBody> {
   late final TextEditingController _controller;
 
+  /// Cómo estaba el post al abrir: vacío al crear, el post al editar.
+  late final (String, PostPrivacy, RoutineTag?) _alAbrir;
+
+  /// Referencia guardada al montar: en `dispose` ya no se puede usar `ref`.
+  late final GuardiaDeSalida _guardia;
+
+  /// Hay algo escrito o elegido que no se publicó. El borrador vive en un
+  /// provider `autoDispose`: salir —por CANCELAR, atrás o la barra de
+  /// pestañas— lo tira entero, así que pregunta antes.
+  bool get _hayCambios {
+    final s = widget.state;
+    return !s.isSubmitting && (s.text, s.privacy, s.routineTag) != _alAbrir;
+  }
+
+  /// `true` si se puede salir: sin cambios, o el usuario eligió descartarlos.
+  Future<bool> _confirmarSalida() async {
+    if (!_hayCambios || !mounted) return true;
+    return confirmDiscardChanges(context);
+  }
+
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.state.text);
+    _alAbrir =
+        (widget.state.text, widget.state.privacy, widget.state.routineTag);
+    _guardia = ref.read(guardiaDeSalidaProvider)..registrar(_confirmarSalida);
   }
 
   @override
   void dispose() {
+    _guardia.liberar(_confirmarSalida);
     _controller.dispose();
     super.dispose();
   }
@@ -218,6 +246,26 @@ class _CreatePostBodyState extends ConsumerState<_CreatePostBody> {
     final profileAsync = ref.watch(userProfileProvider);
     final hasGym = hasRealGym(profileAsync.valueOrNull?.gymId);
 
+    // Atrás, el swipe de iOS y CANCELAR (que hace `maybePop`) pasan por acá;
+    // la barra de pestañas, por la [GuardiaDeSalida]. El `pop()` después de
+    // publicar es forzado y no pregunta. No hace falta un ListenableBuilder:
+    // cada tecla pasa por `notifier.setText`, que reconstruye con el estado.
+    return PopScope(
+      canPop: !_hayCambios,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (await _confirmarSalida() && context.mounted) context.pop();
+      },
+      child: _buildForm(palette, state, notifier, hasGym),
+    );
+  }
+
+  Widget _buildForm(
+    AppPalette palette,
+    CreatePostState state,
+    CreatePostNotifier notifier,
+    bool hasGym,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -283,12 +331,13 @@ class _CreatePostHeader extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: Row(
         children: [
-          // CANCELAR
+          // CANCELAR — `maybePop` y no `pop`: el forzado saltea el PopScope
+          // del cuerpo y tiraba el borrador sin preguntar.
           Semantics(
             button: true,
             label: l10n.commonCancel,
             child: TreinoTappable(
-              onTap: () => context.pop(),
+              onTap: () => Navigator.of(context).maybePop(),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Align(

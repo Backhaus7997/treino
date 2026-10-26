@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/guardia_de_salida.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
@@ -414,10 +415,61 @@ void main() {
 
       await tester.tap(find.text('CANCELAR'));
       await tester.pumpAndSettle();
+      // Con texto escrito, CANCELAR pregunta antes de tirar el borrador.
+      await tester.tap(find.byKey(const Key('discard_changes_confirm')));
+      await tester.pumpAndSettle();
 
       verifyNever(() => repo.create(any()));
       // Screen has popped — we're back at '/'
       expect(find.text('open'), findsOneWidget);
+    });
+
+    testWidgets('sin nada escrito, CANCELAR sale sin preguntar',
+        (tester) async {
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: MockPostRepository()));
+      await _openCreatePost(tester);
+
+      await tester.tap(find.text('CANCELAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('discard_changes_cancel')), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+    });
+
+    testWidgets('con texto, «Cancelar» en el diálogo conserva el borrador',
+        (tester) async {
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: MockPostRepository()));
+      await _openCreatePost(tester);
+      await tester.enterText(find.byType(TextField), 'Borrador');
+      await tester.pump();
+
+      await tester.tap(find.text('CANCELAR'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('discard_changes_cancel')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('open'), findsNothing);
+      expect(find.text('Borrador'), findsOneWidget);
+    });
+
+    // El borrador vive en un provider autoDispose: la barra de pestañas, que
+    // hace `go`, lo tiraba sin pasar por ningún PopScope.
+    testWidgets('con texto, la barra de pestañas también pregunta',
+        (tester) async {
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: MockPostRepository()));
+      await _openCreatePost(tester);
+      await tester.enterText(find.byType(TextField), 'Borrador');
+      await tester.pump();
+
+      final guardia = ProviderScope.containerOf(
+        tester.element(find.byType(CreatePostScreen)),
+      ).read(guardiaDeSalidaProvider);
+      final salida = guardia.puedeSalir();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('discard_changes_cancel')));
+      await tester.pumpAndSettle();
+
+      expect(await salida, isFalse);
     });
   });
 
