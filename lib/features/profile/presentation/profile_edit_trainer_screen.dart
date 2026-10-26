@@ -83,6 +83,11 @@ class _ProfileEditTrainerScreenState
 
   /// Si el PF tocó el switch en ESTA pantalla. Ver el `_save()`.
   bool _acceptsInquiriesTocado = false;
+
+  /// Pausa de alumnos nuevos. Mismo default y misma regla de "tocado" que
+  /// [_acceptsInquiries]: el Coach Hub también lo edita y persiste al toque.
+  bool _acceptingAthletes = true;
+  bool _acceptingAthletesTocado = false;
   bool _initialized = false;
   bool _saving = false;
   String? _error;
@@ -112,6 +117,7 @@ class _ProfileEditTrainerScreenState
       ..addAll(profile.trainerLocations);
     _offersOnline = profile.trainerOffersOnline;
     _acceptsInquiries = profile.acceptsInquiries;
+    _acceptingAthletes = profile.acceptingAthletes;
     _initialized = true;
   }
 
@@ -354,6 +360,7 @@ class _ProfileEditTrainerScreenState
       // otro campo. `_initFromProfile` corre una sola vez, así que el valor
       // que tenemos en mano puede estar viejo y no hay forma de saberlo.
       if (_acceptsInquiriesTocado) 'acceptsInquiries': _acceptsInquiries,
+      if (_acceptingAthletesTocado) 'acceptingAthletes': _acceptingAthletes,
       // Limpiar legacy singular — este form trabaja con el modelo array-based.
       // Si no los nulleamos, quedan zombi en Firestore (de la migration original)
       // y el mapa los renderea como pin físico aunque el PF haya borrado
@@ -616,6 +623,19 @@ class _ProfileEditTrainerScreenState
               onChanged: (v) => setState(() {
                 _acceptsInquiries = v;
                 _acceptsInquiriesTocado = true;
+              }),
+            ),
+            const SizedBox(height: 12),
+            // La pausa: la misma pregunta, más fuerte. Apagado, no aparecés en
+            // el discovery y no te llegan solicitudes ni consultas nuevas.
+            _ToggleCard(
+              palette: palette,
+              title: l10n.trainerAcceptingAthletesTitle,
+              subtitle: l10n.trainerAcceptingAthletesSubtitle,
+              value: _acceptingAthletes,
+              onChanged: (v) => setState(() {
+                _acceptingAthletes = v;
+                _acceptingAthletesTocado = true;
               }),
             ),
             if (_error != null) ...[

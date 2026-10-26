@@ -11,6 +11,7 @@ import 'package:treino/features/coach/application/template_quota_provider.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/weighted_load.dart';
+import 'package:treino/features/coach/presentation/widgets/pausar_por_cupo_sugerencia.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/cancel_subscription_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_cancel.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_copy.dart';
@@ -103,6 +104,15 @@ class FacturacionTab extends ConsumerWidget {
           limit: limit,
           palette: palette,
           canceladoHasta: vigencia.pagadoHasta,
+        ),
+        // Con el cupo lleno, ofrecer pausar el perfil. Lee el MISMO `load` y
+        // `limit` que la card de arriba, para que la sugerencia nunca
+        // contradiga el número que el PF está viendo. Fuera del tope no
+        // dibuja nada, ni el espacio: lo trae el propio widget en su margen.
+        PausarPorCupoSugerencia(
+          carga: load,
+          tope: limit,
+          margin: const EdgeInsets.only(top: AppSpacing.s14),
         ),
         // ── La baja ──
         //

@@ -534,6 +534,57 @@ void main() {
           reason: 'default debe ser true — ver UserProfile.acceptsInquiries');
     });
   });
+
+  // Pausa del PF: mismo contrato que el switch de consultas. El Coach Hub y
+  // la sugerencia de cupo lleno la cambian al instante, así que el form sólo
+  // la manda si el PF la tocó ACÁ.
+  group('ProfileEditTrainerScreen — pausa de alumnos nuevos', () {
+    Future<Map<String, Object?>> guardar(
+      WidgetTester tester, {
+      required bool tocarSwitch,
+    }) async {
+      final mockRepo = MockUserRepository();
+      when(() => mockRepo.update(any(), any())).thenAnswer((_) async {});
+      await tester.pumpWidget(_buildScreen(
+        profile:
+            _trainerProfile(complete: true).copyWith(acceptingAthletes: true),
+        repo: mockRepo,
+      ));
+      await tester.pumpAndSettle();
+
+      if (tocarSwitch) {
+        final toggle =
+            find.widgetWithText(SwitchListTile, 'Tomo alumnos nuevos');
+        await tester.ensureVisible(toggle);
+        await tester.pumpAndSettle();
+        await tester.tap(toggle);
+        await tester.pumpAndSettle();
+      }
+
+      final saveBtn = find.byKey(const Key('profile_edit_trainer_save_button'));
+      await tester.ensureVisible(saveBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(saveBtn);
+      await tester.pumpAndSettle();
+
+      return verify(() => mockRepo.update('trainer-uid', captureAny()))
+          .captured
+          .single as Map<String, Object?>;
+    }
+
+    testWidgets('sin tocar el switch, el save no manda acceptingAthletes',
+        (tester) async {
+      final escrito = await guardar(tester, tocarSwitch: false);
+      expect(escrito.containsKey('acceptingAthletes'), isFalse,
+          reason: 'pisaría la pausa que el PF acaba de poner en el Hub');
+    });
+
+    testWidgets('apagándolo acá, el save manda acceptingAthletes:false',
+        (tester) async {
+      final escrito = await guardar(tester, tocarSwitch: true);
+      expect(escrito['acceptingAthletes'], isFalse);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------

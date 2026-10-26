@@ -1406,6 +1406,36 @@ abstract class AppL10n {
   /// **'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.'**
   String get trainerAcceptsInquiriesSubtitle;
 
+  /// Título del toggle de pausa del PF (`acceptingAthletes`).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tomo alumnos nuevos'**
+  String get trainerAcceptingAthletesTitle;
+
+  /// Subtítulo del toggle de pausa. Dice NUEVAS por lo mismo que el de consultas: las solicitudes pending que ya entraron y los chats abiertos no se tocan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si lo apagás, dejás de aparecer en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas. Tus alumnos actuales siguen igual.'**
+  String get trainerAcceptingAthletesSubtitle;
+
+  /// Título de la sugerencia de pausar el perfil cuando la carga de alumnos alcanzó el tope del plan. Es una sugerencia: nada se pausa solo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LLEGASTE AL TOPE DE TU PLAN'**
+  String get trainerPlanLimitPauseTitle;
+
+  /// Cuerpo de la sugerencia de pausar con el cupo lleno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si no vas a sumar alumnos, pausá tu perfil: dejás de aparecer en el buscador y no te llegan solicitudes que no vas a poder aceptar.'**
+  String get trainerPlanLimitPauseBody;
+
+  /// Botón de la sugerencia: pone acceptingAthletes en false.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PAUSAR PERFIL'**
+  String get trainerPlanLimitPauseAction;
+
   /// Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir.
   ///
   /// In es_AR, this message translates to:
