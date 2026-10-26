@@ -4,6 +4,9 @@ Estado: **especificación aprobada** (2026-10-22). Fuente de verdad para
 implementar el import; las decisiones de producto de acá son del dueño y no se
 reinterpretan en el código.
 
+**Implementación y lo que falta para el rollout:** ver
+[plan-import-pdf-estado.md](./plan-import-pdf-estado.md).
+
 El contrato técnico compartido entre el backend (`functions/`) y el dominio
 Dart (`lib/features/coach_hub/data` y `domain`) está copiado abajo, en
 «Contrato del callable» y «`PdfPlanExtraction`». Si el código y esta sección no
