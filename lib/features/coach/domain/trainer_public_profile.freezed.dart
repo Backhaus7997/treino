@@ -48,6 +48,14 @@ mixin _$TrainerPublicProfile {
   /// Ver [UserProfile.acceptingAthletes]. Default `true`: espeja el
   /// `.get('acceptingAthletes', true)` de `firestore.rules`, así que un
   /// perfil legacy sin el campo sigue abierto a alumnos nuevos.
+  ///
+  /// Robusto a un valor no booleano, y acá no es hipotético como en
+  /// [hiddenFromDiscovery]: este campo lo escribe el PF y el `update` de
+  /// `trainerPublicProfiles` no valida tipos. Un `bool` crudo haría que un
+  /// solo doc con `"no"` tirara el listado de discovery de TODOS los
+  /// alumnos. Cualquier cosa distinta de `true` cuenta como pausado, igual
+  /// que el `== true` de las rules.
+  @JsonKey(fromJson: _acceptingFromJson)
   bool get acceptingAthletes =>
       throw _privateConstructorUsedError; // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
 // Written exclusively by the reviewAggregate Cloud Function.
@@ -114,7 +122,7 @@ abstract class $TrainerPublicProfileCopyWith<$Res> {
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
       bool acceptsInquiries,
-      bool acceptingAthletes,
+      @JsonKey(fromJson: _acceptingFromJson) bool acceptingAthletes,
       double? averageRating,
       int reviewCount,
       int? trainerExperienceYears,
@@ -274,7 +282,7 @@ abstract class _$$TrainerPublicProfileImplCopyWith<$Res>
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
       bool acceptsInquiries,
-      bool acceptingAthletes,
+      @JsonKey(fromJson: _acceptingFromJson) bool acceptingAthletes,
       double? averageRating,
       int reviewCount,
       int? trainerExperienceYears,
@@ -426,7 +434,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       final List<String> trainerGeohashes = const <String>[],
       this.trainerOffersOnline = false,
       this.acceptsInquiries = true,
-      this.acceptingAthletes = true,
+      @JsonKey(fromJson: _acceptingFromJson) this.acceptingAthletes = true,
       this.averageRating,
       this.reviewCount = 0,
       this.trainerExperienceYears,
@@ -499,8 +507,15 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   /// Ver [UserProfile.acceptingAthletes]. Default `true`: espeja el
   /// `.get('acceptingAthletes', true)` de `firestore.rules`, así que un
   /// perfil legacy sin el campo sigue abierto a alumnos nuevos.
+  ///
+  /// Robusto a un valor no booleano, y acá no es hipotético como en
+  /// [hiddenFromDiscovery]: este campo lo escribe el PF y el `update` de
+  /// `trainerPublicProfiles` no valida tipos. Un `bool` crudo haría que un
+  /// solo doc con `"no"` tirara el listado de discovery de TODOS los
+  /// alumnos. Cualquier cosa distinta de `true` cuenta como pausado, igual
+  /// que el `== true` de las rules.
   @override
-  @JsonKey()
+  @JsonKey(fromJson: _acceptingFromJson)
   final bool acceptingAthletes;
 // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
 // Written exclusively by the reviewAggregate Cloud Function.
@@ -656,7 +671,7 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
           final List<String> trainerGeohashes,
           final bool trainerOffersOnline,
           final bool acceptsInquiries,
-          final bool acceptingAthletes,
+          @JsonKey(fromJson: _acceptingFromJson) final bool acceptingAthletes,
           final double? averageRating,
           final int reviewCount,
           final int? trainerExperienceYears,
@@ -709,7 +724,15 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   /// Ver [UserProfile.acceptingAthletes]. Default `true`: espeja el
   /// `.get('acceptingAthletes', true)` de `firestore.rules`, así que un
   /// perfil legacy sin el campo sigue abierto a alumnos nuevos.
+  ///
+  /// Robusto a un valor no booleano, y acá no es hipotético como en
+  /// [hiddenFromDiscovery]: este campo lo escribe el PF y el `update` de
+  /// `trainerPublicProfiles` no valida tipos. Un `bool` crudo haría que un
+  /// solo doc con `"no"` tirara el listado de discovery de TODOS los
+  /// alumnos. Cualquier cosa distinta de `true` cuenta como pausado, igual
+  /// que el `== true` de las rules.
   @override
+  @JsonKey(fromJson: _acceptingFromJson)
   bool
       get acceptingAthletes; // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
 // Written exclusively by the reviewAggregate Cloud Function.

@@ -64,6 +64,17 @@ void main() {
       );
     });
 
+    test('acceptingAthletes no booleano se lee pausado y no tira el parseo',
+        () {
+      for (final basura in ['no', 0, 'true', <String>[]]) {
+        final restored = TrainerPublicProfile.fromJson({
+          'uid': 'trainer-roto',
+          'acceptingAthletes': basura,
+        });
+        expect(restored.acceptingAthletes, isFalse, reason: 'valor: $basura');
+      }
+    });
+
     test('SCENARIO-407: full JSON roundtrip preserves all fields', () {
       const profile = TrainerPublicProfile(
         uid: 'trainer-1',

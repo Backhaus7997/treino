@@ -48,7 +48,16 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
     /// Ver [UserProfile.acceptingAthletes]. Default `true`: espeja el
     /// `.get('acceptingAthletes', true)` de `firestore.rules`, así que un
     /// perfil legacy sin el campo sigue abierto a alumnos nuevos.
-    @Default(true) bool acceptingAthletes,
+    ///
+    /// Robusto a un valor no booleano, y acá no es hipotético como en
+    /// [hiddenFromDiscovery]: este campo lo escribe el PF y el `update` de
+    /// `trainerPublicProfiles` no valida tipos. Un `bool` crudo haría que un
+    /// solo doc con `"no"` tirara el listado de discovery de TODOS los
+    /// alumnos. Cualquier cosa distinta de `true` cuenta como pausado, igual
+    /// que el `== true` de las rules.
+    @JsonKey(fromJson: _acceptingFromJson)
+    @Default(true)
+    bool acceptingAthletes,
     // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
     // Written exclusively by the reviewAggregate Cloud Function.
     // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
@@ -88,6 +97,8 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
 }
 
 bool _hiddenFromJson(Object? value) => value == true;
+
+bool _acceptingFromJson(Object? value) => value == true;
 
 TrainerSpecialty? _specialtyFromJson(Object? value) =>
     trainerSpecialtyFromString(value as String?);

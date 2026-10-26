@@ -30,7 +30,9 @@ _$TrainerPublicProfileImpl _$$TrainerPublicProfileImplFromJson(
           const <String>[],
       trainerOffersOnline: json['trainerOffersOnline'] as bool? ?? false,
       acceptsInquiries: json['acceptsInquiries'] as bool? ?? true,
-      acceptingAthletes: json['acceptingAthletes'] as bool? ?? true,
+      acceptingAthletes: json['acceptingAthletes'] == null
+          ? true
+          : _acceptingFromJson(json['acceptingAthletes']),
       averageRating: (json['averageRating'] as num?)?.toDouble(),
       reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       trainerExperienceYears: (json['trainerExperienceYears'] as num?)?.toInt(),
