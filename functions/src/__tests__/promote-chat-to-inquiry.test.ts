@@ -240,6 +240,19 @@ describe("runPromoteChatToInquiry — trainer eligibility", () => {
       runPromoteChatToInquiry(app, callerUid, trainerId),
     ).rejects.toMatchObject({ code: "failed-precondition" });
   });
+
+  it("case 10b: rejects when the trainer paused new athletes (users.acceptingAthletes === false)", async () => {
+    const chatId = [callerUid, trainerId].sort().join("_");
+    const { tx } = installFirestore({
+      chats: { [chatId]: chat() },
+      users: { [trainerId]: { role: "trainer", acceptingAthletes: false } },
+      trainerPublicProfiles: { [trainerId]: { acceptsInquiries: true } },
+    });
+    await expect(
+      runPromoteChatToInquiry(app, callerUid, trainerId),
+    ).rejects.toMatchObject({ code: "failed-precondition" });
+    expect(tx.update).not.toHaveBeenCalled();
+  });
 });
 
 // ─── 11/12 — happy path, including the acceptsInquiries default ────────────

@@ -44,6 +44,11 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
     /// el `.get('acceptsInquiries', true)` de `firestore.rules`, así que un
     /// perfil legacy sin el campo sigue siendo consultable.
     @Default(true) bool acceptsInquiries,
+
+    /// Ver [UserProfile.acceptingAthletes]. Default `true`: espeja el
+    /// `.get('acceptingAthletes', true)` de `firestore.rules`, así que un
+    /// perfil legacy sin el campo sigue abierto a alumnos nuevos.
+    @Default(true) bool acceptingAthletes,
     // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
     // Written exclusively by the reviewAggregate Cloud Function.
     // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.

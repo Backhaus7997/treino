@@ -39,6 +39,31 @@ void main() {
       expect(profile.toJson()['acceptsInquiries'], isFalse);
     });
 
+    // Mismo contrato que `acceptsInquiries`: la rule lee
+    // `.get('acceptingAthletes', true)`, así que un perfil sin el campo está
+    // ABIERTO. Con otro default el discovery escondería a todos los PF
+    // existentes mientras el servidor les sigue aceptando solicitudes.
+    test('un perfil SIN acceptingAthletes está abierto a alumnos nuevos', () {
+      final restored = TrainerPublicProfile.fromJson(const {
+        'uid': 'trainer-legacy',
+      });
+
+      expect(restored.acceptingAthletes, isTrue);
+    });
+
+    test('acceptingAthletes:false sobrevive el roundtrip', () {
+      const profile = TrainerPublicProfile(
+        uid: 'trainer-1',
+        acceptingAthletes: false,
+      );
+
+      expect(profile.toJson()['acceptingAthletes'], isFalse);
+      expect(
+        TrainerPublicProfile.fromJson(profile.toJson()).acceptingAthletes,
+        isFalse,
+      );
+    });
+
     test('SCENARIO-407: full JSON roundtrip preserves all fields', () {
       const profile = TrainerPublicProfile(
         uid: 'trainer-1',
