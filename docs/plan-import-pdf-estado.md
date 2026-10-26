@@ -45,7 +45,7 @@ reglas, functions con el LLM mockeado). **Nunca se llamó al modelo real.**
 
 ## Qué falta (en orden)
 
-Los pasos 1 a 5 tocan **producción** (`treino-dev` ES producción, AGENTS.md):
+Los pasos 1 a 6 tocan **producción** (`treino-dev` ES producción, AGENTS.md):
 los hace un humano con OK explícito del dueño.
 
 1. **Vertex AI en `treino-dev`:** habilitar Claude Opus 5.5 (y Sonnet 5.5 /
@@ -61,15 +61,23 @@ los hace un humano con OK explícito del dueño.
    - `firebase deploy --only functions:parsePlanPdf --project prod`
      (el deploy de functions resuelve **todos** los secretos: si falla por un
      secret ajeno, no es de esta feature).
-5. **Kill switch:** crear `app_config/pdf_import` =
+5. **Política publicada ANTES de cualquier allowlist** (spec, *Rollout* paso
+   2). La `allowlistUids` saltea `enabled: false`, así que un PF de la lista ya
+   sube PDFs reales: la política tiene que estar publicada antes de cargar el
+   primer uid. Estado al 2026-10-26: la v5 (con Vertex AI / Claude) **ya está
+   en `main`** (entró con #1634 y viaja en la app 1.2.0+60); falta **confirmar
+   que esté publicada en la landing** (gettreino.com) y que la 1.2.0+60 esté
+   disponible en las tiendas.
+6. **Kill switch:** recién con el paso 5 confirmado, crear
+   `app_config/pdf_import` =
    `{ "enabled": false, "allowlistUids": ["<uid del PF que evalúa>"] }`.
    Sin el documento el callable rechaza a todos.
-6. **Evaluación con 10 a 20 PDFs reales** desde una cuenta de la allowlist,
+7. **Evaluación con 10 a 20 PDFs reales** desde una cuenta de la allowlist,
    con un build de `develop` (con `--dart-define-from-file=~/.config/treino/dart_defines.json`).
    Qué medir: spec, *Rollout* paso 4.
-7. **Elegir modelo:** si Sonnet o Haiku alcanzan con los mismos PDFs, cambiar
+8. **Elegir modelo:** si Sonnet o Haiku alcanzan con los mismos PDFs, cambiar
    el parámetro de config (sin redeploy).
-8. **Release:** `develop` → `main` y build a las tiendas. Recién con la versión
+9. **Release:** `develop` → `main` y build a las tiendas. Recién con la versión
    publicada, `enabled: true`.
 
 Checklist manual en el iPhone (de los PRs #1641 y #1643): botón sin salto de
