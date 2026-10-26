@@ -62,6 +62,7 @@ import '../features/feed/application/follow_list_providers.dart';
 import '../features/feed/presentation/follow_list_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
+import 'guardia_de_salida.dart';
 import 'not_found_screen.dart';
 import '../features/insights/presentation/exercise_progression_screen.dart';
 import '../features/insights/presentation/frequent_exercises_screen.dart';
@@ -1882,7 +1883,12 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
           feedUnreadCount: feedUnreadCount,
           collapsed: _nav.value < 0.5,
           expansion: _nav.value,
-          onTap: (i) {
+          onTap: (i) async {
+            // Una pantalla con cambios sin guardar pregunta antes de que el
+            // `go` de abajo la destruya (ver [GuardiaDeSalida]). Si el usuario
+            // se queda, no se toca nada más: ni popups ni la barra.
+            if (!await ref.read(guardiaDeSalidaProvider).puedeSalir()) return;
+            if (!context.mounted) return;
             // Pop any open popup (modal bottom sheet, dialog) on the SHELL
             // navigator so it animates closed when the user switches tabs —
             // mirrors the auto-dismiss behavior the user expects from the

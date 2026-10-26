@@ -10,6 +10,8 @@ import '../../../core/moderation/moderation_guard.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/geohash.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../app/guardia_de_salida.dart';
+import '../../../core/widgets/discard_changes_dialog.dart';
 import '../../../core/widgets/form_scroll_to_error.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -92,8 +94,54 @@ class _ProfileEditTrainerScreenState
   bool _saving = false;
   String? _error;
 
+  /// Cómo estaba el form al abrir, para saber si hay cambios sin guardar. Las
+  /// ubicaciones se comparan aparte, contra [_locationsAlAbrir].
+  Object? _firmaAlAbrir;
+
+  /// Referencia guardada al montar: en `dispose` ya no se puede usar `ref`.
+  late final GuardiaDeSalida _guardia;
+
+  Object? _firma() => (
+        _bioController.text,
+        _priceController.text,
+        _aliasController.text,
+        _experienceController.text,
+        _specialty,
+        _offersOnline,
+        _acceptsInquiries,
+        _acceptingAthletes,
+      );
+
+  /// Hay algo tocado que no se guardó. Un PF apagó «Tomo alumnos nuevos», se
+  /// fue sin GUARDAR, y quedó convencido de que estaba pausado: salir así
+  /// tiene que preguntar, por atrás y por la barra de pestañas.
+  bool get _hayCambios =>
+      _initialized &&
+      (_firma() != _firmaAlAbrir || !listEquals(_locations, _locationsAlAbrir));
+
+  /// `true` si se puede salir: sin cambios, o el PF eligió descartarlos.
+  Future<bool> _confirmarSalida() async {
+    if (!_hayCambios || !mounted) return true;
+    return confirmDiscardChanges(context);
+  }
+
+  Future<void> _handleBack() async {
+    if (await _confirmarSalida() && mounted) context.pop();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _guardia = ref.read(guardiaDeSalidaProvider);
+    // En onboarding el router ya no deja salir: la guardia sólo sirve en edit.
+    if (widget.mode == ProfileEditTrainerMode.edit) {
+      _guardia.registrar(_confirmarSalida);
+    }
+  }
+
   @override
   void dispose() {
+    _guardia.liberar(_confirmarSalida);
     _bioController.dispose();
     _priceController.dispose();
     _aliasController.dispose();
@@ -118,6 +166,7 @@ class _ProfileEditTrainerScreenState
     _offersOnline = profile.trainerOffersOnline;
     _acceptsInquiries = profile.acceptsInquiries;
     _acceptingAthletes = profile.acceptingAthletes;
+    _firmaAlAbrir = _firma();
     _initialized = true;
   }
 
@@ -688,13 +737,35 @@ class _ProfileEditTrainerScreenState
 
     // ADR-TPO-006: onboarding mode wraps body in PopScope to block OS back
     // gesture (iOS swipe-back, Android back button).
+    //
+    // En edit, PopScope frena atrás y el swipe de iOS si hay cambios sin
+    // guardar y pregunta (#1502). Lo de la barra de pestañas lo cubre la
+    // [GuardiaDeSalida]. El `context.pop()` del guardado es un pop forzado y
+    // no pasa por acá. El ListenableBuilder es porque los campos de texto no
+    // hacen setState: sin él, `canPop` quedaría viejo al tipear.
     final wrappedBody = widget.mode == ProfileEditTrainerMode.onboarding
         ? PopScope(
             canPop: false,
             onPopInvokedWithResult: (_, __) {},
             child: body,
           )
-        : body;
+        : ListenableBuilder(
+            listenable: Listenable.merge([
+              _bioController,
+              _priceController,
+              _aliasController,
+              _experienceController,
+            ]),
+            child: body,
+            builder: (context, body) => PopScope(
+              canPop: !_hayCambios,
+              onPopInvokedWithResult: (didPop, _) {
+                if (didPop) return;
+                _handleBack();
+              },
+              child: body!,
+            ),
+          );
 
     return TreinoStateSwitcher(
       childKey: const ValueKey('form'),
