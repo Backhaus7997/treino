@@ -28,8 +28,8 @@ antes de guardar**. Nada se asigna al alumno sin esa revisión.
 
 Por qué un LLM y no un parser: la gramática del Excel funciona porque la
 plantilla es nuestra. El PDF es formato del PF; el texto plano pierde la
-geometría de las tablas y un escaneado necesita OCR. Claude recibe el PDF como
-texto **e imagen** por página, así que lee tablas y escaneados con el mismo
+geometría de las tablas y un escaneado necesita OCR. El modelo recibe el PDF
+como texto **e imagen** por página, así que lee tablas y escaneados con el mismo
 camino.
 
 ## Alcance v1
@@ -98,14 +98,30 @@ Errores (`HttpsError`):
 | `deadline-exceeded` | el LLM tardó demasiado | **se devuelve** |
 | `internal` | salida del LLM inválida tras validar | **se devuelve** |
 
-**Proveedor.** Claude en **Vertex AI** (`@anthropic-ai/vertex-sdk`,
-`region: "global"`, proyecto del entorno). Auth por la service account de la
-función (ADC): **sin API key ni secret nuevo**. El endpoint regional para los
-modelos nuevos no existe, por eso `global` y no `southamerica-east1`.
+**Proveedor.** **Gemini en Vertex AI** (`gemini-provider.ts`: un POST REST a
+`generateContent`, endpoint `global` —el regional no existe para los modelos
+nuevos, por eso no `southamerica-east1`—, proyecto del entorno). Auth por la service
+account de la función (ADC): **sin API key ni secret nuevo**. Mismo system
+prompt, catálogo y JSON schema que con Claude; reintenta sólo ante 429/503,
+porque Gemini corre sobre capacidad compartida de Google y un rechazo no gasta
+tokens.
 
-**Modelo.** `claude-opus-5-5` por defecto, configurable **sin redeploy**
-(parámetro de config). El callable devuelve en `model` cuál se usó, para poder
-atribuir cada resultado de la evaluación.
+Claude en Vertex (`@anthropic-ai/vertex-sdk`) sigue como adaptador alternativo,
+elegible por config. **No es el default porque Claude en Vertex arranca con
+cuota 0 por modelo** (requests, tokens de entrada y de salida por minuto) y el
+pedido de aumento lo resuelve Google en automático: el 2026-10-27 lo denegó por
+el historial de la cuenta de facturación. Gemini es modelo propio de Google y no
+pasa por ese portón (ni por la org policy de structured outputs, que es sólo
+para modelos de terceros).
+
+**Modelo.** `gemini-4-argon` por defecto, configurable **sin redeploy**
+(parámetro de config). Evaluado el 2026-10-27 con tres PDFs de prueba (tabla de
+4 días con superserie, 4 semanas en columnas con un día en prosa, y un escaneado
+sin capa de texto): los tres transcriptos sin errores, 66–108 s, ~16,7 k tokens
+de entrada y 5–7 k de salida, unos US$0,20 por import (US$4 / US$20 por millón,
+el mismo precio que Claude Opus 5.5). Un Flash (`gemini-3.8-flash`) dio 429 y
+timeout en el PDF de 4 semanas: no se sumó. El callable devuelve en `model` cuál
+se usó, para poder atribuir cada resultado de la evaluación.
 
 **App Check.** El callable va **sin `enforceAppCheck`**: la atestación de
 Android está rota y el flag no degrada, rompe. La exención se declara como
@@ -315,9 +331,10 @@ Documento **`app_config/pdf_import`** con `{ enabled: bool, allowlistUids?: stri
   igual atiende a esos uids (con el rol y el cupo aplicados igual) y rechaza al
   resto. Sirve para evaluar con PDFs reales en producción sin abrirlo a todos
   los PF. Con `enabled: true` no cambia nada.
-- **`model`** (`claude-opus-5-5` por defecto, `claude-sonnet-5-5`,
-  `claude-haiku-5-5`) y **`effort`** (`low`, `medium` por defecto, `high`) se
-  cambian sin redeploy; un valor desconocido cae al default.
+- **`model`** (`gemini-4-argon` por defecto, `claude-opus-5-5`,
+  `claude-sonnet-5-5`, `claude-haiku-5-5`) y **`effort`** (`low`, `medium` por
+  defecto, `high`; sólo lo usa Claude) se cambian sin redeploy; un valor
+  desconocido cae al default.
 
 - **Apagado** hasta terminar la evaluación del rollout.
 - Lo lee el servidor en cada llamada (`failed-precondition` si está apagado o
@@ -352,11 +369,21 @@ el PDF lo dice la política de privacidad, que sí nombra a los encargados
    propios.
 2. **Política publicada antes de encender.** El texto legal de este PR tiene
    que estar en `main` (y en la landing) antes de que un PF pueda subir un PDF.
-3. **Habilitar Vertex AI** (Model Garden, modelo Claude) en `treino-dev`.
-   **`treino-dev` ES producción** (AGENTS.md): lo hace un humano, con OK
-   explícito. Deploy filtrado con `--only functions:parsePlanPdf`.
+3. **Habilitar Vertex AI** en `treino-dev` y darle `roles/aiplatform.user` a la
+   service account de las functions. Con eso Gemini ya responde: no pide cuota
+   ni org policy. **`treino-dev` ES producción** (AGENTS.md): lo hace un
+   humano, con OK explícito. Deploy filtrado con `--only functions:parsePlanPdf`.
 
-   **Permitir los structured outputs (obligatorio).** En Vertex AI están
+   **Sólo para usar Claude** (`model: claude-*`): habilitar el modelo en Model
+   Garden, **pedir las tres cuotas** de `base_model: anthropic-claude-opus` (o
+   el que corresponda) en IAM y administración → Cuotas —
+   `global_online_prediction_requests_per_base_model`,
+   `global_online_prediction_input_tokens_per_minute_per_base_model` y
+   `global_online_prediction_output_tokens_per_minute_per_base_model`, las tres
+   arrancan en 0 y el error 429 sólo nombra la primera—, y la org policy de
+   abajo.
+
+   **Permitir los structured outputs (obligatorio para Claude).** En Vertex AI están
    **denegados por defecto** para todo proyecto dentro de una organización —y
    `treino-dev` lo está— por la org policy
    `constraints/vertexai.allowedPartnerModelFeatures` (docs de Google Cloud
@@ -395,12 +422,13 @@ el PDF lo dice la política de privacidad, que sí nombra a los encargados
    policy efectiva (el segundo comando).
 4. **Evaluación con 10 a 20 PDFs reales** de PFs, variados a propósito: tablas,
    prosa, superseries, semanas en columnas y **al menos uno escaneado**. Se
-   empieza con **`claude-opus-5-5`** como techo de calidad. Por cada PDF se
+   empieza con **`gemini-4-argon`**, el default. Por cada PDF se
    mide: días y semanas correctos, ejercicios con `rawName` fiel, sets con
    reps/rango/peso correctos, cuántos matchean exacto / sugerencia / rojo,
    tokens, costo y duración.
-5. **Bajar de modelo si alcanza.** Con los mismos PDFs se evalúa
-   `claude-sonnet-5-5` y `claude-haiku-5-5`. Se cambia el parámetro de config
+5. **Bajar de modelo si alcanza.** Con los mismos PDFs se evalúa uno más
+   barato (un Flash de Gemini, que hay que sumar a `SUPPORTED_MODELS`, o los
+   Claude si llega a haber cuota). Se cambia el parámetro de config
    (sin redeploy) al más barato que no pierda calidad **en lo que el PF no
    puede corregir fácil** (estructura de días y semanas); los errores de una
    celda la vista previa los muestra.

@@ -1,7 +1,8 @@
 /**
- * parsePlanPdf — callable que lee un plan de entrenamiento de un PDF con
- * Claude en Vertex AI y lo devuelve como `PdfPlanExtraction` para la vista
- * previa del PF (contrato `pdf-import-contrato.md`).
+ * parsePlanPdf — callable que lee un plan de entrenamiento de un PDF con un
+ * modelo de Vertex AI (Gemini por defecto, Claude si la config lo pide) y lo
+ * devuelve como `PdfPlanExtraction` para la vista previa del PF (contrato
+ * `pdf-import-contrato.md`).
  *
  * Pure handler (`runParsePlanPdf`, con dependencias inyectadas) + onCall
  * delgado, mismo molde que `add-alias.ts`.
@@ -34,7 +35,7 @@
  * default y deja un warn. Asi un typo en la consola no rompe el import ni
  * manda la llamada a un modelo que no evaluamos.
  */
-import { App, getApp, initializeApp } from "firebase-admin/app";
+import { App, applicationDefault, getApp, initializeApp } from "firebase-admin/app";
 import { Firestore, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
@@ -42,12 +43,14 @@ import { effectiveTier } from "../subscriptions/effective-limit";
 import { toSubscriptionState } from "../subscriptions/subscription-state";
 import { checkPdf } from "./pdf-check";
 import { PdfPlanExtraction, validateExtraction } from "./extraction";
+import { geminiPlanExtractor } from "./gemini-provider";
 import { CatalogEntry } from "./prompt";
 import {
   DEFAULT_EFFORT,
   DEFAULT_MODEL,
   Effort,
   ExtractorError,
+  modelRouter,
   PlanExtractor,
   SUPPORTED_EFFORTS,
   SUPPORTED_MODELS,
@@ -213,6 +216,7 @@ export async function runParsePlanPdf(
   // ── 5 y 6. LLM y validacion; si fallan, se devuelve el cupo ───────────────
   try {
     const catalog = await deps.loadCatalog();
+    const llmStartedAt = Date.now();
     const result = await withDeadline(
       deps.extractor.extract({
         pdfBase64: data.pdfBase64 as string,
@@ -239,6 +243,8 @@ export async function runParsePlanPdf(
       uid,
       tier,
       model: result.model,
+      llmMs: Date.now() - llmStartedAt,
+      usage: result.usage ?? null,
       fileName,
       pages: pdf.pages,
       days: validation.plan.days.length,
@@ -314,6 +320,19 @@ async function loadCatalogCached(db: Firestore): Promise<CatalogEntry[]> {
   return entries;
 }
 
+/**
+ * Access token de la service account de la funcion para el REST de Gemini.
+ * Dura una hora; se reusa hasta un minuto antes de que venza.
+ */
+let accessToken: { value: string; expiresAt: number } | null = null;
+
+async function adcAccessToken(): Promise<string> {
+  if (accessToken && Date.now() < accessToken.expiresAt) return accessToken.value;
+  const t = await applicationDefault().getAccessToken();
+  accessToken = { value: t.access_token, expiresAt: Date.now() + (t.expires_in - 60) * 1000 };
+  return t.access_token;
+}
+
 let extractor: PlanExtractor | null = null;
 
 export const parsePlanPdf = onCall(
@@ -333,7 +352,10 @@ export const parsePlanPdf = onCall(
     if (!extractor) {
       const projectId = process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT;
       if (!projectId) throw new HttpsError("internal", "Missing project id.");
-      extractor = vertexPlanExtractor(projectId);
+      extractor = modelRouter({
+        gemini: geminiPlanExtractor(projectId, { getAccessToken: adcAccessToken }),
+        claude: vertexPlanExtractor(projectId),
+      });
     }
     return runParsePlanPdf(
       { db, extractor, now: () => new Date(), loadCatalog: () => loadCatalogCached(db) },

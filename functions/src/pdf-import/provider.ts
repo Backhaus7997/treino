@@ -1,11 +1,12 @@
 /**
- * provider.ts — el adaptador del LLM que lee el PDF.
+ * provider.ts — el contrato del LLM que lee el PDF y el adaptador de Claude.
  *
  * `parsePlanPdf` no conoce a Vertex: recibe un `PlanExtractor`. Los tests le
- * pasan un doble; produccion, `vertexPlanExtractor`. Asi el callable se prueba
- * contra el emulador sin red y sin gastar un centavo, y cambiar de proveedor
- * (Anthropic directo, otro modelo) es escribir otro adaptador, no tocar el
- * flujo del cupo.
+ * pasan un doble; produccion, un `modelRouter` que manda cada modelo a su
+ * adaptador: `geminiPlanExtractor` (gemini-provider.ts, el default) o
+ * `vertexPlanExtractor` (Claude, abajo). Asi el callable se prueba contra el
+ * emulador sin red y sin gastar un centavo, y cambiar de proveedor es escribir
+ * otro adaptador, no tocar el flujo del cupo.
  *
  * El adaptador devuelve la salida CRUDA (JSON parseado, sin validar): validar
  * es trabajo de `validateExtraction`, que no confia en ningun proveedor.
@@ -20,13 +21,21 @@ import { APIConnectionTimeoutError, APIError, APIUserAbortError } from "@anthrop
 import { buildSystemPrompt, CatalogEntry, USER_TEXT } from "./prompt";
 import { PDF_PLAN_EXTRACTION_SCHEMA } from "./extraction";
 
+/**
+ * Los modelos que se pueden elegir desde `app_config/pdf_import.model`. El
+ * prefijo decide el adaptador (`modelRouter`): `gemini-*` va a Gemini y
+ * `claude-*` a Claude, los dos en Vertex. El default es Gemini porque Claude
+ * no tiene cuota en treino-dev (ver gemini-provider.ts); los de Claude quedan
+ * para cambiar de modelo sin redeploy el dia que la tenga.
+ */
 export const SUPPORTED_MODELS = [
+  "gemini-4-argon",
   "claude-opus-5-5",
   "claude-sonnet-5-5",
   "claude-haiku-5-5",
 ] as const;
 export type SupportedModel = (typeof SUPPORTED_MODELS)[number];
-export const DEFAULT_MODEL: SupportedModel = "claude-opus-5-5";
+export const DEFAULT_MODEL: SupportedModel = "gemini-4-argon";
 
 export const SUPPORTED_EFFORTS = ["low", "medium", "high"] as const;
 export type Effort = (typeof SUPPORTED_EFFORTS)[number];
@@ -39,10 +48,19 @@ export interface ExtractRequest {
   effort: Effort;
 }
 
+/** Tokens de la llamada, para el log: con esto se mide el costo por import. */
+export interface ExtractUsage {
+  inputTokens: number;
+  outputTokens: number;
+  /** Razonamiento facturado aparte de la salida (Gemini); 0 si no lo reporta. */
+  thinkingTokens: number;
+}
+
 export interface ExtractResult {
   raw: unknown;
   /** El modelo que respondio, segun el proveedor. */
   model: string;
+  usage?: ExtractUsage;
 }
 
 export type ExtractorErrorKind =
@@ -190,11 +208,37 @@ export function vertexPlanExtractor(projectId: string): PlanExtractor {
         .filter((b) => b.type === "text")
         .map((b) => (b as { text: string }).text)
         .join("");
+      let raw: unknown;
       try {
-        return { raw: JSON.parse(text), model: message.model };
+        raw = JSON.parse(text);
       } catch {
         throw new ExtractorError("bad_output", "Output is not valid JSON.");
       }
+      const u = message.usage;
+      return {
+        raw,
+        model: message.model,
+        usage: {
+          inputTokens: u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
+          outputTokens: u.output_tokens,
+          thinkingTokens: 0,
+        },
+      };
+    },
+  };
+}
+
+/**
+ * Elige el adaptador por el prefijo del modelo. Un modelo sin adaptador no
+ * llega aca (`readConfig` solo deja pasar `SUPPORTED_MODELS`), pero si llegara
+ * es un error nuestro, no del PF.
+ */
+export function modelRouter(adapters: { gemini: PlanExtractor; claude: PlanExtractor }): PlanExtractor {
+  return {
+    extract(req) {
+      if (req.model.startsWith("gemini-")) return adapters.gemini.extract(req);
+      if (req.model.startsWith("claude-")) return adapters.claude.extract(req);
+      return Promise.reject(new ExtractorError("provider", `No adapter for model ${req.model}.`));
     },
   };
 }
