@@ -16,7 +16,9 @@ describe("classifyProviderError", () => {
     [403, "Request violates organization policy for partner model features"],
     [400, "Feature blocked by constraints/vertexai.allowedPartnerModelFeatures"],
   ])("%i que nombra la feature o la policy → feature_disabled", (status, message) => {
-    expect(classifyProviderError(apiError(status, message)).kind).toBe("feature_disabled");
+    const e = classifyProviderError(apiError(status, message));
+    expect(e.kind).toBe("feature_disabled");
+    expect(e.status).toBe(status);
   });
 
   it.each([
@@ -24,10 +26,13 @@ describe("classifyProviderError", () => {
     [500, "structured outputs backend unavailable"], // un 5xx nunca es la policy
     [429, "rate limited"],
     [403, "Permission denied on resource project treino-dev"], // falta el rol, no la policy
-  ])("%i que no es la policy → provider, con el status en el mensaje", (status, message) => {
+    [404, "Publisher Model `claude-opus-5-5` was not found"], // modelo inexistente en la region
+  ])("%i que no es la policy → provider, con el status en el mensaje y como campo", (status, message) => {
     const e = classifyProviderError(apiError(status, message));
     expect(e.kind).toBe("provider");
     expect(e.message).toContain(`${status}`);
+    expect(e.message).toContain(message);
+    expect(e.status).toBe(status);
   });
 
   it("timeouts y abortos → timeout", () => {
@@ -38,8 +43,8 @@ describe("classifyProviderError", () => {
     expect(classifyProviderError(abort).kind).toBe("timeout");
   });
 
-  it("un error que no es del SDK → provider", () => {
-    expect(classifyProviderError(new Error("boom")).kind).toBe("provider");
-    expect(classifyProviderError("texto").kind).toBe("provider");
+  it("un error que no es del SDK → provider, sin status", () => {
+    expect(classifyProviderError(new Error("boom"))).toMatchObject({ kind: "provider", status: undefined });
+    expect(classifyProviderError("texto")).toMatchObject({ kind: "provider", status: undefined });
   });
 });

@@ -247,12 +247,21 @@ export async function runParsePlanPdf(
     });
     return { plan: validation.plan, quota: snapshot, model: result.model };
   } catch (e) {
+    // Ningun log de aca lleva una clave `message` en los datos: el logger de
+    // firebase-functions la pisa con su propio texto (en `error`, con el
+    // stack), y el error real no llega a Cloud Logging. Tampoco un `Error`
+    // crudo: se serializa sin `message` ni `stack` (no son enumerables).
     await refundQuota(db, uid, keys).catch((refundErr) =>
-      logger.error("parsePlanPdf: no se pudo devolver el cupo", { uid, refundErr }),
+      logger.error("parsePlanPdf: no se pudo devolver el cupo", { uid, refundError: String(refundErr) }),
     );
     if (e instanceof HttpsError) throw e;
     if (e instanceof ExtractorError) {
-      logger.error("parsePlanPdf: fallo el LLM", { uid, kind: e.kind, message: e.message });
+      logger.error("parsePlanPdf: fallo el LLM", {
+        uid,
+        kind: e.kind,
+        providerStatus: e.status ?? null,
+        errorMessage: e.message,
+      });
       if (e.kind === "timeout") {
         throw new HttpsError("deadline-exceeded", "The PDF took too long to process.");
       }
@@ -264,7 +273,7 @@ export async function runParsePlanPdf(
             "`publishers/anthropic/models/<modelo>:structured_outputs` en la org policy " +
             "constraints/vertexai.allowedPartnerModelFeatures del proyecto " +
             "(docs/plan-import-pdf.md, rollout).",
-          { uid, model: config.model, message: e.message },
+          { uid, model: config.model, providerStatus: e.status ?? null, errorMessage: e.message },
         );
         throw new HttpsError("failed-precondition", "PDF import is not available.", {
           reason: "structured_outputs_disabled",

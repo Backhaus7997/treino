@@ -11,6 +11,7 @@
  */
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { logger } from "firebase-functions";
 import { HttpsError } from "firebase-functions/v2/https";
 import { PDFDocument } from "pdf-lib";
 
@@ -371,6 +372,32 @@ describe("falla nuestra: se devuelve el cupo", () => {
       { reason: "structured_outputs_disabled" },
     );
     expect(await usage()).toMatchObject({ weekCount: 0, dayCount: 0 });
+  });
+
+  // El logger de firebase-functions pisa la clave `message` de los datos con
+  // su propio texto (en `error`, el stack del logger). Asi se perdio el 429
+  // de cuota de Vertex del 2026-10-27: el log no decia por que habia fallado.
+  it.each([
+    ["un 429 de cuota", new ExtractorError("provider", "429: Quota exceeded for aiplatform.googleapis.com", 429)],
+    ["structured outputs denegados", new ExtractorError("feature_disabled", "400: structured_outputs denied", 400)],
+    ["el deadline propio, sin HTTP", new ExtractorError("timeout", "No answer in 50 ms.")],
+  ])("%s: el log lleva el mensaje y el status del proveedor, y ningun dato se llama `message`", async (_n, err) => {
+    await seedTrainer();
+    const f = fakeExtractor(() => { throw err; });
+    const errorLog = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+    try {
+      await runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1 }).catch(() => undefined);
+      const datos = errorLog.mock.calls.map((args) => args[args.length - 1]);
+      expect(datos).toContainEqual({
+        uid,
+        kind: err.kind,
+        providerStatus: err.status ?? null,
+        errorMessage: err.message,
+      });
+      for (const d of datos) expect(d).not.toHaveProperty("message");
+    } finally {
+      errorLog.mockRestore();
+    }
   });
 
   it("la devolucion no toca el uso previo: 1 usado + 1 fallido = 1", async () => {

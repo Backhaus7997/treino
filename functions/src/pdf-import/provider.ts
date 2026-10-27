@@ -54,7 +54,16 @@ export type ExtractorErrorKind =
   | "provider";
 
 export class ExtractorError extends Error {
-  constructor(public readonly kind: ExtractorErrorKind, message: string) {
+  /**
+   * `status`: el HTTP del proveedor cuando lo hubo. Viaja aparte del mensaje
+   * para que el log lo tenga como campo propio: 429 es cuota, 403 permiso,
+   * 404 un modelo que no existe en la region, y se filtra sin parsear texto.
+   */
+  constructor(
+    public readonly kind: ExtractorErrorKind,
+    message: string,
+    public readonly status?: number,
+  ) {
     super(message);
     this.name = "ExtractorError";
   }
@@ -90,10 +99,11 @@ export function classifyProviderError(e: unknown): ExtractorError {
     (e.status === 400 || e.status === 403) &&
     /structured[_ ]?outputs?|allowedPartnerModelFeatures|organization policy|org policy/i.test(message)
   ) {
-    return new ExtractorError("feature_disabled", `${e.status}: ${message}`);
+    return new ExtractorError("feature_disabled", `${e.status}: ${message}`, e.status);
   }
-  const status = e instanceof APIError && e.status != null ? `${e.status}: ` : "";
-  return new ExtractorError("provider", `${status}${message}`);
+  const status = e instanceof APIError ? e.status : undefined;
+  const prefix = status != null ? `${status}: ` : "";
+  return new ExtractorError("provider", `${prefix}${message}`, status);
 }
 
 export interface PlanExtractor {
