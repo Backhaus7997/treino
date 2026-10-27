@@ -19,7 +19,7 @@ process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? "12
 process.env.GCLOUD_PROJECT = "treino-dev";
 
 import { parsePlanPdf, runParsePlanPdf, ParsePlanPdfDeps } from "../pdf-import/parse-plan-pdf";
-import { ExtractorError, ExtractRequest, PlanExtractor } from "../pdf-import/provider";
+import { DEFAULT_MODEL, ExtractorError, ExtractRequest, PlanExtractor } from "../pdf-import/provider";
 import { quotaKeys, resetsAt } from "../pdf-import/quota";
 
 let app: App;
@@ -245,7 +245,7 @@ describe("camino feliz", () => {
     const f = fakeExtractor(() => planWith(["ex-press-banca"]));
     const res = await runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1, fileName: "plan.pdf" });
 
-    expect(res.model).toBe("claude-opus-5-5");
+    expect(res.model).toBe(DEFAULT_MODEL);
     expect(res.quota).toEqual({ usedThisWeek: 1, limitWeekly: 2, usedToday: 1, limitDaily: 2 });
     expect(res.plan.days[0].rows[0].exercises[0].candidateExerciseId).toBe("ex-press-banca");
     expect(await usage()).toMatchObject({ weekKey: WEEK, weekCount: 1, dayKey: DAY, dayCount: 1 });
@@ -270,7 +270,7 @@ describe("camino feliz", () => {
     await setConfig({ enabled: true, model: "gpt-5", effort: "turbo" });
     const f = fakeExtractor(() => planWith([null]));
     await runParsePlanPdf(deps(f.extractor), uid, { pdfBase64: pdf1 });
-    expect(f.calls[0]).toMatchObject({ model: "claude-opus-5-5", effort: "medium" });
+    expect(f.calls[0]).toMatchObject({ model: DEFAULT_MODEL, effort: "medium" });
   });
 });
 
