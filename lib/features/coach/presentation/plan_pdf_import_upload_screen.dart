@@ -10,7 +10,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../app/theme/tokens/tokens.dart';
-import '../../../core/utils/argentina_time.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_confirm_dialog.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -19,6 +18,7 @@ import '../../coach_hub/application/pdf_import_quota_provider.dart';
 import '../../coach_hub/application/plan_import_providers.dart';
 import '../../coach_hub/application/plan_pdf_import_providers.dart';
 import '../../coach_hub/data/plan_pdf_import_service.dart';
+import '../../coach_hub/presentation/widgets/pdf_import_failure_copy.dart';
 import 'plan_pdf_import_preview_screen.dart' show planPdfImportPreviewPath;
 
 /// Ruta de la pantalla de subida para [athleteId].
@@ -429,60 +429,6 @@ class _Processing extends StatelessWidget {
       ],
     );
   }
-}
-
-typedef PdfImportFailureCopy = ({String message, bool pickAnother, bool retry});
-
-/// El texto de cada resultado no exitoso, y si se arregla eligiendo otro
-/// archivo o reintentando. Exhaustivo: una variante nueva del servicio no
-/// compila hasta tener su texto.
-PdfImportFailureCopy pdfImportFailureCopy(
-  AppL10n l10n,
-  PdfImportResult failure,
-) {
-  PdfImportFailureCopy copy(String m,
-          {bool pick = false, bool retry = false}) =>
-      (message: m, pickAnother: pick, retry: retry);
-  return switch (failure) {
-    PdfImportInvalidFile(:final reason) => copy(
-        switch (reason) {
-          PdfRejectReason.tooBig => l10n.pdfImportErrorTooBig,
-          PdfRejectReason.notPdf => l10n.pdfImportErrorNotPdf,
-          PdfRejectReason.tooManyPages => l10n.pdfImportErrorTooManyPages,
-          PdfRejectReason.encrypted => l10n.pdfImportErrorEncrypted,
-          PdfRejectReason.unknown => l10n.pdfImportErrorFileUnknown,
-        },
-        pick: true,
-      ),
-    PdfImportQuotaExhausted(:final scope, :final resetsAt) =>
-      copy(_quotaMessage(l10n, scope, resetsAt)),
-    PdfImportTimeout() =>
-      copy(l10n.pdfImportErrorTimeout, pick: true, retry: true),
-    PdfImportInternal() => copy(l10n.pdfImportErrorInternal, retry: true),
-    PdfImportInvalidPlan() => copy(l10n.pdfImportErrorInvalidPlan, pick: true),
-    PdfImportDisabled() => copy(l10n.pdfImportErrorDisabled),
-    PdfImportStructuredOutputsDisabled() =>
-      copy(l10n.pdfImportErrorUnavailable),
-    PdfImportNotTrainer() => copy(l10n.pdfImportErrorNotTrainer),
-    PdfImportUnauthenticated() => copy(l10n.pdfImportErrorSignedOut),
-    PdfImportSuccess() => copy(''),
-  };
-}
-
-/// Cupo agotado: cuándo vuelve, sólo si el servidor lo dijo. Sin fecha, no
-/// se inventa una.
-String _quotaMessage(AppL10n l10n, PdfQuotaScope scope, DateTime? resetsAt) {
-  if (resetsAt == null || scope == PdfQuotaScope.unknown) {
-    return l10n.pdfImportErrorQuotaUnknown;
-  }
-  String two(int n) => n.toString().padLeft(2, '0');
-  // El cupo se resetea en hora argentina (spec), no en la del teléfono.
-  final at = toArgentina(resetsAt.toUtc());
-  final date = '${two(at.day)}/${two(at.month)}';
-  final time = '${two(at.hour)}:${two(at.minute)}';
-  return scope == PdfQuotaScope.week
-      ? l10n.pdfImportErrorQuotaWeek(date, time)
-      : l10n.pdfImportErrorQuotaDay(date, time);
 }
 
 class _FailurePanel extends StatelessWidget {
