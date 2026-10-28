@@ -499,6 +499,41 @@ void main() {
     });
 
     testWidgets(
+        'mientras guarda, una fila resuelta no se puede cambiar: la rutina '
+        'ya se arma con el borrador tomado al tocar ASIGNAR', (tester) async {
+      final pending = Completer<Routine>();
+      when(() => routineRepo.createAssigned(any()))
+          .thenAnswer((_) => pending.future);
+      final r = _resolved();
+      final c = await pump(
+        tester,
+        PeriodizedImportDraft(
+          plan: r.plan,
+          warnings: const [],
+          name: r.name,
+          assignments: r.assignments,
+          suggestions: const {},
+          alternatives: {_k3: _remoM},
+        ),
+      );
+      // Desplegada antes de asignar: «Usar alternativa» queda a mano. La
+      // primera «Remo con barra» es la fila con alternativa (k3).
+      await tester
+          .tap(find.text('Remo con barra  ·  2 × 8', findRichText: true).first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(assignButton());
+      await tester.pump();
+      await tester.tap(find.text('Usar alternativa'), warnIfMissed: false);
+      await tester.pump();
+
+      expect(c.read(periodizedImportProvider)!.assignments[_k3], _remo);
+      pending.complete(const Routine(
+          id: 'nuevo-1', name: '', level: ExperienceLevel.beginner, days: []));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
         'mientras guarda, ni el atrás de la barra ni el del sistema salen ni '
         'limpian el borrador', (tester) async {
       final pending = Completer<Routine>();
