@@ -32,6 +32,7 @@ Todo en `develop`, en este orden de merge:
 | #1642–#1644 | Vista previa mobile, asignación, nombre editable, y los hallazgos de la revisión independiente y de Codex |
 | #1654 | El log de errores del LLM conserva el mensaje y el status del proveedor (el logger de firebase-functions pisaba la clave `message`) |
 | #1655 | Gemini en Vertex como proveedor por defecto (`gemini-provider.ts`, `modelRouter`); Claude queda elegible por config. Tokens y duración del LLM en el log |
+| — | Coach Hub web: «Importar plan» (`coach_hub_upload_plan_screen.dart`) acepta la plantilla o un PDF con el mismo gate que mobile (aviso, cupo, tope de 5 MB, espera y errores tipados); el borrador va sin alumno a la vista previa del Hub, que elige los alumnos al asignar y ofrece «Usar alternativa» |
 
 Revisado por una revisión independiente (sin CRITICAL/HIGH) y por Codex en cada
 PR; todos los hilos quedaron resueltos. Probado con tests (unit, widget, reglas,
@@ -120,8 +121,8 @@ deshabilitado hasta resolver todo; modo claro/oscuro y texto grande.
   revisar»: sumar **fotos** del plan (el modelo lee imágenes) o **Excel en
   mobile** es cambiar la entrada del callable / del servicio, no el resto.
   Las fotos tienen otras reglas de tamaño, privacidad y del aviso.
-- **Import de PDF en el Coach Hub web.** El controller ya es compartido; falta
-  la pantalla de subida web.
+- ~~**Import de PDF en el Coach Hub web.**~~ Hecho: «Importar plan» del Hub
+  acepta el PDF (ver «Qué está hecho»).
 
 ## Trampas del repo que mordieron durante el desarrollo
 
