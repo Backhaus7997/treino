@@ -72,11 +72,12 @@ los hace un humano con OK explícito del dueño.
      (el deploy de functions resuelve **todos** los secretos: si falla por un
      secret ajeno, no es de esta feature).
 5. **Política publicada ANTES de abrir a PF reales** (spec, *Rollout* paso 2).
-   La v5 está en `main` y en la landing (treino-app#40), pero nombra
-   «Google Cloud Vertex AI, con el modelo Claude de Anthropic». Con Gemini el
-   encargado sigue siendo Google; hay que **sacar la mención a Claude /
-   Anthropic** en las tres copias del texto legal antes de cargar en la
-   allowlist a un PF que no sea del equipo.
+   La **v6** (2026-10-28) nombra «Google Cloud Vertex AI, con el modelo Gemini
+   de Google» en lugar de Claude / Anthropic. Falta que llegue a `main` (release)
+   y a la landing (el autosync de treino-app copia `web/legal/`) antes de cargar
+   en la allowlist a un PF que no sea del equipo. Si algún día se elige un
+   modelo `claude-*` por config, primero hay que volver a nombrar a Anthropic
+   en la política.
 6. ~~**Kill switch**~~ — creado el 2026-10-27:
    `{ "enabled": false, "allowlistUids": [<uid del PF de Martín>] }`.
 7. **Evaluación con 10 a 20 PDFs reales** desde una cuenta de la allowlist,
