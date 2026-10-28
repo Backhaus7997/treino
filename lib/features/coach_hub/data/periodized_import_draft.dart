@@ -87,6 +87,11 @@ class PeriodizedImportDraft {
       unresolved.where((k) => !suggestions.containsKey(k)).length;
 
   /// Asigna [exercise] al componente [key] y descarta su sugerencia.
+  ///
+  /// La alternativa NO se descarta: con «Confirmar las N sugerencias» el PF
+  /// confirma en bloque y después revisa, y la alternativa es justo lo que
+  /// necesita para corregir una sugerencia equivocada sin buscar en la
+  /// biblioteca. La vista previa la oculta cuando ya es la asignada.
   PeriodizedImportDraft resolve(ExerciseKey key, MatcherExercise exercise) {
     return PeriodizedImportDraft(
       plan: plan,
@@ -94,7 +99,7 @@ class PeriodizedImportDraft {
       name: name,
       assignments: {...assignments, key: exercise},
       suggestions: {...suggestions}..remove(key),
-      alternatives: {...alternatives}..remove(key),
+      alternatives: alternatives,
       athleteId: athleteId,
     );
   }

@@ -143,6 +143,9 @@ class PlanImportPreviewController {
   /// borrador o el componente ya estaba resuelto (un doble tap no vuelve a
   /// llamar a `addAlias`).
   ///
+  /// Con [replace] («Cambiar» sobre una fila ya resuelta) sí reemplaza la
+  /// asignación; elegir el mismo ejercicio que ya tenía no hace nada.
+  ///
   /// Se resuelve por la clave EXACTA (día, fila, componente). Con [custom],
   /// el propio recién creado resuelve además los homónimos exactos sin
   /// candidato: son el mismo ejercicio repetido en el plan. Un propio NO
@@ -151,9 +154,14 @@ class PlanImportPreviewController {
     ExerciseKey key,
     MatcherExercise exercise, {
     bool custom = false,
+    bool replace = false,
   }) {
     final current = draft;
-    if (current == null || current.isResolved(key)) return false;
+    if (current == null) return false;
+    final previous = current.assignments[key];
+    if (previous != null && (!replace || previous.id == exercise.id)) {
+      return false;
+    }
     _ref.read(periodizedImportProvider.notifier).state = custom
         ? current.resolveWithSameName(key, exercise)
         : current.resolve(key, exercise);
@@ -175,6 +183,25 @@ class PlanImportPreviewController {
                 const <CustomExercise>[])
             .any((c) => c.id == suggestion.id);
     return resolve(key, suggestion, custom: isCustom);
+  }
+
+  /// «Confirmar las N sugerencias»: confirma, en el orden del plan, cada
+  /// componente con sugerencia pendiente — exactamente lo que haría tocar
+  /// «Confirmar» fila por fila, alias incluido. No toca los que no tienen
+  /// candidato. Devuelve cuántos confirmó; un segundo llamado no encuentra
+  /// nada pendiente y devuelve 0.
+  int confirmAllSuggestions() {
+    final current = draft;
+    if (current == null) return 0;
+    final pending = [
+      for (final key in current.unresolved)
+        if (current.suggestions.containsKey(key)) key,
+    ];
+    var confirmed = 0;
+    for (final key in pending) {
+      if (confirmSuggestion(key)) confirmed++;
+    }
+    return confirmed;
   }
 
   /// «Crear como propio» para UNA fila. El propio se crea recién al confirmar

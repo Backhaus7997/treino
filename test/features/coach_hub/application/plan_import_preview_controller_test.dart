@@ -168,6 +168,82 @@ void main() {
       expect(draft.suggestions, isEmpty);
     });
 
+    test(
+        'confirmar las N: confirma sólo las sugeridas, en orden y con su '
+        'alias; las sin match y las resueltas no se tocan', () async {
+      final c = container(_draft(
+        ['Press banca', 'Remo pendlay', 'Plancha rara', 'Pres banka'],
+        assignments: {_k(1): _press},
+        suggestions: {_k(2): _remo, _k(4): _press},
+      ));
+      final ctrl = c.read(planImportPreviewControllerProvider);
+      expect(ctrl.draft!.pendingSuggestions, 2);
+
+      expect(ctrl.confirmAllSuggestions(), 2);
+      await Future<void>.delayed(Duration.zero);
+
+      final draft = c.read(periodizedImportProvider)!;
+      expect(draft.assignments[_k(2)], same(_remo));
+      expect(draft.assignments[_k(4)], same(_press));
+      expect(draft.isResolved(_k(3)), isFalse);
+      expect(draft.pendingSuggestions, 0);
+      expect(draft.withoutSuggestion, 1);
+      // Igual que confirmar fila por fila: un alias por cada una, y ninguno
+      // por la que ya venía resuelta.
+      expect(aliases, [
+        {'exerciseId': 'remo', 'alias': 'Remo pendlay'},
+        {'exerciseId': 'press', 'alias': 'Pres banka'},
+      ]);
+    });
+
+    test('confirmar las N es idempotente: la segunda vez no hace nada',
+        () async {
+      final c = container(_draft(['Remo pendlay', 'Plancha rara'],
+          suggestions: {_k(1): _remo}));
+      final ctrl = c.read(planImportPreviewControllerProvider);
+
+      expect(ctrl.confirmAllSuggestions(), 1);
+      final after = c.read(periodizedImportProvider);
+      expect(ctrl.confirmAllSuggestions(), 0);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(c.read(periodizedImportProvider), same(after));
+      expect(aliases, hasLength(1));
+    });
+
+    test('confirmar las N sin sugerencias ni borrador devuelve 0', () {
+      expect(
+          container(_draft(['Plancha rara']))
+              .read(planImportPreviewControllerProvider)
+              .confirmAllSuggestions(),
+          0);
+      final empty = ProviderContainer(overrides: [
+        periodizedImportProvider.overrideWith((_) => null),
+      ]);
+      addTearDown(empty.dispose);
+      expect(
+          empty
+              .read(planImportPreviewControllerProvider)
+              .confirmAllSuggestions(),
+          0);
+    });
+
+    test('«Cambiar» sobre una resuelta (replace) la reemplaza; el mismo no',
+        () async {
+      final c =
+          container(_draft(['Remo pendlay'], assignments: {_k(1): _press}));
+      final ctrl = c.read(planImportPreviewControllerProvider);
+
+      expect(ctrl.resolve(_k(1), _press, replace: true), isFalse);
+      expect(ctrl.resolve(_k(1), _remo, replace: true), isTrue);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(c.read(periodizedImportProvider)!.assignments[_k(1)], same(_remo));
+      expect(aliases, [
+        {'exerciseId': 'remo', 'alias': 'Remo pendlay'}
+      ]);
+    });
+
     test('crear un propio resuelve sus homónimos sin alias', () async {
       final c = container(_draft(['Remo Pendlay', 'remo pendlay ', 'Otro']));
       final ctrl = c.read(planImportPreviewControllerProvider);
