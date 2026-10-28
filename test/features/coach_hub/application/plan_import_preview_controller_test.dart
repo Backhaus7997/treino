@@ -126,8 +126,7 @@ void main() {
   }
 
   group('resolver', () {
-    test('resuelve por clave exacta y registra el alias con el texto del PF',
-        () async {
+    test('resuelve por clave exacta y NO registra alias todavía', () async {
       final c = container(_draft(['Press banca', 'Press banca']));
       final ctrl = c.read(planImportPreviewControllerProvider);
 
@@ -138,8 +137,10 @@ void main() {
       expect(draft.assignments[_k(1)], same(_press));
       // El homónimo NO se resuelve: vincular es por renglón.
       expect(draft.isResolved(_k(2)), isFalse);
-      expect(aliases, [
-        {'exerciseId': 'press', 'alias': 'Press banca'}
+      // El alias se registra al asignar, no al resolver.
+      expect(aliases, isEmpty);
+      expect(draft.aliasesToRegister, [
+        (exerciseId: 'press', alias: 'Press banca'),
       ]);
     });
 
@@ -153,7 +154,7 @@ void main() {
 
       expect(
           c.read(periodizedImportProvider)!.assignments[_k(1)], same(_press));
-      expect(aliases, hasLength(1));
+      expect(aliases, isEmpty);
     });
 
     test('confirmar la sugerencia la asigna', () {
@@ -169,8 +170,8 @@ void main() {
     });
 
     test(
-        'confirmar las N: confirma sólo las sugeridas, en orden y con su '
-        'alias; las sin match y las resueltas no se tocan', () async {
+        'confirmar las N: confirma sólo las sugeridas, sin registrar alias; '
+        'las sin match y las resueltas no se tocan', () async {
       final c = container(_draft(
         ['Press banca', 'Remo pendlay', 'Plancha rara', 'Pres banka'],
         assignments: {_k(1): _press},
@@ -188,11 +189,12 @@ void main() {
       expect(draft.isResolved(_k(3)), isFalse);
       expect(draft.pendingSuggestions, 0);
       expect(draft.withoutSuggestion, 1);
-      // Igual que confirmar fila por fila: un alias por cada una, y ninguno
-      // por la que ya venía resuelta.
-      expect(aliases, [
-        {'exerciseId': 'remo', 'alias': 'Remo pendlay'},
-        {'exerciseId': 'press', 'alias': 'Pres banka'},
+      // Confirmar no llama a addAlias: quedan anotados para asignar, y la
+      // que ya venía resuelta (exacta) no enseña nada.
+      expect(aliases, isEmpty);
+      expect(draft.aliasesToRegister, [
+        (exerciseId: 'remo', alias: 'Remo pendlay'),
+        (exerciseId: 'press', alias: 'Pres banka'),
       ]);
     });
 
@@ -208,7 +210,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(c.read(periodizedImportProvider), same(after));
-      expect(aliases, hasLength(1));
+      expect(aliases, isEmpty);
     });
 
     test('confirmar las N sin sugerencias ni borrador devuelve 0', () {
@@ -239,9 +241,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(c.read(periodizedImportProvider)!.assignments[_k(1)], same(_remo));
-      expect(aliases, [
-        {'exerciseId': 'remo', 'alias': 'Remo pendlay'}
-      ]);
+      expect(aliases, isEmpty);
     });
 
     test('crear un propio resuelve sus homónimos sin alias', () async {
@@ -379,6 +379,177 @@ void main() {
       expect(await assign(container(resolved()), const []),
           isA<PlanAssignNoAthletes>());
       verifyNever(() => routines.createAssigned(any()));
+    });
+  });
+
+  group('alias al asignar', () {
+    final sentadilla = MatcherExercise(id: 'sq', name: 'Sentadilla (Barra)');
+    final banda = MatcherExercise(id: 'sq-band', name: 'Sentadilla con banda');
+
+    Future<PlanAssignOutcome> assign(ProviderContainer c) =>
+        c.read(planImportPreviewControllerProvider).assign(
+          athleteIds: const ['a1'],
+          trainerUid: _trainer,
+          routineName: 'Plan',
+          level: ExperienceLevel.beginner,
+        );
+
+    void routinesOk() => when(() => routines.createAssigned(any()))
+        .thenAnswer((inv) async => inv.positionalArguments.single as Routine);
+
+    /// 1 exacto · 2 y 5 sugerencia (mismo texto: un solo par) · 3 sugerencia
+    /// con alternativa · 4 sin match (se vincula con el picker) · 6 sin match
+    /// (se crea como propio).
+    ProviderContainer plan() => container(_draft(
+          [
+            'Press de banca',
+            'Remo pendlay',
+            'Sentadilla trasera',
+            'Plancha rara',
+            'Remo pendlay',
+            'Copenhague',
+          ],
+          assignments: {_k(1): _press},
+          suggestions: {_k(2): _remo, _k(3): banda, _k(5): _remo},
+        ));
+
+    test(
+        'éxito: un addAlias por par final (sugerencia, alternativa o picker), '
+        'sin repetidos; exactos y propios no', () async {
+      routinesOk();
+      final c = plan();
+      final ctrl = c.read(planImportPreviewControllerProvider);
+      ctrl.confirmAllSuggestions();
+      ctrl.resolve(_k(3), sentadilla, replace: true); // alternativa
+      ctrl.resolve(_k(4), _press); // picker
+      await ctrl.createCustomFor(
+        _k(6),
+        canCreate: () async => true,
+        openForm: (rawName, _) async => _custom('c-1', rawName),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(aliases, isEmpty, reason: 'resolver no registra nada');
+
+      expect(await assign(c), isA<PlanAssignSuccess>());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(aliases, [
+        {'exerciseId': 'remo', 'alias': 'Remo pendlay'},
+        {'exerciseId': 'sq', 'alias': 'Sentadilla trasera'},
+        {'exerciseId': 'press', 'alias': 'Plancha rara'},
+      ]);
+    });
+
+    test('confirmada y después cambiada: sólo el ejercicio final', () async {
+      routinesOk();
+      final c = container(
+          _draft(['Sentadilla trasera'], suggestions: {_k(1): banda}));
+      final ctrl = c.read(planImportPreviewControllerProvider);
+      ctrl.confirmSuggestion(_k(1));
+      ctrl.resolve(_k(1), sentadilla, replace: true);
+
+      await assign(c);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(aliases, [
+        {'exerciseId': 'sq', 'alias': 'Sentadilla trasera'},
+      ]);
+    });
+
+    test('cambiada por un propio después de confirmar: no enseña nada',
+        () async {
+      routinesOk();
+      final c = container(
+          _draft(['Sentadilla trasera'], suggestions: {_k(1): banda}));
+      final ctrl = c.read(planImportPreviewControllerProvider);
+      ctrl.confirmSuggestion(_k(1));
+      ctrl.resolve(_k(1), MatcherExercise(id: 'c-1', name: 'Mía'),
+          custom: true, replace: true);
+
+      await assign(c);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(aliases, isEmpty);
+    });
+
+    test('sólo exactos: no registra nada', () async {
+      routinesOk();
+      final c =
+          container(_draft(['Press de banca'], assignments: {_k(1): _press}));
+
+      expect(await assign(c), isA<PlanAssignSuccess>());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(aliases, isEmpty);
+    });
+
+    for (final (name, stub) in <(String, void Function(_MockRoutineRepo))>[
+      (
+        'falla',
+        (r) => when(() => r.createAssigned(any())).thenThrow(Exception('red')),
+      ),
+      (
+        'la moderación lo bloquea',
+        (r) => when(() => r.createAssigned(any()))
+            .thenThrow(const ModerationBlockedException('name')),
+      ),
+    ]) {
+      test('si la asignación $name, no registra nada', () async {
+        stub(routines);
+        final c =
+            container(_draft(['Remo pendlay'], suggestions: {_k(1): _remo}));
+        c.read(planImportPreviewControllerProvider).confirmSuggestion(_k(1));
+
+        expect(await assign(c), isNot(isA<PlanAssignSuccess>()));
+        await Future<void>.delayed(Duration.zero);
+
+        expect(aliases, isEmpty);
+      });
+    }
+
+    test('parcial: no registra hasta que el reintento termina bien', () async {
+      var failA2 = true;
+      when(() => routines.createAssigned(any())).thenAnswer((inv) async {
+        final r = inv.positionalArguments.single as Routine;
+        if (r.assignedTo == 'a2' && failA2) throw Exception('red');
+        return r;
+      });
+      final c =
+          container(_draft(['Remo pendlay'], suggestions: {_k(1): _remo}));
+      final ctrl = c.read(planImportPreviewControllerProvider);
+      ctrl.confirmSuggestion(_k(1));
+      Future<PlanAssignOutcome> to(List<String> ids) => ctrl.assign(
+            athleteIds: ids,
+            trainerUid: _trainer,
+            routineName: 'Plan',
+            level: ExperienceLevel.beginner,
+          );
+
+      expect(await to(['a1', 'a2']), isA<PlanAssignPartial>());
+      await Future<void>.delayed(Duration.zero);
+      expect(aliases, isEmpty);
+
+      failA2 = false;
+      expect(await to(['a2']), isA<PlanAssignSuccess>());
+      await Future<void>.delayed(Duration.zero);
+      expect(aliases, [
+        {'exerciseId': 'remo', 'alias': 'Remo pendlay'},
+      ]);
+    });
+
+    test('un addAlias que falla no cambia el resultado de la asignación',
+        () async {
+      routinesOk();
+      when(() => addAlias.call(any())).thenThrow(Exception('App Check'));
+      final c =
+          container(_draft(['Remo pendlay'], suggestions: {_k(1): _remo}));
+      c.read(planImportPreviewControllerProvider).confirmSuggestion(_k(1));
+
+      final outcome = await assign(c);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(outcome, isA<PlanAssignSuccess>());
+      verify(() => addAlias.call(any())).called(1);
     });
   });
 
