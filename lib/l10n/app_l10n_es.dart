@@ -6166,6 +6166,30 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get pdfImportRowHideDetail => 'Ocultar detalle';
+
+  @override
+  String get coachHubImportUploadHintPdf =>
+      'Plantilla .xlsx (hasta 10 MB) o el PDF de tu plan (hasta 5 MB).';
+
+  @override
+  String get coachHubImportTemplateBodyPdf =>
+      'Descarga la plantilla: una hoja \"Programa\" con un bloque por día y una columna por semana, y una hoja \"Instrucciones\" con la notación. Es la única hoja de cálculo que aceptamos; si tu plan está en PDF, súbelo tal cual.';
+
+  @override
+  String get coachHubPdfProcessingHint =>
+      'Puede tardar hasta un par de minutos. Puedes seguir usando el Hub: te avisamos cuando esté listo.';
+
+  @override
+  String get coachHubPdfReadyToast => 'Tu plan está listo';
+
+  @override
+  String get coachHubPdfReadyAction => 'VER VISTA PREVIA';
+
+  @override
+  String get coachHubPdfFailedToast => 'No pudimos leer tu plan.';
+
+  @override
+  String get coachHubPdfFailedAction => 'VER DETALLE';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -12327,4 +12351,28 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get pdfImportRowHideDetail => 'Ocultar detalle';
+
+  @override
+  String get coachHubImportUploadHintPdf =>
+      'Plantilla .xlsx (hasta 10 MB) o el PDF de tu plan (hasta 5 MB).';
+
+  @override
+  String get coachHubImportTemplateBodyPdf =>
+      'Descargá la plantilla: una hoja \"Programa\" con un bloque por día y una columna por semana, y una hoja \"Instrucciones\" con la notación. Es la única planilla que aceptamos; si tu plan está en PDF, subilo tal cual.';
+
+  @override
+  String get coachHubPdfProcessingHint =>
+      'Puede tardar hasta un par de minutos. Podés seguir usando el Hub: te avisamos cuando esté listo.';
+
+  @override
+  String get coachHubPdfReadyToast => 'Tu plan está listo';
+
+  @override
+  String get coachHubPdfReadyAction => 'VER VISTA PREVIA';
+
+  @override
+  String get coachHubPdfFailedToast => 'No pudimos leer tu plan.';
+
+  @override
+  String get coachHubPdfFailedAction => 'VER DETALLE';
 }

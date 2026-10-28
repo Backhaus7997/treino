@@ -5547,5 +5547,19 @@
   "pdfImportRowShowDetail": "Ver detalle",
   "@pdfImportRowShowDetail": {"description": "Lector de pantalla: qué hace tocar una fila resuelta plegada (la despliega para cambiarla o ver el texto del PDF)."},
   "pdfImportRowHideDetail": "Ocultar detalle",
-  "@pdfImportRowHideDetail": {"description": "Lector de pantalla: qué hace tocar el encabezado de una fila resuelta desplegada (la vuelve a plegar)."}
+  "@pdfImportRowHideDetail": {"description": "Lector de pantalla: qué hace tocar el encabezado de una fila resuelta desplegada (la vuelve a plegar)."},
+  "coachHubImportUploadHintPdf": "Plantilla .xlsx (hasta 10 MB) o el PDF de tu plan (hasta 5 MB).",
+  "@coachHubImportUploadHintPdf": {"description": "Coach Hub, «Importar plan»: qué archivos acepta la tarjeta de subida cuando el import de PDF está habilitado para el PF (kill switch app_config/pdf_import). Los topes son los del parser de Excel y PDF_MAX_BYTES del servidor."},
+  "coachHubImportTemplateBodyPdf": "Descargá la plantilla: una hoja \"Programa\" con un bloque por día y una columna por semana, y una hoja \"Instrucciones\" con la notación. Es la única planilla que aceptamos; si tu plan está en PDF, subilo tal cual.",
+  "@coachHubImportTemplateBodyPdf": {"description": "Coach Hub, «Importar plan»: texto de la tarjeta de la plantilla cuando el import de PDF está habilitado. Sin el PDF dice «Es la única que aceptamos», que con un PDF al lado sería falso."},
+  "coachHubPdfProcessingHint": "Puede tardar hasta un par de minutos. Podés seguir usando el Hub: te avisamos cuando esté listo.",
+  "@coachHubPdfProcessingHint": {"description": "Coach Hub: debajo de «Leyendo tu plan…». En el Hub la lectura sigue aunque el PF se vaya de la pantalla, y el shell le avisa al terminar (mobile usa pdfImportProcessingHint, que pide no cerrar)."},
+  "coachHubPdfReadyToast": "Tu plan está listo",
+  "@coachHubPdfReadyToast": {"description": "Coach Hub: aviso del shell cuando la lectura del PDF terminó bien mientras el PF estaba en otra sección. También es el título de la tarjeta si vuelve a «Importar plan» con el plan listo."},
+  "coachHubPdfReadyAction": "VER VISTA PREVIA",
+  "@coachHubPdfReadyAction": {"description": "Acción del aviso «Tu plan está listo»: abre la vista previa del plan leído."},
+  "coachHubPdfFailedToast": "No pudimos leer tu plan.",
+  "@coachHubPdfFailedToast": {"description": "Coach Hub: aviso del shell cuando la lectura del PDF terminó mal mientras el PF estaba en otra sección. El detalle y su acción están en «Importar plan»."},
+  "coachHubPdfFailedAction": "VER DETALLE",
+  "@coachHubPdfFailedAction": {"description": "Acción del aviso «No pudimos leer tu plan.»: vuelve a «Importar plan», que muestra el error tipado."}
 }

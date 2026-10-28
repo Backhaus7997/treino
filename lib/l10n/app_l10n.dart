@@ -10272,6 +10272,48 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Ocultar detalle'**
   String get pdfImportRowHideDetail;
+
+  /// Coach Hub, «Importar plan»: qué archivos acepta la tarjeta de subida cuando el import de PDF está habilitado para el PF (kill switch app_config/pdf_import). Los topes son los del parser de Excel y PDF_MAX_BYTES del servidor.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plantilla .xlsx (hasta 10 MB) o el PDF de tu plan (hasta 5 MB).'**
+  String get coachHubImportUploadHintPdf;
+
+  /// Coach Hub, «Importar plan»: texto de la tarjeta de la plantilla cuando el import de PDF está habilitado. Sin el PDF dice «Es la única que aceptamos», que con un PDF al lado sería falso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Descargá la plantilla: una hoja \"Programa\" con un bloque por día y una columna por semana, y una hoja \"Instrucciones\" con la notación. Es la única planilla que aceptamos; si tu plan está en PDF, subilo tal cual.'**
+  String get coachHubImportTemplateBodyPdf;
+
+  /// Coach Hub: debajo de «Leyendo tu plan…». En el Hub la lectura sigue aunque el PF se vaya de la pantalla, y el shell le avisa al terminar (mobile usa pdfImportProcessingHint, que pide no cerrar).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Puede tardar hasta un par de minutos. Podés seguir usando el Hub: te avisamos cuando esté listo.'**
+  String get coachHubPdfProcessingHint;
+
+  /// Coach Hub: aviso del shell cuando la lectura del PDF terminó bien mientras el PF estaba en otra sección. También es el título de la tarjeta si vuelve a «Importar plan» con el plan listo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan está listo'**
+  String get coachHubPdfReadyToast;
+
+  /// Acción del aviso «Tu plan está listo»: abre la vista previa del plan leído.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER VISTA PREVIA'**
+  String get coachHubPdfReadyAction;
+
+  /// Coach Hub: aviso del shell cuando la lectura del PDF terminó mal mientras el PF estaba en otra sección. El detalle y su acción están en «Importar plan».
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos leer tu plan.'**
+  String get coachHubPdfFailedToast;
+
+  /// Acción del aviso «No pudimos leer tu plan.»: vuelve a «Importar plan», que muestra el error tipado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER DETALLE'**
+  String get coachHubPdfFailedAction;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

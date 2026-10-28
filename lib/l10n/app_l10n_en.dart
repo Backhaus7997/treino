@@ -6058,4 +6058,28 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get pdfImportRowHideDetail => 'Hide details';
+
+  @override
+  String get coachHubImportUploadHintPdf =>
+      'The .xlsx template (up to 10 MB) or your plan\'s PDF (up to 5 MB).';
+
+  @override
+  String get coachHubImportTemplateBodyPdf =>
+      'Download the template: a \"Programa\" sheet with one block per day and one column per week, and an \"Instrucciones\" sheet with the notation. It\'s the only spreadsheet we accept; if your plan is a PDF, upload it as is.';
+
+  @override
+  String get coachHubPdfProcessingHint =>
+      'It can take up to a couple of minutes. You can keep using the Hub: we will let you know when it is ready.';
+
+  @override
+  String get coachHubPdfReadyToast => 'Your plan is ready';
+
+  @override
+  String get coachHubPdfReadyAction => 'SEE PREVIEW';
+
+  @override
+  String get coachHubPdfFailedToast => 'We couldn’t read your plan.';
+
+  @override
+  String get coachHubPdfFailedAction => 'SEE DETAILS';
 }

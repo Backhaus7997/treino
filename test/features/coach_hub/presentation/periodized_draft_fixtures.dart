@@ -11,6 +11,7 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
+import 'package:treino/features/coach_hub/application/plan_pdf_import_providers.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_upload_plan_screen.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -29,6 +30,8 @@ import 'package:treino/features/coach_hub/data/exercise_matcher.dart';
 import 'package:treino/features/coach_hub/data/periodized_excel_parser.dart';
 import 'package:treino/features/coach_hub/data/periodized_import_draft.dart';
 import 'package:treino/features/coach_hub/data/periodized_routine_mapper.dart';
+import 'package:treino/features/coach_hub/domain/periodized_plan.dart';
+import 'package:treino/features/workout/domain/set_spec.dart';
 
 import '../data/periodized_test_helpers.dart';
 
@@ -75,6 +78,63 @@ PeriodizedImportDraft draftOf(
                 !draft.assignments.containsKey(exerciseKeyOf(day, row, ex)))
               exerciseKeyOf(day, row, ex): suggestions[ex.rawName]!,
     },
+  );
+}
+
+/// Borrador como el que deja `PlanPdfImportService` después de un parse
+/// exitoso, SIN dueño (`athleteId` null, como lo arma el Coach Hub): dos
+/// semanas, una fila ya resuelta, otra con sugerencia del fuzzy y la
+/// alternativa del extractor, el texto del PDF en cada una y un aviso.
+final kPdfSentadilla =
+    MatcherExercise(id: 'sq', name: 'Sentadilla', muscleGroup: 'quadriceps');
+final kPdfRemoBarra =
+    MatcherExercise(id: 'rb', name: 'Remo con barra', muscleGroup: 'back');
+final kPdfRemoMancuerna =
+    MatcherExercise(id: 'rm', name: 'Remo con mancuerna', muscleGroup: 'back');
+const kPdfRemoKey = (dayNumber: 1, row: 2, component: 0);
+const kPdfWarning = 'No se lee bien la semana 2 del día 1.';
+
+PeriodizedImportDraft pdfDraft() {
+  const plan = PeriodizedPlan(numWeeks: 2, days: [
+    PeriodizedDay(dayNumber: 1, rows: [
+      PeriodizedRow(position: 1, number: 1, restSeconds: 120, exercises: [
+        PeriodizedExercise(
+          component: 0,
+          rawName: 'Sentadilla trasera',
+          weeks: [
+            [SetSpec(reps: 8), SetSpec(reps: 8)],
+            [SetSpec(reps: 6), SetSpec(reps: 6)],
+          ],
+          sourceText: 'Sentadilla trasera 2x8 / 2x6',
+        ),
+      ]),
+      PeriodizedRow(position: 2, number: 2, restSeconds: 90, exercises: [
+        PeriodizedExercise(
+          component: 0,
+          rawName: 'Remo barra',
+          weeks: [
+            [SetSpec(reps: 10)],
+            [SetSpec(reps: 12)],
+          ],
+          sourceText: 'Remo barra 1x10 / 1x12',
+        ),
+      ]),
+    ]),
+  ]);
+  return PeriodizedImportDraft(
+    plan: plan,
+    warnings: const [
+      ImportDiagnostic(
+        severity: ImportDiagnosticSeverity.warning,
+        code: ImportDiagnosticCode.extractorWarning,
+        message: kPdfWarning,
+        page: 2,
+      ),
+    ],
+    name: 'plan fuerza',
+    assignments: {(dayNumber: 1, row: 1, component: 0): kPdfSentadilla},
+    suggestions: {kPdfRemoKey: kPdfRemoBarra},
+    alternatives: {kPdfRemoKey: kPdfRemoMancuerna},
   );
 }
 
@@ -221,15 +281,22 @@ ExerciseRepository exerciseRepoWith(List<Exercise> catalog) {
 
 /// Pantalla de subir + vista previa + dashboard, con el archivo [bytes]
 /// ya "elegido" por el picker. Devuelve el repo de rutinas para verificar.
+///
+/// [pdfGate] es el kill switch del import de PDF; apagado por defecto, que
+/// es la pantalla del Excel solo. [extra] suma overrides (el servicio del
+/// PDF, el cupo).
 Future<void> pumpUploadFlow(
   WidgetTester tester, {
   required Uint8List bytes,
   required List<Exercise> catalog,
   required RoutineRepository routineRepo,
   String fileName = 'mi-plan.xlsx',
+  int? fileSize,
+  PdfImportGate pdfGate = PdfImportGate.disabled,
+  List<Override> extra = const [],
 }) async {
   FilePicker.platform = FakeFilePicker(
-    PlatformFile(name: fileName, size: bytes.length, bytes: bytes),
+    PlatformFile(name: fileName, size: fileSize ?? bytes.length, bytes: bytes),
   );
   final router = GoRouter(
     initialLocation: '/upload-plan',
@@ -254,6 +321,8 @@ Future<void> pumpUploadFlow(
   await tester.pumpWidget(appWith(router, [
     ...previewOverrides(routineRepo),
     exerciseRepositoryProvider.overrideWithValue(exerciseRepoWith(catalog)),
+    pdfImportGateProvider.overrideWithValue(pdfGate),
+    ...extra,
   ]));
   await tester.pumpAndSettle();
 }

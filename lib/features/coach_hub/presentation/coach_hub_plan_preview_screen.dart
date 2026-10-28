@@ -303,6 +303,17 @@ class _CoachHubPlanPreviewScreenState
       ref.read(planImportPreviewControllerProvider).confirmAllSuggestions() >
           0);
 
+  /// PDF: «Usar alternativa» — el candidato del extractor en vez de la
+  /// sugerencia del fuzzy. Enseña su alias al asignar, como el picker. El
+  /// borrador del Excel no trae alternativas, así que ahí no aparece.
+  void _useAlternative(ExerciseKey key) {
+    if (_saving) return;
+    final controller = ref.read(planImportPreviewControllerProvider);
+    final alternative = controller.draft?.alternatives[key];
+    if (alternative == null) return;
+    _afterResolve(controller.resolve(key, alternative, replace: true));
+  }
+
   /// Lo que la pantalla hace cuando el controller resolvió un componente.
   void _afterResolve(bool resolved) {
     if (!resolved || !mounted) return;
@@ -421,6 +432,9 @@ class _CoachHubPlanPreviewScreenState
                               _pickExerciseFor(key: key, rowName: rawName),
                           onCreateCustom: (key, _) =>
                               _createCustomFor(key: key),
+                          onUseAlternative: _useAlternative,
+                          // `collapseResolved` queda apagado a propósito:
+                          // en el Hub cada fila se revisa desplegada.
                         ),
                       ),
                     const SizedBox(height: AppSpacing.s8),

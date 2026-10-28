@@ -34,7 +34,9 @@ camino.
 
 ## Alcance v1
 
-- **Sólo app mobile, sólo PDF.** Sin Coach Hub web y sin fotos del plan.
+- **Sólo PDF**, sin fotos del plan. Nació sólo para mobile; después se sumó el
+  Coach Hub web desde «Importar plan», donde los alumnos se eligen al asignar
+  (`docs/plan-import-pdf-estado.md`).
 - **Sólo entrenadores** (`role == "trainer"`), desde la ficha de un alumno: el
   alumno ya es conocido, no hace falta selector.
 - **Apagado por kill switch** hasta la evaluación del rollout (abajo).
