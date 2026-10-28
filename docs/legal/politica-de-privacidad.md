@@ -15,8 +15,14 @@ dart: kPrivacySections
 # `kLegacyPrivacyNoticeCutoff` (2026-09-03), en
 # `legacy_privacy_notice_providers.dart`. Antes lo leia de aca, y subir la
 # version lo habria mandado a todos los atletas.
-version: 5
-published: 2026-10-22
+#
+# 6 desde el 2026-10-28: el import de PDF pasa a usar Gemini (modelo de
+# Google) en Vertex AI en lugar de Claude de Anthropic (secciones 6.3; ver
+# docs/plan-import-pdf.md, «Proveedor»). El encargado sigue siendo Google.
+# OJO: `app_config/pdf_import.model` todavia acepta modelos `claude-*`;
+# elegir uno exige volver a nombrar a Anthropic aca ANTES de cambiar la config.
+version: 6
+published: 2026-10-28
 -->
 
 # Política de Privacidad de TREINO
@@ -271,15 +277,15 @@ instrucciones:
 |---|---|
 | **Google (Firebase / Google Cloud)** | Autenticación, base de datos, archivos, notificaciones, analítica, reportes de error |
 | **Google Places** | Las búsquedas de gimnasios que hacés |
-| **Google Cloud Vertex AI, con el modelo Claude de Anthropic** | Sólo si sos entrenador y usás «Importar de PDF»: el PDF que subís, para extraer de él el plan de entrenamiento |
+| **Google Cloud Vertex AI, con el modelo Gemini de Google** | Sólo si sos entrenador y usás «Importar de PDF»: el PDF que subís, para extraer de él el plan de entrenamiento |
 | **Resend** | Envío de correo (verificación, recupero de contraseña, avisos sobre tu plan y tus pagos) |
 | **Vercel** | Alojamiento del sitio web y del panel web para entrenadores |
 | **CARTO** | Provee las imágenes del mapa. Al cargarlo, tu dirección IP llega a su servidor |
 | **Apple / Google** | Si iniciás sesión con sus cuentas, o si contratás por sus tiendas |
 
 **Sobre el import de planes desde PDF.** Cuando un entrenador sube el PDF de un
-plan, lo procesa Google a través de Vertex AI con un modelo de lenguaje (Claude,
-desarrollado por Anthropic) con una única finalidad: extraer de él los días,
+plan, lo procesa Google a través de Vertex AI con un modelo de lenguaje propio
+(Gemini) con una única finalidad: extraer de él los días,
 ejercicios, series y repeticiones, para que el entrenador los revise antes de
 guardar nada. **Nosotros no guardamos el PDF**: no se sube a nuestro
 almacenamiento ni a nuestra base de datos; se usa para esa lectura y se
