@@ -1378,5 +1378,7 @@
   "pdfImportConfirmAll": "{count, plural, =1{Confirmar la sugerencia} other{Confirmar las {count} sugerencias}}",
   "pdfImportRowResolved": "Resuelto",
   "pdfImportRowShowDetail": "Ver detalle",
-  "pdfImportRowHideDetail": "Ocultar detalle"
+  "pdfImportRowHideDetail": "Ocultar detalle",
+  "coachHubImportUploadHintPdf": "Plantilla .xlsx (hasta 10 MB) o el PDF de tu plan (hasta 5 MB).",
+  "coachHubImportTemplateBodyPdf": "Descarga la plantilla: una hoja \"Programa\" con un bloque por día y una columna por semana, y una hoja \"Instrucciones\" con la notación. Es la única hoja de cálculo que aceptamos; si tu plan está en PDF, súbelo tal cual."
 }
