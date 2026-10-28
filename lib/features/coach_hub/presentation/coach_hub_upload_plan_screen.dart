@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -10,6 +11,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../application/hub_pdf_import_job_provider.dart';
 import '../application/pdf_import_quota_provider.dart';
 import '../application/plan_import_providers.dart';
 import '../application/plan_pdf_import_providers.dart';
@@ -17,7 +19,6 @@ import '../data/periodized_template_builder.dart';
 import '../data/plan_pdf_import_service.dart';
 import '../domain/periodized_plan.dart';
 import '../infrastructure/browser_download.dart';
-import 'widgets/dialog/treino_dialog.dart';
 import 'widgets/import_plan_widgets.dart';
 import 'widgets/pdf_import_failure_copy.dart';
 
@@ -31,6 +32,8 @@ import 'widgets/pdf_import_failure_copy.dart';
 ///    parser encuentra errores se muestran TODOS con su celda y no se avanza.
 ///    Un PDF va por `parsePlanPdf` (docs/plan-import-pdf.md) y llega a la
 ///    MISMA vista previa, sin alumno: se eligen al asignar, como en el Excel.
+///    La lectura vive en [hubPdfImportJobProvider], no en esta pantalla: el
+///    PF puede irse a otra sección y el shell le avisa al terminar.
 ///
 /// Con el gate apagado (o cargando) la pantalla es la del Excel solo: ni el
 /// picker acepta PDF ni hay texto del PDF.
@@ -50,15 +53,40 @@ class _CoachHubUploadPlanScreenState
   String? _error;
   List<ImportDiagnostic> _diagnostics = const [];
 
-  /// `parsePlanPdf` está leyendo el PDF. Mientras tanto no se reenvía y salir
-  /// pide confirmación: el servidor ya descontó el cupo.
-  bool _readingPdf = false;
-
-  /// Resultado no exitoso del PDF (o el tope local de 5 MB), con su acción.
-  PdfImportResult? _pdfFailure;
+  /// El tope local de 5 MB, chequeado al elegir. Los resultados del servidor
+  /// no viven acá sino en [hubPdfImportJobProvider], que sobrevive a esta
+  /// pantalla: el PF puede irse mientras se lee el PDF sin perder lo que ya
+  /// pagó con su cupo.
+  PdfImportResult? _pickFailure;
 
   bool get _pdfEnabled =>
       ref.read(pdfImportGateProvider) == PdfImportGate.enabled;
+
+  HubPdfImportJobNotifier get _job =>
+      ref.read(hubPdfImportJobProvider.notifier);
+
+  @override
+  void initState() {
+    super.initState();
+    // Lo que la lectura terminó mientras el PF estaba acá: listo → a la
+    // vista previa, como siempre. Si estaba en otra sección, avisa el shell.
+    ref.listenManual<HubPdfImportJob>(hubPdfImportJobProvider, (prev, next) {
+      if (prev is! HubPdfImportReading || next is! HubPdfImportReady) return;
+      // Sólo si esta pantalla es la de arriba: debajo de la vista previa no
+      // se empuja otra.
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
+      _openPreview();
+    });
+  }
+
+  void _openPreview() {
+    _job.acknowledge();
+    // Ese PDF ya gastó cupo: al volver de la vista previa no queda listo
+    // para procesarse de nuevo por un clic de más.
+    setState(() => _pickedFile = null);
+    // push, como el Excel: «atrás» desde la vista previa vuelve acá.
+    context.push('/upload-plan/preview');
+  }
 
   /// El archivo va por el import de PDF: es un `.pdf` y el gate lo permite.
   /// Con el gate apagado todo va por el Excel, como antes.
@@ -70,8 +98,11 @@ class _CoachHubUploadPlanScreenState
     setState(() {
       _error = null;
       _diagnostics = const [];
-      _pdfFailure = null;
+      _pickFailure = null;
     });
+    // Elegir otro archivo deja atrás el error (o el «listo») de la lectura
+    // anterior.
+    _job.acknowledge();
     // Web: no hay rutas, sólo bytes (`withData`). Un solo selector para los
     // dos formatos: el tipo del archivo decide el camino.
     final result = await FilePicker.platform.pickFiles(
@@ -87,7 +118,7 @@ class _CoachHubUploadPlanScreenState
       final tooBig = _isPdf(file, pdfEnabled: pdfEnabled) &&
           file.size > kPdfImportMaxBytes;
       _pickedFile = tooBig ? null : file;
-      _pdfFailure =
+      _pickFailure =
           tooBig ? const PdfImportInvalidFile(PdfRejectReason.tooBig) : null;
     });
   }
@@ -99,57 +130,20 @@ class _CoachHubUploadPlanScreenState
   Future<void> _processPdf() async {
     final file = _pickedFile;
     final bytes = file?.bytes;
-    if (_readingPdf || file == null) return;
+    // Una lectura a la vez, aunque el PF haya salido y vuelto.
+    if (_job.isReading || file == null) return;
     if (bytes == null) {
-      setState(() => _pdfFailure = const PdfImportInternal(code: 'no-bytes'));
+      setState(() => _pickFailure = const PdfImportInternal(code: 'no-bytes'));
       return;
     }
     setState(() {
-      _readingPdf = true;
-      _pdfFailure = null;
+      _pickFailure = null;
       _error = null;
     });
-    // Sin alumno: el Hub los elige al asignar (el servidor no lo usa).
-    final result = await ref.read(planPdfImportServiceProvider).importPdf(
-          bytes: Uint8List.fromList(bytes),
-          fileName: file.name,
-        );
-    if (!mounted) return;
-    if (result is PdfImportSuccess) {
-      // Sin `forAthlete`, igual que el borrador del Excel: la vista previa del
-      // Hub no mira el dueño y asigna a los alumnos que elija el PF.
-      ref.read(periodizedImportProvider.notifier).state = result.draft;
-      setState(() {
-        _readingPdf = false;
-        // Ese PDF ya gastó cupo: al volver de la vista previa no queda listo
-        // para procesarse de nuevo por un clic de más.
-        _pickedFile = null;
-      });
-      // push, como el Excel: «atrás» desde la vista previa vuelve acá.
-      context.push('/upload-plan/preview');
-      return;
-    }
-    setState(() {
-      _readingPdf = false;
-      _pdfFailure = result;
-    });
-  }
-
-  Future<void> _confirmLeave() async {
-    final l10n = AppL10n.of(context);
-    final leave = await showTreinoDialog<bool>(
-      context,
-      builder: (ctx) => TreinoDialog(
-        title: l10n.pdfImportLeaveTitle,
-        body: Text(l10n.pdfImportLeaveBody),
-        primaryLabel: l10n.pdfImportLeaveConfirm,
-        destructive: true,
-        onPrimaryTap: () => Navigator.of(ctx).pop(true),
-        secondaryLabel: l10n.commonCancel,
-        onSecondaryTap: () => Navigator.of(ctx).pop(false),
-      ),
-    );
-    if (leave == true && mounted) _leave();
+    // Sin await: la lectura sigue aunque esta pantalla se desmonte. El
+    // resultado llega por [hubPdfImportJobProvider].
+    unawaited(
+        _job.start(bytes: Uint8List.fromList(bytes), fileName: file.name));
   }
 
   // pop back to the dashboard (the push origin); fall back to go() when
@@ -239,82 +233,88 @@ class _CoachHubUploadPlanScreenState
     final errors = _diagnostics.where((d) => d.isError).toList();
     final pdfEnabled =
         ref.watch(pdfImportGateProvider) == PdfImportGate.enabled;
-    final pdfFailure = _pdfFailure;
+    // La lectura vive en el job, no acá: al volver a la pantalla se ve en
+    // qué quedó. Salir mientras lee ya no pregunta nada: no se pierde.
+    final job = ref.watch(hubPdfImportJobProvider);
+    final readingPdf = job is HubPdfImportReading;
+    final pdfReady =
+        job is HubPdfImportReady && ref.watch(periodizedImportProvider) != null;
+    final pdfFailure =
+        _pickFailure ?? (job is HubPdfImportFailed ? job.failure : null);
 
-    return PopScope(
-      canPop: !_readingPdf,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _confirmLeave();
-      },
-      child: Scaffold(
-        backgroundColor: palette.bg,
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s20,
-                  vertical: AppSpacing.s18,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _Header(
-                      palette: palette,
-                      onBack: _readingPdf ? _confirmLeave : _leave,
+    return Scaffold(
+      backgroundColor: palette.bg,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s20,
+                vertical: AppSpacing.s18,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _Header(palette: palette, onBack: _leave),
+                  const SizedBox(height: AppSpacing.s20),
+                  _TemplateCard(
+                    palette: palette,
+                    onDownload: _downloadTemplate,
+                    loading: _downloadingTemplate,
+                    pdfEnabled: pdfEnabled,
+                  ),
+                  const SizedBox(height: AppSpacing.s18),
+                  _UploadCard(
+                    palette: palette,
+                    file: file,
+                    pdfEnabled: pdfEnabled,
+                    isPdf: _isPdf(file, pdfEnabled: pdfEnabled),
+                    onPick: readingPdf ? null : _pickFile,
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: AppSpacing.s14),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: importText(palette.dangerText,
+                          size: AppTextSize.bodyDense),
                     ),
-                    const SizedBox(height: AppSpacing.s20),
-                    _TemplateCard(
-                      palette: palette,
-                      onDownload: _downloadTemplate,
-                      loading: _downloadingTemplate,
-                      pdfEnabled: pdfEnabled,
-                    ),
-                    const SizedBox(height: AppSpacing.s18),
-                    _UploadCard(
-                      palette: palette,
-                      file: file,
-                      pdfEnabled: pdfEnabled,
-                      isPdf: _isPdf(file, pdfEnabled: pdfEnabled),
-                      onPick: _readingPdf ? null : _pickFile,
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: AppSpacing.s14),
-                      Text(
-                        _error!,
-                        textAlign: TextAlign.center,
-                        style: importText(palette.dangerText,
-                            size: AppTextSize.bodyDense),
-                      ),
-                    ],
-                    if (errors.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.s14),
-                      _ErrorsCard(palette: palette, errors: errors),
-                    ],
-                    if (pdfFailure != null && !_readingPdf) ...[
-                      const SizedBox(height: AppSpacing.s14),
-                      _PdfFailureCard(
-                        palette: palette,
-                        failure: pdfFailure,
-                        onPickAnother: _pickFile,
-                        onRetry: file == null ? null : _processPdf,
-                      ),
-                    ],
-                    const SizedBox(height: AppSpacing.s18),
-                    // Leyendo, la espera ocupa el lugar del botón; con un
-                    // error del PDF, sus acciones (como en mobile).
-                    if (_readingPdf)
-                      _ReadingPdfCard(palette: palette)
-                    else if (pdfFailure == null)
-                      TreinoButton(
-                        label: 'PROCESAR PLAN',
-                        expand: true,
-                        loading: _submitting,
-                        onPressed: _pickedFile == null ? null : _process,
-                      ),
                   ],
-                ),
+                  if (errors.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.s14),
+                    _ErrorsCard(palette: palette, errors: errors),
+                  ],
+                  if (pdfFailure != null && !readingPdf) ...[
+                    const SizedBox(height: AppSpacing.s14),
+                    _PdfFailureCard(
+                      palette: palette,
+                      failure: pdfFailure,
+                      onPickAnother: _pickFile,
+                      // Con los bytes que guardó el job: sirve aunque el
+                      // PF se haya ido y vuelto sin el archivo.
+                      onRetry: _pickFailure == null && _job.canRetry
+                          ? _job.retry
+                          : null,
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.s18),
+                  // Leyendo, la espera ocupa el lugar del botón; con un
+                  // error del PDF, sus acciones (como en mobile); con el
+                  // plan ya leído (terminó mientras el PF estaba en otra
+                  // sección), el paso a la vista previa.
+                  if (readingPdf)
+                    _ReadingPdfCard(palette: palette, fileName: job.fileName)
+                  else if (pdfReady)
+                    _PdfReadyCard(palette: palette, onOpen: _openPreview)
+                  else if (pdfFailure == null)
+                    TreinoButton(
+                      label: 'PROCESAR PLAN',
+                      expand: true,
+                      loading: _submitting,
+                      onPressed: _pickedFile == null ? null : _process,
+                    ),
+                ],
               ),
             ),
           ),
@@ -384,10 +384,15 @@ class _PdfQuotaLine extends ConsumerWidget {
   }
 }
 
-/// La espera mientras `parsePlanPdf` lee el PDF.
+/// La espera mientras `parsePlanPdf` lee el PDF. Dice que se puede seguir
+/// usando el Hub: la lectura no depende de esta pantalla.
 class _ReadingPdfCard extends StatelessWidget {
-  const _ReadingPdfCard({required this.palette});
+  const _ReadingPdfCard({required this.palette, required this.fileName});
   final AppPalette palette;
+
+  /// El PDF que se está leyendo: al volver a la pantalla, el archivo elegido
+  /// ya no está en la tarjeta de subida.
+  final String fileName;
 
   @override
   Widget build(BuildContext context) {
@@ -404,6 +409,13 @@ class _ReadingPdfCard extends StatelessWidget {
               weight: AppFonts.w700,
             ),
           ),
+          const SizedBox(height: AppSpacing.hairline),
+          Text(
+            fileName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: importText(palette.textMuted, size: AppTextSize.caption),
+          ),
           const SizedBox(height: AppSpacing.s12),
           ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.full),
@@ -415,12 +427,55 @@ class _ReadingPdfCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.s12),
           Text(
-            l10n.pdfImportProcessingHint,
+            l10n.coachHubPdfProcessingHint,
             style: importText(
               palette.textMuted,
               size: AppTextSize.bodyDense,
               height: 1.4,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// El plan se leyó mientras el PF estaba en otra sección y volvió acá sin
+/// pasar por el aviso: el borrador lo espera en la vista previa.
+class _PdfReadyCard extends StatelessWidget {
+  const _PdfReadyCard({required this.palette, required this.onOpen});
+  final AppPalette palette;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return ImportCard(
+      key: const Key('pdf_import_ready'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(TreinoIcon.checkCircleFill, color: palette.accent),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: Text(
+                  l10n.coachHubPdfReadyToast,
+                  style: importText(
+                    palette.textPrimary,
+                    size: AppTextSize.bodyLarge,
+                    weight: AppFonts.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s14),
+          TreinoButton(
+            label: l10n.coachHubPdfReadyAction,
+            expand: true,
+            onPressed: onOpen,
           ),
         ],
       ),

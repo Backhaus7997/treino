@@ -32,7 +32,7 @@ Todo en `develop`, en este orden de merge:
 | #1642–#1644 | Vista previa mobile, asignación, nombre editable, y los hallazgos de la revisión independiente y de Codex |
 | #1654 | El log de errores del LLM conserva el mensaje y el status del proveedor (el logger de firebase-functions pisaba la clave `message`) |
 | #1655 | Gemini en Vertex como proveedor por defecto (`gemini-provider.ts`, `modelRouter`); Claude queda elegible por config. Tokens y duración del LLM en el log |
-| — | Coach Hub web: «Importar plan» (`coach_hub_upload_plan_screen.dart`) acepta la plantilla o un PDF con el mismo gate que mobile (aviso, cupo, tope de 5 MB, espera y errores tipados); el borrador va sin alumno a la vista previa del Hub, que elige los alumnos al asignar y ofrece «Usar alternativa» |
+| — | Coach Hub web: «Importar plan» (`coach_hub_upload_plan_screen.dart`) acepta la plantilla o un PDF con el mismo gate que mobile (aviso, cupo, tope de 5 MB, espera y errores tipados); el borrador va sin alumno a la vista previa del Hub, que elige los alumnos al asignar y ofrece «Usar alternativa». La lectura vive en `hubPdfImportJobProvider`, no en la pantalla: si el PF se va a otra sección, el shell le avisa al terminar (`HubPdfImportNotice`) |
 
 Revisado por una revisión independiente (sin CRITICAL/HIGH) y por Codex en cada
 PR; todos los hilos quedaron resueltos. Probado con tests (unit, widget, reglas,

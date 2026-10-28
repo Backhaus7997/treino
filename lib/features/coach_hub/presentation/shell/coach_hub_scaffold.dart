@@ -11,6 +11,7 @@ import 'content_max_width.dart';
 import 'coach_hub_resolving_view.dart';
 import 'coach_hub_sidebar.dart';
 import 'coach_hub_top_bar.dart';
+import 'hub_pdf_import_notice.dart';
 import 'mobile_banner.dart';
 import 'mobile_facturacion_shell.dart';
 import 'navigator_semantics_boundary.dart';
@@ -100,6 +101,9 @@ class CoachHubScaffold extends ConsumerWidget {
                   // Tour de bienvenida (#627). SizedBox.shrink(); va DESPUÉS del
                   // early-return de Viewport.mobile de arriba.
                   const CoachHubTourGate(),
+                  // Aviso de la lectura de PDF que terminó con el PF en otra
+                  // sección. También SizedBox.shrink(): no mueve el layout.
+                  const HubPdfImportNotice(),
                   Expanded(
                     child: ContentMaxWidth(
                       maxWidth: contentMaxWidth,

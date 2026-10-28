@@ -218,9 +218,10 @@ void main() {
       expect(service.calls, ['plan_fuerza-FINAL.pdf:null']);
       expect(find.text('Leyendo tu plan…'), findsOneWidget);
       expect(
-          find.text('Puede tardar hasta un par de minutos. No cierres esta '
-              'pantalla.'),
+          find.text('Puede tardar hasta un par de minutos. Podés seguir usando '
+              'el Hub: te avisamos cuando esté listo.'),
           findsOneWidget);
+      expect(find.textContaining('No cierres'), findsNothing);
       expect(find.byKey(const Key('pdf_import_progress')), findsOneWidget);
       expect(find.text('PROCESAR PLAN'), findsNothing);
 
@@ -263,32 +264,31 @@ void main() {
       expect(find.text('Elegir archivo'), findsOneWidget);
     });
 
-    testWidgets('salir mientras lee pide confirmación', (tester) async {
+    testWidgets(
+        'salir mientras lee NO pregunta: la lectura sigue y el resultado no se '
+        'pierde', (tester) async {
       final service = _FakeService();
       await _pumpPdf(tester, service);
       await _pickAndStart(tester);
+      expect(
+          find.text('Puede tardar hasta un par de minutos. Podés seguir usando '
+              'el Hub: te avisamos cuando esté listo.'),
+          findsOneWidget);
 
       // La barra de progreso es indeterminada: pumpAndSettle no termina.
       await tester.tap(find.byTooltip('Volver'));
-      await tester.pump(const Duration(milliseconds: 500));
-
-      expect(find.text('¿Salir mientras se lee el plan?'), findsOneWidget);
-      expect(find.text('Este intento ya cuenta en tu cupo aunque salgas.'),
-          findsOneWidget);
-      await tester.tap(find.text('Cancelar'));
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(find.text('¿Salir mientras se lee el plan?'), findsNothing);
-      expect(find.text('Leyendo tu plan…'), findsOneWidget);
-
-      // Confirmar sí sale, al dashboard.
-      await tester.tap(find.byTooltip('Volver'));
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.text('Salir'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
-      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('¿Salir mientras se lee el plan?'), findsNothing);
       expect(find.byType(CoachHubUploadPlanScreen), findsNothing);
       expect(find.text('DASHBOARD'), findsOneWidget);
+
+      service.complete(
+          PdfImportSuccess(draft: pdfDraft(), quota: null, model: 'm'));
+      await tester.pumpAndSettle();
+      final container =
+          ProviderScope.containerOf(tester.element(find.text('DASHBOARD')));
+      expect(container.read(periodizedImportProvider), isNotNull);
     });
 
     group('errores tipados del servicio, con su acción', () {
