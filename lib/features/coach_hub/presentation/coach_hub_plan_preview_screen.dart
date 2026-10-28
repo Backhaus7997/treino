@@ -297,6 +297,12 @@ class _CoachHubPlanPreviewScreenState
   void _confirmSuggestion(ExerciseKey key) => _afterResolve(
       ref.read(planImportPreviewControllerProvider).confirmSuggestion(key));
 
+  /// «Confirmar las N sugerencias»: lo mismo que [_confirmSuggestion] fila
+  /// por fila. Las filas sin match no se tocan.
+  void _confirmAllSuggestions() => _afterResolve(
+      ref.read(planImportPreviewControllerProvider).confirmAllSuggestions() >
+          0);
+
   /// Lo que la pantalla hace cuando el controller resolvió un componente.
   void _afterResolve(bool resolved) {
     if (!resolved || !mounted) return;
@@ -382,6 +388,13 @@ class _CoachHubPlanPreviewScreenState
                     const SizedBox(height: AppSpacing.s18),
                     if (draft.unresolved.isNotEmpty) ...[
                       _UnmatchedWarning(palette: palette, draft: draft),
+                      const SizedBox(height: AppSpacing.s18),
+                    ],
+                    if (draft.pendingSuggestions > 0) ...[
+                      ConfirmAllSuggestionsButton(
+                        count: draft.pendingSuggestions,
+                        onPressed: _saving ? null : _confirmAllSuggestions,
+                      ),
                       const SizedBox(height: AppSpacing.s18),
                     ],
                     if (draft.warnings.isNotEmpty) ...[

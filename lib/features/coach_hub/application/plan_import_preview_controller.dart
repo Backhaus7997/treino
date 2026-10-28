@@ -126,6 +126,15 @@ class BulkCustomResult {
 ///
 /// El borrador vive en [periodizedImportProvider]: es lo que empuja la
 /// pantalla de subida y lo que la vista previa dibuja.
+///
+/// ALIAS. Resolver un componente sólo cambia el borrador: ni «Confirmar»
+/// (uno o en bloque), ni «Usar alternativa», ni «Cambiar» llaman a
+/// `addAlias`. Los alias se registran recién cuando [assign] termina con
+/// éxito, con el estado FINAL de cada fila
+/// ([PeriodizedImportDraft.aliasesToRegister]). Antes se registraban al
+/// confirmar, y `addAlias` hace `arrayUnion` sobre el catálogo GLOBAL: una
+/// sugerencia equivocada confirmada al pasar (más fácil con «Confirmar las
+/// N») quedaba enseñada para el próximo import aunque el PF la corrigiera.
 class PlanImportPreviewController {
   PlanImportPreviewController(this._ref);
 
@@ -139,33 +148,38 @@ class PlanImportPreviewController {
   /// Sin borrador cuenta como resuelto: no hay nada que resolver.
   bool isResolved(ExerciseKey key) => draft?.isResolved(key) ?? true;
 
-  /// Asigna [exercise] al componente [key]. Devuelve false si no había
-  /// borrador o el componente ya estaba resuelto (un doble tap no vuelve a
-  /// llamar a `addAlias`).
+  /// Asigna [exercise] al componente [key] en el borrador. Devuelve false si
+  /// no había borrador o el componente ya estaba resuelto (un doble tap no
+  /// cambia nada).
+  ///
+  /// Con [replace] («Cambiar» sobre una fila ya resuelta) sí reemplaza la
+  /// asignación; elegir el mismo ejercicio que ya tenía no hace nada.
   ///
   /// Se resuelve por la clave EXACTA (día, fila, componente). Con [custom],
   /// el propio recién creado resuelve además los homónimos exactos sin
-  /// candidato: son el mismo ejercicio repetido en el plan. Un propio NO
-  /// registra alias: `addAlias` indexa contra el catálogo global.
+  /// candidato: son el mismo ejercicio repetido en el plan. Sin [custom] la
+  /// fila queda marcada para enseñar su alias al asignar; un propio NO:
+  /// `addAlias` indexa contra el catálogo global.
   bool resolve(
     ExerciseKey key,
     MatcherExercise exercise, {
     bool custom = false,
+    bool replace = false,
   }) {
     final current = draft;
-    if (current == null || current.isResolved(key)) return false;
+    if (current == null) return false;
+    final previous = current.assignments[key];
+    if (previous != null && (!replace || previous.id == exercise.id)) {
+      return false;
+    }
     _ref.read(periodizedImportProvider.notifier).state = custom
         ? current.resolveWithSameName(key, exercise)
-        : current.resolve(key, exercise);
-    if (!custom) {
-      // FIRE-AND-FORGET: see ADR-CXP-006
-      unawaited(_addAlias(exercise.id, rawNameOf(current.plan, key)));
-    }
+        : current.resolve(key, exercise, learn: true);
     return true;
   }
 
   /// Confirma la sugerencia pendiente de [key]. Si la sugerencia es un propio
-  /// del PF (entra al catálogo del matcher), no registra alias.
+  /// del PF (entra al catálogo del matcher), no enseña alias al asignar.
   bool confirmSuggestion(ExerciseKey key) {
     final suggestion = draft?.suggestions[key];
     if (suggestion == null) return false;
@@ -175,6 +189,25 @@ class PlanImportPreviewController {
                 const <CustomExercise>[])
             .any((c) => c.id == suggestion.id);
     return resolve(key, suggestion, custom: isCustom);
+  }
+
+  /// «Confirmar las N sugerencias»: confirma, en el orden del plan, cada
+  /// componente con sugerencia pendiente — exactamente lo que haría tocar
+  /// «Confirmar» fila por fila. No toca los que no tienen
+  /// candidato. Devuelve cuántos confirmó; un segundo llamado no encuentra
+  /// nada pendiente y devuelve 0.
+  int confirmAllSuggestions() {
+    final current = draft;
+    if (current == null) return 0;
+    final pending = [
+      for (final key in current.unresolved)
+        if (current.suggestions.containsKey(key)) key,
+    ];
+    var confirmed = 0;
+    for (final key in pending) {
+      if (confirmSuggestion(key)) confirmed++;
+    }
+    return confirmed;
   }
 
   /// «Crear como propio» para UNA fila. El propio se crea recién al confirmar
@@ -381,6 +414,9 @@ class PlanImportPreviewController {
         failedAthleteIds: [for (final f in failed) f.athleteId],
       );
     }
+    // Recién ahora, y sólo con éxito total. Un parcial no registra: la UI
+    // reintenta con los que fallaron y se registra al terminar bien.
+    _registerAliases(current);
     return PlanAssignSuccess(
       athleteIds.length,
       routineIds: [for (final id in athleteIds) creadas[id]!],
@@ -396,6 +432,16 @@ class PlanImportPreviewController {
 
   /// Descarta el borrador (después de asignar, o al salir).
   void clear() => _ref.read(periodizedImportProvider.notifier).state = null;
+
+  /// Un `addAlias` por cada par (ejercicio, texto del PF) que el PF eligió
+  /// sobre el catálogo, con la asignación final. Sin esperar a ninguno: un
+  /// alias que falla no puede trabar ni ensuciar una asignación ya hecha.
+  void _registerAliases(PeriodizedImportDraft draft) {
+    for (final a in draft.aliasesToRegister) {
+      // FIRE-AND-FORGET: see ADR-CXP-006
+      unawaited(_addAlias(a.exerciseId, a.alias));
+    }
+  }
 
   /// Fire-and-forget: registra el alias para que el próximo import matchee
   /// solo. Falla en silencio (ADR-CXP-009): `addAlias` exige App Check y

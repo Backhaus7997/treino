@@ -5539,5 +5539,13 @@
   "pdfImportPreviewTitle": "REVISAR PLAN",
   "@pdfImportPreviewTitle": {"description": "Título de la vista previa del plan importado de PDF."},
   "pdfImportNameLabel": "Nombre de la rutina",
-  "@pdfImportNameLabel": {"description": "Etiqueta del campo editable con el nombre de la rutina importada."}
+  "@pdfImportNameLabel": {"description": "Etiqueta del campo editable con el nombre de la rutina importada."},
+  "pdfImportConfirmAll": "{count, plural, =1{Confirmar la sugerencia} other{Confirmar las {count} sugerencias}}",
+  "@pdfImportConfirmAll": {"description": "Confirma en bloque todas las sugerencias pendientes de la vista previa, igual que tocar «Confirmar» en cada fila. No toca las filas sin match.", "placeholders": {"count": {"type": "int"}}},
+  "pdfImportRowResolved": "Resuelto",
+  "@pdfImportRowResolved": {"description": "Lector de pantalla: el tilde de una fila de la vista previa ya vinculada a un ejercicio de la biblioteca."},
+  "pdfImportRowShowDetail": "Ver detalle",
+  "@pdfImportRowShowDetail": {"description": "Lector de pantalla: qué hace tocar una fila resuelta plegada (la despliega para cambiarla o ver el texto del PDF)."},
+  "pdfImportRowHideDetail": "Ocultar detalle",
+  "@pdfImportRowHideDetail": {"description": "Lector de pantalla: qué hace tocar el encabezado de una fila resuelta desplegada (la vuelve a plegar)."}
 }

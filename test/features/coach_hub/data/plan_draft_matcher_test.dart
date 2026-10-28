@@ -139,9 +139,11 @@ void main() {
 
       expect(draft.suggestions[key]!.id, 'pendlay-alto');
       expect(draft.alternatives[key]!.id, 'remo');
-      // Resolver el componente limpia la alternativa.
+      // Resolver el componente conserva la alternativa: después de confirmar
+      // (sobre todo en bloque) el PF todavía puede corregir con ella.
       final resolved = draft.resolve(key, draft.suggestions[key]!);
-      expect(resolved.alternatives, isEmpty);
+      expect(resolved.suggestions, isEmpty);
+      expect(resolved.alternatives[key]!.id, 'remo');
     });
 
     test('LLM vetado junto a un fuzzy válido: no queda como alternativa',

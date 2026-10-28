@@ -151,40 +151,60 @@ class _PlanPdfImportPreviewScreenState
     });
   }
 
+  /// Mientras se asigna (o corre un bloque) el borrador no se toca: `assign`
+  /// ya tomó su copia, y un cambio aceptado ahora se descartaria en silencio
+  /// al limpiar el borrador con la rutina vieja ya creada.
+  void _confirmOne(ExerciseKey key) {
+    if (_busy) return;
+    _afterResolve(_controller.confirmSuggestion(key));
+  }
+
   Future<void> _pick(ExerciseKey key) async {
+    if (_busy) return;
     final picked = await showExercisePicker(context, single: true);
-    if (!mounted || picked == null || picked.isEmpty) return;
+    // Se vuelve a mirar: ASIGNAR pudo arrancar con el picker abierto.
+    if (!mounted || _busy || picked == null || picked.isEmpty) return;
     final ex = picked.first;
-    // Lo que no está en el catálogo es un propio del PF: sin alias.
+    // Lo que no está en el catálogo es un propio del PF: sin alias. Con
+    // `replace`, el mismo picker sirve de «Cambiar» en una fila ya resuelta.
     final catalog = ref.read(exercisesProvider).valueOrNull ?? const [];
     _afterResolve(_controller.resolve(
       key,
       MatcherExercise(id: ex.id, name: ex.name, muscleGroup: ex.muscleGroup),
       custom: !catalog.any((c) => c.id == ex.id),
+      replace: true,
     ));
   }
 
+  void _confirmAll() {
+    if (_busy) return;
+    _afterResolve(_controller.confirmAllSuggestions() > 0);
+  }
+
   Future<void> _createCustom(ExerciseKey key) async {
+    if (_busy) return;
     final resolved = await _controller.createCustomFor(
       key,
       canCreate: () async =>
-          await intentarCrearEjercicioPropio(context, ref) && mounted,
+          await intentarCrearEjercicioPropio(context, ref) && mounted && !_busy,
       openForm: (rawName, canSave) async {
         final created = await showCreateCustomExerciseDialog(
           context,
           initialName: rawName,
-          canSave: () => mounted && canSave(),
+          canSave: () => mounted && !_busy && canSave(),
         );
-        return mounted ? created : null;
+        return mounted && !_busy ? created : null;
       },
     );
     _afterResolve(resolved);
   }
 
   void _useAlternative(ExerciseKey key) {
+    if (_busy) return;
     final alternative = _controller.draft?.alternatives[key];
     if (alternative == null) return;
-    _afterResolve(_controller.resolve(key, alternative));
+    // También desde una fila ya confirmada: la alternativa se conserva.
+    _afterResolve(_controller.resolve(key, alternative, replace: true));
   }
 
   Future<void> _createBulk() async {
@@ -446,6 +466,13 @@ class _PlanPdfImportPreviewScreenState
                     style: importText(palette.warning, weight: AppFonts.w600),
                   ),
                 ],
+                if (draft.pendingSuggestions > 0) ...[
+                  const SizedBox(height: AppSpacing.s12),
+                  ConfirmAllSuggestionsButton(
+                    count: draft.pendingSuggestions,
+                    onPressed: _busy ? null : _confirmAll,
+                  ),
+                ],
                 if (bulk > 0) ...[
                   const SizedBox(height: AppSpacing.s12),
                   OutlinedButton.icon(
@@ -493,11 +520,11 @@ class _PlanPdfImportPreviewScreenState
                         day: d,
                         week: week,
                         draft: draft,
-                        onConfirmSuggestion: (key) =>
-                            _afterResolve(_controller.confirmSuggestion(key)),
+                        onConfirmSuggestion: _confirmOne,
                         onPickManual: (key, _) => _pick(key),
                         onCreateCustom: (key, _) => _createCustom(key),
                         onUseAlternative: _useAlternative,
+                        collapseResolved: true,
                       ),
                     ),
                   ),

@@ -6146,6 +6146,26 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get pdfImportNameLabel => 'Nombre de la rutina';
+
+  @override
+  String pdfImportConfirmAll(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Confirmar las $count sugerencias',
+      one: 'Confirmar la sugerencia',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pdfImportRowResolved => 'Resuelto';
+
+  @override
+  String get pdfImportRowShowDetail => 'Ver detalle';
+
+  @override
+  String get pdfImportRowHideDetail => 'Ocultar detalle';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -12287,4 +12307,24 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get pdfImportNameLabel => 'Nombre de la rutina';
+
+  @override
+  String pdfImportConfirmAll(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Confirmar las $count sugerencias',
+      one: 'Confirmar la sugerencia',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pdfImportRowResolved => 'Resuelto';
+
+  @override
+  String get pdfImportRowShowDetail => 'Ver detalle';
+
+  @override
+  String get pdfImportRowHideDetail => 'Ocultar detalle';
 }

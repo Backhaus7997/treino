@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/data/exercise_matcher.dart';
 import 'package:treino/features/coach_hub/domain/periodized_plan.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
@@ -10,6 +14,10 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/set_enums.dart';
 
 import 'periodized_draft_fixtures.dart';
+
+class _MockFunctions extends Mock implements FirebaseFunctions {}
+
+class _MockCallable extends Mock implements HttpsCallable {}
 
 List<MatcherExercise> _catalog() => [
       for (final l in ['A', 'B', 'C', 'D', 'E'])
@@ -216,6 +224,75 @@ void main() {
       await tester.tap(find.text('ASIGNAR PLAN'));
       await tester.pumpAndSettle();
       verify(() => repo.createAssigned(any())).called(1);
+    });
+
+    testWidgets(
+        '«Confirmar las N sugerencias» confirma las sugeridas y deja las sin '
+        'match', (tester) async {
+      final draft = draftOf(
+        [
+          [1, 'Ejercicio Q', 60, ...sameWeeks('3x8')],
+          [2, 'Ejercicio R', 60, ...sameWeeks('3x8')],
+          [3, 'Ejercicio Z', 60, ...sameWeeks('3x8')],
+        ],
+        catalog: _catalog(),
+        suggestions: {
+          'Ejercicio Q': MatcherExercise(id: 'ex-q', name: 'Ejercicio Quasi'),
+          'Ejercicio R': MatcherExercise(id: 'ex-r', name: 'Ejercicio Recto'),
+        },
+      );
+      await pumpPreview(tester, draft, MockRoutineRepo());
+      expect(find.text('sugerencia pendiente'), findsNWidgets(2));
+
+      await tester.tap(find.text('Confirmar las 2 sugerencias'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('sugerencia pendiente'), findsNothing);
+      expect(find.text('Ejercicio Quasi'), findsOneWidget);
+      expect(find.text('Ejercicio Recto'), findsOneWidget);
+      expect(find.text('sin match'), findsOneWidget);
+      expect(find.textContaining('Confirmar las'), findsNothing);
+    });
+
+    testWidgets(
+        'Excel: el alias se registra al ASIGNAR, no al confirmar, y un '
+        'addAlias colgado no traba la asignación', (tester) async {
+      final functions = _MockFunctions();
+      final callable = _MockCallable();
+      final calls = <Object?>[];
+      when(() => functions.httpsCallable('addAlias')).thenReturn(callable);
+      when(() => callable.call(any())).thenAnswer((inv) {
+        calls.add(inv.positionalArguments.single);
+        // Nunca termina: la asignación no lo espera.
+        return Completer<HttpsCallableResult<dynamic>>().future;
+      });
+      final repo = MockRoutineRepo();
+      when(() => repo.createAssigned(any())).thenAnswer((inv) async =>
+          (inv.positionalArguments.first as Routine).copyWith(id: 'r-1'));
+      final draft = draftOf(
+        [
+          [1, 'Ejercicio A', 60, ...sameWeeks('3x8')],
+          [2, 'Ejercicio Q', 60, ...sameWeeks('3x8')],
+        ],
+        catalog: _catalog(),
+        suggestions: {
+          'Ejercicio Q': MatcherExercise(id: 'ex-q', name: 'Ejercicio Quasi'),
+        },
+      );
+      await pumpPreview(tester, draft, repo,
+          extra: [cloudFunctionsProvider.overrideWithValue(functions)]);
+
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+
+      await _selectAnaAndAssign(tester);
+
+      expect(find.text('DASHBOARD'), findsOneWidget);
+      // Ejercicio A matcheó exacto: no enseña nada.
+      expect(calls, [
+        {'exerciseId': 'ex-q', 'alias': 'Ejercicio Q'},
+      ]);
     });
 
     testWidgets('las celdas de semana vacías son SÓLO un aviso: no bloquean',
