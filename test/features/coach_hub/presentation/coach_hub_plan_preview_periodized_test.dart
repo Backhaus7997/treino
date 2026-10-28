@@ -218,6 +218,34 @@ void main() {
       verify(() => repo.createAssigned(any())).called(1);
     });
 
+    testWidgets(
+        '«Confirmar las N sugerencias» confirma las sugeridas y deja las sin '
+        'match', (tester) async {
+      final draft = draftOf(
+        [
+          [1, 'Ejercicio Q', 60, ...sameWeeks('3x8')],
+          [2, 'Ejercicio R', 60, ...sameWeeks('3x8')],
+          [3, 'Ejercicio Z', 60, ...sameWeeks('3x8')],
+        ],
+        catalog: _catalog(),
+        suggestions: {
+          'Ejercicio Q': MatcherExercise(id: 'ex-q', name: 'Ejercicio Quasi'),
+          'Ejercicio R': MatcherExercise(id: 'ex-r', name: 'Ejercicio Recto'),
+        },
+      );
+      await pumpPreview(tester, draft, MockRoutineRepo());
+      expect(find.text('sugerencia pendiente'), findsNWidgets(2));
+
+      await tester.tap(find.text('Confirmar las 2 sugerencias'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('sugerencia pendiente'), findsNothing);
+      expect(find.text('Ejercicio Quasi'), findsOneWidget);
+      expect(find.text('Ejercicio Recto'), findsOneWidget);
+      expect(find.text('sin match'), findsOneWidget);
+      expect(find.textContaining('Confirmar las'), findsNothing);
+    });
+
     testWidgets('las celdas de semana vacías son SÓLO un aviso: no bloquean',
         (tester) async {
       final repo = MockRoutineRepo();

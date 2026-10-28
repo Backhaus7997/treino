@@ -10248,6 +10248,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Nombre de la rutina'**
   String get pdfImportNameLabel;
+
+  /// Confirma en bloque todas las sugerencias pendientes de la vista previa, igual que tocar «Confirmar» en cada fila. No toca las filas sin match.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{Confirmar la sugerencia} other{Confirmar las {count} sugerencias}}'**
+  String pdfImportConfirmAll(int count);
+
+  /// Lector de pantalla: el tilde de una fila de la vista previa ya vinculada a un ejercicio de la biblioteca.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Resuelto'**
+  String get pdfImportRowResolved;
+
+  /// Lector de pantalla: qué hace tocar una fila resuelta plegada (la despliega para cambiarla o ver el texto del PDF).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver detalle'**
+  String get pdfImportRowShowDetail;
+
+  /// Lector de pantalla: qué hace tocar el encabezado de una fila resuelta desplegada (la vuelve a plegar).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ocultar detalle'**
+  String get pdfImportRowHideDetail;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

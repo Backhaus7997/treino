@@ -1374,5 +1374,9 @@
   "pdfImportAssignFailed": "No pudimos guardar el plan. Prueba de nuevo.",
   "pdfImportLevel": "Nivel del plan",
   "pdfImportPreviewTitle": "REVISAR PLAN",
-  "pdfImportNameLabel": "Nombre de la rutina"
+  "pdfImportNameLabel": "Nombre de la rutina",
+  "pdfImportConfirmAll": "{count, plural, =1{Confirmar la sugerencia} other{Confirmar las {count} sugerencias}}",
+  "pdfImportRowResolved": "Resuelto",
+  "pdfImportRowShowDetail": "Ver detalle",
+  "pdfImportRowHideDetail": "Ocultar detalle"
 }

@@ -6038,4 +6038,24 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get pdfImportNameLabel => 'Routine name';
+
+  @override
+  String pdfImportConfirmAll(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Confirm all $count suggestions',
+      one: 'Confirm the suggestion',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pdfImportRowResolved => 'Resolved';
+
+  @override
+  String get pdfImportRowShowDetail => 'Show details';
+
+  @override
+  String get pdfImportRowHideDetail => 'Hide details';
 }

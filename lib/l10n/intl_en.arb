@@ -2493,5 +2493,9 @@
   "pdfImportAssignFailed": "We couldn't save the plan. Try again.",
   "pdfImportLevel": "Plan level",
   "pdfImportPreviewTitle": "REVIEW PLAN",
-  "pdfImportNameLabel": "Routine name"
+  "pdfImportNameLabel": "Routine name",
+  "pdfImportConfirmAll": "{count, plural, =1{Confirm the suggestion} other{Confirm all {count} suggestions}}",
+  "pdfImportRowResolved": "Resolved",
+  "pdfImportRowShowDetail": "Show details",
+  "pdfImportRowHideDetail": "Hide details"
 }

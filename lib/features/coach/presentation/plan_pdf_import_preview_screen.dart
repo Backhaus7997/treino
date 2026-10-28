@@ -155,13 +155,20 @@ class _PlanPdfImportPreviewScreenState
     final picked = await showExercisePicker(context, single: true);
     if (!mounted || picked == null || picked.isEmpty) return;
     final ex = picked.first;
-    // Lo que no está en el catálogo es un propio del PF: sin alias.
+    // Lo que no está en el catálogo es un propio del PF: sin alias. Con
+    // `replace`, el mismo picker sirve de «Cambiar» en una fila ya resuelta.
     final catalog = ref.read(exercisesProvider).valueOrNull ?? const [];
     _afterResolve(_controller.resolve(
       key,
       MatcherExercise(id: ex.id, name: ex.name, muscleGroup: ex.muscleGroup),
       custom: !catalog.any((c) => c.id == ex.id),
+      replace: true,
     ));
+  }
+
+  void _confirmAll() {
+    if (_busy) return;
+    _afterResolve(_controller.confirmAllSuggestions() > 0);
   }
 
   Future<void> _createCustom(ExerciseKey key) async {
@@ -184,7 +191,8 @@ class _PlanPdfImportPreviewScreenState
   void _useAlternative(ExerciseKey key) {
     final alternative = _controller.draft?.alternatives[key];
     if (alternative == null) return;
-    _afterResolve(_controller.resolve(key, alternative));
+    // También desde una fila ya confirmada: la alternativa se conserva.
+    _afterResolve(_controller.resolve(key, alternative, replace: true));
   }
 
   Future<void> _createBulk() async {
@@ -446,6 +454,13 @@ class _PlanPdfImportPreviewScreenState
                     style: importText(palette.warning, weight: AppFonts.w600),
                   ),
                 ],
+                if (draft.pendingSuggestions > 0) ...[
+                  const SizedBox(height: AppSpacing.s12),
+                  ConfirmAllSuggestionsButton(
+                    count: draft.pendingSuggestions,
+                    onPressed: _busy ? null : _confirmAll,
+                  ),
+                ],
                 if (bulk > 0) ...[
                   const SizedBox(height: AppSpacing.s12),
                   OutlinedButton.icon(
@@ -498,6 +513,7 @@ class _PlanPdfImportPreviewScreenState
                         onPickManual: (key, _) => _pick(key),
                         onCreateCustom: (key, _) => _createCustom(key),
                         onUseAlternative: _useAlternative,
+                        collapseResolved: true,
                       ),
                     ),
                   ),
