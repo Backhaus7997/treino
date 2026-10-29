@@ -80,10 +80,13 @@ class PlanDraftMatcher {
 ///    ([ExerciseNameMatcher.suggestFromCandidate]);
 /// 2. el componente no está asignado (el exacto siempre gana).
 ///
-/// Si el fuzzy no sugirió nada, el candidato pasa a ser la sugerencia. Si
-/// sugirió otro ejercicio, se queda la del fuzzy (es reproducible) y el
-/// candidato va a [PeriodizedImportDraft.alternatives]. Nunca se autoasigna, y
-/// `candidateConfidence` no mueve nada en v1.
+/// El candidato pasa a ser LA sugerencia, y si el fuzzy había sugerido otro
+/// ejercicio, el del fuzzy queda en [PeriodizedImportDraft.alternatives].
+/// Antes era al revés y el fuzzy se equivocaba donde el modelo no: cuenta
+/// palabras en común, así que «Sentadilla trasera» elegía «Sentadilla
+/// trasera con banda» (dos palabras) sobre «Sentadilla (Barra)», que es la
+/// que propuso el modelo leyendo el plan entero. Sigue sin autoasignarse
+/// nunca, y `candidateConfidence` no mueve nada en v1.
 ///
 /// En el Excel no hay candidatos: devuelve el mismo borrador.
 PeriodizedImportDraft applyExtractorCandidates(
@@ -102,10 +105,9 @@ PeriodizedImportDraft applyExtractorCandidates(
         final candidate = matcher.suggestFromCandidate(id, ex.rawName);
         if (candidate == null) continue;
         final fuzzy = suggestions[key];
-        if (fuzzy == null) {
-          suggestions[key] = candidate;
-        } else if (fuzzy.id != candidate.id) {
-          alternatives[key] = candidate;
+        suggestions[key] = candidate;
+        if (fuzzy != null && fuzzy.id != candidate.id) {
+          alternatives[key] = fuzzy;
         }
       }
     }

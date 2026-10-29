@@ -133,17 +133,18 @@ void main() {
       expect(draft.suggestions, isEmpty);
     });
 
-    test('fuzzy y LLM distintos: queda el fuzzy, el LLM es alternativa',
-        () async {
+    test(
+        'fuzzy y LLM distintos: queda el del LLM, el fuzzy es alternativa '
+        '(el modelo lee el plan; el fuzzy sólo cuenta palabras)', () async {
       final draft = await draftFor('Remo pendlay', candidate: 'remo');
 
-      expect(draft.suggestions[key]!.id, 'pendlay-alto');
-      expect(draft.alternatives[key]!.id, 'remo');
+      expect(draft.suggestions[key]!.id, 'remo');
+      expect(draft.alternatives[key]!.id, 'pendlay-alto');
       // Resolver el componente conserva la alternativa: después de confirmar
       // (sobre todo en bloque) el PF todavía puede corregir con ella.
       final resolved = draft.resolve(key, draft.suggestions[key]!);
       expect(resolved.suggestions, isEmpty);
-      expect(resolved.alternatives[key]!.id, 'remo');
+      expect(resolved.alternatives[key]!.id, 'pendlay-alto');
     });
 
     test('LLM vetado junto a un fuzzy válido: no queda como alternativa',
