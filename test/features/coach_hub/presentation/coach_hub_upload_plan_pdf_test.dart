@@ -172,7 +172,7 @@ void main() {
       expect(find.text(_hintPdf), findsOneWidget);
       expect(find.text(_hintExcel), findsNothing);
       expect(find.text(_aviso), findsOneWidget);
-      expect(find.text('Te quedan 5 esta semana y 2 hoy.'), findsOneWidget);
+      expect(find.text('Te quedan 2 hoy · 5 esta semana.'), findsOneWidget);
       // La plantilla sigue ahí: el Excel no se fue a ningún lado.
       expect(find.text('Descargar plantilla'), findsOneWidget);
       // Con un PDF al lado, la plantilla ya no es «la única que aceptamos».

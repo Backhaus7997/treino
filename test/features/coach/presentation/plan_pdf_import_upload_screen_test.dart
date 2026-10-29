@@ -145,7 +145,7 @@ void main() {
   testWidgets('el cupo sale sólo si se sabe', (tester) async {
     await _pump(tester, _FakeService(),
         remaining: (week: 5, day: 2, limitWeekly: 7, limitDaily: 7));
-    expect(find.text('Te quedan 5 esta semana y 2 hoy.'), findsOneWidget);
+    expect(find.text('Te quedan 2 hoy · 5 esta semana.'), findsOneWidget);
   });
 
   testWidgets('sin cupo conocido no hay ningún número', (tester) async {

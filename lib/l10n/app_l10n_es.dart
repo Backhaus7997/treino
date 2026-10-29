@@ -6065,8 +6065,25 @@ class AppL10nEs extends AppL10n {
   String get pdfImportCta => 'IMPORTAR DE PDF';
 
   @override
-  String pdfImportQuotaRemaining(int week, int day) {
-    return 'Te quedan $week esta semana y $day hoy.';
+  String pdfImportQuotaWeek(int week) {
+    String _temp0 = intl.Intl.pluralLogic(
+      week,
+      locale: localeName,
+      other: 'Te quedan $week importaciones esta semana.',
+      one: 'Te queda 1 importación esta semana.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportQuotaDayLimited(int day, int week) {
+    String _temp0 = intl.Intl.pluralLogic(
+      day,
+      locale: localeName,
+      other: 'Te quedan $day hoy',
+      one: 'Te queda 1 hoy',
+    );
+    return '$_temp0 · $week esta semana.';
   }
 
   @override
@@ -12326,8 +12343,25 @@ class AppL10nEsAr extends AppL10nEs {
   String get pdfImportCta => 'IMPORTAR DE PDF';
 
   @override
-  String pdfImportQuotaRemaining(int week, int day) {
-    return 'Te quedan $week esta semana y $day hoy.';
+  String pdfImportQuotaWeek(int week) {
+    String _temp0 = intl.Intl.pluralLogic(
+      week,
+      locale: localeName,
+      other: 'Te quedan $week importaciones esta semana.',
+      one: 'Te queda 1 importación esta semana.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportQuotaDayLimited(int day, int week) {
+    String _temp0 = intl.Intl.pluralLogic(
+      day,
+      locale: localeName,
+      other: 'Te quedan $day hoy',
+      one: 'Te queda 1 hoy',
+    );
+    return '$_temp0 · $week esta semana.';
   }
 
   @override

@@ -20,6 +20,7 @@ import '../../coach_hub/application/plan_pdf_import_providers.dart';
 import '../../coach_hub/data/plan_pdf_import_service.dart';
 import '../../coach_hub/presentation/widgets/pdf_import_failure_copy.dart';
 import 'plan_pdf_import_preview_screen.dart' show planPdfImportPreviewPath;
+import '../../coach_hub/presentation/widgets/pdf_import_quota_copy.dart';
 
 /// Ruta de la pantalla de subida para [athleteId].
 String planPdfImportPath(String athleteId) => '/workout/import-pdf/$athleteId';
@@ -276,12 +277,14 @@ class _QuotaLine extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final remaining = ref.watch(pdfImportRemainingProvider);
-    if (remaining == null) return const SizedBox.shrink();
+    final text = remaining == null
+        ? null
+        : pdfImportQuotaText(AppL10n.of(context), remaining);
+    if (text == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.s12),
       child: Text(
-        AppL10n.of(context)
-            .pdfImportQuotaRemaining(remaining.week, remaining.day),
+        text,
         key: const Key('pdf_import_quota'),
         style: _body(AppPalette.of(context).textMuted),
       ),
