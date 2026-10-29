@@ -5959,8 +5959,33 @@ class AppL10nEn extends AppL10n {
   String get pdfImportCta => 'IMPORT FROM PDF';
 
   @override
-  String pdfImportQuotaRemaining(int week, int day) {
-    return '$week left this week, $day today.';
+  String pdfImportQuotaWeek(int week) {
+    String _temp0 = intl.Intl.pluralLogic(
+      week,
+      locale: localeName,
+      other: '$week imports left this week.',
+      one: '1 import left this week.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pdfImportQuotaNoneWeek =>
+      'No imports left this week: they renew on Monday.';
+
+  @override
+  String get pdfImportQuotaNoneDay =>
+      'No imports left today: they renew tomorrow.';
+
+  @override
+  String pdfImportQuotaDayLimited(int day, int week) {
+    String _temp0 = intl.Intl.pluralLogic(
+      day,
+      locale: localeName,
+      other: '$day left today',
+      one: '1 left today',
+    );
+    return '$_temp0 · $week this week.';
   }
 
   @override

@@ -21,6 +21,7 @@ import '../domain/periodized_plan.dart';
 import '../infrastructure/browser_download.dart';
 import 'widgets/import_plan_widgets.dart';
 import 'widgets/pdf_import_failure_copy.dart';
+import 'widgets/pdf_import_quota_copy.dart';
 
 /// Upload screen del Coach Hub — paso 1 del flujo de import.
 ///
@@ -371,12 +372,24 @@ class _PdfQuotaLine extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final remaining = ref.watch(pdfImportRemainingProvider);
-    if (remaining == null) return const SizedBox.shrink();
+    final text = remaining == null
+        ? null
+        : pdfImportQuotaText(
+            AppL10n.of(context),
+            remaining,
+            // El cartel rojo de cupo agotado sale del job fallido: si ya está,
+            // la línea no lo repite.
+            exhaustedBannerShown: switch (ref.watch(hubPdfImportJobProvider)) {
+              HubPdfImportFailed(:final failure) =>
+                failure is PdfImportQuotaExhausted,
+              _ => false,
+            },
+          );
+    if (text == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.s8),
       child: Text(
-        AppL10n.of(context)
-            .pdfImportQuotaRemaining(remaining.week, remaining.day),
+        text,
         key: const Key('pdf_import_quota'),
         style: importText(palette.textMuted, size: AppTextSize.bodyDense),
       ),

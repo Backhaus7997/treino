@@ -10141,11 +10141,29 @@ abstract class AppL10n {
   /// **'IMPORTAR DE PDF'**
   String get pdfImportCta;
 
-  /// Cupo restante de imports de PDF. Sólo se muestra si se sabe: nunca un número inventado.
+  /// Cupo de imports de PDF que se pueden hacer ahora, cuando el tope que frena es el semanal (o los dos son iguales). Sin cupo no se muestra: habla el cartel rojo.
   ///
   /// In es_AR, this message translates to:
-  /// **'Te quedan {week} esta semana y {day} hoy.'**
-  String pdfImportQuotaRemaining(int week, int day);
+  /// **'{week, plural, =1{Te queda 1 importación esta semana.} other{Te quedan {week} importaciones esta semana.}}'**
+  String pdfImportQuotaWeek(int week);
+
+  /// Cupo semanal agotado, visible ANTES de subir un archivo (el cartel rojo sale recién cuando un import falla).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No te quedan importaciones esta semana: se renuevan el lunes.'**
+  String get pdfImportQuotaNoneWeek;
+
+  /// Cupo diario agotado con cupo semanal disponible (planes 2 y 3), visible antes de subir un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No te quedan importaciones hoy: se renuevan mañana.'**
+  String get pdfImportQuotaNoneDay;
+
+  /// Cupo de imports de PDF cuando frena el tope DIARIO (planes 2 y 3): lo que queda hoy, y lo que queda en la semana como dato.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{day, plural, =1{Te queda 1 hoy} other{Te quedan {day} hoy}} · {week} esta semana.'**
+  String pdfImportQuotaDayLimited(int day, int week);
 
   /// Despliega el texto del PDF del que salió el ejercicio, para compararlo.
   ///
