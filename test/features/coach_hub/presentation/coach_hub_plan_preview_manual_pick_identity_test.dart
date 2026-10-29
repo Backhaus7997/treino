@@ -64,6 +64,9 @@ Widget _wrap(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
+        // Las acciones de la vista previa salen de AppL10n: sin locale el
+        // test las vería en inglés.
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: child),
       ),
     );
@@ -113,7 +116,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Two identical unmatched rows → two badges, two manual-pick buttons.
-      expect(find.text('sin match'), findsNWidgets(2));
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsNWidgets(2));
       expect(find.text('Vincular con la biblioteca'), findsNWidgets(2));
 
       // Resolve only the FIRST row.
@@ -124,7 +128,8 @@ void main() {
 
       // BUG: keying on rowName resolved BOTH rows (findsNothing).
       // FIXED: exactly one row remains unmatched.
-      expect(find.text('sin match'), findsOneWidget);
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsOneWidget);
       expect(find.text('Vincular con la biblioteca'), findsOneWidget);
     });
   });

@@ -226,48 +226,50 @@ void main() {
         'matcheado: plegado en UNA línea con el nombre del catálogo, las '
         'series y el ✓', (tester) async {
       await pump(tester, _draft());
-      expect(find.text('Press banca  ·  2 × 8', findRichText: true),
+      expect(find.text('Press banca  ·  2 × 8 · 90 s', findRichText: true),
           findsOneWidget);
       expect(find.textContaining('Press banca plano', findRichText: true),
           findsNothing);
       // Plegado no hay acciones ni texto del PDF: sólo las filas pendientes
       // (dos sugeridas y tres sin match) tienen el suyo.
-      expect(find.text('Ver texto del PDF'), findsNothing);
+      expect(find.text('Ver PDF'), findsNothing);
       expect(find.text('Cambiar'), findsNWidgets(2));
     });
 
     testWidgets('tocar la línea plegada la despliega con «Cambiar»',
         (tester) async {
       await pump(tester, _draft());
-      await tester.tap(find.text('Press banca  ·  2 × 8', findRichText: true));
+      await tester
+          .tap(find.text('Press banca  ·  2 × 8 · 90 s', findRichText: true));
       await tester.pumpAndSettle();
 
       expect(find.text('Press banca'), findsOneWidget);
-      expect(find.text('Ver texto del PDF'), findsOneWidget);
+      expect(find.text('Ver PDF'), findsOneWidget);
       expect(find.text('Cambiar'), findsNWidgets(3));
 
       // El encabezado la vuelve a plegar.
       await tester.tap(find.text('Press banca'));
       await tester.pumpAndSettle();
-      expect(find.text('Press banca  ·  2 × 8', findRichText: true),
+      expect(find.text('Press banca  ·  2 × 8 · 90 s', findRichText: true),
           findsOneWidget);
     });
 
     testWidgets('sugerido: Confirmar lo asigna', (tester) async {
       final c = await pump(tester, _draft());
-      expect(find.text('Sugerencia: Sentadilla'), findsOneWidget);
+      expect(find.bySemanticsLabel('Sugerencia: Sentadilla'), findsOneWidget);
 
       await tester.tap(find.text('Confirmar').first);
       await tester.pumpAndSettle();
 
       expect(c.read(periodizedImportProvider)!.assignments[_k2], _sentadilla);
-      expect(find.text('Sugerencia: Sentadilla'), findsNothing);
+      expect(find.bySemanticsLabel('Sugerencia: Sentadilla'), findsNothing);
     });
 
     testWidgets('con alternativa del LLM: Usar alternativa la asigna',
         (tester) async {
       final c = await pump(tester, _draft());
-      expect(find.text('Sugerencia: Remo con barra'), findsOneWidget);
+      expect(
+          find.bySemanticsLabel('Sugerencia: Remo con barra'), findsOneWidget);
       expect(find.text('Alternativa: Remo con mancuerna'), findsOneWidget);
       // Sólo la fila con alternativa lo ofrece.
       expect(find.text('Usar alternativa'), findsOneWidget);
@@ -281,7 +283,8 @@ void main() {
     testWidgets('sin match: vincular o crear como propio', (tester) async {
       await pump(tester, _draft());
       // Remo Pendlay ×2 y Plancha: tres filas en rojo.
-      expect(find.text('sin match'), findsNWidgets(3));
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsNWidgets(3));
       expect(find.text('Vincular con la biblioteca'), findsNWidgets(3));
       expect(find.text('Crear como propio'), findsNWidgets(3));
     });
@@ -289,15 +292,16 @@ void main() {
     testWidgets('el texto del PDF se despliega y se pliega', (tester) async {
       await pump(tester, _draft());
       // La fila con texto fuente está resuelta: primero se despliega.
-      await tester.tap(find.text('Press banca  ·  2 × 8', findRichText: true));
+      await tester
+          .tap(find.text('Press banca  ·  2 × 8 · 90 s', findRichText: true));
       await tester.pumpAndSettle();
       expect(find.text('Press banca 2x8 @60kg'), findsNothing);
 
-      await tester.tap(find.text('Ver texto del PDF'));
+      await tester.tap(find.text('Ver PDF'));
       await tester.pumpAndSettle();
       expect(find.text('Press banca 2x8 @60kg'), findsOneWidget);
 
-      await tester.tap(find.text('Ocultar texto del PDF'));
+      await tester.tap(find.text('Ocultar PDF'));
       await tester.pumpAndSettle();
       expect(find.text('Press banca 2x8 @60kg'), findsNothing);
     });
@@ -322,11 +326,12 @@ void main() {
       expect(d.assignments.containsKey(_k5), isFalse);
       expect(d.assignments.containsKey(_k6), isFalse);
       expect(confirmAll(), findsNothing);
-      expect(find.text('sugerencia pendiente'), findsNothing);
-      expect(find.text('sin match'), findsNWidgets(3));
-      expect(find.text('Sentadilla  ·  2 × 8', findRichText: true),
+      expect(find.bySemanticsLabel('sugerencia por confirmar'), findsNothing);
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsNWidgets(3));
+      expect(find.text('Sentadilla  ·  2 × 8 · 90 s', findRichText: true),
           findsOneWidget);
-      expect(find.text('Remo con barra  ·  2 × 8', findRichText: true),
+      expect(find.text('Remo con barra  ·  2 × 8 · 90 s', findRichText: true),
           findsOneWidget);
     });
 
@@ -343,8 +348,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Usar alternativa'), findsNothing);
 
-      await tester
-          .tap(find.text('Remo con barra  ·  2 × 8', findRichText: true));
+      await tester.tap(
+          find.text('Remo con barra  ·  2 × 8 · 90 s', findRichText: true));
       await tester.pumpAndSettle();
       expect(find.text('Alternativa: Remo con mancuerna'), findsOneWidget);
 
@@ -372,7 +377,8 @@ void main() {
       final d = c.read(periodizedImportProvider)!;
       expect(d.assignments[_k4]!.id, d.assignments[_k6]!.id);
       expect(d.assignments[_k5]!.name, 'Plancha copenhague');
-      expect(find.text('sin match'), findsNothing);
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsNothing);
     });
 
     testWidgets('sin cupo para todos: avisa cuántos y crea sólo esos',
@@ -387,7 +393,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(createdNames, ['Remo Pendlay']);
-      expect(find.text('sin match'), findsOneWidget);
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsOneWidget);
     });
 
     testWidgets('en el tope: no crea nada', (tester) async {
@@ -398,7 +405,8 @@ void main() {
 
       expect(createdNames, isEmpty);
       expect(find.text('Te alcanza para 0 de 2'), findsNothing);
-      expect(find.text('sin match'), findsNWidgets(3));
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsNWidgets(3));
     });
   });
 
@@ -429,9 +437,9 @@ void main() {
         .descendant(
             of: find.byType(ListView), matching: find.byType(Scrollable))
         .first;
-    await tester.scrollUntilVisible(find.text('Ver texto del PDF'), 200,
+    await tester.scrollUntilVisible(find.text('Ver PDF'), 200,
         scrollable: list);
-    await tester.tap(find.text('Ver texto del PDF'));
+    await tester.tap(find.text('Ver PDF'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Usar alternativa'), 200,
         scrollable: list);
@@ -518,8 +526,9 @@ void main() {
       );
       // Desplegada antes de asignar: «Usar alternativa» queda a mano. La
       // primera «Remo con barra» es la fila con alternativa (k3).
-      await tester
-          .tap(find.text('Remo con barra  ·  2 × 8', findRichText: true).first);
+      await tester.tap(find
+          .text('Remo con barra  ·  2 × 8 · 90 s', findRichText: true)
+          .first);
       await tester.pumpAndSettle();
 
       await tester.tap(assignButton());

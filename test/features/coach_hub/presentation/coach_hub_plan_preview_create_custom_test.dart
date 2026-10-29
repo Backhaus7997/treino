@@ -127,7 +127,8 @@ void main() {
     expect(find.text('Vincular con la biblioteca'), findsNWidgets(3));
     expect(find.text('Crear como propio'), findsNWidgets(3));
     // Lo que matcheó no ofrece ninguna.
-    expect(find.text('sin match'), findsNWidgets(3));
+    expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+        findsNWidgets(3));
     _verifyNeverCreated(customRepo);
   });
 
@@ -161,7 +162,8 @@ void main() {
         )).called(1);
 
     // La fila y su homónimo exacto quedaron resueltos; "Press Raro 2" no.
-    expect(find.text('sin match'), findsOneWidget);
+    expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+        findsOneWidget);
     expect(find.text('Crear como propio'), findsOneWidget);
     // Sin alias: el ejercicio propio no vive en el catálogo global.
     verifyNever(() => functions.httpsCallable(any()));
@@ -171,7 +173,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('create_exercise_submit_button')));
     await tester.pumpAndSettle();
-    expect(find.text('sin match'), findsNothing);
+    expect(
+        find.bySemanticsLabel('sin ejercicio de la biblioteca'), findsNothing);
 
     when(() => routineRepo.createAssigned(any())).thenAnswer((inv) async =>
         (inv.positionalArguments.first as Routine).copyWith(id: 'r-1'));
@@ -192,7 +195,8 @@ void main() {
     await tester.pumpAndSettle();
 
     _verifyNeverCreated(customRepo);
-    expect(find.text('sin match'), findsNWidgets(3));
+    expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+        findsNWidgets(3));
   });
 
   testWidgets(

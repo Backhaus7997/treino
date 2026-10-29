@@ -88,18 +88,18 @@ void main() {
       'alternativa, avisos, semanas y el botón en bloque', (tester) async {
     await pump(tester);
 
-    // Dos filas, dos «Ver texto del PDF»: la resuelta NO se pliega en el
+    // Dos filas, dos «Ver PDF»: la resuelta NO se pliega en el
     // Hub (`collapseResolved` es de mobile).
-    expect(find.text('Ver texto del PDF'), findsNWidgets(2));
+    expect(find.text('Ver PDF'), findsNWidgets(2));
     expect(find.text('Sentadilla'), findsOneWidget);
-    expect(find.text('Sugerencia: Remo con barra'), findsOneWidget);
+    expect(find.bySemanticsLabel('Sugerencia: Remo con barra'), findsOneWidget);
     expect(find.text('Alternativa: Remo con mancuerna'), findsOneWidget);
     expect(find.text('Usar alternativa'), findsOneWidget);
     expect(find.text('Confirmar la sugerencia'), findsOneWidget);
     expect(find.textContaining(kPdfWarning), findsOneWidget);
     expect(find.text('SEMANA 2'), findsOneWidget);
 
-    await tester.tap(find.text('Ver texto del PDF').last);
+    await tester.tap(find.text('Ver PDF').last);
     await tester.pumpAndSettle();
     expect(find.textContaining('Remo barra 1x10 / 1x12'), findsOneWidget);
   });

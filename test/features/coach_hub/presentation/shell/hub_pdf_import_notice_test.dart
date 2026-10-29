@@ -200,7 +200,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(CoachHubPlanPreviewScreen), findsOneWidget);
-    expect(find.text('Sugerencia: Remo con barra'), findsOneWidget);
+    expect(find.bySemanticsLabel('Sugerencia: Remo con barra'), findsOneWidget);
     expect(h.container.read(hubPdfImportJobProvider), isA<HubPdfImportIdle>());
   });
 

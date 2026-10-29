@@ -5964,10 +5964,10 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
-  String get pdfImportSourceShow => 'Show PDF text';
+  String get pdfImportSourceShow => 'View PDF';
 
   @override
-  String get pdfImportSourceHide => 'Hide PDF text';
+  String get pdfImportSourceHide => 'Hide PDF';
 
   @override
   String pdfImportAlternative(String name) {
@@ -6058,6 +6058,82 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get pdfImportRowHideDetail => 'Hide details';
+
+  @override
+  String get pdfImportConfirm => 'Confirm';
+
+  @override
+  String get pdfImportChange => 'Change';
+
+  @override
+  String get pdfImportLinkLibrary => 'Link to library';
+
+  @override
+  String get pdfImportCreateOwn => 'Create as custom';
+
+  @override
+  String pdfImportSuggestionA11y(String name) {
+    return 'Suggestion: $name';
+  }
+
+  @override
+  String get pdfImportMarkPending => 'suggestion to confirm';
+
+  @override
+  String get pdfImportMarkNoMatch => 'no library exercise';
+
+  @override
+  String pdfImportBlockSuperset(int count) {
+    return 'SUPERSET · $count exercises';
+  }
+
+  @override
+  String pdfImportBlockTriset(int count) {
+    return 'TRI-SET · $count exercises';
+  }
+
+  @override
+  String pdfImportBlockCircuit(int count) {
+    return 'CIRCUIT · $count exercises';
+  }
+
+  @override
+  String pdfImportBlockRest(String rest) {
+    return '$rest rest at the end';
+  }
+
+  @override
+  String get pdfImportFailure => 'to failure';
+
+  @override
+  String get pdfImportWarmup => 'WARM-UP';
+
+  @override
+  String pdfImportPendingSuggestions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count suggestions to confirm',
+      one: '1 suggestion to confirm',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportPendingNoMatch(int count) {
+    return '$count unmatched';
+  }
+
+  @override
+  String pdfImportWarningsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count warnings',
+      one: '1 warning',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get coachHubImportUploadHintPdf =>
