@@ -256,6 +256,76 @@ void main() {
     });
   });
 
+  group('alias compartidos por varios ejercicios', () {
+    // El catálogo real (2026-10-29): «Press militar» es alias de las cuatro
+    // versiones, y antes se asignaba sola la primera indexada (la de banda).
+    final catalog = [
+      MatcherExercise(
+          id: 'overhead-press-banda',
+          name: 'Press militar (Banda)',
+          aliases: const ['Press militar (Banda)', 'Press militar']),
+      MatcherExercise(
+          id: 'overhead-press-barra',
+          name: 'Press militar (Barra)',
+          aliases: const ['Press militar (Barra)', 'Press militar']),
+      MatcherExercise(
+          id: 'overhead-press-mancuerna',
+          name: 'Press militar (Mancuerna)',
+          aliases: const ['Press militar (Mancuerna)', 'Press militar']),
+      MatcherExercise(
+          id: 'overhead-press-polea',
+          name: 'Press militar (Cable)',
+          aliases: const ['Press militar (Cable)', 'Press militar']),
+    ];
+
+    test('un alias de varios NO se autoasigna: no hay exacto', () {
+      final match = ExerciseNameMatcher(catalog).match('Press militar');
+      expect(match.exercise, isNull);
+    });
+
+    test('el orden del catálogo ya no decide nada', () {
+      for (final order in [catalog, catalog.reversed.toList()]) {
+        expect(
+            ExerciseNameMatcher(order).match('Press militar').exercise, isNull);
+      }
+    });
+
+    test('el nombre completo sigue siendo exacto', () {
+      expect(
+          ExerciseNameMatcher(catalog)
+              .match('Press militar (Barra)')
+              .exercise
+              ?.id,
+          'overhead-press-barra');
+    });
+
+    test('un nombre propio gana sobre los alias ajenos', () {
+      final conNombre = [
+        ...catalog,
+        MatcherExercise(id: 'press-militar', name: 'Press militar'),
+      ];
+      expect(ExerciseNameMatcher(conNombre).match('press MILITAR').exercise?.id,
+          'press-militar');
+    });
+
+    test('dos ejercicios con el mismo nombre tampoco se autoasignan', () {
+      final mismos = [
+        MatcherExercise(id: 'a', name: 'Plancha copenhague'),
+        MatcherExercise(id: 'b', name: 'Plancha copenhague'),
+      ];
+      expect(ExerciseNameMatcher(mismos).match('Plancha copenhague').exercise,
+          isNull);
+    });
+
+    test('el candidato del modelo sigue siendo sugerible entre ellos', () {
+      expect(
+          ExerciseNameMatcher(catalog)
+              .suggestFromCandidate('overhead-press-barra', 'Press militar')
+              ?.id,
+          'overhead-press-barra');
+    });
+  });
+
   group('veto público y candidatos externos', () {
     final catalog = [
       MatcherExercise(

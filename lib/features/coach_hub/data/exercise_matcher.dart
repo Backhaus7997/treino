@@ -39,20 +39,39 @@ class _Index {
   final Map<String, MatcherExercise> byId;
   final List<MatcherExercise> exercises;
 
+  /// Una etiqueta (nombre o alias normalizado) es exacta sólo si señala a UN
+  /// ejercicio. El catálogo sembrado repite alias genéricos: «Press militar»
+  /// es alias de las versiones con barra, mancuerna, polea y banda, y
+  /// «sentadilla» de seis. Antes ganaba el primero que se indexaba
+  /// (`putIfAbsent`) y se asignaba SOLO, al azar y sin preguntar. Ahora esa
+  /// etiqueta no es exacta: el renglón queda como sugerencia a confirmar.
+  ///
+  /// El nombre propio gana sobre los alias ajenos: si un solo ejercicio se
+  /// LLAMA así, es ese aunque otros lo tengan de alias. Ambiguo es cuando la
+  /// llevan varios nombres, o ningún nombre y varios alias.
   factory _Index.build(List<MatcherExercise> exercises) {
-    final byName = <String, MatcherExercise>{};
+    final byId = {for (final ex in exercises) ex.id: ex};
+    final nameOwners = <String, Set<String>>{};
+    final aliasOwners = <String, Set<String>>{};
 
-    void indexLabel(String label, MatcherExercise ex) {
+    void add(Map<String, Set<String>> owners, String label, String id) {
       final normalized = normalize(label);
       if (normalized.isEmpty) return;
-      byName.putIfAbsent(normalized, () => ex);
+      (owners[normalized] ??= <String>{}).add(id);
     }
 
     for (final ex in exercises) {
-      indexLabel(ex.name, ex);
+      add(nameOwners, ex.name, ex.id);
       for (final alias in ex.aliases) {
-        indexLabel(alias, ex);
+        add(aliasOwners, alias, ex.id);
       }
+    }
+
+    final byName = <String, MatcherExercise>{};
+    for (final label in {...nameOwners.keys, ...aliasOwners.keys}) {
+      final names = nameOwners[label] ?? const <String>{};
+      final owners = names.isNotEmpty ? names : aliasOwners[label]!;
+      if (owners.length == 1) byName[label] = byId[owners.single]!;
     }
     return _Index._(byName, exercises);
   }
