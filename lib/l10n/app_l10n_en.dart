@@ -5970,6 +5970,14 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get pdfImportQuotaNoneWeek =>
+      'No imports left this week: they renew on Monday.';
+
+  @override
+  String get pdfImportQuotaNoneDay =>
+      'No imports left today: they renew tomorrow.';
+
+  @override
   String pdfImportQuotaDayLimited(int day, int week) {
     String _temp0 = intl.Intl.pluralLogic(
       day,

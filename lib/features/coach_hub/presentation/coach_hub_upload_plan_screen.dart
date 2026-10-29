@@ -374,7 +374,17 @@ class _PdfQuotaLine extends ConsumerWidget {
     final remaining = ref.watch(pdfImportRemainingProvider);
     final text = remaining == null
         ? null
-        : pdfImportQuotaText(AppL10n.of(context), remaining);
+        : pdfImportQuotaText(
+            AppL10n.of(context),
+            remaining,
+            // El cartel rojo de cupo agotado sale del job fallido: si ya está,
+            // la línea no lo repite.
+            exhaustedBannerShown: switch (ref.watch(hubPdfImportJobProvider)) {
+              HubPdfImportFailed(:final failure) =>
+                failure is PdfImportQuotaExhausted,
+              _ => false,
+            },
+          );
     if (text == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.s8),

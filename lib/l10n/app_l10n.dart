@@ -10147,6 +10147,18 @@ abstract class AppL10n {
   /// **'{week, plural, =1{Te queda 1 importación esta semana.} other{Te quedan {week} importaciones esta semana.}}'**
   String pdfImportQuotaWeek(int week);
 
+  /// Cupo semanal agotado, visible ANTES de subir un archivo (el cartel rojo sale recién cuando un import falla).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No te quedan importaciones esta semana: se renuevan el lunes.'**
+  String get pdfImportQuotaNoneWeek;
+
+  /// Cupo diario agotado con cupo semanal disponible (planes 2 y 3), visible antes de subir un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No te quedan importaciones hoy: se renuevan mañana.'**
+  String get pdfImportQuotaNoneDay;
+
   /// Cupo de imports de PDF cuando frena el tope DIARIO (planes 2 y 3): lo que queda hoy, y lo que queda en la semana como dato.
   ///
   /// In es_AR, this message translates to:

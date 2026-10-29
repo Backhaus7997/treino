@@ -6076,6 +6076,14 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get pdfImportQuotaNoneWeek =>
+      'No te quedan importaciones esta semana: se renuevan el lunes.';
+
+  @override
+  String get pdfImportQuotaNoneDay =>
+      'No te quedan importaciones hoy: se renuevan mañana.';
+
+  @override
   String pdfImportQuotaDayLimited(int day, int week) {
     String _temp0 = intl.Intl.pluralLogic(
       day,
@@ -12352,6 +12360,14 @@ class AppL10nEsAr extends AppL10nEs {
     );
     return '$_temp0';
   }
+
+  @override
+  String get pdfImportQuotaNoneWeek =>
+      'No te quedan importaciones esta semana: se renuevan el lunes.';
+
+  @override
+  String get pdfImportQuotaNoneDay =>
+      'No te quedan importaciones hoy: se renuevan mañana.';
 
   @override
   String pdfImportQuotaDayLimited(int day, int week) {

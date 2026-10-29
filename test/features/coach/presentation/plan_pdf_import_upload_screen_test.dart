@@ -148,6 +148,17 @@ void main() {
     expect(find.text('Te quedan 2 hoy · 5 esta semana.'), findsOneWidget);
   });
 
+  testWidgets(
+      'con el cupo agotado lo dice al entrar, sin tener que subir un PDF '
+      'para enterarse', (tester) async {
+    await _pump(tester, _FakeService(),
+        remaining: (week: 0, day: 2, limitWeekly: 2, limitDaily: 2));
+    expect(
+        find.text(
+            'No te quedan importaciones esta semana: se renuevan el lunes.'),
+        findsOneWidget);
+  });
+
   testWidgets('sin cupo conocido no hay ningún número', (tester) async {
     await _pump(tester, _FakeService());
     expect(find.byKey(const Key('pdf_import_quota')), findsNothing);

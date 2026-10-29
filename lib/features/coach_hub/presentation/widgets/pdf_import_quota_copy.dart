@@ -10,11 +10,23 @@ import '../../application/pdf_import_quota_provider.dart';
 /// sólo cuando es el que frena (planes 2 y 3: 10 por día con más por semana);
 /// en Free y Plan 1 el diario es igual al semanal y nunca frena antes.
 ///
-/// `null` sin cupo: ahí habla el cartel rojo, que dice cuándo se renueva.
-String? pdfImportQuotaText(AppL10n l10n, PdfImportRemaining remaining) {
+/// Sin cupo también dice algo, ANTES de elegir un archivo: el cartel rojo de
+/// cupo agotado sale recién cuando un import falla, y sin esta línea el PF
+/// subiría un PDF para enterarse de un límite que ya se sabía. Si ese cartel
+/// ya está a la vista ([exhaustedBannerShown]), la línea calla para no
+/// repetirlo.
+String? pdfImportQuotaText(
+  AppL10n l10n,
+  PdfImportRemaining remaining, {
+  bool exhaustedBannerShown = false,
+}) {
   final week = remaining.week;
   final day = remaining.day;
-  if (week <= 0 || day <= 0) return null;
+  if (week <= 0 || day <= 0) {
+    if (exhaustedBannerShown) return null;
+    // El semanal manda: sin cupo en la semana, «mañana» sería falso.
+    return week <= 0 ? l10n.pdfImportQuotaNoneWeek : l10n.pdfImportQuotaNoneDay;
+  }
   if (day < week) return l10n.pdfImportQuotaDayLimited(day, week);
   return l10n.pdfImportQuotaWeek(week);
 }

@@ -29,8 +29,20 @@ void main() {
         'Te queda 1 hoy · 12 esta semana.');
   });
 
-  test('sin cupo no hay línea: habla el cartel rojo', () {
-    expect(pdfImportQuotaText(l10n, _r(0, 2, limitW: 2, limitD: 2)), isNull);
-    expect(pdfImportQuotaText(l10n, _r(5, 0)), isNull);
+  test('sin cupo lo dice ANTES de subir; el semanal manda sobre el diario', () {
+    expect(pdfImportQuotaText(l10n, _r(0, 2, limitW: 2, limitD: 2)),
+        'No te quedan importaciones esta semana: se renuevan el lunes.');
+    expect(pdfImportQuotaText(l10n, _r(0, 0)),
+        'No te quedan importaciones esta semana: se renuevan el lunes.');
+    expect(pdfImportQuotaText(l10n, _r(5, 0)),
+        'No te quedan importaciones hoy: se renuevan mañana.');
+  });
+
+  test('con el cartel rojo de cupo agotado a la vista, la línea calla', () {
+    expect(
+        pdfImportQuotaText(l10n, _r(0, 2), exhaustedBannerShown: true), isNull);
+    // Con cupo, el cartel no apaga nada (no puede estar, pero por las dudas).
+    expect(pdfImportQuotaText(l10n, _r(3, 10), exhaustedBannerShown: true),
+        'Te quedan 3 importaciones esta semana.');
   });
 }

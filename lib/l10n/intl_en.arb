@@ -2477,6 +2477,8 @@
   "pdfImportErrorSignedOut": "You've been signed out. Sign in again.",
   "pdfImportCta": "IMPORT FROM PDF",
   "pdfImportQuotaWeek": "{week, plural, =1{1 import left this week.} other{{week} imports left this week.}}",
+  "pdfImportQuotaNoneWeek": "No imports left this week: they renew on Monday.",
+  "pdfImportQuotaNoneDay": "No imports left today: they renew tomorrow.",
   "pdfImportQuotaDayLimited": "{day, plural, =1{1 left today} other{{day} left today}} · {week} this week.",
   "pdfImportSourceShow": "View PDF",
   "pdfImportSourceHide": "Hide PDF",

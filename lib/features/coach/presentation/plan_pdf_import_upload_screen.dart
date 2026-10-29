@@ -220,7 +220,9 @@ class _PlanPdfImportUploadScreenState
                         AppSpacing.s12, AppSpacing.s20, AppSpacing.s20),
                     children: [
                       _Notice(text: l10n.pdfImportPrivacyNotice),
-                      const _QuotaLine(),
+                      _QuotaLine(
+                          exhaustedBannerShown:
+                              _failure is PdfImportQuotaExhausted),
                       const SizedBox(height: AppSpacing.s18),
                       TreinoStateSwitcher(childKey: stateKey, child: state),
                     ],
@@ -272,14 +274,18 @@ class _Notice extends StatelessWidget {
 /// El cupo, sólo si se sabe: mientras carga, o si el tier no se puede
 /// afirmar, no hay línea (ni un «0» inventado).
 class _QuotaLine extends ConsumerWidget {
-  const _QuotaLine();
+  const _QuotaLine({required this.exhaustedBannerShown});
+
+  /// El cartel rojo de cupo agotado ya está a la vista: la línea no lo repite.
+  final bool exhaustedBannerShown;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final remaining = ref.watch(pdfImportRemainingProvider);
     final text = remaining == null
         ? null
-        : pdfImportQuotaText(AppL10n.of(context), remaining);
+        : pdfImportQuotaText(AppL10n.of(context), remaining,
+            exhaustedBannerShown: exhaustedBannerShown);
     if (text == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.s12),
