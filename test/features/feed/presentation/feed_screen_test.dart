@@ -1445,6 +1445,14 @@ void main() {
       // volver el carrusel reaparecía scrolleado al final —con las primeras
       // sugerencias escondidas—. Ningún test lo veía porque todos lo miraban
       // recién montado.
+      //
+      // Ancho de teléfono: cada carrusel del feed trae 8 (dos filas de 4).
+      // En la superficie por defecto (800 de ancho) 4 tarjetas entran sin
+      // scrollear, el drag no mueve la fila y cambia de pestaña del feed. El
+      // alto queda en 600: más alto, al bajar 2500 aparece OTRO carrusel.
+      tester.view.physicalSize = const Size(1170, 1800);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
       await tester.pumpWidget(
         _wrapProvider(
           const FeedScreen(),
@@ -1454,37 +1462,59 @@ void main() {
       await tester.pumpAndSettle();
 
       final carousel = find.byKey(const Key('suggested_users_section'));
-      Finder row() =>
-          find.descendant(of: carousel, matching: find.byType(ListView));
-      double rowOffset() =>
-          tester.widget<ListView>(row()).controller!.position.pixels;
+      // El feed intercala varios carruseles (8 sugerencias cada uno): éste es
+      // el PRIMERO, el que trae a `cand-0`. Las filas se buscan adentro suyo:
+      // con dos carruseles a la vista, la clave de fila se repetiría.
+      Finder first() => find.ancestor(
+          of: find.byKey(const Key('suggested_user_cand-0')),
+          matching: carousel);
+      Finder row(Finder section, int i) => find.descendant(
+          of: find.descendant(
+              of: section, matching: find.byKey(Key('suggested_users_row_$i'))),
+          matching: find.byType(ListView));
+      double offset(Finder section, int i) =>
+          tester.widget<ListView>(row(section, i)).controller!.position.pixels;
+      Future<void> center(Finder section, int i) async {
+        // Centrada: alineada arriba queda debajo del header fijo de las
+        // pestañas, y el drag cambiaría de pestaña en vez de mover la fila.
+        await Scrollable.ensureVisible(tester.element(row(section, i)),
+            alignment: 0.5);
+        await tester.pumpAndSettle();
+      }
 
-      expect(await scrollUntil(tester, carousel), isTrue);
-      // `scrollUntil` corta cuando el carrusel EXISTE, y el cacheExtent lo
-      // construye antes de que se vea. Sin este ensureVisible el drag de abajo
-      // no impacta y el test pasa sin haber probado nada.
-      await tester.ensureVisible(carousel);
-      await tester.pumpAndSettle();
+      expect(await scrollUntil(tester, first()), isTrue);
+      // Se fija el elemento ANTES de mover las filas: al scrollearlas, la
+      // tarjeta de `cand-0` sale del ListView y `first()` deja de encontrarlo.
+      final element = first().evaluate().single;
+      final section = find.byElementPredicate((e) => identical(e, element),
+          description: 'el primer carrusel');
 
-      // Lo scrolleamos a mano hasta el fondo…
-      await tester.drag(row(), const Offset(-1200, 0));
-      await tester.pumpAndSettle();
-      expect(rowOffset(), greaterThan(0),
-          reason: 'setup del test: el carrusel tiene que haberse movido');
+      // Scrolleamos a mano las DOS filas hasta el fondo…
+      for (final i in [0, 1]) {
+        await center(section, i);
+        await tester.drag(row(section, i), const Offset(-1200, 0));
+        await tester.pumpAndSettle();
+        expect(offset(section, i), greaterThan(0),
+            reason: 'setup del test: la fila $i tiene que haberse movido');
+      }
 
       // …lo sacamos del viewport para que el sliver lo destruya…
       await tester.drag(find.byType(CustomScrollView), const Offset(0, -2500));
       await tester.pumpAndSettle();
-      expect(carousel.evaluate(), isEmpty,
+      expect(element.mounted, isFalse,
           reason: 'setup del test: el sliver tiene que haberlo reciclado');
 
       await tester.drag(find.byType(CustomScrollView), const Offset(0, 2500));
       await tester.pumpAndSettle();
 
-      // …y al volver tiene que estar en cero otra vez.
-      expect(await scrollUntil(tester, carousel), isTrue);
-      expect(rowOffset(), 0,
-          reason: 'una fila de sugerencias siempre empieza por la primera');
+      // …y al volver, las DOS filas tienen que estar en cero otra vez (cada
+      // una tiene su controller: no alcanza con mirar la que se movió).
+      expect(await scrollUntil(tester, first()), isTrue);
+      for (final i in [0, 1]) {
+        await center(first(), i);
+        expect(offset(first(), i), 0,
+            reason: 'una fila de sugerencias siempre empieza por la primera');
+      }
     });
 
     testWidgets('sin candidatos no se intercala nada en todo el scroll', (

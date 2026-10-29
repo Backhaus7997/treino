@@ -25,7 +25,8 @@ const double _kCardWidth = 120;
 /// tarjeta quedaba con ~40% de alto vacío abajo.
 const double _kRowHeight = 176;
 
-/// Same-gym profiles shown in a horizontal carousel.
+/// Same-gym profiles shown in one or two horizontal carousels (two from
+/// [_kTwoRowsFrom] suggestions on, each row scrolling on its own).
 ///
 /// Loading, errors, no-gym, and an empty result are intentionally silent: the
 /// existing feed empty state remains the complete fallback in those cases.
@@ -67,39 +68,34 @@ class SuggestedUsersSection extends ConsumerWidget {
   }
 }
 
-class _SuggestedUsersContent extends StatefulWidget {
+/// Desde cuántas sugerencias se reparten en dos filas. Con menos, dos filas
+/// de una o dos tarjetas se ven vacías: queda una sola.
+const int _kTwoRowsFrom = 4;
+
+/// Reparte las sugerencias en las filas que se muestran: una sola si son
+/// pocas, y si no dos, alternando (1ª arriba, 2ª abajo, 3ª arriba…). Alternar
+/// y no partir al medio deja las mejores sugerencias a la vista, a la
+/// izquierda de las DOS filas. Pública para el test.
+List<List<UserPublicProfile>> splitSuggestionRows(
+    List<UserPublicProfile> profiles) {
+  if (profiles.length < _kTwoRowsFrom) return [profiles];
+  return [
+    for (final parity in [0, 1])
+      [
+        for (var i = parity; i < profiles.length; i += 2) profiles[i],
+      ],
+  ];
+}
+
+class _SuggestedUsersContent extends StatelessWidget {
   const _SuggestedUsersContent({required this.profiles});
 
   final List<UserPublicProfile> profiles;
 
   @override
-  State<_SuggestedUsersContent> createState() => _SuggestedUsersContentState();
-}
-
-class _SuggestedUsersContentState extends State<_SuggestedUsersContent> {
-  /// `keepScrollOffset: false` NO es un detalle: es la corrección de un bug
-  /// real. Por defecto un `Scrollable` guarda su offset en `PageStorage`, y el
-  /// `CustomScrollView` del feed abre ese bucket con su
-  /// `PageStorageKey('feed-scroll-position')`. Como el carrusel vive dentro de
-  /// un sliver perezoso, al alejarse se destruye y al volver se reconstruye —
-  /// restaurando el offset viejo. Resultado observado en device: la fila
-  /// reaparecía scrolleada al final y las primeras sugerencias quedaban
-  /// escondidas a la izquierda. Una fila de sugerencias SIEMPRE tiene que
-  /// empezar por la primera.
-  late final ScrollController _controller = ScrollController(
-    keepScrollOffset: false,
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
-    final profiles = widget.profiles;
+    final rows = splitSuggestionRows(profiles);
 
     return Padding(
       key: const Key('suggested_users_section'),
@@ -119,21 +115,62 @@ class _SuggestedUsersContentState extends State<_SuggestedUsersContent> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: _kRowHeight,
-            child: ListView.builder(
-              controller: _controller,
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: profiles.length * 2 - 1,
-              itemBuilder: (context, index) {
-                if (index.isOdd) return const SizedBox(width: 12);
-                return _SuggestedUserCard(profile: profiles[index ~/ 2]);
-              },
-            ),
-          ),
+          for (final (i, row) in rows.indexed) ...[
+            const SizedBox(height: 12),
+            _SuggestedRow(key: Key('suggested_users_row_$i'), profiles: row),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// Una fila de tarjetas con su PROPIO scroll horizontal: cada fila se mueve
+/// sola.
+class _SuggestedRow extends StatefulWidget {
+  const _SuggestedRow({super.key, required this.profiles});
+
+  final List<UserPublicProfile> profiles;
+
+  @override
+  State<_SuggestedRow> createState() => _SuggestedRowState();
+}
+
+class _SuggestedRowState extends State<_SuggestedRow> {
+  /// `keepScrollOffset: false` NO es un detalle: es la corrección de un bug
+  /// real. Por defecto un `Scrollable` guarda su offset en `PageStorage`, y el
+  /// `CustomScrollView` del feed abre ese bucket con su
+  /// `PageStorageKey('feed-scroll-position')`. Como el carrusel vive dentro de
+  /// un sliver perezoso, al alejarse se destruye y al volver se reconstruye —
+  /// restaurando el offset viejo. Resultado observado en device: la fila
+  /// reaparecía scrolleada al final y las primeras sugerencias quedaban
+  /// escondidas a la izquierda. Una fila de sugerencias SIEMPRE tiene que
+  /// empezar por la primera. Un controller por fila: compartirlo ataría el
+  /// scroll de las dos.
+  late final ScrollController _controller = ScrollController(
+    keepScrollOffset: false,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profiles = widget.profiles;
+    return SizedBox(
+      height: _kRowHeight,
+      child: ListView.builder(
+        controller: _controller,
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: profiles.length * 2 - 1,
+        itemBuilder: (context, index) {
+          if (index.isOdd) return const SizedBox(width: 12);
+          return _SuggestedUserCard(profile: profiles[index ~/ 2]);
+        },
       ),
     );
   }

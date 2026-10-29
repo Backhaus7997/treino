@@ -163,27 +163,76 @@ void main() {
     expect(find.byKey(const Key('suggested_users_section')), findsOneWidget);
   });
 
-  testWidgets('renders suggestions in a horizontal carousel', (
-    tester,
-  ) async {
-    final suggestions = [
-      for (var index = 0; index < kSuggestedUsersLimit; index++)
-        profile(uid: 'uid-$index', displayName: 'Persona $index'),
-    ];
+  group('filas', () {
+    List<UserPublicProfile> people(int n) => [
+          for (var index = 0; index < n; index++)
+            profile(uid: 'uid-$index', displayName: 'Persona $index'),
+        ];
 
-    await tester.pumpWidget(
-      wrap(gymId: 'gym-a', suggestions: suggestions),
-    );
-    await tester.pumpAndSettle();
+    Finder row(int i) => find.byKey(Key('suggested_users_row_$i'));
+    Finder cardIn(int r, int person) => find.descendant(
+        of: row(r), matching: find.byKey(Key('suggested_user_uid-$person')));
 
-    final listView = tester.widget<ListView>(find.byType(ListView));
-    expect(listView.scrollDirection, Axis.horizontal);
-    for (final suggestion in suggestions.take(2)) {
-      expect(
-        find.byKey(Key('suggested_user_${suggestion.uid}')),
-        findsOneWidget,
+    test(
+        'alterna: 1ª arriba, 2ª abajo, 3ª arriba… (las mejores a la '
+        'izquierda de las dos)', () {
+      final rows = splitSuggestionRows(people(7));
+      expect(rows, hasLength(2));
+      expect(rows[0].map((p) => p.uid), ['uid-0', 'uid-2', 'uid-4', 'uid-6']);
+      expect(rows[1].map((p) => p.uid), ['uid-1', 'uid-3', 'uid-5']);
+    });
+
+    test('con menos de 4 queda una sola fila', () {
+      expect(splitSuggestionRows(people(3)), hasLength(1));
+      expect(splitSuggestionRows(people(4)), hasLength(2));
+    });
+
+    testWidgets('con varias sugerencias: dos filas horizontales', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(gymId: 'gym-a', suggestions: people(kSuggestedUsersLimit)),
       );
-    }
+      await tester.pumpAndSettle();
+
+      final lists = tester.widgetList<ListView>(find.byType(ListView));
+      expect(lists, hasLength(2));
+      expect(lists.every((l) => l.scrollDirection == Axis.horizontal), isTrue);
+      // La 1ª y la 2ª a la vista, una en cada fila.
+      expect(cardIn(0, 0), findsOneWidget);
+      expect(cardIn(1, 1), findsOneWidget);
+      expect(tester.getTopLeft(row(1)).dy,
+          greaterThan(tester.getTopLeft(row(0)).dy));
+    });
+
+    testWidgets('cada fila scrollea sola: mover una no mueve la otra', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(gymId: 'gym-a', suggestions: people(kSuggestedUsersLimit)),
+      );
+      await tester.pumpAndSettle();
+
+      double offsetOf(int r) => tester
+          .state<ScrollableState>(
+              find.descendant(of: row(r), matching: find.byType(Scrollable)))
+          .position
+          .pixels;
+
+      await tester.drag(row(0), const Offset(-200, 0));
+      await tester.pumpAndSettle();
+
+      expect(offsetOf(0), greaterThan(0));
+      expect(offsetOf(1), 0);
+    });
+
+    testWidgets('con pocas sugerencias: una sola fila', (tester) async {
+      await tester.pumpWidget(wrap(gymId: 'gym-a', suggestions: people(3)));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ListView), findsOneWidget);
+      expect(row(1), findsNothing);
+    });
   });
 
   group('botón Seguir en la tarjeta', () {
