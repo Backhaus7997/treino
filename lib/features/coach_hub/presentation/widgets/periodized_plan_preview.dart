@@ -810,10 +810,10 @@ class _ExerciseLineState extends State<_ExerciseLine> {
           children: [
             Expanded(
               child: Text(
+                // Entero, como la línea de datos: un nombre cortado no se
+                // puede comparar con el PDF.
                 resolved ? assigned.name : exercise.rawName,
                 style: importText(nameColor, weight: AppFonts.w600),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: AppSpacing.s8),
@@ -976,8 +976,11 @@ class _ExerciseLineState extends State<_ExerciseLine> {
   }
 }
 
-/// La línea gris de datos: hasta dos renglones y, si no entra, puntos
-/// suspensivos (el detalle completo está en el texto del PDF).
+/// La línea gris de datos, COMPLETA: sin tope de renglones. Es lo que el PF
+/// revisa antes de asignar, y no hay otro lugar donde ver lo que quedara
+/// cortado: en el Hub las filas no se despliegan y el texto del PDF puede
+/// faltar (en el Excel no existe nunca). Sólo la fila plegada de mobile va
+/// en un renglón, porque tocarla la despliega.
 class _DataLine extends StatelessWidget {
   const _DataLine(this.text);
   final String text;
@@ -987,8 +990,7 @@ class _DataLine extends StatelessWidget {
     if (text.isEmpty) return const SizedBox.shrink();
     return Text(
       text,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
+      key: const Key('periodized_data_line'),
       style: importText(AppPalette.of(context).textMuted,
           size: AppTextSize.caption),
     );

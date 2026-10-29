@@ -353,6 +353,30 @@ void main() {
           '3 series · al fallo · 1 min 30 s · 200 m');
     });
 
+    testWidgets(
+        'una prescripción larga se ve ENTERA: sin tope de renglones ni '
+        'puntos suspensivos (en el Hub no hay otro lugar donde verla)',
+        (tester) async {
+      const nota = 'pirámide 12-10-8-6 con la última al fallo técnico, tempo '
+          '3-1-1, pausa de 2 segundos abajo y anotar el RPE de cada serie';
+      final day = PeriodizedDay(dayNumber: 1, rows: [
+        PeriodizedRow(position: 1, number: 1, restSeconds: 150, exercises: [
+          _ex(0, 'Press banca plano con barra y agarre cerrado', note: nota)
+        ]),
+      ]);
+      await _pumpCard(tester, day, _draftFor(day, pending: {_k(1)}));
+
+      final line =
+          tester.widget<Text>(find.byKey(const Key('periodized_data_line')));
+      expect(line.maxLines, isNull);
+      expect(line.overflow, isNot(TextOverflow.ellipsis));
+      expect(line.data, contains(nota));
+      expect(line.data, endsWith('2 min 30 s'));
+      final name = tester.widget<Text>(
+          find.text('Press banca plano con barra y agarre cerrado'));
+      expect(name.maxLines, isNull);
+    });
+
     test('blockLetter: A…Z y después AA', () {
       expect(blockLetter(0), 'A');
       expect(blockLetter(25), 'Z');
