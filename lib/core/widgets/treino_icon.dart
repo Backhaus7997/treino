@@ -268,4 +268,9 @@ class TreinoIcon {
   /// esta persona" igual de claro y mantiene el resto del kit en un solo
   /// peso de ícono.
   static const IconData block = PhosphorIconsRegular.userCircleMinus;
+
+  // Vista previa del import de plan: encabezado del bloque de superserie /
+  // triserie / circuito. Un eslabón dice "estos ejercicios van juntos" sin
+  // pedir color: el bloque es gris y el ícono también.
+  static const IconData supersetLink = PhosphorIconsRegular.linkSimple;
 }

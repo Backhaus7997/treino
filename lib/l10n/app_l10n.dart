@@ -10150,13 +10150,13 @@ abstract class AppL10n {
   /// Despliega el texto del PDF del que salió el ejercicio, para compararlo.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ver texto del PDF'**
+  /// **'Ver PDF'**
   String get pdfImportSourceShow;
 
   /// Pliega ese texto.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ocultar texto del PDF'**
+  /// **'Ocultar PDF'**
   String get pdfImportSourceHide;
 
   /// El candidato del extractor cuando pasó el veto pero el matcher sugirió otro ejercicio.
@@ -10272,6 +10272,102 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Ocultar detalle'**
   String get pdfImportRowHideDetail;
+
+  /// Vista previa del import: confirma la sugerencia de la fila. Es la única acción de la fila con el acento.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Confirmar'**
+  String get pdfImportConfirm;
+
+  /// Vista previa del import: elige otro ejercicio de la biblioteca para la fila.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cambiar'**
+  String get pdfImportChange;
+
+  /// Vista previa del import: fila sin match, buscar el ejercicio en la biblioteca.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Vincular con la biblioteca'**
+  String get pdfImportLinkLibrary;
+
+  /// Vista previa del import: fila sin match, crear un ejercicio propio con el nombre leído.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Crear como propio'**
+  String get pdfImportCreateOwn;
+
+  /// Lector de pantalla: la línea «→ ejercicio» de una fila con sugerencia pendiente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sugerencia: {name}'**
+  String pdfImportSuggestionA11y(String name);
+
+  /// Lector de pantalla: el punto ámbar al final de una fila con sugerencia sin confirmar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'sugerencia por confirmar'**
+  String get pdfImportMarkPending;
+
+  /// Lector de pantalla: el anillo al final de una fila que no matcheó con la biblioteca.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'sin ejercicio de la biblioteca'**
+  String get pdfImportMarkNoMatch;
+
+  /// Encabezado de un renglón de 2 ejercicios en la vista previa del import.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SUPERSERIE · {count} ejercicios'**
+  String pdfImportBlockSuperset(int count);
+
+  /// Encabezado de un renglón de 3 ejercicios en la vista previa del import.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TRISERIE · {count} ejercicios'**
+  String pdfImportBlockTriset(int count);
+
+  /// Encabezado de un renglón de 4 o más ejercicios en la vista previa del import.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CIRCUITO · {count} ejercicios'**
+  String pdfImportBlockCircuit(int count);
+
+  /// Encabezado de superserie: el descanso del renglón, que va una sola vez después del último ejercicio. {rest} ya viene formateado (`90 s`, `2 min`).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'descanso {rest} al final'**
+  String pdfImportBlockRest(String rest);
+
+  /// Línea de datos de un ejercicio: la serie va al fallo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'al fallo'**
+  String get pdfImportFailure;
+
+  /// Marca de un renglón sin número (calentamiento) en la vista previa del import.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CALENTAMIENTO'**
+  String get pdfImportWarmup;
+
+  /// Aviso arriba de la vista previa: cuántas sugerencias faltan confirmar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 sugerencia por confirmar} other{{count} sugerencias por confirmar}}'**
+  String pdfImportPendingSuggestions(int count);
+
+  /// Aviso arriba de la vista previa: cuántos ejercicios no matchearon con la biblioteca.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} sin match'**
+  String pdfImportPendingNoMatch(int count);
+
+  /// Título de la tarjeta de avisos del parser en la vista previa del import.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 aviso} other{{count} avisos}}'**
+  String pdfImportWarningsCount(int count);
 
   /// Coach Hub, «Importar plan»: qué archivos acepta la tarjeta de subida cuando el import de PDF está habilitado para el PF (kill switch app_config/pdf_import). Los topes son los del parser de Excel y PDF_MAX_BYTES del servidor.
   ///

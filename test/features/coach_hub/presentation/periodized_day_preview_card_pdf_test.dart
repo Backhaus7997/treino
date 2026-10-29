@@ -140,7 +140,7 @@ void main() {
     await _pump(tester, _day('Remo', src: 'Remo 4x8 c/ pausa'));
     expect(find.text('Remo 4x8 c/ pausa'), findsNothing);
 
-    await tester.tap(find.text('Ver texto del PDF'));
+    await tester.tap(find.text('Ver PDF'));
     await tester.pumpAndSettle();
     expect(find.text('Remo 4x8 c/ pausa'), findsOneWidget);
   });
@@ -148,7 +148,7 @@ void main() {
   testWidgets('sin texto fuente (Excel) no hay nada que desplegar',
       (tester) async {
     await _pump(tester, _day('Remo'));
-    expect(find.text('Ver texto del PDF'), findsNothing);
+    expect(find.text('Ver PDF'), findsNothing);
   });
 
   testWidgets('la alternativa se muestra y «Usar alternativa» avisa la clave',
@@ -175,11 +175,12 @@ void main() {
         width: 240);
 
     expect(tester.takeException(), isNull);
-    expect(find.text('sugerencia pendiente'), findsOneWidget);
+    expect(find.bySemanticsLabel('sugerencia por confirmar'), findsOneWidget);
   });
 
   group('resuelto plegado (mobile)', () {
-    const line = 'Sentadilla (Barra)  ·  5 × 5 · 80 kg';
+    // El descanso (120 s) va al final de la línea de datos, compacto.
+    const line = 'Sentadilla (Barra)  ·  5 × 5 · 80 kg · 2 min';
 
     testWidgets('UNA línea: ejercicio de la biblioteca, series con carga y ✓',
         (tester) async {
@@ -187,10 +188,10 @@ void main() {
 
       expect(find.text(line, findRichText: true), findsOneWidget);
       expect(find.byIcon(TreinoIcon.check), findsOneWidget);
-      // Plegado: ni acciones, ni texto del PDF, ni el chip del descanso.
+      // Plegado: ni acciones ni texto del PDF; el descanso no va aparte.
       expect(find.text('Cambiar'), findsNothing);
-      expect(find.text('Ver texto del PDF'), findsNothing);
-      expect(find.text('Descanso 120 s'), findsNothing);
+      expect(find.text('Ver PDF'), findsNothing);
+      expect(find.textContaining('Descanso'), findsNothing);
     });
 
     testWidgets('tocarla la despliega con «Cambiar» y el texto del PDF',
@@ -202,9 +203,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Sentadilla (Barra)'), findsOneWidget);
-      expect(find.text('5 × 5 · 80 kg'), findsOneWidget);
-      expect(find.text('Ver texto del PDF'), findsOneWidget);
-      expect(find.text('Descanso 120 s'), findsOneWidget);
+      expect(find.text('5 × 5 · 80 kg · 2 min'), findsOneWidget);
+      expect(find.text('Ver PDF'), findsOneWidget);
       await tester.tap(find.text('Cambiar'));
       expect(picked, [_key]);
 
@@ -217,7 +217,7 @@ void main() {
     testWidgets('lo que pide atención no se pliega', (tester) async {
       await _pumpCard(tester, _day('Remo'), _draft(_day('Remo')),
           collapse: true);
-      expect(find.text('sugerencia pendiente'), findsOneWidget);
+      expect(find.bySemanticsLabel('sugerencia por confirmar'), findsOneWidget);
       expect(find.text('Confirmar'), findsOneWidget);
     });
 
@@ -227,8 +227,8 @@ void main() {
 
       expect(find.text(line, findRichText: true), findsNothing);
       expect(find.text('Sentadilla (Barra)'), findsOneWidget);
-      expect(find.text('5 × 5 · 80 kg'), findsOneWidget);
-      expect(find.text('Descanso 120 s'), findsOneWidget);
+      expect(find.text('5 × 5 · 80 kg · 2 min'), findsOneWidget);
+      expect(find.bySemanticsLabel('Resuelto'), findsOneWidget);
       expect(find.text('Cambiar'), findsNothing);
     });
   });

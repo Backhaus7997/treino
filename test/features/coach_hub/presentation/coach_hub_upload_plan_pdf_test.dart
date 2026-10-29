@@ -240,7 +240,8 @@ void main() {
       expect(draft, isNotNull);
       expect(draft!.athleteId, isNull);
       expect(draft.suggestions, {kPdfRemoKey: kPdfRemoBarra});
-      expect(find.text('Sugerencia: Remo con barra'), findsOneWidget);
+      expect(
+          find.bySemanticsLabel('Sugerencia: Remo con barra'), findsOneWidget);
       expect(find.text('Confirmar la sugerencia'), findsOneWidget);
       expect(find.text('Alternativa: Remo con mancuerna'), findsOneWidget);
       // Una sola llamada: ni el éxito ni el rebuild reenvían.

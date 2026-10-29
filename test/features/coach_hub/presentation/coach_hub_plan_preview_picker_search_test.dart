@@ -89,6 +89,9 @@ Widget _wrap(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
+        // Las acciones de la vista previa salen de AppL10n: sin locale el
+        // test las vería en inglés.
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: child),
       ),
     );

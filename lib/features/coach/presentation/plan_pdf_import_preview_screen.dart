@@ -453,17 +453,14 @@ class _PlanPdfImportPreviewScreenState
                 ),
                 if (draft.warnings.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.s14),
-                  ImportCard(
-                    padding: AppSpacing.s14,
-                    child: ImportDiagnosticsList(diagnostics: draft.warnings),
-                  ),
+                  PreviewWarningsCard(warnings: draft.warnings),
                 ],
                 if (pending > 0) ...[
                   const SizedBox(height: AppSpacing.s14),
-                  Text(
-                    l10n.pdfImportPending(pending),
+                  PendingResolutionNotice(
                     key: const Key('pdf_import_pending'),
-                    style: importText(palette.warning, weight: AppFonts.w600),
+                    pendingSuggestions: draft.pendingSuggestions,
+                    withoutSuggestion: draft.withoutSuggestion,
                   ),
                 ],
                 if (draft.pendingSuggestions > 0) ...[
@@ -478,19 +475,21 @@ class _PlanPdfImportPreviewScreenState
                   OutlinedButton.icon(
                     key: const Key('pdf_import_bulk'),
                     onPressed: _bulkRunning || _saving ? null : _createBulk,
+                    // Neutro: en la vista previa el acento queda sólo para
+                    // «Confirmar las N sugerencias».
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: palette.accent),
-                      foregroundColor: palette.accentText,
+                      side: BorderSide(color: palette.border),
+                      foregroundColor: palette.textPrimary,
                       minimumSize: const Size.fromHeight(44),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
                     ),
-                    icon: Icon(TreinoIcon.plus, color: palette.accent),
+                    icon: Icon(TreinoIcon.plus, color: palette.textMuted),
                     label: Text(
                       l10n.pdfImportBulkCreate(bulk),
-                      style:
-                          importText(palette.accentText, weight: AppFonts.w700),
+                      style: importText(palette.textPrimary,
+                          weight: AppFonts.w700),
                     ),
                   ),
                 ],

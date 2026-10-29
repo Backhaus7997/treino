@@ -27,7 +27,6 @@ import '../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../application/plan_import_preview_controller.dart';
 import '../application/plan_import_providers.dart';
 import '../data/exercise_matcher.dart';
-import '../data/periodized_import_draft.dart';
 import '../domain/periodized_plan.dart';
 import 'widgets/create_custom_exercise_dialog.dart';
 import 'widgets/filter_chips/filter_chips.dart';
@@ -398,7 +397,11 @@ class _CoachHubPlanPreviewScreenState
                     ),
                     const SizedBox(height: AppSpacing.s18),
                     if (draft.unresolved.isNotEmpty) ...[
-                      _UnmatchedWarning(palette: palette, draft: draft),
+                      PendingResolutionNotice(
+                        key: const Key('hub_import_pending'),
+                        pendingSuggestions: draft.pendingSuggestions,
+                        withoutSuggestion: draft.withoutSuggestion,
+                      ),
                       const SizedBox(height: AppSpacing.s18),
                     ],
                     if (draft.pendingSuggestions > 0) ...[
@@ -409,7 +412,7 @@ class _CoachHubPlanPreviewScreenState
                       const SizedBox(height: AppSpacing.s18),
                     ],
                     if (draft.warnings.isNotEmpty) ...[
-                      _WarningsCard(palette: palette, warnings: draft.warnings),
+                      PreviewWarningsCard(warnings: draft.warnings),
                       const SizedBox(height: AppSpacing.s18),
                     ],
                     if (plan.numWeeks > 1) ...[
@@ -640,83 +643,6 @@ class _MetaTile extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _UnmatchedWarning extends StatelessWidget {
-  const _UnmatchedWarning({required this.palette, required this.draft});
-  final AppPalette palette;
-  final PeriodizedImportDraft draft;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppL10n.of(context);
-    final pendingSuggestions = draft.pendingSuggestions;
-    final withoutSuggestion = draft.withoutSuggestion;
-    final unresolved = pendingSuggestions + withoutSuggestion;
-    return ImportCard(
-      padding: AppSpacing.s14,
-      borderColor: palette.warning,
-      background: palette.warning.withValues(alpha: 0.12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            TreinoIcon.warning,
-            color: palette.warning,
-            semanticLabel: l10n.commonWarning,
-          ),
-          const SizedBox(width: AppSpacing.s12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$unresolved ejercicio(s) por resolver',
-                  style: importText(palette.textPrimary, weight: AppFonts.w700),
-                ),
-                const SizedBox(height: AppSpacing.hairline),
-                Text(
-                  '${pendingSuggestions > 0 ? '$pendingSuggestions con sugerencia pendiente. ' : ''}'
-                  '${withoutSuggestion > 0 ? '$withoutSuggestion sin match. ' : ''}'
-                  'No se puede asignar hasta que estén todos resueltos.',
-                  style: importText(
-                    palette.textMuted,
-                    size: AppTextSize.bodyDense,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Avisos del parser, cada uno con su celda. No bloquean la asignación.
-class _WarningsCard extends StatelessWidget {
-  const _WarningsCard({required this.palette, required this.warnings});
-  final AppPalette palette;
-  final List<ImportDiagnostic> warnings;
-
-  @override
-  Widget build(BuildContext context) {
-    return ImportCard(
-      padding: AppSpacing.s14,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            warnings.length == 1 ? '1 aviso' : '${warnings.length} avisos',
-            style: importText(palette.textPrimary, weight: AppFonts.w700),
-          ),
-          const SizedBox(height: AppSpacing.s8),
-          ImportDiagnosticsList(diagnostics: warnings),
-        ],
-      ),
     );
   }
 }

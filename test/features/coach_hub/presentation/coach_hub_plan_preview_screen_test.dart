@@ -79,6 +79,9 @@ Widget _wrap(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
+        // Las acciones de la vista previa salen de AppL10n: sin locale el
+        // test las vería en inglés.
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: child),
       ),
     );
@@ -165,7 +168,8 @@ void main() {
       verifyNever(() => mockCallable.call(any<Map<String, dynamic>>()));
 
       // Verify local state preserved (item is no longer unmatched)
-      expect(find.text('sin match'), findsNothing);
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsNothing);
     });
   });
 
@@ -272,7 +276,8 @@ void main() {
       // No exception propagated — widget tree still intact
       expect(find.byType(CoachHubPlanPreviewScreen), findsOneWidget);
       // Local mapping state preserved (unmatched badge gone)
-      expect(find.text('sin match'), findsNothing);
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsNothing);
     });
   });
 
@@ -381,14 +386,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Sentadilla búlgara'), findsOneWidget);
-      expect(find.text('Sugerencia: Sentadilla con barra'), findsOneWidget);
-      expect(find.text('sugerencia pendiente'), findsOneWidget);
+      expect(find.bySemanticsLabel('Sugerencia: Sentadilla con barra'),
+          findsOneWidget);
+      expect(find.bySemanticsLabel('sugerencia por confirmar'), findsOneWidget);
 
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
 
       verifyNever(() => mockCallable.call(any<Map<String, dynamic>>()));
-      expect(find.text('sugerencia pendiente'), findsNothing);
+      expect(find.bySemanticsLabel('sugerencia por confirmar'), findsNothing);
       expect(find.text('Sentadilla con barra'), findsOneWidget);
     });
 
@@ -436,7 +442,7 @@ void main() {
 
       verifyNever(() => mockCallable.call(any<Map<String, dynamic>>()));
       expect(find.text('Sentadilla búlgara asistida'), findsOneWidget);
-      expect(find.text('sugerencia pendiente'), findsNothing);
+      expect(find.bySemanticsLabel('sugerencia por confirmar'), findsNothing);
     });
 
     testWidgets('una sugerencia pendiente bloquea la asignación',

@@ -6070,10 +6070,10 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
-  String get pdfImportSourceShow => 'Ver texto del PDF';
+  String get pdfImportSourceShow => 'Ver PDF';
 
   @override
-  String get pdfImportSourceHide => 'Ocultar texto del PDF';
+  String get pdfImportSourceHide => 'Ocultar PDF';
 
   @override
   String pdfImportAlternative(String name) {
@@ -6166,6 +6166,82 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get pdfImportRowHideDetail => 'Ocultar detalle';
+
+  @override
+  String get pdfImportConfirm => 'Confirmar';
+
+  @override
+  String get pdfImportChange => 'Cambiar';
+
+  @override
+  String get pdfImportLinkLibrary => 'Vincular con la biblioteca';
+
+  @override
+  String get pdfImportCreateOwn => 'Crear como propio';
+
+  @override
+  String pdfImportSuggestionA11y(String name) {
+    return 'Sugerencia: $name';
+  }
+
+  @override
+  String get pdfImportMarkPending => 'sugerencia por confirmar';
+
+  @override
+  String get pdfImportMarkNoMatch => 'sin ejercicio de la biblioteca';
+
+  @override
+  String pdfImportBlockSuperset(int count) {
+    return 'SUPERSERIE · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockTriset(int count) {
+    return 'TRISERIE · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockCircuit(int count) {
+    return 'CIRCUITO · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockRest(String rest) {
+    return 'descanso $rest al final';
+  }
+
+  @override
+  String get pdfImportFailure => 'al fallo';
+
+  @override
+  String get pdfImportWarmup => 'CALENTAMIENTO';
+
+  @override
+  String pdfImportPendingSuggestions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sugerencias por confirmar',
+      one: '1 sugerencia por confirmar',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportPendingNoMatch(int count) {
+    return '$count sin match';
+  }
+
+  @override
+  String pdfImportWarningsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count avisos',
+      one: '1 aviso',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get coachHubImportUploadHintPdf =>
@@ -12255,10 +12331,10 @@ class AppL10nEsAr extends AppL10nEs {
   }
 
   @override
-  String get pdfImportSourceShow => 'Ver texto del PDF';
+  String get pdfImportSourceShow => 'Ver PDF';
 
   @override
-  String get pdfImportSourceHide => 'Ocultar texto del PDF';
+  String get pdfImportSourceHide => 'Ocultar PDF';
 
   @override
   String pdfImportAlternative(String name) {
@@ -12351,6 +12427,82 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get pdfImportRowHideDetail => 'Ocultar detalle';
+
+  @override
+  String get pdfImportConfirm => 'Confirmar';
+
+  @override
+  String get pdfImportChange => 'Cambiar';
+
+  @override
+  String get pdfImportLinkLibrary => 'Vincular con la biblioteca';
+
+  @override
+  String get pdfImportCreateOwn => 'Crear como propio';
+
+  @override
+  String pdfImportSuggestionA11y(String name) {
+    return 'Sugerencia: $name';
+  }
+
+  @override
+  String get pdfImportMarkPending => 'sugerencia por confirmar';
+
+  @override
+  String get pdfImportMarkNoMatch => 'sin ejercicio de la biblioteca';
+
+  @override
+  String pdfImportBlockSuperset(int count) {
+    return 'SUPERSERIE · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockTriset(int count) {
+    return 'TRISERIE · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockCircuit(int count) {
+    return 'CIRCUITO · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockRest(String rest) {
+    return 'descanso $rest al final';
+  }
+
+  @override
+  String get pdfImportFailure => 'al fallo';
+
+  @override
+  String get pdfImportWarmup => 'CALENTAMIENTO';
+
+  @override
+  String pdfImportPendingSuggestions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sugerencias por confirmar',
+      one: '1 sugerencia por confirmar',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportPendingNoMatch(int count) {
+    return '$count sin match';
+  }
+
+  @override
+  String pdfImportWarningsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count avisos',
+      one: '1 aviso',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get coachHubImportUploadHintPdf =>
