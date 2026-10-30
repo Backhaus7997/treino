@@ -14,6 +14,9 @@ class PeriodizedImportDraft {
     required this.name,
     required this.assignments,
     required this.suggestions,
+    this.alternatives = const {},
+    this.aliasKeys = const {},
+    this.athleteId,
   });
 
   /// Arma el borrador a partir del veredicto del matcher: lo exacto o por
@@ -53,6 +56,45 @@ class PeriodizedImportDraft {
   /// confirmó. Un componente con sugerencia NO está asignado.
   final Map<ExerciseKey, MatcherExercise> suggestions;
 
+  /// PDF: el candidato del extractor cuando pasó el veto pero el fuzzy
+  /// sugirió OTRO ejercicio. Se muestra la sugerencia del fuzzy (es
+  /// reproducible) y esta queda como alternativa para el picker
+  /// (docs/plan-import-pdf.md, «Matcheo»). Nunca se asigna sola. Vacío en el
+  /// Excel.
+  final Map<ExerciseKey, MatcherExercise> alternatives;
+
+  /// Componentes cuya asignación FINAL la eligió el PF sobre el catálogo
+  /// (sugerencia confirmada, alternativa o el picker): son los que enseñan un
+  /// alias al asignar el plan. Quedan afuera los automáticos (exacto o por
+  /// alias: no hay nada que aprender), los propios del PF y los sin match.
+  /// Se recalcula con cada resolución, así un «Cambiar» deja sólo el último.
+  final Set<ExerciseKey> aliasKeys;
+
+  /// Los alias a registrar después de asignar: `rawName` del componente →
+  /// ejercicio asignado, sin pares repetidos, en el orden del plan.
+  List<({String exerciseId, String alias})> get aliasesToRegister {
+    final seen = <(String, String)>{};
+    final out = <({String exerciseId, String alias})>[];
+    for (final day in plan.days) {
+      for (final row in day.rows) {
+        for (final ex in row.exercises) {
+          final key = exerciseKeyOf(day, row, ex);
+          final assigned = assignments[key];
+          if (assigned == null || !aliasKeys.contains(key)) continue;
+          if (!seen.add((assigned.id, ex.rawName))) continue;
+          out.add((exerciseId: assigned.id, alias: ex.rawName));
+        }
+      }
+    }
+    return out;
+  }
+
+  /// PDF: el alumno para el que se importó. La vista previa mobile vive en
+  /// una ruta por alumno y sólo muestra (y asigna) el borrador de ESE
+  /// alumno: un borrador de A abierto en la ruta de B no es de B. `null` en
+  /// el Excel del Coach Hub, que elige los alumnos al asignar.
+  final String? athleteId;
+
   bool isResolved(ExerciseKey key) => assignments.containsKey(key);
 
   /// Componentes que bloquean la asignación: con sugerencia pendiente o sin
@@ -72,13 +114,29 @@ class PeriodizedImportDraft {
       unresolved.where((k) => !suggestions.containsKey(k)).length;
 
   /// Asigna [exercise] al componente [key] y descarta su sugerencia.
-  PeriodizedImportDraft resolve(ExerciseKey key, MatcherExercise exercise) {
+  ///
+  /// La alternativa NO se descarta: con «Confirmar las N sugerencias» el PF
+  /// confirma en bloque y después revisa, y la alternativa es justo lo que
+  /// necesita para corregir una sugerencia equivocada sin buscar en la
+  /// biblioteca. La vista previa la oculta cuando ya es la asignada.
+  ///
+  /// Con [learn] la clave entra en [aliasKeys] (el PF eligió sobre el
+  /// catálogo); sin él sale, así una fila reemplazada por un propio deja de
+  /// enseñar el alias de antes.
+  PeriodizedImportDraft resolve(
+    ExerciseKey key,
+    MatcherExercise exercise, {
+    bool learn = false,
+  }) {
     return PeriodizedImportDraft(
       plan: plan,
       warnings: warnings,
       name: name,
       assignments: {...assignments, key: exercise},
       suggestions: {...suggestions}..remove(key),
+      alternatives: alternatives,
+      aliasKeys: learn ? {...aliasKeys, key} : ({...aliasKeys}..remove(key)),
+      athleteId: athleteId,
     );
   }
 
@@ -86,7 +144,8 @@ class PeriodizedImportDraft {
   /// todavía sin candidato (ni asignación ni sugerencia) cuyo nombre
   /// normalizado es idéntico al de [key]. Es lo que corresponde al crear un
   /// ejercicio propio: «Press X» repetido en tres días es UN ejercicio.
-  /// Nunca toca componentes con otro nombre, aunque se parezcan.
+  /// Nunca toca componentes con otro nombre, aunque se parezcan. Un propio
+  /// no enseña alias: [key] sale de [aliasKeys].
   PeriodizedImportDraft resolveWithSameName(
     ExerciseKey key,
     MatcherExercise exercise,
@@ -120,6 +179,10 @@ class PeriodizedImportDraft {
       name: name,
       assignments: next,
       suggestions: nextSuggestions,
+      alternatives: {...alternatives}
+        ..removeWhere((k, _) => next.containsKey(k)),
+      aliasKeys: {...aliasKeys}..remove(key),
+      athleteId: athleteId,
     );
   }
 
@@ -129,5 +192,20 @@ class PeriodizedImportDraft {
         name: value,
         assignments: assignments,
         suggestions: suggestions,
+        alternatives: alternatives,
+        aliasKeys: aliasKeys,
+        athleteId: athleteId,
+      );
+
+  /// El mismo borrador, atado a [id].
+  PeriodizedImportDraft forAthlete(String id) => PeriodizedImportDraft(
+        plan: plan,
+        warnings: warnings,
+        name: name,
+        assignments: assignments,
+        suggestions: suggestions,
+        alternatives: alternatives,
+        aliasKeys: aliasKeys,
+        athleteId: id,
       );
 }

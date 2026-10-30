@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/guardia_de_salida.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
@@ -73,6 +74,7 @@ Widget _wrapWithRouter({
   String? gymId,
   MockPostRepository? mockRepo,
   List<Routine> routines = const [],
+  PostPrivacy? initialPrivacy,
 }) {
   final MockPostRepository repo;
   if (mockRepo != null) {
@@ -108,7 +110,9 @@ Widget _wrapWithRouter({
       ),
       GoRoute(
         path: '/create',
-        builder: (_, __) => const Scaffold(body: CreatePostScreen()),
+        builder: (_, __) => Scaffold(
+          body: CreatePostScreen(initialPrivacy: initialPrivacy),
+        ),
       ),
     ],
   );
@@ -402,6 +406,54 @@ void main() {
 
   // ── SCENARIO-230 — CANCELAR pops without write ───────────────────────────
 
+  // ── Visibilidad inicial (invitación a publicar de Mi gym / Público) ──────
+
+  group('visibilidad inicial', () {
+    testWidgets('abre en MI GYM y el post sale con esa visibilidad',
+        (tester) async {
+      final repo = MockPostRepository();
+      when(() => repo.create(any())).thenAnswer(
+        (inv) async =>
+            (inv.positionalArguments[0] as Post).copyWith(id: 'generated-id'),
+      );
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          gymId: 'gym-123',
+          mockRepo: repo,
+          initialPrivacy: PostPrivacy.gym,
+        ),
+      );
+      await _openCreatePost(tester);
+
+      await tester.enterText(find.byType(TextField), 'Hoy pierna');
+      await tester.pump();
+      await tester.tap(find.text('PUBLICAR'));
+      await tester.pumpAndSettle();
+
+      final creado =
+          verify(() => repo.create(captureAny())).captured.single as Post;
+      expect(creado.privacy, PostPrivacy.gym);
+    });
+
+    // La visibilidad pedida no es un cambio del usuario: salir sin escribir
+    // nada no tiene que preguntar por descartar.
+    testWidgets('sin tocar nada, CANCELAR sale sin preguntar', (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          mockRepo: MockPostRepository(),
+          initialPrivacy: PostPrivacy.public,
+        ),
+      );
+      await _openCreatePost(tester);
+
+      await tester.tap(find.text('CANCELAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('discard_changes_cancel')), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+    });
+  });
+
   group('SCENARIO-230: CANCELAR behavior', () {
     testWidgets('SCENARIO-230: CANCELAR pops without calling repo.create',
         (tester) async {
@@ -414,10 +466,61 @@ void main() {
 
       await tester.tap(find.text('CANCELAR'));
       await tester.pumpAndSettle();
+      // Con texto escrito, CANCELAR pregunta antes de tirar el borrador.
+      await tester.tap(find.byKey(const Key('discard_changes_confirm')));
+      await tester.pumpAndSettle();
 
       verifyNever(() => repo.create(any()));
       // Screen has popped — we're back at '/'
       expect(find.text('open'), findsOneWidget);
+    });
+
+    testWidgets('sin nada escrito, CANCELAR sale sin preguntar',
+        (tester) async {
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: MockPostRepository()));
+      await _openCreatePost(tester);
+
+      await tester.tap(find.text('CANCELAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('discard_changes_cancel')), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+    });
+
+    testWidgets('con texto, «Cancelar» en el diálogo conserva el borrador',
+        (tester) async {
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: MockPostRepository()));
+      await _openCreatePost(tester);
+      await tester.enterText(find.byType(TextField), 'Borrador');
+      await tester.pump();
+
+      await tester.tap(find.text('CANCELAR'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('discard_changes_cancel')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('open'), findsNothing);
+      expect(find.text('Borrador'), findsOneWidget);
+    });
+
+    // El borrador vive en un provider autoDispose: la barra de pestañas, que
+    // hace `go`, lo tiraba sin pasar por ningún PopScope.
+    testWidgets('con texto, la barra de pestañas también pregunta',
+        (tester) async {
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: MockPostRepository()));
+      await _openCreatePost(tester);
+      await tester.enterText(find.byType(TextField), 'Borrador');
+      await tester.pump();
+
+      final guardia = ProviderScope.containerOf(
+        tester.element(find.byType(CreatePostScreen)),
+      ).read(guardiaDeSalidaProvider);
+      final salida = guardia.puedeSalir();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('discard_changes_cancel')));
+      await tester.pumpAndSettle();
+
+      expect(await salida, isFalse);
     });
   });
 

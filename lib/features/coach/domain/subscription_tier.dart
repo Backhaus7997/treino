@@ -83,6 +83,22 @@ const Map<SubscriptionTier, int?> kTierTemplateLimits = {
   SubscriptionTier.plan3: null,
 };
 
+/// Cupo de imports de plan desde PDF por tier: cuántos PDF puede mandar el PF
+/// a `parsePlanPdf` por semana (lunes a domingo, hora de Buenos Aires) y por
+/// día. Espejo a mano de `TIER_PDF_IMPORT_LIMITS` en
+/// `functions/src/subscriptions/tier-config.ts` — el servidor es la autoridad
+/// (descuenta el cupo en `pdfImportUsage/{uid}` antes de llamar al LLM); este
+/// mapa es sólo para mostrar "N/límite" sin un round-trip.
+///
+/// Sin `null`: ningún plan importa ilimitado, porque cada import cuesta una
+/// llamada al LLM.
+const Map<SubscriptionTier, ({int weekly, int daily})> kTierPdfImportLimits = {
+  SubscriptionTier.free: (weekly: 2, daily: 2),
+  SubscriptionTier.plan1: (weekly: 7, daily: 7),
+  SubscriptionTier.plan2: (weekly: 15, daily: 10),
+  SubscriptionTier.plan3: (weekly: 30, daily: 10),
+};
+
 /// Precios en ARS por tier pago y ciclo. Fuente de verdad para la UI del
 /// paywall (pricing page, cards de plan). DEBE mantenerse en sync con
 /// `TIER_PRICES_ARS` en `functions/src/subscriptions/tier-config.ts` — el

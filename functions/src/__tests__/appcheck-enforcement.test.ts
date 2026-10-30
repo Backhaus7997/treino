@@ -457,6 +457,29 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "El mismo que requestPasswordReset. Restaurar los tres callables a la " +
       "vez, no de a uno.",
   },
+  "pdf-import/parse-plan-pdf:parsePlanPdf": {
+    // `debt` y no `decided`: lo llama SOLO la app mobile del PF (el import de
+    // PDF v1 no existe en el Coach Hub web), que activa App Check. No hay
+    // impedimento de plataforma; lo que falta es que la atestacion funcione.
+    permanence: "debt",
+    reason:
+      "Nace sin el flag por el mismo motivo que promoteChatToInquiry: la " +
+      "atestacion de la app no funciona (medicion del #961: acceptTrainerLink " +
+      "y requestPasswordReset en CERO validas, mintWatchCredential en 53%), " +
+      "asi que con el flag el boton de importar fallaria casi siempre. Lo que " +
+      "acota el abuso —y el gasto, porque cada llamada paga una inferencia— no " +
+      "es la atestacion: request.auth, role == 'trainer' (los PF los da de " +
+      "alta el equipo), el cupo semanal y diario por plan descontado en " +
+      "transaccion ANTES del LLM, el kill switch app_config/pdf_import, " +
+      "maxInstances 10 con concurrency 1, y los topes de 5 MB, 20 paginas y " +
+      "max_tokens. Ver pdf-import/parse-plan-pdf.ts.",
+    exitCondition:
+      "El mismo del resto del inventario: que iOS y Android emitan atestacion " +
+      "valida. Es mobile-only, asi que no depende del App Check del Coach " +
+      "Hub web. Contar sobre jsonPayload.verifications.app con el filtro " +
+      "ANCHO del #961 y pedir cero INVALID por plataforma antes de poner el " +
+      "flag.",
+  },
   "mint-watch-credential:mintWatchCredential": {
     permanence: "debt",
     reason:
@@ -499,6 +522,7 @@ const EXPECTED_DEPLOYED = [
   "markReportViewed",
   "mintWatchCredential",
   "moderationStats",
+  "parsePlanPdf",
   "promoteChatToInquiry",
   "reconcileMyCheckout",
   "requestEmailVerification",
@@ -741,6 +765,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "mail/baja-de-promocionales",
       symbol: "bajaDeCorreosPromocionales",
       as: "bajaDeCorreosPromocionales",
+      attested: false,
+    },
+    {
+      module: "pdf-import/parse-plan-pdf",
+      symbol: "parsePlanPdf",
+      as: "parsePlanPdf",
       attested: false,
     },
   ];

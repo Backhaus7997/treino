@@ -142,6 +142,14 @@ export async function runPromoteChatToInquiry(
         "Trainer is not accepting inquiries.",
       );
     }
+    // Pausa del PF (`acceptingAthletes`): espeja `pfTomaAlumnos` del create
+    // de chats, que lo lee de `users/{uid}` y no del doc público.
+    if (user.get("acceptingAthletes") === false) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Trainer is not accepting new athletes.",
+      );
+    }
 
     tx.update(chatRef, { kind: "inquiry" });
     logger.info("promoteChatToInquiry: chat stamped", {

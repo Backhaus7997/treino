@@ -275,6 +275,21 @@ describe("chats/create — consulta denegada (#637)", () => {
     await assertFails(openInquiry(ATHLETE, CLOSED));
   });
 
+  // `pfTomaAlumnos(other)` sostiene esta celda: la pausa se lee de
+  // `users/{uid}`, no del doc público, así que el perfil publicado y con
+  // consultas abiertas no alcanza.
+  it("DENIEGA la consulta si el PF pausó los alumnos nuevos", async () => {
+    await seedPublishedTrainer(CLOSED);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
+        .collection("users")
+        .doc(CLOSED)
+        .update({ acceptingAthletes: false });
+    });
+    await assertFails(openInquiry(ATHLETE, CLOSED));
+  });
+
   it("DENIEGA la consulta a un usuario cualquiera, sin perfil de PF ni rol", async () => {
     await seedUser(OUTSIDER, "athlete");
     await assertFails(openInquiry(ATHLETE, OUTSIDER));

@@ -40,6 +40,8 @@ import '../features/workout/presentation/custom_exercise_editor_screen.dart';
 import '../features/workout/presentation/my_exercises_screen.dart';
 import '../features/workout/presentation/routine_editor_mode.dart';
 import '../features/workout/presentation/routine_editor_screen.dart';
+import '../features/coach/presentation/plan_pdf_import_preview_screen.dart';
+import '../features/coach/presentation/plan_pdf_import_upload_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
 import '../features/workout/presentation/post_workout_summary_screen.dart';
@@ -49,6 +51,7 @@ import '../features/workout/presentation/session_history_screen.dart';
 import '../features/workout/presentation/routine_detail_screen.dart';
 import '../features/workout/presentation/session_player_screen.dart';
 import '../features/feed/domain/post.dart';
+import '../features/feed/domain/post_privacy.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/friend_requests_inbox_screen.dart';
@@ -60,6 +63,7 @@ import '../features/feed/application/follow_list_providers.dart';
 import '../features/feed/presentation/follow_list_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
+import 'guardia_de_salida.dart';
 import 'not_found_screen.dart';
 import '../features/insights/presentation/exercise_progression_screen.dart';
 import '../features/insights/presentation/frequent_exercises_screen.dart';
@@ -632,6 +636,23 @@ GoRouter buildRouter({
         },
       ),
       GoRoute(
+        // Import de un plan desde PDF (docs/plan-import-pdf.md): mismo patrón
+        // que el editor de arriba, con el alumno en el path. Top-level y con
+        // Scaffold propio. La barrera (rol, kill switch, cupo) es el servidor.
+        path: '/workout/import-pdf/:athleteId',
+        builder: (context, state) => PlanPdfImportUploadScreen(
+          athleteId: state.pathParameters['athleteId']!,
+        ),
+      ),
+      GoRoute(
+        // La vista previa del mismo import. Hermana y no hija: la subida la
+        // reemplaza al terminar, así «atrás» vuelve a la ficha del alumno.
+        path: '/workout/import-pdf/:athleteId/preview',
+        builder: (context, state) => PlanPdfImportPreviewScreen(
+          athleteId: state.pathParameters['athleteId']!,
+        ),
+      ),
+      GoRoute(
         path: '/workout/template-editor',
         builder: (context, state) {
           // `extra` carries an existing template id when editing; null = create.
@@ -1024,7 +1045,15 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'create',
                 builder: (_, state) => _withBg(
-                  CreatePostScreen(existingPost: state.extra as Post?),
+                  CreatePostScreen(
+                    existingPost: state.extra as Post?,
+                    // `?visibilidad=gym|public` lo manda la invitación a
+                    // publicar de cada vacío del feed. Un valor desconocido
+                    // se ignora y queda el default (SEGUIDORES).
+                    initialPrivacy: postPrivacyFromQuery(
+                      state.uri.queryParameters['visibilidad'],
+                    ),
+                  ),
                 ),
               ),
               GoRoute(
@@ -1863,7 +1892,12 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
           feedUnreadCount: feedUnreadCount,
           collapsed: _nav.value < 0.5,
           expansion: _nav.value,
-          onTap: (i) {
+          onTap: (i) async {
+            // Una pantalla con cambios sin guardar pregunta antes de que el
+            // `go` de abajo la destruya (ver [GuardiaDeSalida]). Si el usuario
+            // se queda, no se toca nada más: ni popups ni la barra.
+            if (!await ref.read(guardiaDeSalidaProvider).puedeSalir()) return;
+            if (!context.mounted) return;
             // Pop any open popup (modal bottom sheet, dialog) on the SHELL
             // navigator so it animates closed when the user switches tabs —
             // mirrors the auto-dismiss behavior the user expects from the

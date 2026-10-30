@@ -8,6 +8,7 @@ import {
   SubscriptionCycle,
   SubscriptionTier,
   TIER_CUSTOM_EXERCISE_LIMITS,
+  TIER_PDF_IMPORT_LIMITS,
   TIER_PRICES_ARS,
   TIER_TEMPLATE_LIMITS,
   TIER_WEIGHT_LIMITS,
@@ -115,6 +116,36 @@ describe("TIER_TEMPLATE_LIMITS", () => {
         limitRank(TIER_TEMPLATE_LIMITS[ORDEN[i]]) <
         limitRank(TIER_TEMPLATE_LIMITS[ORDEN[i - 1]]);
       expect(pesoSube && plantillasBajan).toBe(false);
+    }
+  });
+});
+
+describe("TIER_PDF_IMPORT_LIMITS", () => {
+  const ORDEN: SubscriptionTier[] = ["free", "plan1", "plan2", "plan3"];
+
+  it("la tabla del contrato: semanal/diario", () => {
+    expect(TIER_PDF_IMPORT_LIMITS).toEqual({
+      free: { weekly: 2, daily: 2 },
+      plan1: { weekly: 7, daily: 7 },
+      plan2: { weekly: 15, daily: 10 },
+      plan3: { weekly: 30, daily: 10 },
+    });
+  });
+
+  it("el diario nunca supera al semanal (sino el semanal no corta nada)", () => {
+    for (const t of ORDEN) {
+      expect(TIER_PDF_IMPORT_LIMITS[t].daily).toBeLessThanOrEqual(
+        TIER_PDF_IMPORT_LIMITS[t].weekly,
+      );
+    }
+  });
+
+  it("ningun escalon baja: un plan mejor nunca importa menos", () => {
+    for (let i = 1; i < ORDEN.length; i++) {
+      const anterior = TIER_PDF_IMPORT_LIMITS[ORDEN[i - 1]];
+      const actual = TIER_PDF_IMPORT_LIMITS[ORDEN[i]];
+      expect(actual.weekly).toBeGreaterThanOrEqual(anterior.weekly);
+      expect(actual.daily).toBeGreaterThanOrEqual(anterior.daily);
     }
   });
 });

@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
@@ -36,6 +37,7 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/coach/domain/trainer_location.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
@@ -111,7 +113,11 @@ Post _makePost({
       createdAt: createdAt ?? DateTime.now().subtract(const Duration(hours: 1)),
     );
 
-UserProfile _makeProfile({String? gymId, UserRole role = UserRole.athlete}) =>
+UserProfile _makeProfile({
+  String? gymId,
+  UserRole role = UserRole.athlete,
+  List<TrainerLocation> trainerLocations = const [],
+}) =>
     UserProfile(
       uid: 'u1',
       email: 'tincho@test.com',
@@ -120,6 +126,7 @@ UserProfile _makeProfile({String? gymId, UserRole role = UserRole.athlete}) =>
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
       gymId: gymId,
+      trainerLocations: trainerLocations,
       // These tests are about the feed, not onboarding (#627). Without this the
       // FEED card renders above the pill tabs and pushes content out of the
       // test viewport.
@@ -150,12 +157,23 @@ Widget _wrapProviderRouter(Widget w, List<Override> overrides) {
         builder: (_, state) =>
             Scaffold(body: Text('profile-${state.pathParameters['uid']}')),
       ),
+      GoRoute(
+        path: '/feed/create',
+        // La query va en el texto: así un test ve con qué visibilidad se
+        // pidió Nuevo post, no sólo que se navegó.
+        builder: (_, state) => Scaffold(
+          body: Text(
+            'create-post:${state.uri.queryParameters['visibilidad'] ?? ''}',
+          ),
+        ),
+      ),
     ],
   );
   return ProviderScope(
     overrides: overrides,
     child: MaterialApp.router(
       theme: AppTheme.dark(),
+      locale: const Locale('es', 'AR'),
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
       routerConfig: router,
@@ -466,6 +484,69 @@ void main() {
 
       expect(find.byType(PostCard), findsNothing);
     });
+
+    // El vacío dejaba el resto del viewport en blanco debajo del mensaje y
+    // las sugerencias: la invitación a publicar es lo que lo ocupa.
+    testWidgets('invita a publicar y el botón abre Nuevo post', (tester) async {
+      await tester.pumpWidget(
+        _wrapProviderRouter(const FeedScreen(), emptyOverrides),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('feed_first_post_prompt')), findsOneWidget);
+
+      // Por key y no por ícono: el header también tiene un «+» a /feed/create,
+      // y un test que tocara ése pasaría con el botón nuevo roto.
+      await tester.tap(find.byKey(const Key('feed_first_post_button')));
+      await tester.pumpAndSettle();
+
+      // Sin query: AMIGOS abre Nuevo post con el default (SEGUIDORES).
+      expect(find.text('create-post:'), findsOneWidget);
+    });
+
+    testWidgets('el prompt queda debajo del mensaje de vacío', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), emptyOverrides),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Y SI ARRANCÁS VOS?'), findsOneWidget);
+      // Sin sugerencias el separador propio es el único aire: 20.
+      expect(
+        tester.getRect(find.byKey(const Key('feed_first_post_prompt'))).top -
+            tester.getRect(find.byType(FeedEmptyState)).bottom,
+        AppSpacing.s20,
+      );
+    });
+
+    testWidgets('con sugerencias, el aire es sólo el padding del carrusel', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          ...emptyOverrides,
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(gymId: 'gym-a')),
+          ),
+          suggestedUsersProvider('gym-a').overrideWith(
+            (ref) async => const [
+              UserPublicProfile(uid: 'cand-0', displayName: 'Candidato 0'),
+            ],
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      // La key está en el `Padding` de la sección, así que su borde inferior
+      // ya incluye los 20 del carrusel. Si el separador se sumara siempre,
+      // acá habría 20 de más (40 de hueco en pantalla).
+      final section = find.byKey(const Key('suggested_users_section'));
+      expect(section, findsOneWidget);
+      expect(
+        tester.getRect(find.byKey(const Key('feed_first_post_prompt'))).top,
+        tester.getRect(section).bottom,
+      );
+    });
   });
 
   // ── REQ-FEED-SCREEN-004 — Loading state ───────────────────────────────────
@@ -621,6 +702,8 @@ void main() {
 
       expect(find.byType(FeedEmptyState), findsOneWidget);
       expect(find.text('Todavía no estás en un gym'), findsOneWidget);
+      // Sin gym no se puede publicar con visibilidad MI GYM.
+      expect(find.byKey(const Key('feed_first_post_prompt')), findsNothing);
     });
 
     // SCENARIO-203: empty list shows gym-no-posts empty state
@@ -637,6 +720,30 @@ void main() {
 
       expect(find.byType(FeedEmptyState), findsOneWidget);
       expect(find.text('Tu gym todavía no tiene posts'), findsOneWidget);
+    });
+
+    testWidgets('gym sin posts: invita a publicar con visibilidad MI GYM', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProviderRouter(
+          const FeedScreen(),
+          gymOverrides(gymFuture: () async => const <Post>[]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Contá cómo te fue en tu último entreno. '
+          'La gente de tu gym lo va a ver acá.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('feed_first_post_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('create-post:gym'), findsOneWidget);
     });
 
     // SCENARIO-204: non-empty list shows ListView with PostCards
@@ -685,6 +792,32 @@ void main() {
   // ── REQ-FSG-014..016 — _PublicoBody ──────────────────────────────────────
 
   group('_PublicoBody', () {
+    testWidgets('vacío: invita a publicar con visibilidad PÚBLICO', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProviderRouter(const FeedScreen(), [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Contá cómo te fue en tu último entreno. '
+          'Cualquiera en TREINO lo va a ver acá.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('feed_first_post_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('create-post:public'), findsOneWidget);
+    });
+
     // SCENARIO-211: loading state shows spinner
     testWidgets('SCENARIO-211: loading state shows spinner', (tester) async {
       await tester.pumpWidget(
@@ -1336,6 +1469,7 @@ void main() {
 
     List<Override> overridesWith({
       required List<UserPublicProfile> candidates,
+      UserProfile? profile,
     }) =>
         [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
@@ -1343,7 +1477,7 @@ void main() {
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => manyPosts()),
           userProfileProvider.overrideWith(
-            (ref) => Stream.value(_makeProfile(gymId: 'gym-a')),
+            (ref) => Stream.value(profile ?? _makeProfile(gymId: 'gym-a')),
           ),
           suggestedUsersProvider('gym-a')
               .overrideWith((ref) async => candidates),
@@ -1390,6 +1524,43 @@ void main() {
           greaterThan(tester.getRect(post10).top),
         );
       }
+    });
+
+    testWidgets(
+        'PF sin gymId: las sugerencias salen del gym de sus trainerLocations', (
+      tester,
+    ) async {
+      // Regresión: el feed gateaba las sugerencias sólo por `gymId`, y un PF
+      // con «OTRO/SIN GYM» no veía nunca el carrusel aunque tuviera sus gyms
+      // cargados como lugares de trabajo.
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedScreen(),
+          overridesWith(
+            candidates: candidates(20),
+            profile: _makeProfile(
+              role: UserRole.trainer,
+              trainerLocations: const [
+                TrainerLocation(
+                  id: 'loc-1',
+                  type: TrainerLocationType.gym,
+                  gymId: 'gym-a',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        await scrollUntil(
+          tester,
+          find.byKey(const Key('suggested_users_section')),
+        ),
+        isTrue,
+        reason: 'el PF sin gymId no vio el carrusel',
+      );
     });
 
     testWidgets(

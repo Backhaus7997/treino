@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/guardia_de_salida.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
@@ -532,6 +533,150 @@ void main() {
           find.widgetWithText(SwitchListTile, 'Acepto consultas');
       expect(tester.widget<SwitchListTile>(toggleFinder).value, isTrue,
           reason: 'default debe ser true — ver UserProfile.acceptsInquiries');
+    });
+  });
+
+  // Pausa del PF: mismo contrato que el switch de consultas. El Coach Hub y
+  // la sugerencia de cupo lleno la cambian al instante, así que el form sólo
+  // la manda si el PF la tocó ACÁ.
+  group('ProfileEditTrainerScreen — pausa de alumnos nuevos', () {
+    Future<Map<String, Object?>> guardar(
+      WidgetTester tester, {
+      required bool tocarSwitch,
+    }) async {
+      final mockRepo = MockUserRepository();
+      when(() => mockRepo.update(any(), any())).thenAnswer((_) async {});
+      await tester.pumpWidget(_buildScreen(
+        profile:
+            _trainerProfile(complete: true).copyWith(acceptingAthletes: true),
+        repo: mockRepo,
+      ));
+      await tester.pumpAndSettle();
+
+      if (tocarSwitch) {
+        final toggle =
+            find.widgetWithText(SwitchListTile, 'Tomo alumnos nuevos');
+        await tester.ensureVisible(toggle);
+        await tester.pumpAndSettle();
+        await tester.tap(toggle);
+        await tester.pumpAndSettle();
+      }
+
+      final saveBtn = find.byKey(const Key('profile_edit_trainer_save_button'));
+      await tester.ensureVisible(saveBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(saveBtn);
+      await tester.pumpAndSettle();
+
+      return verify(() => mockRepo.update('trainer-uid', captureAny()))
+          .captured
+          .single as Map<String, Object?>;
+    }
+
+    testWidgets('sin tocar el switch, el save no manda acceptingAthletes',
+        (tester) async {
+      final escrito = await guardar(tester, tocarSwitch: false);
+      expect(escrito.containsKey('acceptingAthletes'), isFalse,
+          reason: 'pisaría la pausa que el PF acaba de poner en el Hub');
+    });
+
+    testWidgets('apagándolo acá, el save manda acceptingAthletes:false',
+        (tester) async {
+      final escrito = await guardar(tester, tocarSwitch: true);
+      expect(escrito['acceptingAthletes'], isFalse);
+    });
+  });
+
+  // Regresión vista en device: el PF apagó «Tomo alumnos nuevos», se fue sin
+  // GUARDAR y quedó convencido de que estaba pausado. Salir con cambios tiene
+  // que preguntar: por atrás (PopScope) y por la barra (GuardiaDeSalida).
+  group('ProfileEditTrainerScreen — salir con cambios sin guardar', () {
+    final switchPausa =
+        find.widgetWithText(SwitchListTile, 'Tomo alumnos nuevos');
+    final dialogo = find.byKey(const Key('discard_changes_cancel'));
+
+    Future<void> abrir(WidgetTester tester, {MockUserRepository? repo}) async {
+      await tester.pumpWidget(_buildScreen(
+        profile: _trainerProfile(complete: true),
+        repo: repo,
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tocarPausa(WidgetTester tester) async {
+      await tester.ensureVisible(switchPausa);
+      await tester.pumpAndSettle();
+      await tester.tap(switchPausa);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> atras(WidgetTester tester) async {
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('sin cambios, atrás sale directo', (tester) async {
+      await abrir(tester);
+      await atras(tester);
+
+      expect(dialogo, findsNothing);
+      expect(find.text('PROFILE'), findsOneWidget);
+    });
+
+    testWidgets('con cambios, atrás pregunta; «Cancelar» se queda',
+        (tester) async {
+      await abrir(tester);
+      await tocarPausa(tester);
+      await atras(tester);
+
+      expect(dialogo, findsOneWidget);
+      await tester.tap(dialogo);
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfileEditTrainerScreen), findsOneWidget);
+      expect(find.text('PROFILE'), findsNothing);
+    });
+
+    testWidgets('con cambios, descartar sí sale', (tester) async {
+      await abrir(tester);
+      await tocarPausa(tester);
+      await atras(tester);
+
+      await tester.tap(find.byKey(const Key('discard_changes_confirm')));
+      await tester.pumpAndSettle();
+      expect(find.text('PROFILE'), findsOneWidget);
+    });
+
+    testWidgets('con cambios, la barra de pestañas también pregunta',
+        (tester) async {
+      await abrir(tester);
+      await tocarPausa(tester);
+
+      final guardia = ProviderScope.containerOf(
+        tester.element(find.byType(ProfileEditTrainerScreen)),
+      ).read(guardiaDeSalidaProvider);
+      final salida = guardia.puedeSalir();
+      await tester.pumpAndSettle();
+      expect(dialogo, findsOneWidget);
+
+      await tester.tap(dialogo);
+      await tester.pumpAndSettle();
+      expect(await salida, isFalse, reason: 'canceló: la barra no navega');
+    });
+
+    testWidgets('después de GUARDAR sale sin preguntar', (tester) async {
+      final repo = MockUserRepository();
+      when(() => repo.update(any(), any())).thenAnswer((_) async {});
+      await abrir(tester, repo: repo);
+      await tocarPausa(tester);
+
+      final saveBtn = find.byKey(const Key('profile_edit_trainer_save_button'));
+      await tester.ensureVisible(saveBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(saveBtn);
+      await tester.pumpAndSettle();
+
+      expect(dialogo, findsNothing);
+      expect(find.text('PROFILE'), findsOneWidget);
     });
   });
 }

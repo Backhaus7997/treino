@@ -61,12 +61,63 @@ class PlanDraftMatcher {
     required List<ImportDiagnostic> warnings,
     required String name,
   }) async {
-    final match = matchPeriodizedPlan(plan, await loadCatalog());
-    return PeriodizedImportDraft.fromMatch(
+    final catalog = await loadCatalog();
+    final draft = PeriodizedImportDraft.fromMatch(
       plan: plan,
       warnings: warnings,
       name: name,
-      match: match,
+      match: matchPeriodizedPlan(plan, catalog),
     );
+    return applyExtractorCandidates(draft, ExerciseNameMatcher(catalog));
   }
+}
+
+/// Suma al borrador los candidatos que propuso el extractor del PDF
+/// (`candidateExerciseId`), SÓLO como sugerencias (docs/plan-import-pdf.md,
+/// «Matcheo»). Un candidato entra si:
+///
+/// 1. existe en el catálogo del matcher y pasa el veto determinístico
+///    ([ExerciseNameMatcher.suggestFromCandidate]);
+/// 2. el componente no está asignado (el exacto siempre gana).
+///
+/// El candidato pasa a ser LA sugerencia, y si el fuzzy había sugerido otro
+/// ejercicio, el del fuzzy queda en [PeriodizedImportDraft.alternatives].
+/// Antes era al revés y el fuzzy se equivocaba donde el modelo no: cuenta
+/// palabras en común, así que «Sentadilla trasera» elegía «Sentadilla
+/// trasera con banda» (dos palabras) sobre «Sentadilla (Barra)», que es la
+/// que propuso el modelo leyendo el plan entero. Sigue sin autoasignarse
+/// nunca, y `candidateConfidence` no mueve nada en v1.
+///
+/// En el Excel no hay candidatos: devuelve el mismo borrador.
+PeriodizedImportDraft applyExtractorCandidates(
+  PeriodizedImportDraft draft,
+  ExerciseNameMatcher matcher,
+) {
+  final suggestions = {...draft.suggestions};
+  final alternatives = {...draft.alternatives};
+  for (final day in draft.plan.days) {
+    for (final row in day.rows) {
+      for (final ex in row.exercises) {
+        final id = ex.candidateExerciseId;
+        if (id == null) continue;
+        final key = exerciseKeyOf(day, row, ex);
+        if (draft.isResolved(key)) continue;
+        final candidate = matcher.suggestFromCandidate(id, ex.rawName);
+        if (candidate == null) continue;
+        final fuzzy = suggestions[key];
+        suggestions[key] = candidate;
+        if (fuzzy != null && fuzzy.id != candidate.id) {
+          alternatives[key] = fuzzy;
+        }
+      }
+    }
+  }
+  return PeriodizedImportDraft(
+    plan: draft.plan,
+    warnings: draft.warnings,
+    name: draft.name,
+    assignments: draft.assignments,
+    suggestions: suggestions,
+    alternatives: alternatives,
+  );
 }

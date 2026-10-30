@@ -15,6 +15,9 @@ import 'package:treino/features/moderation/application/moderation_providers.dart
 import 'package:treino/features/gyms/domain/gym_source.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/coach/domain/trainer_location.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
@@ -196,6 +199,58 @@ void main() {
         await buildContainer().read(suggestedUsersProvider('gym-a').future);
 
     expect(result.map((profile) => profile.uid), ['available']);
+  });
+
+  group('suggestionsOriginGymId', () {
+    UserProfile profile({
+      String? gymId,
+      List<TrainerLocation> locations = const [],
+    }) =>
+        UserProfile(
+          uid: 'me',
+          email: 'me@test.com',
+          displayName: 'Profe',
+          role: UserRole.trainer,
+          createdAt: DateTime.utc(2026, 1, 1),
+          updatedAt: DateTime.utc(2026, 1, 1),
+          gymId: gymId,
+          trainerLocations: locations,
+        );
+
+    const custom = TrainerLocation(
+      id: 'casa',
+      type: TrainerLocationType.custom,
+      customLabel: 'Mi estudio',
+    );
+    const gymB = TrainerLocation(
+      id: 'b',
+      type: TrainerLocationType.gym,
+      gymId: 'gym-b',
+    );
+
+    test('el gymId del perfil manda sobre los lugares de trabajo', () {
+      expect(
+        suggestionsOriginGymId(profile(gymId: 'gym-a', locations: [gymB])),
+        'gym-a',
+      );
+    });
+
+    test('sin gymId, usa el primer lugar que sea gym del catálogo', () {
+      for (final gymId in [null, '', kNoGymId]) {
+        expect(
+          suggestionsOriginGymId(
+            profile(gymId: gymId, locations: [custom, gymB]),
+          ),
+          'gym-b',
+          reason: 'gymId = $gymId',
+        );
+      }
+    });
+
+    test('sin gymId ni gyms entre los lugares, no hay origen', () {
+      expect(suggestionsOriginGymId(profile(locations: [custom])), isNull);
+      expect(suggestionsOriginGymId(null), isNull);
+    });
   });
 
   test('returns no suggestions when the user has no gym', () async {

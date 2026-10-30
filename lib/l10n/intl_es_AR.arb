@@ -550,6 +550,38 @@
   "@trainerAcceptsInquiriesSubtitle": {
     "description": "Subtítulo del toggle de consultas. Dice NUEVAS a propósito: `senderMayPost` autoriza incondicionalmente todo chat que ya tiene kind:inquiry, así que apagar el switch NO calla a quien ya venía hablando. Decir «sólo te escriben tus alumnos» era una promesa que el sistema no cumple."
   },
+  "trainerAcceptingAthletesTitle": "Tomo alumnos nuevos",
+  "@trainerAcceptingAthletesTitle": {
+    "description": "Título del toggle de pausa del PF (`acceptingAthletes`)."
+  },
+  "trainerAcceptingAthletesSubtitle": "Si lo apagás, dejás de aparecer en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas. Tus alumnos actuales siguen igual.",
+  "@trainerAcceptingAthletesSubtitle": {
+    "description": "Subtítulo del toggle de pausa. Dice NUEVAS por lo mismo que el de consultas: las solicitudes pending que ya entraron y los chats abiertos no se tocan."
+  },
+  "trainerPlanLimitPauseTitle": "LLEGASTE AL TOPE DE TU PLAN",
+  "@trainerPlanLimitPauseTitle": {
+    "description": "Título de la sugerencia de pausar el perfil cuando la carga de alumnos alcanzó el tope del plan. Es una sugerencia: nada se pausa solo."
+  },
+  "trainerPlanLimitPauseBody": "Si no vas a sumar alumnos, pausá tu perfil: dejás de aparecer en el buscador y no te llegan solicitudes que no vas a poder aceptar.",
+  "@trainerPlanLimitPauseBody": {
+    "description": "Cuerpo de la sugerencia de pausar con el cupo lleno."
+  },
+  "trainerPlanLimitPauseAction": "PAUSAR PERFIL",
+  "@trainerPlanLimitPauseAction": {
+    "description": "Botón de la sugerencia: pone acceptingAthletes en false."
+  },
+  "trainerPausedNoticeTitle": "TU PERFIL ESTÁ PAUSADO",
+  "@trainerPausedNoticeTitle": {
+    "description": "Aviso fijo en el panel del PF mientras acceptingAthletes == false."
+  },
+  "trainerPausedNoticeBody": "No aparecés en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas.",
+  "@trainerPausedNoticeBody": {
+    "description": "Cuerpo del aviso de perfil pausado."
+  },
+  "trainerPausedNoticeAction": "REANUDAR",
+  "@trainerPausedNoticeAction": {
+    "description": "Botón del aviso de perfil pausado: pone acceptingAthletes en true."
+  },
   "athleteLinkUnconfirmed": "No pudimos confirmar tu vínculo con tu PF.",
   "@athleteLinkUnconfirmed": {
     "description": "Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir."
@@ -3184,6 +3216,19 @@
       }
     }
   },
+  "trainerNotAcceptingLabel": "NO TOMA ALUMNOS",
+  "@trainerNotAcceptingLabel": {
+    "description": "Disabled contact CTA label on a trainer's public profile when the trainer paused new athletes (acceptingAthletes == false)."
+  },
+  "trainerNotAcceptingExplanation": "{trainerName} no está tomando alumnos nuevos por ahora.",
+  "@trainerNotAcceptingExplanation": {
+    "description": "Helper line under the disabled contact CTA on the trainer's public profile when the trainer paused new athletes.",
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubPreviewDiscardTitle": "¿Salir sin guardar el plan?",
   "@coachHubPreviewDiscardTitle": {
     "description": "Title of the confirm dialog shown when leaving the coach-hub plan preview screen with manually-mapped exercises that would be lost (finding 9)."
@@ -4305,6 +4350,26 @@
   "@feedEmptyFollowing": {
     "description": "Estado vacío del feed SEGUIDORES."
   },
+  "feedFirstPostTitle": "¿Y SI ARRANCÁS VOS?",
+  "@feedFirstPostTitle": {
+    "description": "Invitación a publicar al pie del vacío de AMIGOS."
+  },
+  "feedFirstPostBody": "Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.",
+  "@feedFirstPostBody": {
+    "description": "Invitación a publicar al pie del vacío de AMIGOS."
+  },
+  "feedFirstPostBodyGym": "Contá cómo te fue en tu último entreno. La gente de tu gym lo va a ver acá.",
+  "@feedFirstPostBodyGym": {
+    "description": "Invitación a publicar al pie del vacío de MI GYM."
+  },
+  "feedFirstPostBodyPublic": "Contá cómo te fue en tu último entreno. Cualquiera en TREINO lo va a ver acá.",
+  "@feedFirstPostBodyPublic": {
+    "description": "Invitación a publicar al pie del vacío de PÚBLICO."
+  },
+  "feedFirstPostCta": "PUBLICAR",
+  "@feedFirstPostCta": {
+    "description": "Botón de la invitación a publicar del vacío de AMIGOS."
+  },
   "chatBlockedComposerNotice": "Bloqueaste a esta persona. Desbloqueala para escribirle.",
   "@chatBlockedComposerNotice": {
     "description": "Aviso persistente sobre el composer cuando el usuario bloqueó al otro miembro del chat."
@@ -5402,5 +5467,157 @@
   "sessionRestCountdownTitle": "Descanso",
   "@sessionRestCountdownTitle": {"description": "Título de la notificación con la cuenta regresiva en vivo del descanso, que se publica al pasar la app a segundo plano (#1617, sólo Android). El tiempo lo pone el sistema con un cronómetro; esto es lo que lo acompaña."},
   "sessionRestCountdownBody": "Volvé a la serie cuando llegue a cero",
-  "@sessionRestCountdownBody": {"description": "Cuerpo de la notificación de cuenta regresiva. Silenciosa: el aviso que suena es el de «Terminó el descanso»."}
+  "@sessionRestCountdownBody": {"description": "Cuerpo de la notificación de cuenta regresiva. Silenciosa: el aviso que suena es el de «Terminó el descanso»."},
+  "pdfImportUploadTitle": "IMPORTAR PLAN",
+  "@pdfImportUploadTitle": {"description": "Título de la pantalla de subida del PDF."},
+  "pdfImportPrivacyNotice": "Usamos IA para leer tu PDF y armar el plan. No guardamos el archivo. Subí solo los datos de tu alumno que sean necesarios.",
+  "@pdfImportPrivacyNotice": {"description": "Aviso de privacidad de la pantalla de subida. Texto final aprobado por el dueño el 2026-10-22 (docs/plan-import-pdf.md, «Aviso en la pantalla de subida»): no se reescribe ni se agregan nombres de proveedores."},
+  "pdfImportPickFile": "Elegir PDF",
+  "@pdfImportPickFile": {"description": "Botón que abre el selector de archivos (sólo .pdf)."},
+  "pdfImportPickAnother": "Elegir otro archivo",
+  "@pdfImportPickAnother": {"description": "Acción para cambiar el PDF elegido, también la de los errores del archivo."},
+  "pdfImportProcess": "PROCESAR PLAN",
+  "@pdfImportProcess": {"description": "Botón que manda el PDF a leer."},
+  "pdfImportProcessingTitle": "Leyendo tu plan…",
+  "@pdfImportProcessingTitle": {"description": "Estado de espera mientras el servidor lee el PDF."},
+  "pdfImportProcessingHint": "Puede tardar hasta un par de minutos. No cierres esta pantalla.",
+  "@pdfImportProcessingHint": {"description": "Debajo del estado de espera: la extracción puede pasar del minuto."},
+  "pdfImportLeaveTitle": "¿Salir mientras se lee el plan?",
+  "@pdfImportLeaveTitle": {"description": "Confirmación al querer salir con la lectura en curso."},
+  "pdfImportLeaveBody": "Este intento ya cuenta en tu cupo aunque salgas.",
+  "@pdfImportLeaveBody": {"description": "Cuerpo de esa confirmación. Es verdad: el servidor descuenta el cupo ANTES de llamar al modelo."},
+  "pdfImportLeaveConfirm": "Salir",
+  "@pdfImportLeaveConfirm": {"description": "Acción que confirma salir con la lectura en curso."},
+  "pdfImportRetry": "Reintentar",
+  "@pdfImportRetry": {"description": "Acción de los errores que se arreglan reintentando."},
+  "pdfImportErrorTooBig": "El archivo pesa más de 5 MB. Elegí uno más liviano.",
+  "@pdfImportErrorTooBig": {"description": "El PDF supera el tope de 5 MB (lo chequea el cliente antes de mandar y el servidor de nuevo)."},
+  "pdfImportErrorInternal": "No pudimos leer el plan. Probá de nuevo en un rato.",
+  "@pdfImportErrorInternal": {"description": "internal y todo lo que no es del contrato."},
+  "pdfImportReadSummary": "Leímos {days, plural, =1{1 día} other{{days} días}} y {weeks, plural, =1{1 semana} other{{weeks} semanas}}.",
+  "@pdfImportReadSummary": {"description": "Resumen de lo que se leyó del PDF: días y semanas del plan.", "placeholders": {"days": {"type": "int"}, "weeks": {"type": "int"}}},
+  "pdfImportErrorNotPdf": "El archivo no es un PDF válido.",
+  "@pdfImportErrorNotPdf": {"description": "invalid-argument con reason not_pdf."},
+  "pdfImportErrorTooManyPages": "El PDF tiene más de 20 páginas. Elegí uno más corto.",
+  "@pdfImportErrorTooManyPages": {"description": "invalid-argument con reason too_many_pages."},
+  "pdfImportErrorEncrypted": "El PDF tiene contraseña. Exportalo sin contraseña y elegilo de nuevo.",
+  "@pdfImportErrorEncrypted": {"description": "invalid-argument con reason encrypted."},
+  "pdfImportErrorFileUnknown": "No pudimos usar este archivo. Probá con otro.",
+  "@pdfImportErrorFileUnknown": {"description": "invalid-argument con una reason que no conocemos."},
+  "pdfImportErrorQuotaWeek": "Usaste todas las importaciones de esta semana. Se renueva el {date} a las {time}.",
+  "@pdfImportErrorQuotaWeek": {"description": "resource-exhausted con scope week. date = dd/mm, time = HH:mm, en la hora local del teléfono.", "placeholders": {"date": {"type": "String"}, "time": {"type": "String"}}},
+  "pdfImportErrorQuotaDay": "Usaste todas las importaciones de hoy. Se renueva el {date} a las {time}.",
+  "@pdfImportErrorQuotaDay": {"description": "resource-exhausted con scope day.", "placeholders": {"date": {"type": "String"}, "time": {"type": "String"}}},
+  "pdfImportErrorQuotaUnknown": "Usaste todas las importaciones disponibles por ahora.",
+  "@pdfImportErrorQuotaUnknown": {"description": "resource-exhausted sin scope o sin resetsAt legible: no se inventa la fecha."},
+  "pdfImportErrorTimeout": "La lectura tardó demasiado. Probá de nuevo; si el PDF es largo, probá con menos páginas.",
+  "@pdfImportErrorTimeout": {"description": "deadline-exceeded (servidor) o timeout del cliente."},
+  "pdfImportErrorInvalidPlan": "Leímos el PDF pero no pudimos armar el plan. Este intento ya contó en tu cupo.",
+  "@pdfImportErrorInvalidPlan": {"description": "El cliente rechazó el plan que devolvió el servidor: el cupo ya se descontó."},
+  "pdfImportErrorDisabled": "Importar de PDF no está disponible para tu cuenta.",
+  "@pdfImportErrorDisabled": {"description": "failed-precondition sin reason: kill switch apagado para este uid."},
+  "pdfImportErrorUnavailable": "Importar de PDF no está disponible por un problema nuestro. No se descontó de tu cupo.",
+  "@pdfImportErrorUnavailable": {"description": "failed-precondition con reason structured_outputs_disabled: el servidor devuelve el cupo."},
+  "pdfImportErrorNotTrainer": "Solo los entrenadores pueden importar planes.",
+  "@pdfImportErrorNotTrainer": {"description": "permission-denied."},
+  "pdfImportErrorSignedOut": "Tu sesión se cerró. Volvé a iniciar sesión.",
+  "@pdfImportErrorSignedOut": {"description": "unauthenticated."},
+  "pdfImportCta": "IMPORTAR DE PDF",
+  "@pdfImportCta": {"description": "CTA en la ficha del alumno, al lado de CREAR PLAN. Sólo si el kill switch de app_config/pdf_import habilita al PF (docs/plan-import-pdf.md)."},
+  "pdfImportQuotaWeek": "{week, plural, =1{Te queda 1 importación esta semana.} other{Te quedan {week} importaciones esta semana.}}",
+  "@pdfImportQuotaWeek": {"description": "Cupo de imports de PDF que se pueden hacer ahora, cuando el tope que frena es el semanal (o los dos son iguales). Sin cupo no se muestra: habla el cartel rojo.", "placeholders": {"week": {"type": "int"}}},
+  "pdfImportQuotaNoneWeek": "No te quedan importaciones esta semana: se renuevan el lunes.",
+  "@pdfImportQuotaNoneWeek": {"description": "Cupo semanal agotado, visible ANTES de subir un archivo (el cartel rojo sale recién cuando un import falla)."},
+  "pdfImportQuotaNoneDay": "No te quedan importaciones hoy: se renuevan mañana.",
+  "@pdfImportQuotaNoneDay": {"description": "Cupo diario agotado con cupo semanal disponible (planes 2 y 3), visible antes de subir un archivo."},
+  "pdfImportQuotaDayLimited": "{day, plural, =1{Te queda 1 hoy} other{Te quedan {day} hoy}} · {week} esta semana.",
+  "@pdfImportQuotaDayLimited": {"description": "Cupo de imports de PDF cuando frena el tope DIARIO (planes 2 y 3): lo que queda hoy, y lo que queda en la semana como dato.", "placeholders": {"day": {"type": "int"}, "week": {"type": "int"}}},
+  "pdfImportSourceShow": "Ver PDF",
+  "@pdfImportSourceShow": {"description": "Despliega el texto del PDF del que salió el ejercicio, para compararlo."},
+  "pdfImportSourceHide": "Ocultar PDF",
+  "@pdfImportSourceHide": {"description": "Pliega ese texto."},
+  "pdfImportAlternative": "Alternativa: {name}",
+  "@pdfImportAlternative": {"description": "El candidato del extractor cuando pasó el veto pero el matcher sugirió otro ejercicio.", "placeholders": {"name": {"type": "String"}}},
+  "pdfImportUseAlternative": "Usar alternativa",
+  "@pdfImportUseAlternative": {"description": "Asigna la alternativa en vez de la sugerencia."},
+  "pdfImportPending": "{count, plural, =1{Queda 1 ejercicio por resolver: confirmá la sugerencia o vinculalo.} other{Quedan {count} ejercicios por resolver: confirmá las sugerencias o vinculalos.}}",
+  "@pdfImportPending": {"description": "Vista previa del PDF: pendientes que bloquean ASIGNAR (sugerencias sin confirmar y ejercicios sin match).", "placeholders": {"count": {"type": "int"}}},
+  "pdfImportBulkCreate": "{count, plural, =1{CREAR 1 PROPIO} other{CREAR {count} PROPIOS}}",
+  "@pdfImportBulkCreate": {"description": "Crea en bloque los ejercicios sin candidato como propios del PF, uno por nombre distinto (docs/plan-import-pdf.md, «Crear N propios»).", "placeholders": {"count": {"type": "int"}}},
+  "pdfImportBulkPartialTitle": "Te alcanza para {allowed} de {total}",
+  "@pdfImportBulkPartialTitle": {"description": "El tope de ejercicios propios del plan no alcanza para todos.", "placeholders": {"allowed": {"type": "int"}, "total": {"type": "int"}}},
+  "pdfImportBulkPartialBody": "Se crean los primeros en el orden del plan. El resto queda para vincular con la biblioteca.",
+  "@pdfImportBulkPartialBody": {"description": "Cuerpo de esa confirmación."},
+  "pdfImportBulkQuotaUnknown": "No pudimos verificar tu tope de ejercicios propios. Probá de nuevo.",
+  "@pdfImportBulkQuotaUnknown": {"description": "No se supo el tope: crear en bloque no se arriesga a pasarlo."},
+  "pdfImportBulkFailed": "Se crearon {created} de {requested}. No pudimos crear el resto.",
+  "@pdfImportBulkFailed": {"description": "Una creación en bloque se cortó a mitad: lo creado queda creado.", "placeholders": {"created": {"type": "int"}, "requested": {"type": "int"}}},
+  "pdfImportAssign": "ASIGNAR PLAN",
+  "@pdfImportAssign": {"description": "Asigna el plan al alumno. Deshabilitado mientras haya pendientes."},
+  "pdfImportAssigned": "Plan asignado.",
+  "@pdfImportAssigned": {"description": "Aviso al volver a la ficha del alumno después de asignar."},
+  "pdfImportOpenEditor": "ABRIR EDITOR",
+  "@pdfImportOpenEditor": {"description": "Acción del aviso: abre el plan recién asignado en el editor de rutina para ajustarlo."},
+  "pdfImportAssignFailed": "No pudimos guardar el plan. Probá de nuevo.",
+  "@pdfImportAssignFailed": {"description": "Falló la asignación: no se guardó nada."},
+  "pdfImportLevel": "Nivel del plan",
+  "@pdfImportLevel": {"description": "Título del selector de nivel de la rutina importada."},
+  "pdfImportPreviewTitle": "REVISAR PLAN",
+  "@pdfImportPreviewTitle": {"description": "Título de la vista previa del plan importado de PDF."},
+  "pdfImportNameLabel": "Nombre de la rutina",
+  "@pdfImportNameLabel": {"description": "Etiqueta del campo editable con el nombre de la rutina importada."},
+  "pdfImportConfirmAll": "{count, plural, =1{Confirmar la sugerencia} other{Confirmar las {count} sugerencias}}",
+  "@pdfImportConfirmAll": {"description": "Confirma en bloque todas las sugerencias pendientes de la vista previa, igual que tocar «Confirmar» en cada fila. No toca las filas sin match.", "placeholders": {"count": {"type": "int"}}},
+  "pdfImportRowResolved": "Resuelto",
+  "@pdfImportRowResolved": {"description": "Lector de pantalla: el tilde de una fila de la vista previa ya vinculada a un ejercicio de la biblioteca."},
+  "pdfImportRowShowDetail": "Ver detalle",
+  "@pdfImportRowShowDetail": {"description": "Lector de pantalla: qué hace tocar una fila resuelta plegada (la despliega para cambiarla o ver el texto del PDF)."},
+  "pdfImportRowHideDetail": "Ocultar detalle",
+  "@pdfImportRowHideDetail": {"description": "Lector de pantalla: qué hace tocar el encabezado de una fila resuelta desplegada (la vuelve a plegar)."},
+  "pdfImportConfirm": "Confirmar",
+  "@pdfImportConfirm": {"description": "Vista previa del import: confirma la sugerencia de la fila. Es la única acción de la fila con el acento."},
+  "pdfImportChange": "Cambiar",
+  "@pdfImportChange": {"description": "Vista previa del import: elige otro ejercicio de la biblioteca para la fila."},
+  "pdfImportLinkLibrary": "Vincular con la biblioteca",
+  "@pdfImportLinkLibrary": {"description": "Vista previa del import: fila sin match, buscar el ejercicio en la biblioteca."},
+  "pdfImportCreateOwn": "Crear como propio",
+  "@pdfImportCreateOwn": {"description": "Vista previa del import: fila sin match, crear un ejercicio propio con el nombre leído."},
+  "pdfImportSuggestionA11y": "Sugerencia: {name}",
+  "@pdfImportSuggestionA11y": {"description": "Lector de pantalla: la línea «→ ejercicio» de una fila con sugerencia pendiente.", "placeholders": {"name": {"type": "String"}}},
+  "pdfImportMarkPending": "sugerencia por confirmar",
+  "@pdfImportMarkPending": {"description": "Lector de pantalla: el punto ámbar al final de una fila con sugerencia sin confirmar."},
+  "pdfImportMarkNoMatch": "sin ejercicio de la biblioteca",
+  "@pdfImportMarkNoMatch": {"description": "Lector de pantalla: el anillo al final de una fila que no matcheó con la biblioteca."},
+  "pdfImportBlockSuperset": "SUPERSERIE · {count} ejercicios",
+  "@pdfImportBlockSuperset": {"description": "Encabezado de un renglón de 2 ejercicios en la vista previa del import.", "placeholders": {"count": {"type": "int"}}},
+  "pdfImportBlockTriset": "TRISERIE · {count} ejercicios",
+  "@pdfImportBlockTriset": {"description": "Encabezado de un renglón de 3 ejercicios en la vista previa del import.", "placeholders": {"count": {"type": "int"}}},
+  "pdfImportBlockCircuit": "CIRCUITO · {count} ejercicios",
+  "@pdfImportBlockCircuit": {"description": "Encabezado de un renglón de 4 o más ejercicios en la vista previa del import.", "placeholders": {"count": {"type": "int"}}},
+  "pdfImportBlockRest": "descanso {rest} al final",
+  "@pdfImportBlockRest": {"description": "Encabezado de superserie: el descanso del renglón, que va una sola vez después del último ejercicio. {rest} ya viene formateado (`90 s`, `2 min`).", "placeholders": {"rest": {"type": "String"}}},
+  "pdfImportFailure": "al fallo",
+  "@pdfImportFailure": {"description": "Línea de datos de un ejercicio: la serie va al fallo."},
+  "pdfImportWarmup": "CALENTAMIENTO",
+  "@pdfImportWarmup": {"description": "Marca de un renglón sin número (calentamiento) en la vista previa del import."},
+  "pdfImportPendingSuggestions": "{count, plural, =1{1 sugerencia por confirmar} other{{count} sugerencias por confirmar}}",
+  "@pdfImportPendingSuggestions": {"description": "Aviso arriba de la vista previa: cuántas sugerencias faltan confirmar.", "placeholders": {"count": {"type": "int"}}},
+  "pdfImportPendingNoMatch": "{count} sin match",
+  "@pdfImportPendingNoMatch": {"description": "Aviso arriba de la vista previa: cuántos ejercicios no matchearon con la biblioteca.", "placeholders": {"count": {"type": "int"}}},
+  "pdfImportWarningsCount": "{count, plural, =1{1 aviso} other{{count} avisos}}",
+  "@pdfImportWarningsCount": {"description": "Título de la tarjeta de avisos del parser en la vista previa del import.", "placeholders": {"count": {"type": "int"}}},
+  "coachHubImportUploadHintPdf": "Plantilla .xlsx (hasta 10 MB) o el PDF de tu plan (hasta 5 MB).",
+  "@coachHubImportUploadHintPdf": {"description": "Coach Hub, «Importar plan»: qué archivos acepta la tarjeta de subida cuando el import de PDF está habilitado para el PF (kill switch app_config/pdf_import). Los topes son los del parser de Excel y PDF_MAX_BYTES del servidor."},
+  "coachHubImportTemplateBodyPdf": "Descargá la plantilla: una hoja \"Programa\" con un bloque por día y una columna por semana, y una hoja \"Instrucciones\" con la notación. Es la única planilla que aceptamos; si tu plan está en PDF, subilo tal cual.",
+  "@coachHubImportTemplateBodyPdf": {"description": "Coach Hub, «Importar plan»: texto de la tarjeta de la plantilla cuando el import de PDF está habilitado. Sin el PDF dice «Es la única que aceptamos», que con un PDF al lado sería falso."},
+  "coachHubPdfProcessingHint": "Puede tardar hasta un par de minutos. Podés seguir usando el Hub: te avisamos cuando esté listo.",
+  "@coachHubPdfProcessingHint": {"description": "Coach Hub: debajo de «Leyendo tu plan…». En el Hub la lectura sigue aunque el PF se vaya de la pantalla, y el shell le avisa al terminar (mobile usa pdfImportProcessingHint, que pide no cerrar)."},
+  "coachHubPdfReadyToast": "Tu plan está listo",
+  "@coachHubPdfReadyToast": {"description": "Coach Hub: aviso del shell cuando la lectura del PDF terminó bien mientras el PF estaba en otra sección. También es el título de la tarjeta si vuelve a «Importar plan» con el plan listo."},
+  "coachHubPdfReadyAction": "VER VISTA PREVIA",
+  "@coachHubPdfReadyAction": {"description": "Acción del aviso «Tu plan está listo»: abre la vista previa del plan leído."},
+  "coachHubPdfFailedToast": "No pudimos leer tu plan.",
+  "@coachHubPdfFailedToast": {"description": "Coach Hub: aviso del shell cuando la lectura del PDF terminó mal mientras el PF estaba en otra sección. El detalle y su acción están en «Importar plan»."},
+  "coachHubPdfFailedAction": "VER DETALLE",
+  "@coachHubPdfFailedAction": {"description": "Acción del aviso «No pudimos leer tu plan.»: vuelve a «Importar plan», que muestra el error tipado."}
 }

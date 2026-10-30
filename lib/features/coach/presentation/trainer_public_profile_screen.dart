@@ -147,11 +147,21 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
                 // error por una decisión deliberada del PF. Se lee del perfil
                 // que esta pantalla YA tiene en mano, así que el CTA conserva su
                 // propiedad de no watchear ningún provider.
-                if (profile.acceptsInquiries) ...[
+                //
+                // La pausa del PF (`acceptingAthletes`) también cierra las
+                // consultas — la rule las rechaza —, así que se esconde igual.
+                // El de vínculo NO se esconde: lo decide el propio CTA, que es
+                // el que le muestra al alumno actual su vínculo con este PF.
+                if (profile.acceptsInquiries && profile.acceptingAthletes) ...[
                   TrainerInquiryCta(trainerId: uid, preview: preview),
                   const SizedBox(height: AppSpacing.s12),
                 ],
-                TrainerContactCtaStub(trainerId: uid, preview: preview),
+                TrainerContactCtaStub(
+                  trainerId: uid,
+                  preview: preview,
+                  acceptingAthletes: profile.acceptingAthletes,
+                  trainerName: profile.displayName,
+                ),
                 const SizedBox(height: 12),
                 ReviewCta(trainerId: uid),
                 const SizedBox(height: 20),

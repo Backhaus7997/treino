@@ -94,6 +94,31 @@ export const TIER_TEMPLATE_LIMITS: Record<SubscriptionTier, number | null> = {
 };
 
 /**
+ * Cupo de imports de plan desde PDF por plan del PF (contrato
+ * `pdf-import-contrato.md`): cuantos PDF puede mandar a `parsePlanPdf` por
+ * semana y por dia. La semana va de lunes 00:00 a domingo 23:59 en
+ * `America/Argentina/Buenos_Aires` (ver `pdf-import/quota.ts`).
+ *
+ * A diferencia de las tres escaleras de arriba, aca NO hay `null`: cada
+ * import le cuesta plata a TREINO (una llamada al LLM), asi que ningun plan
+ * es ilimitado. Por eso el tipo es `{ weekly; daily }` de numeros, y el
+ * diario es el que corta una rafaga en un plan con semanal alto.
+ *
+ * Debe mantenerse espejada a mano en `kTierPdfImportLimits`
+ * (`lib/features/coach/domain/subscription_tier.dart`); lo vigila
+ * `test/conformance/tier_limits_parity_test.dart`.
+ */
+export const TIER_PDF_IMPORT_LIMITS: Record<
+  SubscriptionTier,
+  { weekly: number; daily: number }
+> = {
+  free: { weekly: 2, daily: 2 },
+  plan1: { weekly: 7, daily: 7 },
+  plan2: { weekly: 15, daily: 10 },
+  plan3: { weekly: 30, daily: 10 },
+};
+
+/**
  * Price table in ARS. Server-authoritative — NEVER trust a client-supplied
  * amount. `free` has no price (never charged).
  *

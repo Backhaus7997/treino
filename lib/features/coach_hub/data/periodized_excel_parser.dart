@@ -14,10 +14,6 @@ const String kProgramSheet = 'Programa';
 /// Hoja de ayuda de la plantilla (el parser la ignora).
 const String kInstructionsSheet = 'Instrucciones';
 
-/// Techos del producto (`athlete_entitlement.dart`).
-const int kMaxImportDays = 7;
-const int kMaxImportWeeks = 16;
-
 /// Mensaje de rechazo del formato simple viejo.
 const String kOldFormatMessage =
     'Este Excel es del formato viejo. Bajá la plantilla nueva desde el '

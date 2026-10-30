@@ -745,6 +745,33 @@ class AppL10nEs extends AppL10n {
       'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.';
 
   @override
+  String get trainerAcceptingAthletesTitle => 'Acepto alumnos nuevos';
+
+  @override
+  String get trainerAcceptingAthletesSubtitle =>
+      'Si lo apagas, dejas de aparecer en Encuentra tu coach y no te llegan solicitudes ni consultas nuevas. Tus alumnos actuales siguen igual.';
+
+  @override
+  String get trainerPlanLimitPauseTitle => 'LLEGASTE AL LÍMITE DE TU PLAN';
+
+  @override
+  String get trainerPlanLimitPauseBody =>
+      'Si no vas a sumar alumnos, pausa tu perfil: dejas de aparecer en el buscador y no te llegan solicitudes que no podrás aceptar.';
+
+  @override
+  String get trainerPlanLimitPauseAction => 'PAUSAR PERFIL';
+
+  @override
+  String get trainerPausedNoticeTitle => 'TU PERFIL ESTÁ PAUSADO';
+
+  @override
+  String get trainerPausedNoticeBody =>
+      'No apareces en Encuentra tu coach y no te llegan solicitudes ni consultas nuevas.';
+
+  @override
+  String get trainerPausedNoticeAction => 'REANUDAR';
+
+  @override
   String get athleteLinkUnconfirmed =>
       'No pudimos confirmar tu vínculo con tu PF.';
 
@@ -3786,6 +3813,14 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get trainerNotAcceptingLabel => 'NO TOMA ALUMNOS';
+
+  @override
+  String trainerNotAcceptingExplanation(String trainerName) {
+    return '$trainerName no está tomando alumnos nuevos por ahora.';
+  }
+
+  @override
   String get coachHubPreviewDiscardTitle => '¿Salir sin guardar el plan?';
 
   @override
@@ -4696,6 +4731,24 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get feedEmptyFollowing => 'Aún no hay posts de quienes seguís';
+
+  @override
+  String get feedFirstPostTitle => '¿Y SI ARRANCÁS VOS?';
+
+  @override
+  String get feedFirstPostBody =>
+      'Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.';
+
+  @override
+  String get feedFirstPostBodyGym =>
+      'Contá cómo te fue en tu último entreno. La gente de tu gym lo va a ver acá.';
+
+  @override
+  String get feedFirstPostBodyPublic =>
+      'Contá cómo te fue en tu último entreno. Cualquiera en TREINO lo va a ver acá.';
+
+  @override
+  String get feedFirstPostCta => 'PUBLICAR';
 
   @override
   String get chatBlockedComposerNotice =>
@@ -5911,6 +5964,351 @@ class AppL10nEs extends AppL10n {
   @override
   String get sessionRestCountdownBody =>
       'Vuelve a la serie cuando llegue a cero';
+
+  @override
+  String get pdfImportUploadTitle => 'IMPORTAR PLAN';
+
+  @override
+  String get pdfImportPrivacyNotice =>
+      'Usamos IA para leer tu PDF y armar el plan. No guardamos el archivo. Sube solo los datos de tu alumno que sean necesarios.';
+
+  @override
+  String get pdfImportPickFile => 'Elegir PDF';
+
+  @override
+  String get pdfImportPickAnother => 'Elegir otro archivo';
+
+  @override
+  String get pdfImportProcess => 'PROCESAR PLAN';
+
+  @override
+  String get pdfImportProcessingTitle => 'Leyendo tu plan…';
+
+  @override
+  String get pdfImportProcessingHint =>
+      'Puede tardar hasta un par de minutos. No cierres esta pantalla.';
+
+  @override
+  String get pdfImportLeaveTitle => '¿Salir mientras se lee el plan?';
+
+  @override
+  String get pdfImportLeaveBody =>
+      'Este intento ya cuenta en tu cupo aunque salgas.';
+
+  @override
+  String get pdfImportLeaveConfirm => 'Salir';
+
+  @override
+  String get pdfImportRetry => 'Reintentar';
+
+  @override
+  String get pdfImportErrorTooBig =>
+      'El archivo pesa más de 5 MB. Elige uno más liviano.';
+
+  @override
+  String get pdfImportErrorInternal =>
+      'No pudimos leer el plan. Prueba de nuevo en un rato.';
+
+  @override
+  String pdfImportReadSummary(int days, int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days días',
+      one: '1 día',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: '$weeks semanas',
+      one: '1 semana',
+    );
+    return 'Leímos $_temp0 y $_temp1.';
+  }
+
+  @override
+  String get pdfImportErrorNotPdf => 'El archivo no es un PDF válido.';
+
+  @override
+  String get pdfImportErrorTooManyPages =>
+      'El PDF tiene más de 20 páginas. Elige uno más corto.';
+
+  @override
+  String get pdfImportErrorEncrypted =>
+      'El PDF tiene contraseña. Expórtalo sin contraseña y elígelo de nuevo.';
+
+  @override
+  String get pdfImportErrorFileUnknown =>
+      'No pudimos usar este archivo. Prueba con otro.';
+
+  @override
+  String pdfImportErrorQuotaWeek(String date, String time) {
+    return 'Usaste todas las importaciones de esta semana. Se renueva el $date a las $time.';
+  }
+
+  @override
+  String pdfImportErrorQuotaDay(String date, String time) {
+    return 'Usaste todas las importaciones de hoy. Se renueva el $date a las $time.';
+  }
+
+  @override
+  String get pdfImportErrorQuotaUnknown =>
+      'Usaste todas las importaciones disponibles por ahora.';
+
+  @override
+  String get pdfImportErrorTimeout =>
+      'La lectura tardó demasiado. Prueba de nuevo; si el PDF es largo, prueba con menos páginas.';
+
+  @override
+  String get pdfImportErrorInvalidPlan =>
+      'Leímos el PDF pero no pudimos armar el plan. Este intento ya contó en tu cupo.';
+
+  @override
+  String get pdfImportErrorDisabled =>
+      'Importar de PDF no está disponible para tu cuenta.';
+
+  @override
+  String get pdfImportErrorUnavailable =>
+      'Importar de PDF no está disponible por un problema nuestro. No se descontó de tu cupo.';
+
+  @override
+  String get pdfImportErrorNotTrainer =>
+      'Solo los entrenadores pueden importar planes.';
+
+  @override
+  String get pdfImportErrorSignedOut =>
+      'Tu sesión se cerró. Vuelve a iniciar sesión.';
+
+  @override
+  String get pdfImportCta => 'IMPORTAR DE PDF';
+
+  @override
+  String pdfImportQuotaWeek(int week) {
+    String _temp0 = intl.Intl.pluralLogic(
+      week,
+      locale: localeName,
+      other: 'Te quedan $week importaciones esta semana.',
+      one: 'Te queda 1 importación esta semana.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pdfImportQuotaNoneWeek =>
+      'No te quedan importaciones esta semana: se renuevan el lunes.';
+
+  @override
+  String get pdfImportQuotaNoneDay =>
+      'No te quedan importaciones hoy: se renuevan mañana.';
+
+  @override
+  String pdfImportQuotaDayLimited(int day, int week) {
+    String _temp0 = intl.Intl.pluralLogic(
+      day,
+      locale: localeName,
+      other: 'Te quedan $day hoy',
+      one: 'Te queda 1 hoy',
+    );
+    return '$_temp0 · $week esta semana.';
+  }
+
+  @override
+  String get pdfImportSourceShow => 'Ver PDF';
+
+  @override
+  String get pdfImportSourceHide => 'Ocultar PDF';
+
+  @override
+  String pdfImportAlternative(String name) {
+    return 'Alternativa: $name';
+  }
+
+  @override
+  String get pdfImportUseAlternative => 'Usar alternativa';
+
+  @override
+  String pdfImportPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Quedan $count ejercicios por resolver: confirma las sugerencias o vincúlalos.',
+      one:
+          'Queda 1 ejercicio por resolver: confirma la sugerencia o vincúlalo.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportBulkCreate(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'CREAR $count PROPIOS',
+      one: 'CREAR 1 PROPIO',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportBulkPartialTitle(int allowed, int total) {
+    return 'Te alcanza para $allowed de $total';
+  }
+
+  @override
+  String get pdfImportBulkPartialBody =>
+      'Se crean los primeros en el orden del plan. El resto queda para vincular con la biblioteca.';
+
+  @override
+  String get pdfImportBulkQuotaUnknown =>
+      'No pudimos verificar tu tope de ejercicios propios. Prueba de nuevo.';
+
+  @override
+  String pdfImportBulkFailed(int created, int requested) {
+    return 'Se crearon $created de $requested. No pudimos crear el resto.';
+  }
+
+  @override
+  String get pdfImportAssign => 'ASIGNAR PLAN';
+
+  @override
+  String get pdfImportAssigned => 'Plan asignado.';
+
+  @override
+  String get pdfImportOpenEditor => 'ABRIR EDITOR';
+
+  @override
+  String get pdfImportAssignFailed =>
+      'No pudimos guardar el plan. Prueba de nuevo.';
+
+  @override
+  String get pdfImportLevel => 'Nivel del plan';
+
+  @override
+  String get pdfImportPreviewTitle => 'REVISAR PLAN';
+
+  @override
+  String get pdfImportNameLabel => 'Nombre de la rutina';
+
+  @override
+  String pdfImportConfirmAll(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Confirmar las $count sugerencias',
+      one: 'Confirmar la sugerencia',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pdfImportRowResolved => 'Resuelto';
+
+  @override
+  String get pdfImportRowShowDetail => 'Ver detalle';
+
+  @override
+  String get pdfImportRowHideDetail => 'Ocultar detalle';
+
+  @override
+  String get pdfImportConfirm => 'Confirmar';
+
+  @override
+  String get pdfImportChange => 'Cambiar';
+
+  @override
+  String get pdfImportLinkLibrary => 'Vincular con la biblioteca';
+
+  @override
+  String get pdfImportCreateOwn => 'Crear como propio';
+
+  @override
+  String pdfImportSuggestionA11y(String name) {
+    return 'Sugerencia: $name';
+  }
+
+  @override
+  String get pdfImportMarkPending => 'sugerencia por confirmar';
+
+  @override
+  String get pdfImportMarkNoMatch => 'sin ejercicio de la biblioteca';
+
+  @override
+  String pdfImportBlockSuperset(int count) {
+    return 'SUPERSERIE · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockTriset(int count) {
+    return 'TRISERIE · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockCircuit(int count) {
+    return 'CIRCUITO · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockRest(String rest) {
+    return 'descanso $rest al final';
+  }
+
+  @override
+  String get pdfImportFailure => 'al fallo';
+
+  @override
+  String get pdfImportWarmup => 'CALENTAMIENTO';
+
+  @override
+  String pdfImportPendingSuggestions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sugerencias por confirmar',
+      one: '1 sugerencia por confirmar',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportPendingNoMatch(int count) {
+    return '$count sin match';
+  }
+
+  @override
+  String pdfImportWarningsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count avisos',
+      one: '1 aviso',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get coachHubImportUploadHintPdf =>
+      'Plantilla .xlsx (hasta 10 MB) o el PDF de tu plan (hasta 5 MB).';
+
+  @override
+  String get coachHubImportTemplateBodyPdf =>
+      'Descarga la plantilla: una hoja \"Programa\" con un bloque por día y una columna por semana, y una hoja \"Instrucciones\" con la notación. Es la única hoja de cálculo que aceptamos; si tu plan está en PDF, súbelo tal cual.';
+
+  @override
+  String get coachHubPdfProcessingHint =>
+      'Puede tardar hasta un par de minutos. Puedes seguir usando el Hub: te avisamos cuando esté listo.';
+
+  @override
+  String get coachHubPdfReadyToast => 'Tu plan está listo';
+
+  @override
+  String get coachHubPdfReadyAction => 'VER VISTA PREVIA';
+
+  @override
+  String get coachHubPdfFailedToast => 'No pudimos leer tu plan.';
+
+  @override
+  String get coachHubPdfFailedAction => 'VER DETALLE';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6652,6 +7050,33 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get trainerAcceptsInquiriesSubtitle =>
       'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.';
+
+  @override
+  String get trainerAcceptingAthletesTitle => 'Tomo alumnos nuevos';
+
+  @override
+  String get trainerAcceptingAthletesSubtitle =>
+      'Si lo apagás, dejás de aparecer en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas. Tus alumnos actuales siguen igual.';
+
+  @override
+  String get trainerPlanLimitPauseTitle => 'LLEGASTE AL TOPE DE TU PLAN';
+
+  @override
+  String get trainerPlanLimitPauseBody =>
+      'Si no vas a sumar alumnos, pausá tu perfil: dejás de aparecer en el buscador y no te llegan solicitudes que no vas a poder aceptar.';
+
+  @override
+  String get trainerPlanLimitPauseAction => 'PAUSAR PERFIL';
+
+  @override
+  String get trainerPausedNoticeTitle => 'TU PERFIL ESTÁ PAUSADO';
+
+  @override
+  String get trainerPausedNoticeBody =>
+      'No aparecés en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas.';
+
+  @override
+  String get trainerPausedNoticeAction => 'REANUDAR';
 
   @override
   String get athleteLinkUnconfirmed =>
@@ -9693,6 +10118,14 @@ class AppL10nEsAr extends AppL10nEs {
   }
 
   @override
+  String get trainerNotAcceptingLabel => 'NO TOMA ALUMNOS';
+
+  @override
+  String trainerNotAcceptingExplanation(String trainerName) {
+    return '$trainerName no está tomando alumnos nuevos por ahora.';
+  }
+
+  @override
   String get coachHubPreviewDiscardTitle => '¿Salir sin guardar el plan?';
 
   @override
@@ -10602,6 +11035,24 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get feedEmptyFollowing => 'Todavía no hay posts de quienes seguís';
+
+  @override
+  String get feedFirstPostTitle => '¿Y SI ARRANCÁS VOS?';
+
+  @override
+  String get feedFirstPostBody =>
+      'Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.';
+
+  @override
+  String get feedFirstPostBodyGym =>
+      'Contá cómo te fue en tu último entreno. La gente de tu gym lo va a ver acá.';
+
+  @override
+  String get feedFirstPostBodyPublic =>
+      'Contá cómo te fue en tu último entreno. Cualquiera en TREINO lo va a ver acá.';
+
+  @override
+  String get feedFirstPostCta => 'PUBLICAR';
 
   @override
   String get chatBlockedComposerNotice =>
@@ -11817,4 +12268,349 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get sessionRestCountdownBody =>
       'Volvé a la serie cuando llegue a cero';
+
+  @override
+  String get pdfImportUploadTitle => 'IMPORTAR PLAN';
+
+  @override
+  String get pdfImportPrivacyNotice =>
+      'Usamos IA para leer tu PDF y armar el plan. No guardamos el archivo. Subí solo los datos de tu alumno que sean necesarios.';
+
+  @override
+  String get pdfImportPickFile => 'Elegir PDF';
+
+  @override
+  String get pdfImportPickAnother => 'Elegir otro archivo';
+
+  @override
+  String get pdfImportProcess => 'PROCESAR PLAN';
+
+  @override
+  String get pdfImportProcessingTitle => 'Leyendo tu plan…';
+
+  @override
+  String get pdfImportProcessingHint =>
+      'Puede tardar hasta un par de minutos. No cierres esta pantalla.';
+
+  @override
+  String get pdfImportLeaveTitle => '¿Salir mientras se lee el plan?';
+
+  @override
+  String get pdfImportLeaveBody =>
+      'Este intento ya cuenta en tu cupo aunque salgas.';
+
+  @override
+  String get pdfImportLeaveConfirm => 'Salir';
+
+  @override
+  String get pdfImportRetry => 'Reintentar';
+
+  @override
+  String get pdfImportErrorTooBig =>
+      'El archivo pesa más de 5 MB. Elegí uno más liviano.';
+
+  @override
+  String get pdfImportErrorInternal =>
+      'No pudimos leer el plan. Probá de nuevo en un rato.';
+
+  @override
+  String pdfImportReadSummary(int days, int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days días',
+      one: '1 día',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: '$weeks semanas',
+      one: '1 semana',
+    );
+    return 'Leímos $_temp0 y $_temp1.';
+  }
+
+  @override
+  String get pdfImportErrorNotPdf => 'El archivo no es un PDF válido.';
+
+  @override
+  String get pdfImportErrorTooManyPages =>
+      'El PDF tiene más de 20 páginas. Elegí uno más corto.';
+
+  @override
+  String get pdfImportErrorEncrypted =>
+      'El PDF tiene contraseña. Exportalo sin contraseña y elegilo de nuevo.';
+
+  @override
+  String get pdfImportErrorFileUnknown =>
+      'No pudimos usar este archivo. Probá con otro.';
+
+  @override
+  String pdfImportErrorQuotaWeek(String date, String time) {
+    return 'Usaste todas las importaciones de esta semana. Se renueva el $date a las $time.';
+  }
+
+  @override
+  String pdfImportErrorQuotaDay(String date, String time) {
+    return 'Usaste todas las importaciones de hoy. Se renueva el $date a las $time.';
+  }
+
+  @override
+  String get pdfImportErrorQuotaUnknown =>
+      'Usaste todas las importaciones disponibles por ahora.';
+
+  @override
+  String get pdfImportErrorTimeout =>
+      'La lectura tardó demasiado. Probá de nuevo; si el PDF es largo, probá con menos páginas.';
+
+  @override
+  String get pdfImportErrorInvalidPlan =>
+      'Leímos el PDF pero no pudimos armar el plan. Este intento ya contó en tu cupo.';
+
+  @override
+  String get pdfImportErrorDisabled =>
+      'Importar de PDF no está disponible para tu cuenta.';
+
+  @override
+  String get pdfImportErrorUnavailable =>
+      'Importar de PDF no está disponible por un problema nuestro. No se descontó de tu cupo.';
+
+  @override
+  String get pdfImportErrorNotTrainer =>
+      'Solo los entrenadores pueden importar planes.';
+
+  @override
+  String get pdfImportErrorSignedOut =>
+      'Tu sesión se cerró. Volvé a iniciar sesión.';
+
+  @override
+  String get pdfImportCta => 'IMPORTAR DE PDF';
+
+  @override
+  String pdfImportQuotaWeek(int week) {
+    String _temp0 = intl.Intl.pluralLogic(
+      week,
+      locale: localeName,
+      other: 'Te quedan $week importaciones esta semana.',
+      one: 'Te queda 1 importación esta semana.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pdfImportQuotaNoneWeek =>
+      'No te quedan importaciones esta semana: se renuevan el lunes.';
+
+  @override
+  String get pdfImportQuotaNoneDay =>
+      'No te quedan importaciones hoy: se renuevan mañana.';
+
+  @override
+  String pdfImportQuotaDayLimited(int day, int week) {
+    String _temp0 = intl.Intl.pluralLogic(
+      day,
+      locale: localeName,
+      other: 'Te quedan $day hoy',
+      one: 'Te queda 1 hoy',
+    );
+    return '$_temp0 · $week esta semana.';
+  }
+
+  @override
+  String get pdfImportSourceShow => 'Ver PDF';
+
+  @override
+  String get pdfImportSourceHide => 'Ocultar PDF';
+
+  @override
+  String pdfImportAlternative(String name) {
+    return 'Alternativa: $name';
+  }
+
+  @override
+  String get pdfImportUseAlternative => 'Usar alternativa';
+
+  @override
+  String pdfImportPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Quedan $count ejercicios por resolver: confirmá las sugerencias o vinculalos.',
+      one:
+          'Queda 1 ejercicio por resolver: confirmá la sugerencia o vinculalo.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportBulkCreate(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'CREAR $count PROPIOS',
+      one: 'CREAR 1 PROPIO',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportBulkPartialTitle(int allowed, int total) {
+    return 'Te alcanza para $allowed de $total';
+  }
+
+  @override
+  String get pdfImportBulkPartialBody =>
+      'Se crean los primeros en el orden del plan. El resto queda para vincular con la biblioteca.';
+
+  @override
+  String get pdfImportBulkQuotaUnknown =>
+      'No pudimos verificar tu tope de ejercicios propios. Probá de nuevo.';
+
+  @override
+  String pdfImportBulkFailed(int created, int requested) {
+    return 'Se crearon $created de $requested. No pudimos crear el resto.';
+  }
+
+  @override
+  String get pdfImportAssign => 'ASIGNAR PLAN';
+
+  @override
+  String get pdfImportAssigned => 'Plan asignado.';
+
+  @override
+  String get pdfImportOpenEditor => 'ABRIR EDITOR';
+
+  @override
+  String get pdfImportAssignFailed =>
+      'No pudimos guardar el plan. Probá de nuevo.';
+
+  @override
+  String get pdfImportLevel => 'Nivel del plan';
+
+  @override
+  String get pdfImportPreviewTitle => 'REVISAR PLAN';
+
+  @override
+  String get pdfImportNameLabel => 'Nombre de la rutina';
+
+  @override
+  String pdfImportConfirmAll(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Confirmar las $count sugerencias',
+      one: 'Confirmar la sugerencia',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pdfImportRowResolved => 'Resuelto';
+
+  @override
+  String get pdfImportRowShowDetail => 'Ver detalle';
+
+  @override
+  String get pdfImportRowHideDetail => 'Ocultar detalle';
+
+  @override
+  String get pdfImportConfirm => 'Confirmar';
+
+  @override
+  String get pdfImportChange => 'Cambiar';
+
+  @override
+  String get pdfImportLinkLibrary => 'Vincular con la biblioteca';
+
+  @override
+  String get pdfImportCreateOwn => 'Crear como propio';
+
+  @override
+  String pdfImportSuggestionA11y(String name) {
+    return 'Sugerencia: $name';
+  }
+
+  @override
+  String get pdfImportMarkPending => 'sugerencia por confirmar';
+
+  @override
+  String get pdfImportMarkNoMatch => 'sin ejercicio de la biblioteca';
+
+  @override
+  String pdfImportBlockSuperset(int count) {
+    return 'SUPERSERIE · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockTriset(int count) {
+    return 'TRISERIE · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockCircuit(int count) {
+    return 'CIRCUITO · $count ejercicios';
+  }
+
+  @override
+  String pdfImportBlockRest(String rest) {
+    return 'descanso $rest al final';
+  }
+
+  @override
+  String get pdfImportFailure => 'al fallo';
+
+  @override
+  String get pdfImportWarmup => 'CALENTAMIENTO';
+
+  @override
+  String pdfImportPendingSuggestions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sugerencias por confirmar',
+      one: '1 sugerencia por confirmar',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pdfImportPendingNoMatch(int count) {
+    return '$count sin match';
+  }
+
+  @override
+  String pdfImportWarningsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count avisos',
+      one: '1 aviso',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get coachHubImportUploadHintPdf =>
+      'Plantilla .xlsx (hasta 10 MB) o el PDF de tu plan (hasta 5 MB).';
+
+  @override
+  String get coachHubImportTemplateBodyPdf =>
+      'Descargá la plantilla: una hoja \"Programa\" con un bloque por día y una columna por semana, y una hoja \"Instrucciones\" con la notación. Es la única planilla que aceptamos; si tu plan está en PDF, subilo tal cual.';
+
+  @override
+  String get coachHubPdfProcessingHint =>
+      'Puede tardar hasta un par de minutos. Podés seguir usando el Hub: te avisamos cuando esté listo.';
+
+  @override
+  String get coachHubPdfReadyToast => 'Tu plan está listo';
+
+  @override
+  String get coachHubPdfReadyAction => 'VER VISTA PREVIA';
+
+  @override
+  String get coachHubPdfFailedToast => 'No pudimos leer tu plan.';
+
+  @override
+  String get coachHubPdfFailedAction => 'VER DETALLE';
 }

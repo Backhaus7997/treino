@@ -21,7 +21,6 @@ import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
-import '../gyms/domain/gym.dart' show kNoGymId;
 import '../moderation/application/moderation_providers.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_public_profile.dart';
@@ -32,7 +31,9 @@ import 'application/post_providers.dart';
 import 'application/suggested_users_providers.dart';
 import 'domain/feed_segment.dart';
 import 'domain/post.dart';
+import 'domain/post_privacy.dart';
 import 'presentation/widgets/feed_empty_state.dart';
+import 'presentation/widgets/feed_first_post_prompt.dart';
 import 'presentation/widgets/feed_segment_pills.dart';
 import 'presentation/widgets/post_card.dart';
 import 'presentation/widgets/suggested_users_section.dart';
@@ -883,10 +884,8 @@ class _AmigosBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final gymId = ref.watch(
-      userProfileProvider.select((p) => p.valueOrNull?.gymId),
-    );
-    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+    final gymId = ref.watch(suggestionsOriginGymIdProvider);
+    final suggestions = gymId == null
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
 
@@ -926,6 +925,13 @@ class _AmigosBody extends ConsumerWidget {
                   message: AppL10n.of(context).feedEmptyFollowing,
                 ),
                 SuggestedUsersSection(gymId: gymId),
+                // Sin sugerencias (sin gym, o ya los seguís a todos) la
+                // sección colapsa a cero y el prompt quedaría pegado al
+                // mensaje. Con sugerencias el carrusel ya trae sus 20 abajo:
+                // sumarlos siempre dejaba 40. `suggestions` sale del mismo
+                // provider que lee la sección.
+                if (suggestions.isEmpty) const SizedBox(height: AppSpacing.s20),
+                const FeedFirstPostPrompt(),
               ],
             ),
           );
@@ -960,10 +966,8 @@ class _MiGymBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final gymId = ref.watch(
-      userProfileProvider.select((p) => p.valueOrNull?.gymId),
-    );
-    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+    final gymId = ref.watch(suggestionsOriginGymIdProvider);
+    final suggestions = gymId == null
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
     final blockedUids = ref.watch(myBlockedUidsProvider);
@@ -993,6 +997,8 @@ class _MiGymBody extends ConsumerWidget {
       },
       dataBuilder: (context, posts) {
         if (posts == null) {
+          // Sin invitación a publicar: sin gym no se puede postear con
+          // visibilidad MI GYM (`CreatePostNotifier` lo rechaza).
           return const _FeedContent.empty(
             FeedEmptyState(message: 'Todavía no estás en un gym'),
           );
@@ -1008,7 +1014,14 @@ class _MiGymBody extends ConsumerWidget {
             posts.where((p) => !blockedUids.contains(p.authorUid)).toList();
         if (visiblePosts.isEmpty) {
           return const _FeedContent.empty(
-            FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
+                SizedBox(height: AppSpacing.s20),
+                FeedFirstPostPrompt(privacy: PostPrivacy.gym),
+              ],
+            ),
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;
@@ -1042,10 +1055,8 @@ class _PublicoBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = feedPaginationProvider(publicFeedPaginationKey);
-    final gymId = ref.watch(
-      userProfileProvider.select((p) => p.valueOrNull?.gymId),
-    );
-    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+    final gymId = ref.watch(suggestionsOriginGymIdProvider);
+    final suggestions = gymId == null
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
     final blockedUids = ref.watch(myBlockedUidsProvider);
@@ -1070,7 +1081,14 @@ class _PublicoBody extends ConsumerWidget {
             posts.where((p) => !blockedUids.contains(p.authorUid)).toList();
         if (visiblePosts.isEmpty) {
           return const _FeedContent.empty(
-            FeedEmptyState(message: 'Aún no hay posts públicos'),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FeedEmptyState(message: 'Aún no hay posts públicos'),
+                SizedBox(height: AppSpacing.s20),
+                FeedFirstPostPrompt(privacy: PostPrivacy.public),
+              ],
+            ),
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;

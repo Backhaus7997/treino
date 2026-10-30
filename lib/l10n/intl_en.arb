@@ -249,6 +249,14 @@
   "athleteLinkRequired": "We couldn't find an active trainer link.",
   "trainerAcceptsInquiriesTitle": "Accept inquiries",
   "trainerAcceptsInquiriesSubtitle": "Athletes can message you before requesting a link. Turn it off and no new inquiries reach you — conversations already open stay open.",
+  "trainerAcceptingAthletesTitle": "Taking new athletes",
+  "trainerAcceptingAthletesSubtitle": "Turn it off and you stop showing up in Find your coach, and no new requests or inquiries reach you. Your current athletes stay as they are.",
+  "trainerPlanLimitPauseTitle": "YOU HIT YOUR PLAN'S LIMIT",
+  "trainerPlanLimitPauseBody": "If you're not taking more athletes, pause your profile: you stop showing up in search and stop getting requests you can't accept.",
+  "trainerPlanLimitPauseAction": "PAUSE PROFILE",
+  "trainerPausedNoticeTitle": "YOUR PROFILE IS PAUSED",
+  "trainerPausedNoticeBody": "You don't show up in Find your coach and no new requests or inquiries reach you.",
+  "trainerPausedNoticeAction": "RESUME",
   "athleteLinkUnconfirmed": "We couldn't confirm your trainer link.",
   "athleteLinkRequiredRetry": "Retry",
   "athleteSessionMissing": "Your session ended. Please sign in again.",
@@ -1358,6 +1366,15 @@
       }
     }
   },
+  "trainerNotAcceptingLabel": "NOT TAKING ATHLETES",
+  "trainerNotAcceptingExplanation": "{trainerName} isn't taking new athletes right now.",
+  "@trainerNotAcceptingExplanation": {
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubPreviewDiscardTitle": "Leave without saving the plan?",
   "coachHubPreviewDiscardBody": "You'll lose the exercises you matched manually.",
   "coachHubPreviewDiscardConfirm": "Leave anyway",
@@ -1758,6 +1775,26 @@
   "feedEmptyFollowing": "No posts yet from people you follow",
   "@feedEmptyFollowing": {
     "description": "Estado vacío del feed SEGUIDORES."
+  },
+  "feedFirstPostTitle": "WHY NOT GO FIRST?",
+  "@feedFirstPostTitle": {
+    "description": "Invitación a publicar al pie del vacío de AMIGOS."
+  },
+  "feedFirstPostBody": "Share how your last workout went. Your followers will see it here.",
+  "@feedFirstPostBody": {
+    "description": "Invitación a publicar al pie del vacío de AMIGOS."
+  },
+  "feedFirstPostBodyGym": "Share how your last workout went. People at your gym will see it here.",
+  "@feedFirstPostBodyGym": {
+    "description": "Invitación a publicar al pie del vacío de MI GYM."
+  },
+  "feedFirstPostBodyPublic": "Share how your last workout went. Anyone on TREINO will see it here.",
+  "@feedFirstPostBodyPublic": {
+    "description": "Invitación a publicar al pie del vacío de PÚBLICO."
+  },
+  "feedFirstPostCta": "POST",
+  "@feedFirstPostCta": {
+    "description": "Botón de la invitación a publicar del vacío de AMIGOS."
   },
   "chatBlockedComposerNotice": "You blocked this person. Unblock them to send a message.",
   "@chatBlockedComposerNotice": {
@@ -2430,5 +2467,81 @@
   "sessionRestEndedTitle": "Rest is over",
   "sessionRestEndedBody": "Back to your set",
   "sessionRestCountdownTitle": "Rest",
-  "sessionRestCountdownBody": "Back to your set when it hits zero"
+  "sessionRestCountdownBody": "Back to your set when it hits zero",
+  "pdfImportUploadTitle": "IMPORT PLAN",
+  "pdfImportPrivacyNotice": "We use AI to read your PDF and build the plan. We don't keep the file. Only include the client details you need.",
+  "pdfImportPickFile": "Choose PDF",
+  "pdfImportPickAnother": "Choose another file",
+  "pdfImportProcess": "PROCESS PLAN",
+  "pdfImportProcessingTitle": "Reading your plan…",
+  "pdfImportProcessingHint": "It can take up to a couple of minutes. Keep this screen open.",
+  "pdfImportLeaveTitle": "Leave while the plan is being read?",
+  "pdfImportLeaveBody": "This attempt already counts toward your quota, even if you leave.",
+  "pdfImportLeaveConfirm": "Leave",
+  "pdfImportRetry": "Try again",
+  "pdfImportErrorTooBig": "The file is larger than 5 MB. Choose a smaller one.",
+  "pdfImportErrorInternal": "We couldn't read the plan. Try again in a while.",
+  "pdfImportReadSummary": "We read {days, plural, =1{1 day} other{{days} days}} and {weeks, plural, =1{1 week} other{{weeks} weeks}}.",
+  "pdfImportErrorNotPdf": "The file isn't a valid PDF.",
+  "pdfImportErrorTooManyPages": "The PDF has more than 20 pages. Choose a shorter one.",
+  "pdfImportErrorEncrypted": "The PDF is password-protected. Export it without a password and choose it again.",
+  "pdfImportErrorFileUnknown": "We couldn't use this file. Try another one.",
+  "pdfImportErrorQuotaWeek": "You've used all of this week's imports. It resets on {date} at {time}.",
+  "pdfImportErrorQuotaDay": "You've used all of today's imports. It resets on {date} at {time}.",
+  "pdfImportErrorQuotaUnknown": "You've used all the imports available for now.",
+  "pdfImportErrorTimeout": "Reading took too long. Try again; if the PDF is long, try fewer pages.",
+  "pdfImportErrorInvalidPlan": "We read the PDF but couldn't build the plan. This attempt already counted toward your quota.",
+  "pdfImportErrorDisabled": "Import from PDF isn't available for your account.",
+  "pdfImportErrorUnavailable": "Import from PDF is unavailable because of a problem on our side. It didn't count toward your quota.",
+  "pdfImportErrorNotTrainer": "Only trainers can import plans.",
+  "pdfImportErrorSignedOut": "You've been signed out. Sign in again.",
+  "pdfImportCta": "IMPORT FROM PDF",
+  "pdfImportQuotaWeek": "{week, plural, =1{1 import left this week.} other{{week} imports left this week.}}",
+  "pdfImportQuotaNoneWeek": "No imports left this week: they renew on Monday.",
+  "pdfImportQuotaNoneDay": "No imports left today: they renew tomorrow.",
+  "pdfImportQuotaDayLimited": "{day, plural, =1{1 left today} other{{day} left today}} · {week} this week.",
+  "pdfImportSourceShow": "View PDF",
+  "pdfImportSourceHide": "Hide PDF",
+  "pdfImportAlternative": "Alternative: {name}",
+  "pdfImportUseAlternative": "Use alternative",
+  "pdfImportPending": "{count, plural, =1{1 exercise left to resolve: confirm the suggestion or link it.} other{{count} exercises left to resolve: confirm the suggestions or link them.}}",
+  "pdfImportBulkCreate": "{count, plural, =1{CREATE 1 CUSTOM} other{CREATE {count} CUSTOM}}",
+  "pdfImportBulkPartialTitle": "You have room for {allowed} of {total}",
+  "pdfImportBulkPartialBody": "The first ones in plan order are created. Link the rest from the library.",
+  "pdfImportBulkQuotaUnknown": "We couldn't check your custom exercise limit. Try again.",
+  "pdfImportBulkFailed": "{created} of {requested} were created. We couldn't create the rest.",
+  "pdfImportAssign": "ASSIGN PLAN",
+  "pdfImportAssigned": "Plan assigned.",
+  "pdfImportOpenEditor": "OPEN EDITOR",
+  "pdfImportAssignFailed": "We couldn't save the plan. Try again.",
+  "pdfImportLevel": "Plan level",
+  "pdfImportPreviewTitle": "REVIEW PLAN",
+  "pdfImportNameLabel": "Routine name",
+  "pdfImportConfirmAll": "{count, plural, =1{Confirm the suggestion} other{Confirm all {count} suggestions}}",
+  "pdfImportRowResolved": "Resolved",
+  "pdfImportRowShowDetail": "Show details",
+  "pdfImportRowHideDetail": "Hide details",
+  "pdfImportConfirm": "Confirm",
+  "pdfImportChange": "Change",
+  "pdfImportLinkLibrary": "Link to library",
+  "pdfImportCreateOwn": "Create as custom",
+  "pdfImportSuggestionA11y": "Suggestion: {name}",
+  "pdfImportMarkPending": "suggestion to confirm",
+  "pdfImportMarkNoMatch": "no library exercise",
+  "pdfImportBlockSuperset": "SUPERSET · {count} exercises",
+  "pdfImportBlockTriset": "TRI-SET · {count} exercises",
+  "pdfImportBlockCircuit": "CIRCUIT · {count} exercises",
+  "pdfImportBlockRest": "{rest} rest at the end",
+  "pdfImportFailure": "to failure",
+  "pdfImportWarmup": "WARM-UP",
+  "pdfImportPendingSuggestions": "{count, plural, =1{1 suggestion to confirm} other{{count} suggestions to confirm}}",
+  "pdfImportPendingNoMatch": "{count} unmatched",
+  "pdfImportWarningsCount": "{count, plural, =1{1 warning} other{{count} warnings}}",
+  "coachHubImportUploadHintPdf": "The .xlsx template (up to 10 MB) or your plan's PDF (up to 5 MB).",
+  "coachHubImportTemplateBodyPdf": "Download the template: a \"Programa\" sheet with one block per day and one column per week, and an \"Instrucciones\" sheet with the notation. It's the only spreadsheet we accept; if your plan is a PDF, upload it as is.",
+  "coachHubPdfProcessingHint": "It can take up to a couple of minutes. You can keep using the Hub: we will let you know when it is ready.",
+  "coachHubPdfReadyToast": "Your plan is ready",
+  "coachHubPdfReadyAction": "SEE PREVIEW",
+  "coachHubPdfFailedToast": "We couldn’t read your plan.",
+  "coachHubPdfFailedAction": "SEE DETAILS"
 }

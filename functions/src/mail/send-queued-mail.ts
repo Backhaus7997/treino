@@ -498,13 +498,15 @@ export async function sendQueuedMailHandler(
       ...(retriable ? {} : sinSecretos()),
     });
 
+    // `errorMessage`, not `message`: the firebase-functions logger overwrites
+    // a `message` key in the data with its own text.
     if (retriable) {
       // Re-throw so the platform redelivers the event (retry: true).
-      logger.warn("sendQueuedMail: retriable failure", { mailId, message });
+      logger.warn("sendQueuedMail: retriable failure", { mailId, errorMessage: message });
       throw error;
     }
 
-    logger.error("sendQueuedMail: permanent failure", { mailId, message });
+    logger.error("sendQueuedMail: permanent failure", { mailId, errorMessage: message });
     return;
   }
 

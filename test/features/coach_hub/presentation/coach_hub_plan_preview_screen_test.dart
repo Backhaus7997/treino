@@ -79,6 +79,9 @@ Widget _wrap(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
+        // Las acciones de la vista previa salen de AppL10n: sin locale el
+        // test las vería en inglés.
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: child),
       ),
     );
@@ -112,11 +115,11 @@ void main() {
   // ── T-CXP-031 RED ────────────────────────────────────────────────────────
 
   group(
-      'SCENARIO-745: _pickExerciseFor triggers addAlias callable with correct args',
-      () {
+      'SCENARIO-745: _pickExerciseFor resuelve sin llamar a addAlias (el alias '
+      'se registra al asignar)', () {
     testWidgets(
-        'after manual mapping, httpsCallable addAlias called with exerciseId and alias',
-        (tester) async {
+        'after manual mapping, addAlias is NOT called yet: it waits for '
+        'ASIGNAR PLAN', (tester) async {
       final mockFunctions = MockFirebaseFunctions();
       final mockCallable = MockHttpsCallable();
       final mockResult = MockHttpsCallableResult();
@@ -160,16 +163,13 @@ void main() {
       await tester.tap(find.text('Sentadilla').last);
       await tester.pumpAndSettle();
 
-      // Verify addAlias was called with correct args
-      verify(
-        () => mockCallable.call(<String, dynamic>{
-          'exerciseId': 'ex-1',
-          'alias': 'Sentadilla',
-        }),
-      ).called(1);
+      // El alias ya no se registra al vincular: se registra al asignar, con
+      // la asignación final (plan_import_preview_controller_test.dart).
+      verifyNever(() => mockCallable.call(any<Map<String, dynamic>>()));
 
       // Verify local state preserved (item is no longer unmatched)
-      expect(find.text('sin match'), findsNothing);
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsNothing);
     });
   });
 
@@ -276,7 +276,8 @@ void main() {
       // No exception propagated — widget tree still intact
       expect(find.byType(CoachHubPlanPreviewScreen), findsOneWidget);
       // Local mapping state preserved (unmatched badge gone)
-      expect(find.text('sin match'), findsNothing);
+      expect(find.bySemanticsLabel('sin ejercicio de la biblioteca'),
+          findsNothing);
     });
   });
 
@@ -356,8 +357,8 @@ void main() {
 
   group('sugerencias de match', () {
     testWidgets(
-        'muestra texto original y sugerencia; confirmar resuelve y agrega alias',
-        (tester) async {
+        'muestra texto original y sugerencia; confirmar resuelve sin alias '
+        '(se registra al asignar)', (tester) async {
       final mockFunctions = MockFirebaseFunctions();
       final mockCallable = MockHttpsCallable();
       final mockResult = MockHttpsCallableResult();
@@ -385,24 +386,21 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Sentadilla búlgara'), findsOneWidget);
-      expect(find.text('Sugerencia: Sentadilla con barra'), findsOneWidget);
-      expect(find.text('sugerencia pendiente'), findsOneWidget);
+      expect(find.bySemanticsLabel('Sugerencia: Sentadilla con barra'),
+          findsOneWidget);
+      expect(find.bySemanticsLabel('sugerencia por confirmar'), findsOneWidget);
 
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
 
-      verify(
-        () => mockCallable.call(<String, dynamic>{
-          'exerciseId': 'squat-bar',
-          'alias': 'Sentadilla búlgara',
-        }),
-      ).called(1);
-      expect(find.text('sugerencia pendiente'), findsNothing);
+      verifyNever(() => mockCallable.call(any<Map<String, dynamic>>()));
+      expect(find.bySemanticsLabel('sugerencia por confirmar'), findsNothing);
       expect(find.text('Sentadilla con barra'), findsOneWidget);
     });
 
-    testWidgets('cambiar abre el picker y guarda la elección como alias',
-        (tester) async {
+    testWidgets(
+        'cambiar abre el picker y resuelve con la elección, sin alias '
+        'todavía', (tester) async {
       final mockFunctions = MockFirebaseFunctions();
       final mockCallable = MockHttpsCallable();
       final mockResult = MockHttpsCallableResult();
@@ -442,14 +440,9 @@ void main() {
       await tester.tap(find.text('Sentadilla búlgara asistida'));
       await tester.pumpAndSettle();
 
-      verify(
-        () => mockCallable.call(<String, dynamic>{
-          'exerciseId': 'bulgarian-assisted',
-          'alias': 'Sentadilla búlgara',
-        }),
-      ).called(1);
+      verifyNever(() => mockCallable.call(any<Map<String, dynamic>>()));
       expect(find.text('Sentadilla búlgara asistida'), findsOneWidget);
-      expect(find.text('sugerencia pendiente'), findsNothing);
+      expect(find.bySemanticsLabel('sugerencia por confirmar'), findsNothing);
     });
 
     testWidgets('una sugerencia pendiente bloquea la asignación',

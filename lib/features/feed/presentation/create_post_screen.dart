@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/guardia_de_salida.dart';
+import '../../../core/widgets/discard_changes_dialog.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -14,6 +16,8 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
 import '../application/create_post_notifier.dart';
 import '../domain/post.dart';
+import '../domain/post_privacy.dart';
+import '../domain/routine_tag.dart';
 import 'routine_tag_picker_sheet.dart';
 import 'widgets/post_privacy_selector.dart';
 import '../../gyms/domain/gym.dart' show hasRealGym;
@@ -27,10 +31,16 @@ import '../../gyms/domain/gym.dart' show hasRealGym;
 ///
 /// Does NOT own a [Scaffold] — relies on [_ShellScaffold] via the router.
 class CreatePostScreen extends ConsumerWidget {
-  const CreatePostScreen({super.key, this.existingPost});
+  const CreatePostScreen({super.key, this.existingPost, this.initialPrivacy});
 
   /// The post to edit. `null` (default) composes a brand-new post.
   final Post? existingPost;
+
+  /// Visibilidad con la que arranca un post NUEVO. La pasa la invitación a
+  /// publicar de Mi gym / Público: si arrancara en SEGUIDORES, el post no
+  /// aparecería en la pestaña desde la que se pidió y el vacío seguiría igual.
+  /// Al editar se ignora: manda la del post.
+  final PostPrivacy? initialPrivacy;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,7 +59,11 @@ class CreatePostScreen extends ConsumerWidget {
         error: (_, __) => _CreatePostError(
           onRetry: () => ref.invalidate(provider),
         ),
-        data: (state) => _CreatePostBody(state: state, notifier: notifier),
+        data: (state) => _CreatePostBody(
+          state: state,
+          notifier: notifier,
+          initialPrivacy: initialPrivacy,
+        ),
       ),
     );
   }
@@ -186,10 +200,15 @@ class _CreatePostError extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _CreatePostBody extends ConsumerStatefulWidget {
-  const _CreatePostBody({required this.state, required this.notifier});
+  const _CreatePostBody({
+    required this.state,
+    required this.notifier,
+    this.initialPrivacy,
+  });
 
   final CreatePostState state;
   final CreatePostNotifier notifier;
+  final PostPrivacy? initialPrivacy;
 
   @override
   ConsumerState<_CreatePostBody> createState() => _CreatePostBodyState();
@@ -198,14 +217,54 @@ class _CreatePostBody extends ConsumerStatefulWidget {
 class _CreatePostBodyState extends ConsumerState<_CreatePostBody> {
   late final TextEditingController _controller;
 
+  /// Cómo estaba el post al abrir: vacío al crear, el post al editar.
+  late final (String, PostPrivacy, RoutineTag?) _alAbrir;
+
+  /// Referencia guardada al montar: en `dispose` ya no se puede usar `ref`.
+  late final GuardiaDeSalida _guardia;
+
+  /// Hay algo escrito o elegido que no se publicó. El borrador vive en un
+  /// provider `autoDispose`: salir —por CANCELAR, atrás o la barra de
+  /// pestañas— lo tira entero, así que pregunta antes.
+  bool get _hayCambios {
+    final s = widget.state;
+    return !s.isSubmitting && (s.text, s.privacy, s.routineTag) != _alAbrir;
+  }
+
+  /// `true` si se puede salir: sin cambios, o el usuario eligió descartarlos.
+  Future<bool> _confirmarSalida() async {
+    if (!_hayCambios || !mounted) return true;
+    return confirmDiscardChanges(context);
+  }
+
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.state.text);
+    final inicial = widget.initialPrivacy;
+    final aplicarInicial = inicial != null &&
+        widget.state.editingPost == null &&
+        inicial != widget.state.privacy;
+    // La visibilidad pedida cuenta como "lo que había al abrir": si no, la
+    // guardia de salida preguntaría por descartar un cambio que el usuario
+    // nunca hizo.
+    _alAbrir = (
+      widget.state.text,
+      aplicarInicial ? inicial : widget.state.privacy,
+      widget.state.routineTag,
+    );
+    if (aplicarInicial) {
+      // No se puede tocar un provider durante el build del primer frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.notifier.setPrivacy(inicial);
+      });
+    }
+    _guardia = ref.read(guardiaDeSalidaProvider)..registrar(_confirmarSalida);
   }
 
   @override
   void dispose() {
+    _guardia.liberar(_confirmarSalida);
     _controller.dispose();
     super.dispose();
   }
@@ -218,6 +277,26 @@ class _CreatePostBodyState extends ConsumerState<_CreatePostBody> {
     final profileAsync = ref.watch(userProfileProvider);
     final hasGym = hasRealGym(profileAsync.valueOrNull?.gymId);
 
+    // Atrás, el swipe de iOS y CANCELAR (que hace `maybePop`) pasan por acá;
+    // la barra de pestañas, por la [GuardiaDeSalida]. El `pop()` después de
+    // publicar es forzado y no pregunta. No hace falta un ListenableBuilder:
+    // cada tecla pasa por `notifier.setText`, que reconstruye con el estado.
+    return PopScope(
+      canPop: !_hayCambios,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (await _confirmarSalida() && context.mounted) context.pop();
+      },
+      child: _buildForm(palette, state, notifier, hasGym),
+    );
+  }
+
+  Widget _buildForm(
+    AppPalette palette,
+    CreatePostState state,
+    CreatePostNotifier notifier,
+    bool hasGym,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -283,12 +362,13 @@ class _CreatePostHeader extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: Row(
         children: [
-          // CANCELAR
+          // CANCELAR — `maybePop` y no `pop`: el forzado saltea el PopScope
+          // del cuerpo y tiraba el borrador sin preguntar.
           Semantics(
             button: true,
             label: l10n.commonCancel,
             child: TreinoTappable(
-              onTap: () => context.pop(),
+              onTap: () => Navigator.of(context).maybePop(),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Align(

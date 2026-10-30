@@ -325,5 +325,24 @@ void main() {
       expect(t, isNotNull);
       expect(t!.hiddenFromDiscovery, isTrue);
     });
+
+    // Pausa del PF: mismo filtro, otro dueño. `hiddenFromDiscovery` lo pone un
+    // admin; `acceptingAthletes` el propio PF. Por uid sigue accesible, para
+    // sus alumnos actuales y para quien tenga el link.
+    test('el PF pausado sale de los cuatro listados y no de getById', () async {
+      await seedRaw('pausado', {'acceptingAthletes': false});
+      await seedRaw('abierto', {'acceptingAthletes': true});
+      const esperados = [...visibles, 'abierto'];
+
+      for (final listar in <Future<List<TrainerPublicProfile>> Function()>[
+        () => repo.listByGeohashPrefix('s621h'),
+        () => repo.listByGeohashes(['s621h']),
+        () => repo.listVirtualOnly(),
+        () => repo.listAll(),
+      ]) {
+        expect((await listar()).map((t) => t.uid), unorderedEquals(esperados));
+      }
+      expect(await repo.getById('pausado'), isNotNull);
+    });
   });
 }

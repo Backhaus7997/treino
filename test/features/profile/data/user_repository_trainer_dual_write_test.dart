@@ -512,6 +512,34 @@ void main() {
     });
   });
 
+  // Las RULES leen la pausa de `users/{uid}`, pero el discovery y el perfil
+  // público leen `trainerPublicProfiles`: sin la entrada en el allowlist el
+  // PF pausado deja de recibir solicitudes y SIGUE apareciendo en el mapa.
+  group('UserRepository dual-write de acceptingAthletes (pausa del PF)', () {
+    test('false llega a los dos docs, y true lo vuelve a abrir', () async {
+      await seedDoc('trainer-pa-1');
+
+      await repo.update('trainer-pa-1', {'acceptingAthletes': false});
+      final pausado = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-pa-1')
+          .get();
+      final privado =
+          await firestore.collection('users').doc('trainer-pa-1').get();
+      expect(pausado.data()!['acceptingAthletes'], isFalse,
+          reason: 'el discovery lee el doc público');
+      expect(privado.data()!['acceptingAthletes'], isFalse,
+          reason: 'las rules leen users/{uid}');
+
+      await repo.update('trainer-pa-1', {'acceptingAthletes': true});
+      final abierto = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-pa-1')
+          .get();
+      expect(abierto.data()!['acceptingAthletes'], isTrue);
+    });
+  });
+
   group('UserRepository multi-location dual-write', () {
     test('trainerLocations partial propaga a trainerPublicProfiles', () async {
       await seedDoc('trainer-ml-1');

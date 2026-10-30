@@ -43,7 +43,20 @@ mixin _$TrainerPublicProfile {
   /// Ver [UserProfile.acceptsInquiries]. Default `true` a propósito: espeja
   /// el `.get('acceptsInquiries', true)` de `firestore.rules`, así que un
   /// perfil legacy sin el campo sigue siendo consultable.
-  bool get acceptsInquiries =>
+  bool get acceptsInquiries => throw _privateConstructorUsedError;
+
+  /// Ver [UserProfile.acceptingAthletes]. Default `true`: espeja el
+  /// `.get('acceptingAthletes', true)` de `firestore.rules`, así que un
+  /// perfil legacy sin el campo sigue abierto a alumnos nuevos.
+  ///
+  /// Robusto a un valor no booleano, y acá no es hipotético como en
+  /// [hiddenFromDiscovery]: este campo lo escribe el PF y el `update` de
+  /// `trainerPublicProfiles` no valida tipos. Un `bool` crudo haría que un
+  /// solo doc con `"no"` tirara el listado de discovery de TODOS los
+  /// alumnos. Cualquier cosa distinta de `true` cuenta como pausado, igual
+  /// que el `== true` de las rules.
+  @JsonKey(fromJson: _acceptingFromJson)
+  bool get acceptingAthletes =>
       throw _privateConstructorUsedError; // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
 // Written exclusively by the reviewAggregate Cloud Function.
 // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
@@ -109,6 +122,7 @@ abstract class $TrainerPublicProfileCopyWith<$Res> {
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
       bool acceptsInquiries,
+      @JsonKey(fromJson: _acceptingFromJson) bool acceptingAthletes,
       double? averageRating,
       int reviewCount,
       int? trainerExperienceYears,
@@ -147,6 +161,7 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
     Object? acceptsInquiries = null,
+    Object? acceptingAthletes = null,
     Object? averageRating = freezed,
     Object? reviewCount = null,
     Object? trainerExperienceYears = freezed,
@@ -214,6 +229,10 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
           ? _value.acceptsInquiries
           : acceptsInquiries // ignore: cast_nullable_to_non_nullable
               as bool,
+      acceptingAthletes: null == acceptingAthletes
+          ? _value.acceptingAthletes
+          : acceptingAthletes // ignore: cast_nullable_to_non_nullable
+              as bool,
       averageRating: freezed == averageRating
           ? _value.averageRating
           : averageRating // ignore: cast_nullable_to_non_nullable
@@ -263,6 +282,7 @@ abstract class _$$TrainerPublicProfileImplCopyWith<$Res>
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
       bool acceptsInquiries,
+      @JsonKey(fromJson: _acceptingFromJson) bool acceptingAthletes,
       double? averageRating,
       int reviewCount,
       int? trainerExperienceYears,
@@ -298,6 +318,7 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
     Object? acceptsInquiries = null,
+    Object? acceptingAthletes = null,
     Object? averageRating = freezed,
     Object? reviewCount = null,
     Object? trainerExperienceYears = freezed,
@@ -365,6 +386,10 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
           ? _value.acceptsInquiries
           : acceptsInquiries // ignore: cast_nullable_to_non_nullable
               as bool,
+      acceptingAthletes: null == acceptingAthletes
+          ? _value.acceptingAthletes
+          : acceptingAthletes // ignore: cast_nullable_to_non_nullable
+              as bool,
       averageRating: freezed == averageRating
           ? _value.averageRating
           : averageRating // ignore: cast_nullable_to_non_nullable
@@ -409,6 +434,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       final List<String> trainerGeohashes = const <String>[],
       this.trainerOffersOnline = false,
       this.acceptsInquiries = true,
+      @JsonKey(fromJson: _acceptingFromJson) this.acceptingAthletes = true,
       this.averageRating,
       this.reviewCount = 0,
       this.trainerExperienceYears,
@@ -477,6 +503,20 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   @override
   @JsonKey()
   final bool acceptsInquiries;
+
+  /// Ver [UserProfile.acceptingAthletes]. Default `true`: espeja el
+  /// `.get('acceptingAthletes', true)` de `firestore.rules`, así que un
+  /// perfil legacy sin el campo sigue abierto a alumnos nuevos.
+  ///
+  /// Robusto a un valor no booleano, y acá no es hipotético como en
+  /// [hiddenFromDiscovery]: este campo lo escribe el PF y el `update` de
+  /// `trainerPublicProfiles` no valida tipos. Un `bool` crudo haría que un
+  /// solo doc con `"no"` tirara el listado de discovery de TODOS los
+  /// alumnos. Cualquier cosa distinta de `true` cuenta como pausado, igual
+  /// que el `== true` de las rules.
+  @override
+  @JsonKey(fromJson: _acceptingFromJson)
+  final bool acceptingAthletes;
 // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
 // Written exclusively by the reviewAggregate Cloud Function.
 // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
@@ -517,7 +557,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
 
   @override
   String toString() {
-    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, averageRating: $averageRating, reviewCount: $reviewCount, trainerExperienceYears: $trainerExperienceYears, athleteCount: $athleteCount, hiddenFromDiscovery: $hiddenFromDiscovery)';
+    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, acceptingAthletes: $acceptingAthletes, averageRating: $averageRating, reviewCount: $reviewCount, trainerExperienceYears: $trainerExperienceYears, athleteCount: $athleteCount, hiddenFromDiscovery: $hiddenFromDiscovery)';
   }
 
   @override
@@ -554,6 +594,8 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
                 other.trainerOffersOnline == trainerOffersOnline) &&
             (identical(other.acceptsInquiries, acceptsInquiries) ||
                 other.acceptsInquiries == acceptsInquiries) &&
+            (identical(other.acceptingAthletes, acceptingAthletes) ||
+                other.acceptingAthletes == acceptingAthletes) &&
             (identical(other.averageRating, averageRating) ||
                 other.averageRating == averageRating) &&
             (identical(other.reviewCount, reviewCount) ||
@@ -585,6 +627,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
         const DeepCollectionEquality().hash(_trainerGeohashes),
         trainerOffersOnline,
         acceptsInquiries,
+        acceptingAthletes,
         averageRating,
         reviewCount,
         trainerExperienceYears,
@@ -628,6 +671,7 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
           final List<String> trainerGeohashes,
           final bool trainerOffersOnline,
           final bool acceptsInquiries,
+          @JsonKey(fromJson: _acceptingFromJson) final bool acceptingAthletes,
           final double? averageRating,
           final int reviewCount,
           final int? trainerExperienceYears,
@@ -675,8 +719,22 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   /// el `.get('acceptsInquiries', true)` de `firestore.rules`, así que un
   /// perfil legacy sin el campo sigue siendo consultable.
   @override
+  bool get acceptsInquiries;
+
+  /// Ver [UserProfile.acceptingAthletes]. Default `true`: espeja el
+  /// `.get('acceptingAthletes', true)` de `firestore.rules`, así que un
+  /// perfil legacy sin el campo sigue abierto a alumnos nuevos.
+  ///
+  /// Robusto a un valor no booleano, y acá no es hipotético como en
+  /// [hiddenFromDiscovery]: este campo lo escribe el PF y el `update` de
+  /// `trainerPublicProfiles` no valida tipos. Un `bool` crudo haría que un
+  /// solo doc con `"no"` tirara el listado de discovery de TODOS los
+  /// alumnos. Cualquier cosa distinta de `true` cuenta como pausado, igual
+  /// que el `== true` de las rules.
+  @override
+  @JsonKey(fromJson: _acceptingFromJson)
   bool
-      get acceptsInquiries; // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
+      get acceptingAthletes; // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
 // Written exclusively by the reviewAggregate Cloud Function.
 // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
 // ADR-RV-005: MUST NOT appear in UserRepository._trainerPublicFields.

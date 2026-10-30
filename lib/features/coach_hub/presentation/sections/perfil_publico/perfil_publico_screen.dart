@@ -33,6 +33,7 @@ import '../../../../profile/domain/user_profile.dart';
 import '../../../../profile/domain/user_profile_trainer_completeness.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import 'widgets/coach_discovery_preview_card.dart';
+import 'widgets/alumnos_nuevos_card.dart';
 import 'widgets/consultas_card.dart';
 import 'widgets/especialidad_precio_card.dart';
 import 'widgets/identidad_card.dart';
@@ -330,6 +331,8 @@ class _PerfilPublicoDosColumnas extends StatelessWidget {
           EspecialidadPrecioCard(profile: profile),
           const SizedBox(height: AppSpacing.s18),
           ConsultasCard(profile: profile),
+          const SizedBox(height: AppSpacing.s18),
+          AlumnosNuevosCard(profile: profile),
           const SizedBox(height: AppSpacing.s18),
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(2),

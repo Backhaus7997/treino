@@ -44,9 +44,13 @@ class ProfileTrainerSection extends ConsumerWidget {
       missing.add('ubicación o clases virtuales');
     }
 
-    final subtitle = missing.isEmpty
-        ? 'Perfil completo · visible en Discovery'
-        : 'Faltan: ${missing.join(", ")}';
+    // Completo NO alcanza para estar en Discovery: con la pausa puesta, el PF
+    // no aparece aunque no le falte nada. Antes decía "visible" igual.
+    final subtitle = missing.isNotEmpty
+        ? 'Faltan: ${missing.join(", ")}'
+        : profile.acceptingAthletes
+            ? 'Perfil completo · visible en Discovery'
+            : 'Perfil pausado · no aparecés en Discovery'; // i18n
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 18, 0, 8),

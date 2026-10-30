@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -9,19 +10,34 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
+import '../application/hub_pdf_import_job_provider.dart';
+import '../application/pdf_import_quota_provider.dart';
 import '../application/plan_import_providers.dart';
+import '../application/plan_pdf_import_providers.dart';
 import '../data/periodized_template_builder.dart';
+import '../data/plan_pdf_import_service.dart';
 import '../domain/periodized_plan.dart';
 import '../infrastructure/browser_download.dart';
 import 'widgets/import_plan_widgets.dart';
+import 'widgets/pdf_import_failure_copy.dart';
+import 'widgets/pdf_import_quota_copy.dart';
 
 /// Upload screen del Coach Hub — paso 1 del flujo de import.
 ///
 /// 1. Botón "Descargar plantilla" → genera el xlsx periodizado en memoria +
 ///    browser download
-/// 2. File picker para que el PF elija un xlsx
+/// 2. File picker para que el PF elija un xlsx (o un PDF, si el kill switch
+///    `app_config/pdf_import` se lo habilita: [pdfImportGateProvider])
 /// 3. Botón "Procesar" → parseo + match (client-side) → vista previa. Si el
 ///    parser encuentra errores se muestran TODOS con su celda y no se avanza.
+///    Un PDF va por `parsePlanPdf` (docs/plan-import-pdf.md) y llega a la
+///    MISMA vista previa, sin alumno: se eligen al asignar, como en el Excel.
+///    La lectura vive en [hubPdfImportJobProvider], no en esta pantalla: el
+///    PF puede irse a otra sección y el shell le avisa al terminar.
+///
+/// Con el gate apagado (o cargando) la pantalla es la del Excel solo: ni el
+/// picker acepta PDF ni hay texto del PDF.
 class CoachHubUploadPlanScreen extends ConsumerStatefulWidget {
   const CoachHubUploadPlanScreen({super.key});
 
@@ -38,19 +54,102 @@ class _CoachHubUploadPlanScreenState
   String? _error;
   List<ImportDiagnostic> _diagnostics = const [];
 
+  /// El tope local de 5 MB, chequeado al elegir. Los resultados del servidor
+  /// no viven acá sino en [hubPdfImportJobProvider], que sobrevive a esta
+  /// pantalla: el PF puede irse mientras se lee el PDF sin perder lo que ya
+  /// pagó con su cupo.
+  PdfImportResult? _pickFailure;
+
+  bool get _pdfEnabled =>
+      ref.read(pdfImportGateProvider) == PdfImportGate.enabled;
+
+  HubPdfImportJobNotifier get _job =>
+      ref.read(hubPdfImportJobProvider.notifier);
+
+  @override
+  void initState() {
+    super.initState();
+    // Lo que la lectura terminó mientras el PF estaba acá: listo → a la
+    // vista previa, como siempre. Si estaba en otra sección, avisa el shell.
+    ref.listenManual<HubPdfImportJob>(hubPdfImportJobProvider, (prev, next) {
+      if (prev is! HubPdfImportReading || next is! HubPdfImportReady) return;
+      // Sólo si esta pantalla es la de arriba: debajo de la vista previa no
+      // se empuja otra.
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
+      _openPreview();
+    });
+  }
+
+  void _openPreview() {
+    _job.acknowledge();
+    // Ese PDF ya gastó cupo: al volver de la vista previa no queda listo
+    // para procesarse de nuevo por un clic de más.
+    setState(() => _pickedFile = null);
+    // push, como el Excel: «atrás» desde la vista previa vuelve acá.
+    context.push('/upload-plan/preview');
+  }
+
+  /// El archivo va por el import de PDF: es un `.pdf` y el gate lo permite.
+  /// Con el gate apagado todo va por el Excel, como antes.
+  static bool _isPdf(PlatformFile? file, {required bool pdfEnabled}) =>
+      pdfEnabled && file != null && file.name.toLowerCase().endsWith('.pdf');
+
   Future<void> _pickFile() async {
+    final pdfEnabled = _pdfEnabled;
     setState(() {
       _error = null;
       _diagnostics = const [];
+      _pickFailure = null;
     });
+    // Elegir otro archivo deja atrás el error (o el «listo») de la lectura
+    // anterior.
+    _job.acknowledge();
+    // Web: no hay rutas, sólo bytes (`withData`). Un solo selector para los
+    // dos formatos: el tipo del archivo decide el camino.
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx'],
+      allowedExtensions: pdfEnabled ? const ['xlsx', 'pdf'] : const ['xlsx'],
       withData: true,
     );
-    if (result == null || result.files.isEmpty) return;
-    setState(() => _pickedFile = result.files.first);
+    if (!mounted || result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    setState(() {
+      // El tope del PDF se chequea acá, antes de mandar 5 MB en base64 que el
+      // servidor va a rechazar.
+      final tooBig = _isPdf(file, pdfEnabled: pdfEnabled) &&
+          file.size > kPdfImportMaxBytes;
+      _pickedFile = tooBig ? null : file;
+      _pickFailure =
+          tooBig ? const PdfImportInvalidFile(PdfRejectReason.tooBig) : null;
+    });
   }
+
+  Future<void> _process() => _isPdf(_pickedFile, pdfEnabled: _pdfEnabled)
+      ? _processPdf()
+      : _processFile();
+
+  Future<void> _processPdf() async {
+    final file = _pickedFile;
+    final bytes = file?.bytes;
+    // Una lectura a la vez, aunque el PF haya salido y vuelto.
+    if (_job.isReading || file == null) return;
+    if (bytes == null) {
+      setState(() => _pickFailure = const PdfImportInternal(code: 'no-bytes'));
+      return;
+    }
+    setState(() {
+      _pickFailure = null;
+      _error = null;
+    });
+    // Sin await: la lectura sigue aunque esta pantalla se desmonte. El
+    // resultado llega por [hubPdfImportJobProvider].
+    unawaited(
+        _job.start(bytes: Uint8List.fromList(bytes), fileName: file.name));
+  }
+
+  // pop back to the dashboard (the push origin); fall back to go() when
+  // there's no stack to pop (e.g. deep-linked directly here).
+  void _leave() => context.canPop() ? context.pop() : context.go('/dashboard');
 
   Future<void> _downloadTemplate() async {
     if (_downloadingTemplate) return;
@@ -133,6 +232,16 @@ class _CoachHubUploadPlanScreenState
     final palette = AppPalette.of(context);
     final file = _pickedFile;
     final errors = _diagnostics.where((d) => d.isError).toList();
+    final pdfEnabled =
+        ref.watch(pdfImportGateProvider) == PdfImportGate.enabled;
+    // La lectura vive en el job, no acá: al volver a la pantalla se ve en
+    // qué quedó. Salir mientras lee ya no pregunta nada: no se pierde.
+    final job = ref.watch(hubPdfImportJobProvider);
+    final readingPdf = job is HubPdfImportReading;
+    final pdfReady =
+        job is HubPdfImportReady && ref.watch(periodizedImportProvider) != null;
+    final pdfFailure =
+        _pickFailure ?? (job is HubPdfImportFailed ? job.failure : null);
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -148,18 +257,21 @@ class _CoachHubUploadPlanScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _Header(palette: palette),
+                  _Header(palette: palette, onBack: _leave),
                   const SizedBox(height: AppSpacing.s20),
                   _TemplateCard(
                     palette: palette,
                     onDownload: _downloadTemplate,
                     loading: _downloadingTemplate,
+                    pdfEnabled: pdfEnabled,
                   ),
                   const SizedBox(height: AppSpacing.s18),
                   _UploadCard(
                     palette: palette,
                     file: file,
-                    onPick: _pickFile,
+                    pdfEnabled: pdfEnabled,
+                    isPdf: _isPdf(file, pdfEnabled: pdfEnabled),
+                    onPick: readingPdf ? null : _pickFile,
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: AppSpacing.s14),
@@ -174,19 +286,276 @@ class _CoachHubUploadPlanScreenState
                     const SizedBox(height: AppSpacing.s14),
                     _ErrorsCard(palette: palette, errors: errors),
                   ],
+                  if (pdfFailure != null && !readingPdf) ...[
+                    const SizedBox(height: AppSpacing.s14),
+                    _PdfFailureCard(
+                      palette: palette,
+                      failure: pdfFailure,
+                      onPickAnother: _pickFile,
+                      // Con los bytes que guardó el job: sirve aunque el
+                      // PF se haya ido y vuelto sin el archivo.
+                      onRetry: _pickFailure == null && _job.canRetry
+                          ? _job.retry
+                          : null,
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.s18),
-                  TreinoButton(
-                    label: 'PROCESAR PLAN',
-                    expand: true,
-                    loading: _submitting,
-                    onPressed: _pickedFile == null ? null : _processFile,
-                  ),
+                  // Leyendo, la espera ocupa el lugar del botón; con un
+                  // error del PDF, sus acciones (como en mobile); con el
+                  // plan ya leído (terminó mientras el PF estaba en otra
+                  // sección), el paso a la vista previa.
+                  if (readingPdf)
+                    _ReadingPdfCard(palette: palette, fileName: job.fileName)
+                  else if (pdfReady)
+                    _PdfReadyCard(palette: palette, onOpen: _openPreview)
+                  else if (pdfFailure == null)
+                    TreinoButton(
+                      label: 'PROCESAR PLAN',
+                      expand: true,
+                      loading: _submitting,
+                      onPressed: _pickedFile == null ? null : _process,
+                    ),
                 ],
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Aviso de privacidad y cupo del import de PDF, dentro de la tarjeta de
+/// subida: la spec pide el aviso al momento de subir, antes de elegir.
+class _PdfNotice extends StatelessWidget {
+  const _PdfNotice({required this.palette});
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return ImportCard(
+      padding: AppSpacing.s12,
+      background: palette.bg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(TreinoIcon.shieldCheck, color: palette.accent),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: Text(
+                  AppL10n.of(context).pdfImportPrivacyNotice,
+                  style: importText(
+                    palette.textPrimary,
+                    size: AppTextSize.bodyDense,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          _PdfQuotaLine(palette: palette),
+        ],
+      ),
+    );
+  }
+}
+
+/// El cupo, sólo si se sabe: mientras carga, o si el tier no se puede
+/// afirmar, no hay línea (ni un «0» inventado).
+class _PdfQuotaLine extends ConsumerWidget {
+  const _PdfQuotaLine({required this.palette});
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final remaining = ref.watch(pdfImportRemainingProvider);
+    final text = remaining == null
+        ? null
+        : pdfImportQuotaText(
+            AppL10n.of(context),
+            remaining,
+            // El cartel rojo de cupo agotado sale del job fallido: si ya está,
+            // la línea no lo repite.
+            exhaustedBannerShown: switch (ref.watch(hubPdfImportJobProvider)) {
+              HubPdfImportFailed(:final failure) =>
+                failure is PdfImportQuotaExhausted,
+              _ => false,
+            },
+          );
+    if (text == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.s8),
+      child: Text(
+        text,
+        key: const Key('pdf_import_quota'),
+        style: importText(palette.textMuted, size: AppTextSize.bodyDense),
+      ),
+    );
+  }
+}
+
+/// La espera mientras `parsePlanPdf` lee el PDF. Dice que se puede seguir
+/// usando el Hub: la lectura no depende de esta pantalla.
+class _ReadingPdfCard extends StatelessWidget {
+  const _ReadingPdfCard({required this.palette, required this.fileName});
+  final AppPalette palette;
+
+  /// El PDF que se está leyendo: al volver a la pantalla, el archivo elegido
+  /// ya no está en la tarjeta de subida.
+  final String fileName;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return ImportCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l10n.pdfImportProcessingTitle,
+            style: importText(
+              palette.textPrimary,
+              size: AppTextSize.bodyLarge,
+              weight: AppFonts.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.hairline),
+          Text(
+            fileName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: importText(palette.textMuted, size: AppTextSize.caption),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            child: LinearProgressIndicator(
+              key: const Key('pdf_import_progress'),
+              color: palette.accent,
+              backgroundColor: palette.border,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          Text(
+            l10n.coachHubPdfProcessingHint,
+            style: importText(
+              palette.textMuted,
+              size: AppTextSize.bodyDense,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// El plan se leyó mientras el PF estaba en otra sección y volvió acá sin
+/// pasar por el aviso: el borrador lo espera en la vista previa.
+class _PdfReadyCard extends StatelessWidget {
+  const _PdfReadyCard({required this.palette, required this.onOpen});
+  final AppPalette palette;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return ImportCard(
+      key: const Key('pdf_import_ready'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(TreinoIcon.checkCircleFill, color: palette.accent),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: Text(
+                  l10n.coachHubPdfReadyToast,
+                  style: importText(
+                    palette.textPrimary,
+                    size: AppTextSize.bodyLarge,
+                    weight: AppFonts.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s14),
+          TreinoButton(
+            label: l10n.coachHubPdfReadyAction,
+            expand: true,
+            onPressed: onOpen,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Un resultado no exitoso del PDF, con el mismo texto y las mismas acciones
+/// que en mobile ([pdfImportFailureCopy]).
+class _PdfFailureCard extends StatelessWidget {
+  const _PdfFailureCard({
+    required this.palette,
+    required this.failure,
+    required this.onPickAnother,
+    required this.onRetry,
+  });
+  final AppPalette palette;
+  final PdfImportResult failure;
+  final VoidCallback onPickAnother;
+
+  /// Null si no hay archivo con el que reintentar.
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    final copy = pdfImportFailureCopy(l10n, failure);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ImportCard(
+          key: const Key('pdf_import_error'),
+          borderColor: palette.danger,
+          background: palette.danger.withValues(alpha: 0.08),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(TreinoIcon.warning, color: palette.dangerText),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: Text(
+                  copy.message,
+                  style: importText(palette.textPrimary, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (copy.retry && onRetry != null) ...[
+          const SizedBox(height: AppSpacing.s14),
+          TreinoButton(
+            label: l10n.pdfImportRetry,
+            expand: true,
+            onPressed: onRetry,
+          ),
+        ],
+        if (copy.pickAnother) ...[
+          const SizedBox(height: AppSpacing.s12),
+          TreinoButton(
+            label: l10n.pdfImportPickAnother,
+            icon: TreinoIcon.upload,
+            variant: TreinoButtonVariant.secondaryAccent,
+            expand: true,
+            onPressed: onPickAnother,
+          ),
+        ],
+      ],
     );
   }
 }
@@ -224,8 +593,11 @@ class _ErrorsCard extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.palette});
+  const _Header({required this.palette, required this.onBack});
   final AppPalette palette;
+
+  /// Volver al dashboard; mientras se lee un PDF, pide confirmación.
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -235,10 +607,7 @@ class _Header extends StatelessWidget {
           icon: TreinoIcon.arrowLeft,
           tooltip: 'Volver',
           color: palette.textPrimary,
-          // pop back to the dashboard (the push origin); fall back to go()
-          // when there's no stack to pop (e.g. deep-linked directly here).
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/dashboard'),
+          onPressed: onBack,
         ),
         const SizedBox(width: AppSpacing.s8),
         Expanded(
@@ -280,10 +649,15 @@ class _TemplateCard extends StatelessWidget {
     required this.palette,
     required this.onDownload,
     required this.loading,
+    required this.pdfEnabled,
   });
   final AppPalette palette;
   final VoidCallback onDownload;
   final bool loading;
+
+  /// Con el PDF habilitado, «es la única que aceptamos» sería falso: la
+  /// plantilla es la única PLANILLA, y al lado se acepta un PDF.
+  final bool pdfEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -307,10 +681,12 @@ class _TemplateCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.hairline),
                 Text(
-                  'Descargá la plantilla: una hoja "Programa" con un bloque '
-                  'por día y una columna por semana, y una hoja '
-                  '"Instrucciones" con la notación. Es la única que '
-                  'aceptamos.',
+                  pdfEnabled
+                      ? AppL10n.of(context).coachHubImportTemplateBodyPdf
+                      : 'Descargá la plantilla: una hoja "Programa" con un '
+                          'bloque por día y una columna por semana, y una hoja '
+                          '"Instrucciones" con la notación. Es la única que '
+                          'aceptamos.',
                   style: importText(
                     palette.textMuted,
                     size: AppTextSize.bodyDense,
@@ -337,11 +713,21 @@ class _UploadCard extends StatelessWidget {
   const _UploadCard({
     required this.palette,
     required this.file,
+    required this.pdfEnabled,
+    required this.isPdf,
     required this.onPick,
   });
   final AppPalette palette;
   final PlatformFile? file;
-  final VoidCallback onPick;
+
+  /// El gate del import de PDF está prendido para este PF.
+  final bool pdfEnabled;
+
+  /// [file] va por el import de PDF.
+  final bool isPdf;
+
+  /// Null mientras se lee un PDF: no se cambia el archivo a mitad.
+  final VoidCallback? onPick;
 
   @override
   Widget build(BuildContext context) {
@@ -360,9 +746,15 @@ class _UploadCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.hairline),
           Text(
-            'Archivo .xlsx, hasta 10 MB.',
+            pdfEnabled
+                ? AppL10n.of(context).coachHubImportUploadHintPdf
+                : 'Archivo .xlsx, hasta 10 MB.',
             style: importText(palette.textMuted, size: AppTextSize.bodyDense),
           ),
+          if (pdfEnabled) ...[
+            const SizedBox(height: AppSpacing.s14),
+            _PdfNotice(palette: palette),
+          ],
           const SizedBox(height: AppSpacing.s14),
           if (picked == null)
             TreinoButton(
@@ -378,7 +770,8 @@ class _UploadCard extends StatelessWidget {
               background: palette.bg,
               child: Row(
                 children: [
-                  Icon(TreinoIcon.fileXls, color: palette.accent),
+                  Icon(isPdf ? TreinoIcon.filePdf : TreinoIcon.fileXls,
+                      color: palette.accent),
                   const SizedBox(width: AppSpacing.s12),
                   Expanded(
                     child: Column(

@@ -11,6 +11,7 @@ import 'package:treino/core/widgets/treino_toast.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../notifications/presentation/widgets/notification_bell.dart';
+import 'widgets/perfil_pausado_aviso.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/utils/appointment_window.dart';
@@ -79,6 +80,9 @@ class TrainerDashboardTab extends ConsumerWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         const _DashboardHeader(),
+        // Pausa del PF: arriba de todo, porque es lo primero que tiene que ver
+        // al abrir la app. Sin pausa no dibuja nada, ni su margen.
+        const PerfilPausadoAviso(margin: EdgeInsets.only(top: 18)),
         const SizedBox(height: 18),
         // #393: pending requests are NOT shown inline here anymore — they live
         // in the «Solicitudes» tab of the notification centre so they don't clutter

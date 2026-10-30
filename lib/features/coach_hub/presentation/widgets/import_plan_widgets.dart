@@ -110,14 +110,34 @@ String importDiagnosticGroupTitle(ImportDiagnosticCode code) => switch (code) {
       ImportDiagnosticCode.qualifierSavedAsNote =>
         'Calificadores guardados como nota',
       ImportDiagnosticCode.mixedSetKinds => 'Modos mezclados entre semanas',
+      ImportDiagnosticCode.malformedPlan => 'El plan leído está incompleto',
+      ImportDiagnosticCode.weekCountMismatch =>
+        'Ejercicios con otra cantidad de semanas',
+      ImportDiagnosticCode.invalidSetType => 'Tipos de serie inválidos',
+      ImportDiagnosticCode.invalidReps => 'Reps inválidas',
+      ImportDiagnosticCode.invalidWeight => 'Pesos inválidos',
+      ImportDiagnosticCode.invalidComponent => 'Superseries mal numeradas',
+      ImportDiagnosticCode.mixedPrescription =>
+        'Series con más de una prescripción',
+      ImportDiagnosticCode.extractorWarning => 'Para revisar',
+      ImportDiagnosticCode.invalidOptionalField => 'Datos descartados',
     };
 
 /// Todos los diagnósticos, agrupados por código, cada uno con su celda
 /// (`Programa!F12`) y el valor recibido.
 class ImportDiagnosticsList extends StatelessWidget {
-  const ImportDiagnosticsList({super.key, required this.diagnostics});
+  const ImportDiagnosticsList({
+    super.key,
+    required this.diagnostics,
+    this.neutralTitles = false,
+  });
 
   final List<ImportDiagnostic> diagnostics;
+
+  /// Títulos de grupo en el texto de la tarjeta en vez de ámbar/rojo. Lo usa
+  /// la vista previa, donde son sólo avisos y el ícono de la tarjeta ya los
+  /// marca; la pantalla de subida, con errores que frenan, los deja en color.
+  final bool neutralTitles;
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +153,11 @@ class ImportDiagnosticsList extends StatelessWidget {
           Text(
             '${importDiagnosticGroupTitle(entry.key)} (${entry.value.length})',
             style: importText(
-              entry.value.first.isError ? palette.dangerText : palette.warning,
+              neutralTitles
+                  ? palette.textPrimary
+                  : entry.value.first.isError
+                      ? palette.dangerText
+                      : palette.warning,
               size: AppTextSize.bodyDense,
               weight: AppFonts.w700,
             ),

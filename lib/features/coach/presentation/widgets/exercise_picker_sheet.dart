@@ -40,9 +40,13 @@ import 'muscle_filter_sheet.dart';
 /// case/diacritics and tokenizes multi-word queries: every word must appear
 /// in the name, in any order ("press banca" → "Press de Banca (Barra)").
 
+///
+/// Con [single] elegir uno reemplaza al anterior: la lista que vuelve tiene
+/// a lo sumo un ejercicio (resolver una fila del import de PDF).
 Future<List<Exercise>?> showExercisePicker(
   BuildContext context, {
   Set<String> alreadySelectedIds = const {},
+  bool single = false,
 }) {
   // Pantalla completa en vez de bottom sheet: con la foto real de cada
   // ejercicio (#565) la lista merece toda la altura y una vista clara
@@ -51,8 +55,10 @@ Future<List<Exercise>?> showExercisePicker(
   return Navigator.of(context, rootNavigator: true).push<List<Exercise>>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) =>
-          _ExercisePickerSheetContent(alreadySelectedIds: alreadySelectedIds),
+      builder: (_) => _ExercisePickerSheetContent(
+        alreadySelectedIds: alreadySelectedIds,
+        single: single,
+      ),
     ),
   );
 }
@@ -60,9 +66,13 @@ Future<List<Exercise>?> showExercisePicker(
 // ── Sheet content ─────────────────────────────────────────────────────────────
 
 class _ExercisePickerSheetContent extends ConsumerStatefulWidget {
-  const _ExercisePickerSheetContent({required this.alreadySelectedIds});
+  const _ExercisePickerSheetContent({
+    required this.alreadySelectedIds,
+    this.single = false,
+  });
 
   final Set<String> alreadySelectedIds;
+  final bool single;
 
   @override
   ConsumerState<_ExercisePickerSheetContent> createState() =>
@@ -83,7 +93,17 @@ class _ExercisePickerSheetContentState
   @override
   void initState() {
     super.initState();
-    _selected = {...widget.alreadySelectedIds};
+    _selected = _initialSelection(widget.alreadySelectedIds, widget.single);
+  }
+
+  /// En modo [single] la selección inicial respeta el mismo contrato que la
+  /// salida: a lo sumo un ID. Con uno, se conserva. Con varios, ninguno: no
+  /// hay criterio para elegir cuál (el orden del Set lo decide quien llama,
+  /// no el usuario), y pre-marcar uno al azar haría que «Agregar 1 ejercicio»
+  /// confirme algo que nadie eligió. Vacío obliga a una elección explícita.
+  static Set<String> _initialSelection(Set<String> ids, bool single) {
+    if (!single) return {...ids};
+    return ids.length == 1 ? {...ids} : <String>{};
   }
 
   @override
@@ -115,6 +135,7 @@ class _ExercisePickerSheetContentState
       if (_selected.contains(id)) {
         _selected.remove(id);
       } else {
+        if (widget.single) _selected.clear();
         _selected.add(id);
       }
     });

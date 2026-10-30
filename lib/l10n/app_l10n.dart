@@ -1406,6 +1406,54 @@ abstract class AppL10n {
   /// **'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.'**
   String get trainerAcceptsInquiriesSubtitle;
 
+  /// Título del toggle de pausa del PF (`acceptingAthletes`).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tomo alumnos nuevos'**
+  String get trainerAcceptingAthletesTitle;
+
+  /// Subtítulo del toggle de pausa. Dice NUEVAS por lo mismo que el de consultas: las solicitudes pending que ya entraron y los chats abiertos no se tocan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si lo apagás, dejás de aparecer en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas. Tus alumnos actuales siguen igual.'**
+  String get trainerAcceptingAthletesSubtitle;
+
+  /// Título de la sugerencia de pausar el perfil cuando la carga de alumnos alcanzó el tope del plan. Es una sugerencia: nada se pausa solo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LLEGASTE AL TOPE DE TU PLAN'**
+  String get trainerPlanLimitPauseTitle;
+
+  /// Cuerpo de la sugerencia de pausar con el cupo lleno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si no vas a sumar alumnos, pausá tu perfil: dejás de aparecer en el buscador y no te llegan solicitudes que no vas a poder aceptar.'**
+  String get trainerPlanLimitPauseBody;
+
+  /// Botón de la sugerencia: pone acceptingAthletes en false.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PAUSAR PERFIL'**
+  String get trainerPlanLimitPauseAction;
+
+  /// Aviso fijo en el panel del PF mientras acceptingAthletes == false.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU PERFIL ESTÁ PAUSADO'**
+  String get trainerPausedNoticeTitle;
+
+  /// Cuerpo del aviso de perfil pausado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No aparecés en Encontrá tu coach y no te llegan solicitudes ni consultas nuevas.'**
+  String get trainerPausedNoticeBody;
+
+  /// Botón del aviso de perfil pausado: pone acceptingAthletes en true.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REANUDAR'**
+  String get trainerPausedNoticeAction;
+
   /// Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir.
   ///
   /// In es_AR, this message translates to:
@@ -6632,6 +6680,18 @@ abstract class AppL10n {
   /// **'Solo podés tener un PF activo. Terminá tu vínculo actual con {trainerName} para pedir uno nuevo.'**
   String trainerCtaExistingLinkExplanation(String trainerName);
 
+  /// Disabled contact CTA label on a trainer's public profile when the trainer paused new athletes (acceptingAthletes == false).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NO TOMA ALUMNOS'**
+  String get trainerNotAcceptingLabel;
+
+  /// Helper line under the disabled contact CTA on the trainer's public profile when the trainer paused new athletes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{trainerName} no está tomando alumnos nuevos por ahora.'**
+  String trainerNotAcceptingExplanation(String trainerName);
+
   /// Title of the confirm dialog shown when leaving the coach-hub plan preview screen with manually-mapped exercises that would be lost (finding 9).
   ///
   /// In es_AR, this message translates to:
@@ -8096,6 +8156,36 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Todavía no hay posts de quienes seguís'**
   String get feedEmptyFollowing;
+
+  /// Invitación a publicar al pie del vacío de AMIGOS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Y SI ARRANCÁS VOS?'**
+  String get feedFirstPostTitle;
+
+  /// Invitación a publicar al pie del vacío de AMIGOS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.'**
+  String get feedFirstPostBody;
+
+  /// Invitación a publicar al pie del vacío de MI GYM.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contá cómo te fue en tu último entreno. La gente de tu gym lo va a ver acá.'**
+  String get feedFirstPostBodyGym;
+
+  /// Invitación a publicar al pie del vacío de PÚBLICO.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contá cómo te fue en tu último entreno. Cualquiera en TREINO lo va a ver acá.'**
+  String get feedFirstPostBodyPublic;
+
+  /// Botón de la invitación a publicar del vacío de AMIGOS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICAR'**
+  String get feedFirstPostCta;
 
   /// Aviso persistente sobre el composer cuando el usuario bloqueó al otro miembro del chat.
   ///
@@ -9912,6 +10002,462 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Volvé a la serie cuando llegue a cero'**
   String get sessionRestCountdownBody;
+
+  /// Título de la pantalla de subida del PDF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'IMPORTAR PLAN'**
+  String get pdfImportUploadTitle;
+
+  /// Aviso de privacidad de la pantalla de subida. Texto final aprobado por el dueño el 2026-10-22 (docs/plan-import-pdf.md, «Aviso en la pantalla de subida»): no se reescribe ni se agregan nombres de proveedores.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usamos IA para leer tu PDF y armar el plan. No guardamos el archivo. Subí solo los datos de tu alumno que sean necesarios.'**
+  String get pdfImportPrivacyNotice;
+
+  /// Botón que abre el selector de archivos (sólo .pdf).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegir PDF'**
+  String get pdfImportPickFile;
+
+  /// Acción para cambiar el PDF elegido, también la de los errores del archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegir otro archivo'**
+  String get pdfImportPickAnother;
+
+  /// Botón que manda el PDF a leer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PROCESAR PLAN'**
+  String get pdfImportProcess;
+
+  /// Estado de espera mientras el servidor lee el PDF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Leyendo tu plan…'**
+  String get pdfImportProcessingTitle;
+
+  /// Debajo del estado de espera: la extracción puede pasar del minuto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Puede tardar hasta un par de minutos. No cierres esta pantalla.'**
+  String get pdfImportProcessingHint;
+
+  /// Confirmación al querer salir con la lectura en curso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Salir mientras se lee el plan?'**
+  String get pdfImportLeaveTitle;
+
+  /// Cuerpo de esa confirmación. Es verdad: el servidor descuenta el cupo ANTES de llamar al modelo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este intento ya cuenta en tu cupo aunque salgas.'**
+  String get pdfImportLeaveBody;
+
+  /// Acción que confirma salir con la lectura en curso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Salir'**
+  String get pdfImportLeaveConfirm;
+
+  /// Acción de los errores que se arreglan reintentando.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get pdfImportRetry;
+
+  /// El PDF supera el tope de 5 MB (lo chequea el cliente antes de mandar y el servidor de nuevo).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El archivo pesa más de 5 MB. Elegí uno más liviano.'**
+  String get pdfImportErrorTooBig;
+
+  /// internal y todo lo que no es del contrato.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos leer el plan. Probá de nuevo en un rato.'**
+  String get pdfImportErrorInternal;
+
+  /// Resumen de lo que se leyó del PDF: días y semanas del plan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Leímos {days, plural, =1{1 día} other{{days} días}} y {weeks, plural, =1{1 semana} other{{weeks} semanas}}.'**
+  String pdfImportReadSummary(int days, int weeks);
+
+  /// invalid-argument con reason not_pdf.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El archivo no es un PDF válido.'**
+  String get pdfImportErrorNotPdf;
+
+  /// invalid-argument con reason too_many_pages.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El PDF tiene más de 20 páginas. Elegí uno más corto.'**
+  String get pdfImportErrorTooManyPages;
+
+  /// invalid-argument con reason encrypted.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El PDF tiene contraseña. Exportalo sin contraseña y elegilo de nuevo.'**
+  String get pdfImportErrorEncrypted;
+
+  /// invalid-argument con una reason que no conocemos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos usar este archivo. Probá con otro.'**
+  String get pdfImportErrorFileUnknown;
+
+  /// resource-exhausted con scope week. date = dd/mm, time = HH:mm, en la hora local del teléfono.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usaste todas las importaciones de esta semana. Se renueva el {date} a las {time}.'**
+  String pdfImportErrorQuotaWeek(String date, String time);
+
+  /// resource-exhausted con scope day.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usaste todas las importaciones de hoy. Se renueva el {date} a las {time}.'**
+  String pdfImportErrorQuotaDay(String date, String time);
+
+  /// resource-exhausted sin scope o sin resetsAt legible: no se inventa la fecha.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usaste todas las importaciones disponibles por ahora.'**
+  String get pdfImportErrorQuotaUnknown;
+
+  /// deadline-exceeded (servidor) o timeout del cliente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La lectura tardó demasiado. Probá de nuevo; si el PDF es largo, probá con menos páginas.'**
+  String get pdfImportErrorTimeout;
+
+  /// El cliente rechazó el plan que devolvió el servidor: el cupo ya se descontó.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Leímos el PDF pero no pudimos armar el plan. Este intento ya contó en tu cupo.'**
+  String get pdfImportErrorInvalidPlan;
+
+  /// failed-precondition sin reason: kill switch apagado para este uid.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Importar de PDF no está disponible para tu cuenta.'**
+  String get pdfImportErrorDisabled;
+
+  /// failed-precondition con reason structured_outputs_disabled: el servidor devuelve el cupo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Importar de PDF no está disponible por un problema nuestro. No se descontó de tu cupo.'**
+  String get pdfImportErrorUnavailable;
+
+  /// permission-denied.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solo los entrenadores pueden importar planes.'**
+  String get pdfImportErrorNotTrainer;
+
+  /// unauthenticated.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu sesión se cerró. Volvé a iniciar sesión.'**
+  String get pdfImportErrorSignedOut;
+
+  /// CTA en la ficha del alumno, al lado de CREAR PLAN. Sólo si el kill switch de app_config/pdf_import habilita al PF (docs/plan-import-pdf.md).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'IMPORTAR DE PDF'**
+  String get pdfImportCta;
+
+  /// Cupo de imports de PDF que se pueden hacer ahora, cuando el tope que frena es el semanal (o los dos son iguales). Sin cupo no se muestra: habla el cartel rojo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{week, plural, =1{Te queda 1 importación esta semana.} other{Te quedan {week} importaciones esta semana.}}'**
+  String pdfImportQuotaWeek(int week);
+
+  /// Cupo semanal agotado, visible ANTES de subir un archivo (el cartel rojo sale recién cuando un import falla).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No te quedan importaciones esta semana: se renuevan el lunes.'**
+  String get pdfImportQuotaNoneWeek;
+
+  /// Cupo diario agotado con cupo semanal disponible (planes 2 y 3), visible antes de subir un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No te quedan importaciones hoy: se renuevan mañana.'**
+  String get pdfImportQuotaNoneDay;
+
+  /// Cupo de imports de PDF cuando frena el tope DIARIO (planes 2 y 3): lo que queda hoy, y lo que queda en la semana como dato.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{day, plural, =1{Te queda 1 hoy} other{Te quedan {day} hoy}} · {week} esta semana.'**
+  String pdfImportQuotaDayLimited(int day, int week);
+
+  /// Despliega el texto del PDF del que salió el ejercicio, para compararlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver PDF'**
+  String get pdfImportSourceShow;
+
+  /// Pliega ese texto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ocultar PDF'**
+  String get pdfImportSourceHide;
+
+  /// El candidato del extractor cuando pasó el veto pero el matcher sugirió otro ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Alternativa: {name}'**
+  String pdfImportAlternative(String name);
+
+  /// Asigna la alternativa en vez de la sugerencia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usar alternativa'**
+  String get pdfImportUseAlternative;
+
+  /// Vista previa del PDF: pendientes que bloquean ASIGNAR (sugerencias sin confirmar y ejercicios sin match).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{Queda 1 ejercicio por resolver: confirmá la sugerencia o vinculalo.} other{Quedan {count} ejercicios por resolver: confirmá las sugerencias o vinculalos.}}'**
+  String pdfImportPending(int count);
+
+  /// Crea en bloque los ejercicios sin candidato como propios del PF, uno por nombre distinto (docs/plan-import-pdf.md, «Crear N propios»).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{CREAR 1 PROPIO} other{CREAR {count} PROPIOS}}'**
+  String pdfImportBulkCreate(int count);
+
+  /// El tope de ejercicios propios del plan no alcanza para todos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Te alcanza para {allowed} de {total}'**
+  String pdfImportBulkPartialTitle(int allowed, int total);
+
+  /// Cuerpo de esa confirmación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se crean los primeros en el orden del plan. El resto queda para vincular con la biblioteca.'**
+  String get pdfImportBulkPartialBody;
+
+  /// No se supo el tope: crear en bloque no se arriesga a pasarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos verificar tu tope de ejercicios propios. Probá de nuevo.'**
+  String get pdfImportBulkQuotaUnknown;
+
+  /// Una creación en bloque se cortó a mitad: lo creado queda creado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se crearon {created} de {requested}. No pudimos crear el resto.'**
+  String pdfImportBulkFailed(int created, int requested);
+
+  /// Asigna el plan al alumno. Deshabilitado mientras haya pendientes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ASIGNAR PLAN'**
+  String get pdfImportAssign;
+
+  /// Aviso al volver a la ficha del alumno después de asignar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan asignado.'**
+  String get pdfImportAssigned;
+
+  /// Acción del aviso: abre el plan recién asignado en el editor de rutina para ajustarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ABRIR EDITOR'**
+  String get pdfImportOpenEditor;
+
+  /// Falló la asignación: no se guardó nada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar el plan. Probá de nuevo.'**
+  String get pdfImportAssignFailed;
+
+  /// Título del selector de nivel de la rutina importada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nivel del plan'**
+  String get pdfImportLevel;
+
+  /// Título de la vista previa del plan importado de PDF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REVISAR PLAN'**
+  String get pdfImportPreviewTitle;
+
+  /// Etiqueta del campo editable con el nombre de la rutina importada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nombre de la rutina'**
+  String get pdfImportNameLabel;
+
+  /// Confirma en bloque todas las sugerencias pendientes de la vista previa, igual que tocar «Confirmar» en cada fila. No toca las filas sin match.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{Confirmar la sugerencia} other{Confirmar las {count} sugerencias}}'**
+  String pdfImportConfirmAll(int count);
+
+  /// Lector de pantalla: el tilde de una fila de la vista previa ya vinculada a un ejercicio de la biblioteca.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Resuelto'**
+  String get pdfImportRowResolved;
+
+  /// Lector de pantalla: qué hace tocar una fila resuelta plegada (la despliega para cambiarla o ver el texto del PDF).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver detalle'**
+  String get pdfImportRowShowDetail;
+
+  /// Lector de pantalla: qué hace tocar el encabezado de una fila resuelta desplegada (la vuelve a plegar).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ocultar detalle'**
+  String get pdfImportRowHideDetail;
+
+  /// Vista previa del import: confirma la sugerencia de la fila. Es la única acción de la fila con el acento.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Confirmar'**
+  String get pdfImportConfirm;
+
+  /// Vista previa del import: elige otro ejercicio de la biblioteca para la fila.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cambiar'**
+  String get pdfImportChange;
+
+  /// Vista previa del import: fila sin match, buscar el ejercicio en la biblioteca.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Vincular con la biblioteca'**
+  String get pdfImportLinkLibrary;
+
+  /// Vista previa del import: fila sin match, crear un ejercicio propio con el nombre leído.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Crear como propio'**
+  String get pdfImportCreateOwn;
+
+  /// Lector de pantalla: la línea «→ ejercicio» de una fila con sugerencia pendiente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sugerencia: {name}'**
+  String pdfImportSuggestionA11y(String name);
+
+  /// Lector de pantalla: el punto ámbar al final de una fila con sugerencia sin confirmar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'sugerencia por confirmar'**
+  String get pdfImportMarkPending;
+
+  /// Lector de pantalla: el anillo al final de una fila que no matcheó con la biblioteca.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'sin ejercicio de la biblioteca'**
+  String get pdfImportMarkNoMatch;
+
+  /// Encabezado de un renglón de 2 ejercicios en la vista previa del import.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SUPERSERIE · {count} ejercicios'**
+  String pdfImportBlockSuperset(int count);
+
+  /// Encabezado de un renglón de 3 ejercicios en la vista previa del import.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TRISERIE · {count} ejercicios'**
+  String pdfImportBlockTriset(int count);
+
+  /// Encabezado de un renglón de 4 o más ejercicios en la vista previa del import.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CIRCUITO · {count} ejercicios'**
+  String pdfImportBlockCircuit(int count);
+
+  /// Encabezado de superserie: el descanso del renglón, que va una sola vez después del último ejercicio. {rest} ya viene formateado (`90 s`, `2 min`).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'descanso {rest} al final'**
+  String pdfImportBlockRest(String rest);
+
+  /// Línea de datos de un ejercicio: la serie va al fallo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'al fallo'**
+  String get pdfImportFailure;
+
+  /// Marca de un renglón sin número (calentamiento) en la vista previa del import.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CALENTAMIENTO'**
+  String get pdfImportWarmup;
+
+  /// Aviso arriba de la vista previa: cuántas sugerencias faltan confirmar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 sugerencia por confirmar} other{{count} sugerencias por confirmar}}'**
+  String pdfImportPendingSuggestions(int count);
+
+  /// Aviso arriba de la vista previa: cuántos ejercicios no matchearon con la biblioteca.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} sin match'**
+  String pdfImportPendingNoMatch(int count);
+
+  /// Título de la tarjeta de avisos del parser en la vista previa del import.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 aviso} other{{count} avisos}}'**
+  String pdfImportWarningsCount(int count);
+
+  /// Coach Hub, «Importar plan»: qué archivos acepta la tarjeta de subida cuando el import de PDF está habilitado para el PF (kill switch app_config/pdf_import). Los topes son los del parser de Excel y PDF_MAX_BYTES del servidor.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plantilla .xlsx (hasta 10 MB) o el PDF de tu plan (hasta 5 MB).'**
+  String get coachHubImportUploadHintPdf;
+
+  /// Coach Hub, «Importar plan»: texto de la tarjeta de la plantilla cuando el import de PDF está habilitado. Sin el PDF dice «Es la única que aceptamos», que con un PDF al lado sería falso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Descargá la plantilla: una hoja \"Programa\" con un bloque por día y una columna por semana, y una hoja \"Instrucciones\" con la notación. Es la única planilla que aceptamos; si tu plan está en PDF, subilo tal cual.'**
+  String get coachHubImportTemplateBodyPdf;
+
+  /// Coach Hub: debajo de «Leyendo tu plan…». En el Hub la lectura sigue aunque el PF se vaya de la pantalla, y el shell le avisa al terminar (mobile usa pdfImportProcessingHint, que pide no cerrar).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Puede tardar hasta un par de minutos. Podés seguir usando el Hub: te avisamos cuando esté listo.'**
+  String get coachHubPdfProcessingHint;
+
+  /// Coach Hub: aviso del shell cuando la lectura del PDF terminó bien mientras el PF estaba en otra sección. También es el título de la tarjeta si vuelve a «Importar plan» con el plan listo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan está listo'**
+  String get coachHubPdfReadyToast;
+
+  /// Acción del aviso «Tu plan está listo»: abre la vista previa del plan leído.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER VISTA PREVIA'**
+  String get coachHubPdfReadyAction;
+
+  /// Coach Hub: aviso del shell cuando la lectura del PDF terminó mal mientras el PF estaba en otra sección. El detalle y su acción están en «Importar plan».
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos leer tu plan.'**
+  String get coachHubPdfFailedToast;
+
+  /// Acción del aviso «No pudimos leer tu plan.»: vuelve a «Importar plan», que muestra el error tipado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER DETALLE'**
+  String get coachHubPdfFailedAction;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

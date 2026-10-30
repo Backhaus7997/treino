@@ -471,3 +471,9 @@ export {
 // El aviso es lo que hace verdadera la promesa: sin el, la cola existe y nadie
 // la mira. Ver el encabezado de `moderation/notify-report-created.ts`.
 export { notifyReportCreated } from "./moderation/notify-report-created";
+
+// Import de plan desde PDF (pdf-import-contrato.md): lee el PDF con Claude en
+// Vertex AI y devuelve el plan para la vista previa del PF. Nace APAGADO
+// (`app_config/pdf_import.enabled`), con cupo semanal/diario por plan y sin
+// App Check (exencion `debt`). Ver el header de `pdf-import/parse-plan-pdf.ts`.
+export { parsePlanPdf } from "./pdf-import/parse-plan-pdf";

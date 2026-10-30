@@ -4,6 +4,9 @@ Estado: **especificación aprobada** (2026-10-22). Fuente de verdad para
 implementar el import; las decisiones de producto de acá son del dueño y no se
 reinterpretan en el código.
 
+**Implementación y lo que falta para el rollout:** ver
+[plan-import-pdf-estado.md](./plan-import-pdf-estado.md).
+
 El contrato técnico compartido entre el backend (`functions/`) y el dominio
 Dart (`lib/features/coach_hub/data` y `domain`) está copiado abajo, en
 «Contrato del callable» y «`PdfPlanExtraction`». Si el código y esta sección no
@@ -25,13 +28,15 @@ antes de guardar**. Nada se asigna al alumno sin esa revisión.
 
 Por qué un LLM y no un parser: la gramática del Excel funciona porque la
 plantilla es nuestra. El PDF es formato del PF; el texto plano pierde la
-geometría de las tablas y un escaneado necesita OCR. Claude recibe el PDF como
-texto **e imagen** por página, así que lee tablas y escaneados con el mismo
+geometría de las tablas y un escaneado necesita OCR. El modelo recibe el PDF
+como texto **e imagen** por página, así que lee tablas y escaneados con el mismo
 camino.
 
 ## Alcance v1
 
-- **Sólo app mobile, sólo PDF.** Sin Coach Hub web y sin fotos del plan.
+- **Sólo PDF**, sin fotos del plan. Nació sólo para mobile; después se sumó el
+  Coach Hub web desde «Importar plan», donde los alumnos se eligen al asignar
+  (`docs/plan-import-pdf-estado.md`).
 - **Sólo entrenadores** (`role == "trainer"`), desde la ficha de un alumno: el
   alumno ya es conocido, no hace falta selector.
 - **Apagado por kill switch** hasta la evaluación del rollout (abajo).
@@ -89,20 +94,36 @@ Errores (`HttpsError`):
 |---|---|---|
 | `unauthenticated` | sin auth | no se toca |
 | `permission-denied` | no es `role == "trainer"` | no se toca |
-| `failed-precondition` | kill switch apagado | no se toca |
-| `invalid-argument` | no es PDF, > 5 MB o > 20 páginas; `details: { reason: "not_pdf" \| "too_big" \| "too_many_pages" }` | no se toca |
+| `failed-precondition` | kill switch apagado (sin `details`); o Vertex rechaza los structured outputs por la org policy (`details: { reason: "structured_outputs_disabled" }`, ver Rollout paso 3) | no se toca / **se devuelve** |
+| `invalid-argument` | no es PDF, > 5 MB, > 20 páginas o cifrado/con contraseña; `details: { reason: "not_pdf" \| "too_big" \| "too_many_pages" \| "encrypted" }` | no se toca |
 | `resource-exhausted` | sin cupo; `details: { scope: "week" \| "day", resetsAt: ISO }` | — |
 | `deadline-exceeded` | el LLM tardó demasiado | **se devuelve** |
 | `internal` | salida del LLM inválida tras validar | **se devuelve** |
 
-**Proveedor.** Claude en **Vertex AI** (`@anthropic-ai/vertex-sdk`,
-`region: "global"`, proyecto del entorno). Auth por la service account de la
-función (ADC): **sin API key ni secret nuevo**. El endpoint regional para los
-modelos nuevos no existe, por eso `global` y no `southamerica-east1`.
+**Proveedor.** **Gemini en Vertex AI** (`gemini-provider.ts`: un POST REST a
+`generateContent`, endpoint `global` —el regional no existe para los modelos
+nuevos, por eso no `southamerica-east1`—, proyecto del entorno). Auth por la service
+account de la función (ADC): **sin API key ni secret nuevo**. Mismo system
+prompt, catálogo y JSON schema que con Claude; reintenta sólo ante 429/503,
+porque Gemini corre sobre capacidad compartida de Google y un rechazo no gasta
+tokens.
 
-**Modelo.** `claude-opus-5-5` por defecto, configurable **sin redeploy**
-(parámetro de config). El callable devuelve en `model` cuál se usó, para poder
-atribuir cada resultado de la evaluación.
+Claude en Vertex (`@anthropic-ai/vertex-sdk`) sigue como adaptador alternativo,
+elegible por config. **No es el default porque Claude en Vertex arranca con
+cuota 0 por modelo** (requests, tokens de entrada y de salida por minuto) y el
+pedido de aumento lo resuelve Google en automático: el 2026-10-27 lo denegó por
+el historial de la cuenta de facturación. Gemini es modelo propio de Google y no
+pasa por ese portón (ni por la org policy de structured outputs, que es sólo
+para modelos de terceros).
+
+**Modelo.** `gemini-4-argon` por defecto, configurable **sin redeploy**
+(parámetro de config). Evaluado el 2026-10-27 con tres PDFs de prueba (tabla de
+4 días con superserie, 4 semanas en columnas con un día en prosa, y un escaneado
+sin capa de texto): los tres transcriptos sin errores, 66–108 s, ~16,7 k tokens
+de entrada y 5–7 k de salida, unos US$0,20 por import (US$4 / US$20 por millón,
+el mismo precio que Claude Opus 5.5). Un Flash (`gemini-3.8-flash`) dio 429 y
+timeout en el PDF de 4 semanas: no se sumó. El callable devuelve en `model` cuál
+se usó, para poder atribuir cada resultado de la evaluación.
 
 **App Check.** El callable va **sin `enforceAppCheck`**: la atestación de
 Android está rota y el flag no degrada, rompe. La exención se declara como
@@ -306,7 +327,16 @@ el import existe para evitar. Por eso, además de «Crear como propio» por fila
 
 ## Kill switch
 
-Documento **`app_config/pdf_import`** con `{ enabled: bool }`.
+Documento **`app_config/pdf_import`** con `{ enabled: bool, allowlistUids?: string[], model?, effort? }`.
+
+- **`allowlistUids`** es la lista de prueba: con `enabled: false`, el callable
+  igual atiende a esos uids (con el rol y el cupo aplicados igual) y rechaza al
+  resto. Sirve para evaluar con PDFs reales en producción sin abrirlo a todos
+  los PF. Con `enabled: true` no cambia nada.
+- **`model`** (`gemini-4-argon` por defecto, `claude-opus-5-5`,
+  `claude-sonnet-5-5`, `claude-haiku-5-5`) y **`effort`** (`low`, `medium` por
+  defecto, `high`; sólo lo usa Claude) se cambian sin redeploy; un valor
+  desconocido cae al default.
 
 - **Apagado** hasta terminar la evaluación del rollout.
 - Lo lee el servidor en cada llamada (`failed-precondition` si está apagado o
@@ -341,21 +371,71 @@ el PDF lo dice la política de privacidad, que sí nombra a los encargados
    propios.
 2. **Política publicada antes de encender.** El texto legal de este PR tiene
    que estar en `main` (y en la landing) antes de que un PF pueda subir un PDF.
-3. **Habilitar Vertex AI** (Model Garden, modelo Claude) en `treino-dev`.
-   **`treino-dev` ES producción** (AGENTS.md): lo hace un humano, con OK
-   explícito. Deploy filtrado con `--only functions:parsePlanPdf`.
+3. **Habilitar Vertex AI** en `treino-dev` y darle `roles/aiplatform.user` a la
+   service account de las functions. Con eso Gemini ya responde: no pide cuota
+   ni org policy. **`treino-dev` ES producción** (AGENTS.md): lo hace un
+   humano, con OK explícito. Deploy filtrado con `--only functions:parsePlanPdf`.
+
+   **Sólo para usar Claude** (`model: claude-*`): habilitar el modelo en Model
+   Garden, **pedir las tres cuotas** de `base_model: anthropic-claude-opus` (o
+   el que corresponda) en IAM y administración → Cuotas —
+   `global_online_prediction_requests_per_base_model`,
+   `global_online_prediction_input_tokens_per_minute_per_base_model` y
+   `global_online_prediction_output_tokens_per_minute_per_base_model`, las tres
+   arrancan en 0 y el error 429 sólo nombra la primera—, y la org policy de
+   abajo.
+
+   **Permitir los structured outputs (obligatorio para Claude).** En Vertex AI están
+   **denegados por defecto** para todo proyecto dentro de una organización —y
+   `treino-dev` lo está— por la org policy
+   `constraints/vertexai.allowedPartnerModelFeatures` (docs de Google Cloud
+   «Control access to Model Garden models» y «Structured outputs with Anthropic
+   Claude models», 2026-10-21). Sin este paso **todo** import falla antes de la
+   inferencia: el callable lo devuelve como `failed-precondition` con
+   `reason: "structured_outputs_disabled"`, devuelve el cupo y deja un log que
+   nombra la policy. Strict tool use no lo esquiva: Google lo cuenta como parte
+   de la misma feature.
+
+   La policy se puede poner a nivel proyecto (la de proyecto puede pisar la de
+   la organización; requiere `roles/orgpolicy.policyAdmin`). Un archivo
+   `policy.yaml` con un valor por cada modelo que se vaya a usar:
+
+   ```yaml
+   name: projects/treino-dev/policies/vertexai.allowedPartnerModelFeatures
+   spec:
+     rules:
+       - values:
+           allowedValues:
+             - publishers/anthropic/models/claude-opus-5-5:structured_outputs
+             - publishers/anthropic/models/claude-sonnet-5-5:structured_outputs
+             - publishers/anthropic/models/claude-haiku-5-5:structured_outputs
+   ```
+
+   ```bash
+   gcloud org-policies set-policy policy.yaml --project=treino-dev
+   gcloud org-policies describe vertexai.allowedPartnerModelFeatures --project=treino-dev --effective
+   ```
+
+   Por consola: IAM y administración → Políticas de la organización →
+   `vertexai.allowedPartnerModelFeatures` → *Administrar política* sobre el
+   proyecto `treino-dev` → valores permitidos personalizados, los mismos tres.
+   Un `deny` explícito en un nivel superior gana sobre este `allow`: si después
+   del cambio el log sigue diciendo `structured_outputs_disabled`, mirar la
+   policy efectiva (el segundo comando).
 4. **Evaluación con 10 a 20 PDFs reales** de PFs, variados a propósito: tablas,
    prosa, superseries, semanas en columnas y **al menos uno escaneado**. Se
-   empieza con **`claude-opus-5-5`** como techo de calidad. Por cada PDF se
+   empieza con **`gemini-4-argon`**, el default. Por cada PDF se
    mide: días y semanas correctos, ejercicios con `rawName` fiel, sets con
    reps/rango/peso correctos, cuántos matchean exacto / sugerencia / rojo,
    tokens, costo y duración.
-5. **Bajar de modelo si alcanza.** Con los mismos PDFs se evalúa
-   `claude-sonnet-5-5` y `claude-haiku-5-5`. Se cambia el parámetro de config
+5. **Bajar de modelo si alcanza.** Con los mismos PDFs se evalúa uno más
+   barato (un Flash de Gemini, que hay que sumar a `SUPPORTED_MODELS`, o los
+   Claude si llega a haber cuota). Se cambia el parámetro de config
    (sin redeploy) al más barato que no pierda calidad **en lo que el PF no
    puede corregir fácil** (estructura de días y semanas); los errores de una
    celda la vista previa los muestra.
-6. **Encender** `app_config/pdf_import.enabled` con OK del dueño.
+6. **Encender** `app_config/pdf_import.enabled` con OK del dueño. Hasta entonces la
+   evaluación de los pasos 4 y 5 corre desde las cuentas de `allowlistUids`.
 
 ## Riesgos
 

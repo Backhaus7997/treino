@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/guardia_de_salida.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -679,6 +680,60 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  // Salir con cambios sin guardar: antes sólo el back del header preguntaba;
+  // el swipe de iOS y la barra de pestañas los tiraban en silencio.
+  group('salir con cambios sin guardar', () {
+    final dialogo = find.text('¿Descartar los cambios?');
+
+    Future<void> abrirYEditar(WidgetTester tester) async {
+      await tester.pumpWidget(_buildScreen(profile: _profile()));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('edit_personal_display_name')),
+        'Otro nombre',
+      );
+      await tester.pump();
+    }
+
+    testWidgets('el swipe de iOS con cambios pregunta y no sale',
+        (tester) async {
+      await abrirYEditar(tester);
+
+      await _simulateSystemBack(tester);
+      await tester.pumpAndSettle();
+
+      expect(dialogo, findsOneWidget);
+      expect(find.text('PROFILE_SCREEN'), findsNothing);
+    });
+
+    testWidgets('el swipe de iOS sin cambios sale directo', (tester) async {
+      await tester.pumpWidget(_buildScreen(profile: _profile()));
+      await tester.pumpAndSettle();
+
+      await _simulateSystemBack(tester);
+      await tester.pumpAndSettle();
+
+      expect(dialogo, findsNothing);
+      expect(find.text('PROFILE_SCREEN'), findsOneWidget);
+    });
+
+    testWidgets('con cambios, la barra de pestañas también pregunta',
+        (tester) async {
+      await abrirYEditar(tester);
+
+      final guardia = ProviderScope.containerOf(
+        tester.element(find.byType(ProfileEditPersonalScreen)),
+      ).read(guardiaDeSalidaProvider);
+      final salida = guardia.puedeSalir();
+      await tester.pumpAndSettle();
+      expect(dialogo, findsOneWidget);
+
+      await tester.tap(find.text('VOLVER'));
+      await tester.pumpAndSettle();
+      expect(await salida, isFalse);
     });
   });
 }
