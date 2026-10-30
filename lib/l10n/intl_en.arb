@@ -1776,6 +1776,18 @@
   "@feedEmptyFollowing": {
     "description": "Estado vacío del feed SEGUIDORES."
   },
+  "feedFirstPostTitle": "WHY NOT GO FIRST?",
+  "@feedFirstPostTitle": {
+    "description": "Invitación a publicar al pie del vacío de AMIGOS."
+  },
+  "feedFirstPostBody": "Share how your last workout went. Your followers will see it here.",
+  "@feedFirstPostBody": {
+    "description": "Invitación a publicar al pie del vacío de AMIGOS."
+  },
+  "feedFirstPostCta": "POST",
+  "@feedFirstPostCta": {
+    "description": "Botón de la invitación a publicar del vacío de AMIGOS."
+  },
   "chatBlockedComposerNotice": "You blocked this person. Unblock them to send a message.",
   "@chatBlockedComposerNotice": {
     "description": "Aviso persistente sobre el composer cuando el usuario bloqueó al otro miembro del chat."

@@ -4733,6 +4733,16 @@ class AppL10nEs extends AppL10n {
   String get feedEmptyFollowing => 'Aún no hay posts de quienes seguís';
 
   @override
+  String get feedFirstPostTitle => '¿Y SI ARRANCÁS VOS?';
+
+  @override
+  String get feedFirstPostBody =>
+      'Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.';
+
+  @override
+  String get feedFirstPostCta => 'PUBLICAR';
+
+  @override
   String get chatBlockedComposerNotice =>
       'Bloqueaste a esta persona. Desbloqueala para escribirle.';
 
@@ -11017,6 +11027,16 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get feedEmptyFollowing => 'Todavía no hay posts de quienes seguís';
+
+  @override
+  String get feedFirstPostTitle => '¿Y SI ARRANCÁS VOS?';
+
+  @override
+  String get feedFirstPostBody =>
+      'Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.';
+
+  @override
+  String get feedFirstPostCta => 'PUBLICAR';
 
   @override
   String get chatBlockedComposerNotice =>

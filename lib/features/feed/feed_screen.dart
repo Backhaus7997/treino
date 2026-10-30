@@ -32,6 +32,7 @@ import 'application/suggested_users_providers.dart';
 import 'domain/feed_segment.dart';
 import 'domain/post.dart';
 import 'presentation/widgets/feed_empty_state.dart';
+import 'presentation/widgets/feed_first_post_prompt.dart';
 import 'presentation/widgets/feed_segment_pills.dart';
 import 'presentation/widgets/post_card.dart';
 import 'presentation/widgets/suggested_users_section.dart';
@@ -923,6 +924,13 @@ class _AmigosBody extends ConsumerWidget {
                   message: AppL10n.of(context).feedEmptyFollowing,
                 ),
                 SuggestedUsersSection(gymId: gymId),
+                // Sin sugerencias (sin gym, o ya los seguís a todos) la
+                // sección colapsa a cero y el prompt quedaría pegado al
+                // mensaje. Con sugerencias el carrusel ya trae sus 20 abajo:
+                // sumarlos siempre dejaba 40. `suggestions` sale del mismo
+                // provider que lee la sección.
+                if (suggestions.isEmpty) const SizedBox(height: AppSpacing.s20),
+                const FeedFirstPostPrompt(),
               ],
             ),
           );
