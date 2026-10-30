@@ -156,6 +156,10 @@ Widget _wrapProviderRouter(Widget w, List<Override> overrides) {
         builder: (_, state) =>
             Scaffold(body: Text('profile-${state.pathParameters['uid']}')),
       ),
+      GoRoute(
+        path: '/feed/create',
+        builder: (_, __) => const Scaffold(body: Text('create-post')),
+      ),
     ],
   );
   return ProviderScope(
@@ -471,6 +475,37 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(PostCard), findsNothing);
+    });
+
+    // El vacío dejaba el resto del viewport en blanco debajo del mensaje y
+    // las sugerencias: la invitación a publicar es lo que lo ocupa.
+    testWidgets('invita a publicar y el botón abre Nuevo post', (tester) async {
+      await tester.pumpWidget(
+        _wrapProviderRouter(const FeedScreen(), emptyOverrides),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('feed_first_post_prompt')), findsOneWidget);
+
+      // Por key y no por ícono: el header también tiene un «+» a /feed/create,
+      // y un test que tocara ése pasaría con el botón nuevo roto.
+      await tester.tap(find.byKey(const Key('feed_first_post_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('create-post'), findsOneWidget);
+    });
+
+    testWidgets('el prompt queda debajo del mensaje de vacío', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), emptyOverrides),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Y SI ARRANCÁS VOS?'), findsOneWidget);
+      expect(
+        tester.getRect(find.byKey(const Key('feed_first_post_prompt'))).top,
+        greaterThan(tester.getRect(find.byType(FeedEmptyState)).bottom),
+      );
     });
   });
 

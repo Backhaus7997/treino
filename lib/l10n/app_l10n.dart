@@ -8157,6 +8157,24 @@ abstract class AppL10n {
   /// **'Todavía no hay posts de quienes seguís'**
   String get feedEmptyFollowing;
 
+  /// Invitación a publicar al pie del vacío de AMIGOS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Y SI ARRANCÁS VOS?'**
+  String get feedFirstPostTitle;
+
+  /// Invitación a publicar al pie del vacío de AMIGOS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.'**
+  String get feedFirstPostBody;
+
+  /// Botón de la invitación a publicar del vacío de AMIGOS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICAR'**
+  String get feedFirstPostCta;
+
   /// Aviso persistente sobre el composer cuando el usuario bloqueó al otro miembro del chat.
   ///
   /// In es_AR, this message translates to:

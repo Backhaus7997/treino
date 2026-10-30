@@ -4647,6 +4647,16 @@ class AppL10nEn extends AppL10n {
   String get feedEmptyFollowing => 'No posts yet from people you follow';
 
   @override
+  String get feedFirstPostTitle => 'WHY NOT GO FIRST?';
+
+  @override
+  String get feedFirstPostBody =>
+      'Share how your last workout went. Your followers will see it here.';
+
+  @override
+  String get feedFirstPostCta => 'POST';
+
+  @override
   String get chatBlockedComposerNotice =>
       'You blocked this person. Unblock them to send a message.';
 

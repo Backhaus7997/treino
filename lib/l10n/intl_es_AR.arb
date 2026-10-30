@@ -4350,6 +4350,18 @@
   "@feedEmptyFollowing": {
     "description": "Estado vacío del feed SEGUIDORES."
   },
+  "feedFirstPostTitle": "¿Y SI ARRANCÁS VOS?",
+  "@feedFirstPostTitle": {
+    "description": "Invitación a publicar al pie del vacío de AMIGOS."
+  },
+  "feedFirstPostBody": "Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.",
+  "@feedFirstPostBody": {
+    "description": "Invitación a publicar al pie del vacío de AMIGOS."
+  },
+  "feedFirstPostCta": "PUBLICAR",
+  "@feedFirstPostCta": {
+    "description": "Botón de la invitación a publicar del vacío de AMIGOS."
+  },
   "chatBlockedComposerNotice": "Bloqueaste a esta persona. Desbloqueala para escribirle.",
   "@chatBlockedComposerNotice": {
     "description": "Aviso persistente sobre el composer cuando el usuario bloqueó al otro miembro del chat."
