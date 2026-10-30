@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
@@ -502,9 +503,40 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('¿Y SI ARRANCÁS VOS?'), findsOneWidget);
+      // Sin sugerencias el separador propio es el único aire: 20.
+      expect(
+        tester.getRect(find.byKey(const Key('feed_first_post_prompt'))).top -
+            tester.getRect(find.byType(FeedEmptyState)).bottom,
+        AppSpacing.s20,
+      );
+    });
+
+    testWidgets('con sugerencias, el aire es sólo el padding del carrusel', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          ...emptyOverrides,
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(gymId: 'gym-a')),
+          ),
+          suggestedUsersProvider('gym-a').overrideWith(
+            (ref) async => const [
+              UserPublicProfile(uid: 'cand-0', displayName: 'Candidato 0'),
+            ],
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      // La key está en el `Padding` de la sección, así que su borde inferior
+      // ya incluye los 20 del carrusel. Si el separador se sumara siempre,
+      // acá habría 20 de más (40 de hueco en pantalla).
+      final section = find.byKey(const Key('suggested_users_section'));
+      expect(section, findsOneWidget);
       expect(
         tester.getRect(find.byKey(const Key('feed_first_post_prompt'))).top,
-        greaterThan(tester.getRect(find.byType(FeedEmptyState)).bottom),
+        tester.getRect(section).bottom,
       );
     });
   });
