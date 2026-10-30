@@ -4740,6 +4740,14 @@ class AppL10nEs extends AppL10n {
       'Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.';
 
   @override
+  String get feedFirstPostBodyGym =>
+      'Contá cómo te fue en tu último entreno. La gente de tu gym lo va a ver acá.';
+
+  @override
+  String get feedFirstPostBodyPublic =>
+      'Contá cómo te fue en tu último entreno. Cualquiera en TREINO lo va a ver acá.';
+
+  @override
   String get feedFirstPostCta => 'PUBLICAR';
 
   @override
@@ -11034,6 +11042,14 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get feedFirstPostBody =>
       'Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.';
+
+  @override
+  String get feedFirstPostBodyGym =>
+      'Contá cómo te fue en tu último entreno. La gente de tu gym lo va a ver acá.';
+
+  @override
+  String get feedFirstPostBodyPublic =>
+      'Contá cómo te fue en tu último entreno. Cualquiera en TREINO lo va a ver acá.';
 
   @override
   String get feedFirstPostCta => 'PUBLICAR';

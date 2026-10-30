@@ -1228,6 +1228,14 @@
   "@feedFirstPostBody": {
     "description": "Invitación a publicar al pie del vacío de AMIGOS."
   },
+  "feedFirstPostBodyGym": "Contá cómo te fue en tu último entreno. La gente de tu gym lo va a ver acá.",
+  "@feedFirstPostBodyGym": {
+    "description": "Invitación a publicar al pie del vacío de MI GYM."
+  },
+  "feedFirstPostBodyPublic": "Contá cómo te fue en tu último entreno. Cualquiera en TREINO lo va a ver acá.",
+  "@feedFirstPostBodyPublic": {
+    "description": "Invitación a publicar al pie del vacío de PÚBLICO."
+  },
   "feedFirstPostCta": "PUBLICAR",
   "@feedFirstPostCta": {
     "description": "Botón de la invitación a publicar del vacío de AMIGOS."

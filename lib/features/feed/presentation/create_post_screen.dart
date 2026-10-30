@@ -31,10 +31,16 @@ import '../../gyms/domain/gym.dart' show hasRealGym;
 ///
 /// Does NOT own a [Scaffold] — relies on [_ShellScaffold] via the router.
 class CreatePostScreen extends ConsumerWidget {
-  const CreatePostScreen({super.key, this.existingPost});
+  const CreatePostScreen({super.key, this.existingPost, this.initialPrivacy});
 
   /// The post to edit. `null` (default) composes a brand-new post.
   final Post? existingPost;
+
+  /// Visibilidad con la que arranca un post NUEVO. La pasa la invitación a
+  /// publicar de Mi gym / Público: si arrancara en SEGUIDORES, el post no
+  /// aparecería en la pestaña desde la que se pidió y el vacío seguiría igual.
+  /// Al editar se ignora: manda la del post.
+  final PostPrivacy? initialPrivacy;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -53,7 +59,11 @@ class CreatePostScreen extends ConsumerWidget {
         error: (_, __) => _CreatePostError(
           onRetry: () => ref.invalidate(provider),
         ),
-        data: (state) => _CreatePostBody(state: state, notifier: notifier),
+        data: (state) => _CreatePostBody(
+          state: state,
+          notifier: notifier,
+          initialPrivacy: initialPrivacy,
+        ),
       ),
     );
   }
@@ -190,10 +200,15 @@ class _CreatePostError extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _CreatePostBody extends ConsumerStatefulWidget {
-  const _CreatePostBody({required this.state, required this.notifier});
+  const _CreatePostBody({
+    required this.state,
+    required this.notifier,
+    this.initialPrivacy,
+  });
 
   final CreatePostState state;
   final CreatePostNotifier notifier;
+  final PostPrivacy? initialPrivacy;
 
   @override
   ConsumerState<_CreatePostBody> createState() => _CreatePostBodyState();
@@ -226,8 +241,24 @@ class _CreatePostBodyState extends ConsumerState<_CreatePostBody> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.state.text);
-    _alAbrir =
-        (widget.state.text, widget.state.privacy, widget.state.routineTag);
+    final inicial = widget.initialPrivacy;
+    final aplicarInicial = inicial != null &&
+        widget.state.editingPost == null &&
+        inicial != widget.state.privacy;
+    // La visibilidad pedida cuenta como "lo que había al abrir": si no, la
+    // guardia de salida preguntaría por descartar un cambio que el usuario
+    // nunca hizo.
+    _alAbrir = (
+      widget.state.text,
+      aplicarInicial ? inicial : widget.state.privacy,
+      widget.state.routineTag,
+    );
+    if (aplicarInicial) {
+      // No se puede tocar un provider durante el build del primer frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.notifier.setPrivacy(inicial);
+      });
+    }
     _guardia = ref.read(guardiaDeSalidaProvider)..registrar(_confirmarSalida);
   }
 

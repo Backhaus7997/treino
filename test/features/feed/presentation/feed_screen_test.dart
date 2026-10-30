@@ -159,7 +159,13 @@ Widget _wrapProviderRouter(Widget w, List<Override> overrides) {
       ),
       GoRoute(
         path: '/feed/create',
-        builder: (_, __) => const Scaffold(body: Text('create-post')),
+        // La query va en el texto: así un test ve con qué visibilidad se
+        // pidió Nuevo post, no sólo que se navegó.
+        builder: (_, state) => Scaffold(
+          body: Text(
+            'create-post:${state.uri.queryParameters['visibilidad'] ?? ''}',
+          ),
+        ),
       ),
     ],
   );
@@ -167,6 +173,7 @@ Widget _wrapProviderRouter(Widget w, List<Override> overrides) {
     overrides: overrides,
     child: MaterialApp.router(
       theme: AppTheme.dark(),
+      locale: const Locale('es', 'AR'),
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
       routerConfig: router,
@@ -493,7 +500,8 @@ void main() {
       await tester.tap(find.byKey(const Key('feed_first_post_button')));
       await tester.pumpAndSettle();
 
-      expect(find.text('create-post'), findsOneWidget);
+      // Sin query: AMIGOS abre Nuevo post con el default (SEGUIDORES).
+      expect(find.text('create-post:'), findsOneWidget);
     });
 
     testWidgets('el prompt queda debajo del mensaje de vacío', (tester) async {
@@ -694,6 +702,8 @@ void main() {
 
       expect(find.byType(FeedEmptyState), findsOneWidget);
       expect(find.text('Todavía no estás en un gym'), findsOneWidget);
+      // Sin gym no se puede publicar con visibilidad MI GYM.
+      expect(find.byKey(const Key('feed_first_post_prompt')), findsNothing);
     });
 
     // SCENARIO-203: empty list shows gym-no-posts empty state
@@ -710,6 +720,30 @@ void main() {
 
       expect(find.byType(FeedEmptyState), findsOneWidget);
       expect(find.text('Tu gym todavía no tiene posts'), findsOneWidget);
+    });
+
+    testWidgets('gym sin posts: invita a publicar con visibilidad MI GYM', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProviderRouter(
+          const FeedScreen(),
+          gymOverrides(gymFuture: () async => const <Post>[]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Contá cómo te fue en tu último entreno. '
+          'La gente de tu gym lo va a ver acá.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('feed_first_post_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('create-post:gym'), findsOneWidget);
     });
 
     // SCENARIO-204: non-empty list shows ListView with PostCards
@@ -758,6 +792,32 @@ void main() {
   // ── REQ-FSG-014..016 — _PublicoBody ──────────────────────────────────────
 
   group('_PublicoBody', () {
+    testWidgets('vacío: invita a publicar con visibilidad PÚBLICO', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProviderRouter(const FeedScreen(), [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Contá cómo te fue en tu último entreno. '
+          'Cualquiera en TREINO lo va a ver acá.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('feed_first_post_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('create-post:public'), findsOneWidget);
+    });
+
     // SCENARIO-211: loading state shows spinner
     testWidgets('SCENARIO-211: loading state shows spinner', (tester) async {
       await tester.pumpWidget(
