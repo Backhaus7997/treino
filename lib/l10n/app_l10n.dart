@@ -8169,6 +8169,18 @@ abstract class AppL10n {
   /// **'Contá cómo te fue en tu último entreno. Quienes te siguen lo van a ver acá.'**
   String get feedFirstPostBody;
 
+  /// Invitación a publicar al pie del vacío de MI GYM.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contá cómo te fue en tu último entreno. La gente de tu gym lo va a ver acá.'**
+  String get feedFirstPostBodyGym;
+
+  /// Invitación a publicar al pie del vacío de PÚBLICO.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contá cómo te fue en tu último entreno. Cualquiera en TREINO lo va a ver acá.'**
+  String get feedFirstPostBodyPublic;
+
   /// Botón de la invitación a publicar del vacío de AMIGOS.
   ///
   /// In es_AR, this message translates to:

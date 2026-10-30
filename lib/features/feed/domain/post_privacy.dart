@@ -47,3 +47,12 @@ extension PostPrivacyX on PostPrivacy {
         PostPrivacy.public => 'public',
       };
 }
+
+/// La visibilidad que pide `?visibilidad=` en `/feed/create`, o `null`.
+///
+/// Usa el nombre Dart (`followers` / `gym` / `public`), que es lo que manda la
+/// invitación a publicar con `privacy.name` — NO el wire value: `friends` no
+/// es un valor de query válido. Un valor desconocido devuelve `null` y Nuevo
+/// post arranca con su default.
+PostPrivacy? postPrivacyFromQuery(String? value) =>
+    value == null ? null : PostPrivacy.values.asNameMap()[value];

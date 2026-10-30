@@ -31,6 +31,7 @@ import 'application/post_providers.dart';
 import 'application/suggested_users_providers.dart';
 import 'domain/feed_segment.dart';
 import 'domain/post.dart';
+import 'domain/post_privacy.dart';
 import 'presentation/widgets/feed_empty_state.dart';
 import 'presentation/widgets/feed_first_post_prompt.dart';
 import 'presentation/widgets/feed_segment_pills.dart';
@@ -996,6 +997,8 @@ class _MiGymBody extends ConsumerWidget {
       },
       dataBuilder: (context, posts) {
         if (posts == null) {
+          // Sin invitación a publicar: sin gym no se puede postear con
+          // visibilidad MI GYM (`CreatePostNotifier` lo rechaza).
           return const _FeedContent.empty(
             FeedEmptyState(message: 'Todavía no estás en un gym'),
           );
@@ -1011,7 +1014,14 @@ class _MiGymBody extends ConsumerWidget {
             posts.where((p) => !blockedUids.contains(p.authorUid)).toList();
         if (visiblePosts.isEmpty) {
           return const _FeedContent.empty(
-            FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
+                SizedBox(height: AppSpacing.s20),
+                FeedFirstPostPrompt(privacy: PostPrivacy.gym),
+              ],
+            ),
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;
@@ -1071,7 +1081,14 @@ class _PublicoBody extends ConsumerWidget {
             posts.where((p) => !blockedUids.contains(p.authorUid)).toList();
         if (visiblePosts.isEmpty) {
           return const _FeedContent.empty(
-            FeedEmptyState(message: 'Aún no hay posts públicos'),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FeedEmptyState(message: 'Aún no hay posts públicos'),
+                SizedBox(height: AppSpacing.s20),
+                FeedFirstPostPrompt(privacy: PostPrivacy.public),
+              ],
+            ),
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;

@@ -74,6 +74,7 @@ Widget _wrapWithRouter({
   String? gymId,
   MockPostRepository? mockRepo,
   List<Routine> routines = const [],
+  PostPrivacy? initialPrivacy,
 }) {
   final MockPostRepository repo;
   if (mockRepo != null) {
@@ -109,7 +110,9 @@ Widget _wrapWithRouter({
       ),
       GoRoute(
         path: '/create',
-        builder: (_, __) => const Scaffold(body: CreatePostScreen()),
+        builder: (_, __) => Scaffold(
+          body: CreatePostScreen(initialPrivacy: initialPrivacy),
+        ),
       ),
     ],
   );
@@ -402,6 +405,54 @@ void main() {
   });
 
   // ── SCENARIO-230 — CANCELAR pops without write ───────────────────────────
+
+  // ── Visibilidad inicial (invitación a publicar de Mi gym / Público) ──────
+
+  group('visibilidad inicial', () {
+    testWidgets('abre en MI GYM y el post sale con esa visibilidad',
+        (tester) async {
+      final repo = MockPostRepository();
+      when(() => repo.create(any())).thenAnswer(
+        (inv) async =>
+            (inv.positionalArguments[0] as Post).copyWith(id: 'generated-id'),
+      );
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          gymId: 'gym-123',
+          mockRepo: repo,
+          initialPrivacy: PostPrivacy.gym,
+        ),
+      );
+      await _openCreatePost(tester);
+
+      await tester.enterText(find.byType(TextField), 'Hoy pierna');
+      await tester.pump();
+      await tester.tap(find.text('PUBLICAR'));
+      await tester.pumpAndSettle();
+
+      final creado =
+          verify(() => repo.create(captureAny())).captured.single as Post;
+      expect(creado.privacy, PostPrivacy.gym);
+    });
+
+    // La visibilidad pedida no es un cambio del usuario: salir sin escribir
+    // nada no tiene que preguntar por descartar.
+    testWidgets('sin tocar nada, CANCELAR sale sin preguntar', (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          mockRepo: MockPostRepository(),
+          initialPrivacy: PostPrivacy.public,
+        ),
+      );
+      await _openCreatePost(tester);
+
+      await tester.tap(find.text('CANCELAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('discard_changes_cancel')), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+    });
+  });
 
   group('SCENARIO-230: CANCELAR behavior', () {
     testWidgets('SCENARIO-230: CANCELAR pops without calling repo.create',

@@ -4654,6 +4654,14 @@ class AppL10nEn extends AppL10n {
       'Share how your last workout went. Your followers will see it here.';
 
   @override
+  String get feedFirstPostBodyGym =>
+      'Share how your last workout went. People at your gym will see it here.';
+
+  @override
+  String get feedFirstPostBodyPublic =>
+      'Share how your last workout went. Anyone on TREINO will see it here.';
+
+  @override
   String get feedFirstPostCta => 'POST';
 
   @override

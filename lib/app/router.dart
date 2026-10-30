@@ -51,6 +51,7 @@ import '../features/workout/presentation/session_history_screen.dart';
 import '../features/workout/presentation/routine_detail_screen.dart';
 import '../features/workout/presentation/session_player_screen.dart';
 import '../features/feed/domain/post.dart';
+import '../features/feed/domain/post_privacy.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/friend_requests_inbox_screen.dart';
@@ -1044,7 +1045,15 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'create',
                 builder: (_, state) => _withBg(
-                  CreatePostScreen(existingPost: state.extra as Post?),
+                  CreatePostScreen(
+                    existingPost: state.extra as Post?,
+                    // `?visibilidad=gym|public` lo manda la invitación a
+                    // publicar de cada vacío del feed. Un valor desconocido
+                    // se ignora y queda el default (SEGUIDORES).
+                    initialPrivacy: postPrivacyFromQuery(
+                      state.uri.queryParameters['visibilidad'],
+                    ),
+                  ),
                 ),
               ),
               GoRoute(

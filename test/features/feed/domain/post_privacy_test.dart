@@ -54,4 +54,23 @@ void main() {
       );
     });
   });
+
+  // `/feed/create?visibilidad=` — lo usa el router y lo manda la invitación a
+  // publicar de Mi gym / Público con `privacy.name`.
+  group('postPrivacyFromQuery', () {
+    test('ida y vuelta con privacy.name para los tres valores', () {
+      for (final p in PostPrivacy.values) {
+        expect(postPrivacyFromQuery(p.name), p);
+      }
+    });
+
+    test('el wire value no es un valor de query', () {
+      expect(postPrivacyFromQuery('friends'), isNull);
+    });
+
+    test('ausente o desconocido: null (default de Nuevo post)', () {
+      expect(postPrivacyFromQuery(null), isNull);
+      expect(postPrivacyFromQuery('otro'), isNull);
+    });
+  });
 }
