@@ -1050,8 +1050,9 @@ GoRouter buildRouter({
                     // `?visibilidad=gym|public` lo manda la invitación a
                     // publicar de cada vacío del feed. Un valor desconocido
                     // se ignora y queda el default (SEGUIDORES).
-                    initialPrivacy: PostPrivacy.values
-                        .asNameMap()[state.uri.queryParameters['visibilidad']],
+                    initialPrivacy: postPrivacyFromQuery(
+                      state.uri.queryParameters['visibilidad'],
+                    ),
                   ),
                 ),
               ),
