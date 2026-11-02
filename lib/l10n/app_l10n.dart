@@ -4694,10 +4694,10 @@ abstract class AppL10n {
   /// **'SUPERSERIE · {count} {count, plural, =1{EJERCICIO} other{EJERCICIOS}}'**
   String routineEditorSupersetHeader(int count);
 
-  /// Línea de ayuda debajo de las acciones del día: descubre los atajos que viven en el menú de tres puntos de cada ejercicio.
+  /// Línea de ayuda debajo de las acciones del día: descubre los atajos que viven en el menú de tres puntos de cada ejercicio. La UI dibuja el ícono real del menú adelante del texto, así que «Menú» se refiere a él. No escribir el glifo ⋮: la fuente de la app lo dibuja como «:».
   ///
   /// In es_AR, this message translates to:
-  /// **'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.'**
+  /// **'Menú de cada ejercicio: cambiarlo, copiar sets o moverlo.'**
   String get routineEditorSlotMenuHint;
 
   /// No description provided for @routineEditorRestLabel.

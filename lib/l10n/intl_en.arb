@@ -864,9 +864,9 @@
       }
     }
   },
-  "routineEditorSlotMenuHint": "The ⋮ on each exercise has replace, copy sets and move.",
+  "routineEditorSlotMenuHint": "Each exercise's menu: replace it, copy sets or move it.",
   "@routineEditorSlotMenuHint": {
-    "description": "Helper line below the day actions: surfaces the shortcuts living in each exercise's overflow menu."
+    "description": "Helper line below the day actions: surfaces the shortcuts living in each exercise's overflow menu. The UI draws the real menu icon before the text, so \"menu\" refers to it. Never write the ⋮ glyph: the app font renders it as \":\"."
   },
   "routineEditorRestLabel": "Rest",
   "@routineEditorRestLabel": {},

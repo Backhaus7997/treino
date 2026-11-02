@@ -1815,9 +1815,9 @@
       }
     }
   },
-  "routineEditorSlotMenuHint": "El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.",
+  "routineEditorSlotMenuHint": "Menú de cada ejercicio: cambiarlo, copiar sets o moverlo.",
   "@routineEditorSlotMenuHint": {
-    "description": "Línea de ayuda debajo de las acciones del día: descubre los atajos que viven en el menú de tres puntos de cada ejercicio."
+    "description": "Línea de ayuda debajo de las acciones del día: descubre los atajos que viven en el menú de tres puntos de cada ejercicio. La UI dibuja el ícono real del menú adelante del texto, así que «Menú» se refiere a él. No escribir el glifo ⋮: la fuente de la app lo dibuja como «:»."
   },
   "routineEditorRestLabel": "Descanso",
   "@routineEditorRestLabel": {},

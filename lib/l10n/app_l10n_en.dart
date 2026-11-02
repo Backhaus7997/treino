@@ -2597,7 +2597,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorSlotMenuHint =>
-      'The ⋮ on each exercise has replace, copy sets and move.';
+      'Each exercise\'s menu: replace it, copy sets or move it.';
 
   @override
   String get routineEditorRestLabel => 'Rest';

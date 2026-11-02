@@ -264,7 +264,7 @@
   "routineEditorSlotMenuMoveDown": "Bajar",
   "routineEditorSlotMenuRemove": "Eliminar",
   "routineEditorSupersetHeader": "SUPERSERIE · {count} {count, plural, =1{EJERCICIO} other{EJERCICIOS}}",
-  "routineEditorSlotMenuHint": "El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.",
+  "routineEditorSlotMenuHint": "Menú de cada ejercicio: cambiarlo, copiar sets o moverlo.",
   "routineEditorRestLabel": "Descanso",
   "routineEditorAddSet": "+ Agregar set",
   "routineEditorFillKgA11y": "Replicar el peso del primer set en todos",

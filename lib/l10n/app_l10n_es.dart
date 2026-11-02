@@ -2656,7 +2656,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorSlotMenuHint =>
-      'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.';
+      'Menú de cada ejercicio: cambiarlo, copiar sets o moverlo.';
 
   @override
   String get routineEditorRestLabel => 'Descanso';
@@ -8963,7 +8963,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorSlotMenuHint =>
-      'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.';
+      'Menú de cada ejercicio: cambiarlo, copiar sets o moverlo.';
 
   @override
   String get routineEditorRestLabel => 'Descanso';
