@@ -75,6 +75,7 @@ class _PasoIdentidadState extends ConsumerState<PasoIdentidad> {
             label: l10n.coachHubOnboardingFirstNameLabel,
             leadingIcon: TreinoIcon.tabProfile,
             autofillHints: const [AutofillHints.givenName],
+            autocorrect: false,
             textInputAction: TextInputAction.next,
             validator: (v) => (v ?? '').trim().isEmpty
                 ? l10n.coachHubOnboardingFirstNameRequired
@@ -86,6 +87,7 @@ class _PasoIdentidadState extends ConsumerState<PasoIdentidad> {
             label: l10n.coachHubOnboardingLastNameLabel,
             leadingIcon: TreinoIcon.tabProfile,
             autofillHints: const [AutofillHints.familyName],
+            autocorrect: false,
             textInputAction: TextInputAction.done,
             validator: (v) => (v ?? '').trim().isEmpty
                 ? l10n.coachHubOnboardingLastNameRequired

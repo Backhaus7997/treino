@@ -26,6 +26,8 @@ class AuthInput extends StatefulWidget {
     this.enabled = true,
     this.focusNode,
     this.nextFocusNode,
+    this.autocorrect,
+    this.enableSuggestions,
   });
 
   final TextEditingController controller;
@@ -44,6 +46,14 @@ class AuthInput extends StatefulWidget {
   final FocusNode? focusNode;
   final FocusNode? nextFocusNode;
 
+  /// `null` = lo decide el campo: apagado para email y contraseña, que no son
+  /// prosa y el autocorrector de iOS los reescribe al cerrar el teclado;
+  /// prendido para el resto. Un handle o un nombre propio lo apagan explícito.
+  final bool? autocorrect;
+
+  /// Igual que [autocorrect]: `null` lo deriva del tipo de campo.
+  final bool? enableSuggestions;
+
   @override
   State<AuthInput> createState() => _AuthInputState();
 }
@@ -56,6 +66,9 @@ class _AuthInputState extends State<AuthInput> {
     super.initState();
     _obscured = widget.obscureText;
   }
+
+  bool get _isNotProse =>
+      widget.obscureText || widget.keyboardType == TextInputType.emailAddress;
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +110,8 @@ class _AuthInputState extends State<AuthInput> {
           controller: widget.controller,
           focusNode: widget.focusNode,
           obscureText: _obscured,
+          autocorrect: widget.autocorrect ?? !_isNotProse,
+          enableSuggestions: widget.enableSuggestions ?? !_isNotProse,
           keyboardType: widget.keyboardType,
           inputFormatters: widget.inputFormatters,
           textInputAction: widget.textInputAction,
