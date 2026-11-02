@@ -786,7 +786,7 @@
   "agendaCobrarConfirmCta": "CONFIRMAR COBRO",
   "agendaCobrarCompletaCampos": "Completá todos los campos.",
   "agendaCobrarMontoInvalido": "Ingresá un monto válido.",
-  "agendaCobrarSuccess": "Turno cobrado.",
+  "agendaCobrarSuccess": "Cobro registrado: queda pendiente hasta que lo marques pagado.",
   "agendaCobrarError": "No pudimos registrar el cobro. Probá de nuevo.",
   "agendaCobrarConceptoDefault": "Sesión {date}",
   "@agendaCobrarConceptoDefault": {

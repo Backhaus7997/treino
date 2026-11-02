@@ -358,7 +358,7 @@
   "agendaCobrarConfirmCta": "CONFIRM CHARGE",
   "agendaCobrarCompletaCampos": "Fill in all fields.",
   "agendaCobrarMontoInvalido": "Enter a valid amount.",
-  "agendaCobrarSuccess": "Session charged.",
+  "agendaCobrarSuccess": "Charge recorded: it stays pending until you mark it paid.",
   "agendaCobrarError": "We couldn't register the charge. Try again.",
   "agendaCobrarConceptoDefault": "Session {date}",
   "@agendaCobrarConceptoDefault": {

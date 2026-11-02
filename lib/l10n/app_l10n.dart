@@ -1877,7 +1877,7 @@ abstract class AppL10n {
   /// No description provided for @agendaCobrarSuccess.
   ///
   /// In es_AR, this message translates to:
-  /// **'Turno cobrado.'**
+  /// **'Cobro registrado: queda pendiente hasta que lo marques pagado.'**
   String get agendaCobrarSuccess;
 
   /// No description provided for @agendaCobrarError.

@@ -473,7 +473,7 @@
   "agendaCobrarConfirmCta": "CONFIRMAR COBRO",
   "agendaCobrarCompletaCampos": "Completa todos los campos.",
   "agendaCobrarMontoInvalido": "Ingresa un monto válido.",
-  "agendaCobrarSuccess": "Turno cobrado.",
+  "agendaCobrarSuccess": "Cobro registrado: queda pendiente hasta que lo marques pagado.",
   "agendaCobrarError": "No pudimos registrar el cobro. Inténtalo de nuevo.",
   "agendaAthleteCancelCta": "CANCELAR",
   "agendaAthleteCancelConfirmBody": "¿Cancelar esta sesión? Le avisamos a tu entrenador.",

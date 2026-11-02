@@ -1019,7 +1019,8 @@ class AppL10nEn extends AppL10n {
   String get agendaCobrarMontoInvalido => 'Enter a valid amount.';
 
   @override
-  String get agendaCobrarSuccess => 'Session charged.';
+  String get agendaCobrarSuccess =>
+      'Charge recorded: it stays pending until you mark it paid.';
 
   @override
   String get agendaCobrarError =>
