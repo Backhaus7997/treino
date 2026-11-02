@@ -32,6 +32,7 @@ import '../../../../profile/application/user_providers.dart';
 import '../../../../profile/domain/user_profile.dart';
 import '../../../../profile/domain/user_profile_trainer_completeness.dart';
 import '../../widgets/coach_hub_widgets.dart';
+import '../pagos/widgets/payment_format.dart' show fmtArs;
 import 'widgets/coach_discovery_preview_card.dart';
 import 'widgets/alumnos_nuevos_card.dart';
 import 'widgets/consultas_card.dart';
@@ -401,7 +402,7 @@ class _PerfilPublicoPlano extends StatelessWidget {
             key: const Key('perfil_publico_rate'),
             label: 'Tarifa mensual', // i18n: Fase 11
             value: rate != null
-                ? '\$$rate/mes'
+                ? '${fmtArs(rate)}/mes'
                 : 'Sin tarifa cargada.', // i18n: Fase 11
           ),
           _Field(

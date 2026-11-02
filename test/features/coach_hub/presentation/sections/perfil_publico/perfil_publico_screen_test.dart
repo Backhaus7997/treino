@@ -101,7 +101,7 @@ void main() {
       );
       expect(find.text('hipertrofia'), findsOneWidget);
       expect(
-        find.descendant(of: plano, matching: find.text('\$28000/mes')),
+        find.descendant(of: plano, matching: find.text('\$28.000/mes')),
         findsOneWidget,
       );
       expect(find.text('Ofrece online'), findsOneWidget);

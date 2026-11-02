@@ -129,7 +129,7 @@ void main() {
       expect(find.textContaining('Hipertrofia'), findsWidgets);
       expect(find.textContaining('Online'), findsOneWidget);
       expect(find.textContaining('Presencial'), findsOneWidget);
-      expect(find.text('\$28000/mes'), findsOneWidget);
+      expect(find.text('\$28.000/mes'), findsOneWidget);
 
       // Alumnos: solo cuenta los `active` (3), no el `paused`.
       expect(find.text('3'), findsOneWidget);
