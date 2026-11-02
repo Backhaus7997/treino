@@ -64,6 +64,19 @@ Future<void> initFirebaseForEmulators() async {
   _emulatorsWired = true;
 }
 
+/// Imprime cuánto tardó [label] en el log de la corrida. Un paso que se come
+/// minutos sin fallar (un `pumpAndSettle` que tarda en asentarse) no lo
+/// delata ninguna aserción; el tiempo por paso sí.
+Future<T> _timed<T>(String label, Future<T> Function() body) async {
+  final sw = Stopwatch()..start();
+  try {
+    return await body();
+  } finally {
+    // ignore: avoid_print
+    print('[e2e] $label: ${sw.elapsed.inMilliseconds} ms');
+  }
+}
+
 /// Pumps the REAL [TreinoApp] (same widget `main.dart` runs) inside a
 /// [ProviderScope], eager-overriding [sharedPreferencesProvider] con la MISMA
 /// función que usa `main.dart` — `sharedPreferencesOverride()` (ADR-LM-009)—
@@ -85,34 +98,35 @@ Future<void> initFirebaseForEmulators() async {
 Future<void> pumpTreinoApp(
   WidgetTester tester, {
   List<Override> overrides = const [],
-}) async {
-  final prefs = await SharedPreferences.getInstance();
-  await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        // `sharedPreferencesOverride()` y NO un override inline. Acá había
-        // `overrideWith((_) async => prefs)`, con el `async` que el dartdoc de
-        // `shared_prefs_provider.dart:20` prohíbe con todas las letras: un
-        // callback `async` devuelve un Future —aunque ya esté completo, cuesta
-        // un microtask— y deja el provider en `AsyncLoading` el primer frame,
-        // así que `app.dart:208` tiraba
-        // `Bad state: Tried to call requireValue on an AsyncValue that has no
-        // value` antes de pintar nada. Es el #543 otra vez.
-        //
-        // El comentario de abajo decía que esto replicaba producción "exactly".
-        // No lo hacía — y esa es la parte cara: ninguna de las cinco suites
-        // llegaba a montar la app, y el mensaje hablaba de Riverpod, no del
-        // override. Nadie lo vio porque nunca se había corrido ninguna.
-        sharedPreferencesOverride(prefs),
-        ...overrides,
-      ],
-      child: const TreinoApp(),
-    ),
-  );
-  // Splash → redirect resolves (anonymous → /welcome, or → /home when a
-  // session is already restored). Give async auth/profile streams a beat.
-  await tester.pumpAndSettle(const Duration(seconds: 3));
-}
+}) =>
+    _timed('pumpTreinoApp', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            // `sharedPreferencesOverride()` y NO un override inline. Acá había
+            // `overrideWith((_) async => prefs)`, con el `async` que el dartdoc de
+            // `shared_prefs_provider.dart:20` prohíbe con todas las letras: un
+            // callback `async` devuelve un Future —aunque ya esté completo, cuesta
+            // un microtask— y deja el provider en `AsyncLoading` el primer frame,
+            // así que `app.dart:208` tiraba
+            // `Bad state: Tried to call requireValue on an AsyncValue that has no
+            // value` antes de pintar nada. Es el #543 otra vez.
+            //
+            // El comentario de abajo decía que esto replicaba producción "exactly".
+            // No lo hacía — y esa es la parte cara: ninguna de las cinco suites
+            // llegaba a montar la app, y el mensaje hablaba de Riverpod, no del
+            // override. Nadie lo vio porque nunca se había corrido ninguna.
+            sharedPreferencesOverride(prefs),
+            ...overrides,
+          ],
+          child: const TreinoApp(),
+        ),
+      );
+      // Splash → redirect resolves (anonymous → /welcome, or → /home when a
+      // session is already restored). Give async auth/profile streams a beat.
+      await tester.pumpAndSettle(const Duration(seconds: 3));
+    });
 
 /// Signs the Firebase user out so a suite starts from the anonymous
 /// `/welcome` gate regardless of a session left over by a previous suite.
@@ -185,23 +199,13 @@ Future<void> dismissOnboardingTourIfPresent(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-/// Descarta el modal "Entrenamiento en curso" si Inicio lo abrió.
-///
-/// Inicio lo muestra cuando el usuario tiene una sesión `active` (lo deja una
-/// corrida de `workout_session_flow_test` que se cortó a la mitad, o el
-/// recorrido manual). No se puede cerrar tocando afuera, así que sin esto la
-/// suite siguiente queda trabada debajo. El texto está escrito a mano en
-/// `resume_session_modal.dart`, no sale del `.arb`.
-Future<void> dismissResumeSessionPromptIfPresent(WidgetTester tester) async {
-  if (find.text('Entrenamiento en curso').evaluate().isEmpty) return;
-  await tester.tap(find.widgetWithText(OutlinedButton, 'Descartar'));
-  await tester.pumpAndSettle();
-}
-
 /// Drives the UI login flow: `/welcome` → tap "INICIAR SESIÓN"
 /// (`authWelcomeSignIn`) → fill the two [TextFormField]s → tap "ENTRAR"
 /// (`authLoginCta`) → settle on `/home` → close the onboarding tour if it
 /// opened.
+///
+/// Si la cuenta tiene una sesión de entreno activa, Inicio abre encima el modal
+/// "Entrenamiento en curso". Llamá antes a `closeActiveSessionsOf(uid)`.
 ///
 /// Precondition: a verified user with [email]/[password] must exist in the
 /// Auth emulator — the seeded accounts of `support/seed_ids.dart`.
@@ -209,34 +213,33 @@ Future<void> signInViaUi(
   WidgetTester tester, {
   required String email,
   required String password,
-}) async {
-  final l10n = l10nOf(tester);
-  final signInLink = find.text(l10n.authWelcomeSignIn);
-  if (signInLink.evaluate().isNotEmpty) {
-    await tester.tap(signInLink.first);
-    await tester.pumpAndSettle();
-  }
+}) =>
+    _timed('signInViaUi', () async {
+      final l10n = l10nOf(tester);
+      final signInLink = find.text(l10n.authWelcomeSignIn);
+      if (signInLink.evaluate().isNotEmpty) {
+        await tester.tap(signInLink.first);
+        await tester.pumpAndSettle();
+      }
 
-  final fields = find.byType(TextFormField);
-  expect(
-    fields,
-    findsWidgets,
-    reason: 'LoginScreen should render email + password fields',
-  );
-  await tester.enterText(fields.at(0), email);
-  await tester.enterText(fields.at(1), password);
-  await tester.pump();
+      final fields = find.byType(TextFormField);
+      expect(
+        fields,
+        findsWidgets,
+        reason: 'LoginScreen should render email + password fields',
+      );
+      await tester.enterText(fields.at(0), email);
+      await tester.enterText(fields.at(1), password);
+      await tester.pump();
 
-  await tester.tap(find.text(l10n.authLoginCta));
-  await tester.pumpAndSettle(const Duration(seconds: 4));
+      await tester.tap(find.text(l10n.authLoginCta));
+      await tester.pumpAndSettle(const Duration(seconds: 4));
 
-  // El tour va por el navigator raíz y el modal de sesión en curso sólo se
-  // abre con Inicio arriba, así que el modal puede aparecer recién cuando se
-  // cierra el tour. El orden importa; las dos llamadas no hacen nada si no hay
-  // nada que cerrar.
-  await dismissOnboardingTourIfPresent(tester);
-  await dismissResumeSessionPromptIfPresent(tester);
-}
+      // El modal "Entrenamiento en curso" no se cierra acá: la suite tiene que
+      // entrar sin sesiones activas (`closeActiveSessionsOf`, en
+      // `emulator_admin.dart`, que explica por qué no se toca DESCARTAR).
+      await dismissOnboardingTourIfPresent(tester);
+    });
 
 /// Como [goTo], pero con `push`: la pantalla queda ENCIMA de la actual.
 ///
@@ -247,11 +250,18 @@ Future<void> pushTo(
   WidgetTester tester,
   String location, {
   Object? extra,
-}) async {
-  final ctx = tester.element(find.byType(Navigator).first);
-  unawaited(GoRouter.of(ctx).push<void>(location, extra: extra));
-  await tester.pumpAndSettle(const Duration(seconds: 3));
-}
+  bool settle = true,
+  Duration settleFor = const Duration(seconds: 3),
+}) =>
+    _timed('pushTo $location', () async {
+      final ctx = tester.element(find.byType(Navigator).first);
+      unawaited(GoRouter.of(ctx).push<void>(location, extra: extra));
+      if (settle) {
+        await tester.pumpAndSettle(settleFor);
+      } else {
+        await pumpFor(tester, settleFor);
+      }
+    });
 
 /// Navigates the live GoRouter to [location] (optionally passing [extra]).
 /// Used by suites that need to deep-link past a seeded document (a routine,
@@ -259,19 +269,20 @@ Future<void> pushTo(
 ///
 /// [settle] en `false` para destinos que nunca se asientan (el player de la
 /// sesión): ahí pumpea [settleFor] y vuelve, en vez de colgarse en un
-/// `pumpAndSettle`.
+/// `pumpAndSettle`. Lo mismo vale para [pushTo].
 Future<void> goTo(
   WidgetTester tester,
   String location, {
   Object? extra,
   bool settle = true,
   Duration settleFor = const Duration(seconds: 3),
-}) async {
-  final ctx = tester.element(find.byType(Navigator).first);
-  GoRouter.of(ctx).go(location, extra: extra);
-  if (settle) {
-    await tester.pumpAndSettle(settleFor);
-  } else {
-    await pumpFor(tester, settleFor);
-  }
-}
+}) =>
+    _timed('goTo $location', () async {
+      final ctx = tester.element(find.byType(Navigator).first);
+      GoRouter.of(ctx).go(location, extra: extra);
+      if (settle) {
+        await tester.pumpAndSettle(settleFor);
+      } else {
+        await pumpFor(tester, settleFor);
+      }
+    });

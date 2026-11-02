@@ -34,7 +34,7 @@ String get _docsBase =>
 Future<(int, Object?)> _request(
   String method,
   String path, {
-  Map<String, String>? query,
+  Map<String, Object>? query,
   Object? body,
 }) async {
   final client = HttpClient();
@@ -93,6 +93,7 @@ Map<String, Object?> _encode(Object? v) => switch (v) {
       final int i => {'integerValue': '$i'},
       final double d => {'doubleValue': d},
       final String s => {'stringValue': s},
+      final DateTime t => {'timestampValue': t.toUtc().toIso8601String()},
       final Map<String, Object?> m => {
           'mapValue': {
             'fields': {for (final e in m.entries) e.key: _encode(e.value)},
@@ -139,15 +140,41 @@ Future<void> adminDeleteDoc(String path) async {
   }
 }
 
+/// Actualiza SÓLO los campos de [data] en `path` (merge, con `updateMask`),
+/// salteando las reglas. Falla si el documento no existe.
+Future<void> adminUpdateFields(String path, Map<String, Object?> data) async {
+  final (status, body) = await _request(
+    'PATCH',
+    '$_docsBase/$path',
+    query: {
+      // Un parámetro por campo: separados por coma, el emulador lee UN path
+      // con comas adentro y responde 400.
+      'updateMask.fieldPaths': data.keys.toList(),
+      'currentDocument.exists': 'true',
+    },
+    body: {
+      'fields': {for (final e in data.entries) e.key: _encode(e.value)},
+    },
+  );
+  if (status != 200) {
+    throw StateError('adminUpdateFields($path): HTTP $status — $body');
+  }
+}
+
 /// Los documentos de [collection] con `field == value`, salteando las reglas.
-Future<List<Map<String, Object?>>> adminWhereEqual(
+///
+/// [parent] es el documento padre para una subcolección (`users/{uid}` para
+/// `sessions`); sin él, la colección es de primer nivel. Cada resultado trae su
+/// `path` relativo a `documents/`, listo para [adminUpdateFields].
+Future<List<({String path, Map<String, Object?> data})>> adminWhereEqual(
   String collection,
   String field,
-  String value,
-) async {
+  String value, {
+  String? parent,
+}) async {
   final (status, body) = await _request(
     'POST',
-    '$_docsBase:runQuery',
+    parent == null ? '$_docsBase:runQuery' : '$_docsBase/$parent:runQuery',
     body: {
       'structuredQuery': {
         'from': [
@@ -169,9 +196,49 @@ Future<List<Map<String, Object?>>> adminWhereEqual(
   return [
     for (final row in body! as List<dynamic>)
       if ((row as Map<String, dynamic>)['document'] != null)
-        _decodeFields(
-          (row['document'] as Map<String, dynamic>)['fields']
-              as Map<String, dynamic>?,
+        (
+          path: ((row['document'] as Map<String, dynamic>)['name'] as String)
+              .split('/documents/')
+              .last,
+          data: _decodeFields(
+            (row['document'] as Map<String, dynamic>)['fields']
+                as Map<String, dynamic>?,
+          ),
         ),
   ];
+}
+
+/// Cierra las sesiones de entreno `active` de [uid] antes de que la suite
+/// entre a la app.
+///
+/// Una sesión colgada —la deja una corrida de `workout_session_flow_test`
+/// cortada a la mitad, o un recorrido manual— hace que Inicio abra el modal
+/// "Entrenamiento en curso", que no se cierra tocando afuera y aparece TARDE
+/// (cuando llega la lectura de la sesión), así que tapa la pantalla siguiente
+/// de la suite. Medido: tapó el check de la serie en el player.
+///
+/// Se cierra acá, como preparación, y NO tocando DESCARTAR en el modal: ese
+/// botón hace dos `pop` —el listener del diálogo lo cierra cuando la sesión
+/// deja de estar activa y después el `await finish()` vuelve a hacer `pop`
+/// sobre la página de abajo— y la suite se caía con "You have popped the last
+/// page off of the stack" (`home_screen.dart`, `_resumeModal`). Es un bug de la
+/// app, no de la suite: está reportado aparte.
+///
+/// Escribe lo mismo que `SessionRepository.finish` en los campos que deciden
+/// si una sesión está activa; no recalcula volumen ni duración porque ninguna
+/// suite mira esa sesión después.
+Future<void> closeActiveSessionsOf(String uid) async {
+  final activas = await adminWhereEqual(
+    'sessions',
+    'status',
+    'active',
+    parent: 'users/$uid',
+  );
+  for (final s in activas) {
+    await adminUpdateFields(s.path, {
+      'status': 'finished',
+      'finishedAt': DateTime.now(),
+      'wasFullyCompleted': false,
+    });
+  }
 }

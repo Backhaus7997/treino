@@ -40,6 +40,7 @@ import 'package:treino/features/workout/presentation/post_workout_summary_screen
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 
 import 'support/e2e_helpers.dart';
+import 'support/emulator_admin.dart';
 import 'support/seed_ids.dart';
 
 // Credenciales e ids: `support/seed_ids.dart`, generado desde el seed.
@@ -56,6 +57,8 @@ void main() {
   testWidgets('workout: start session → confirm a set → finish → summary',
       (tester) async {
     await ensureSignedOut(tester);
+    // Sin sesión activa, Inicio no abre "Entrenamiento en curso" encima.
+    await closeActiveSessionsOf(kMartin.uid);
     await pumpTreinoApp(tester);
 
     await signInViaUi(tester, email: kMartin.email, password: kSeedPassword);
@@ -63,7 +66,16 @@ void main() {
     // Deep-link straight into a fresh session for the seeded routine/day.
     // (Tapping through Home's "empezar entrenamiento" card is the fuller path;
     //  deep-linking keeps the suite robust to Home layout changes.)
-    await goTo(
+    //
+    // Desde la pestaña Entrenar y con `push`, que es como entra la app
+    // (`routine_detail_screen.dart`). El player es una ruta top-level y las
+    // pestañas viven en un `ShellRoute` con su propio navigator: empujado
+    // desde Inicio, Inicio sigue siendo la ruta ACTUAL de ese navigator, su
+    // listener de sesión activa ve la sesión que el player acaba de crear y
+    // abre "Entrenamiento en curso" encima del player — el tap al check caía
+    // en el diálogo. Desde Entrenar, Inicio no está montado.
+    await goTo(tester, '/workout');
+    await pushTo(
       tester,
       '/workout/session/$kRoutineId/$kDayNumber',
       settle: false,

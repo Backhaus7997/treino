@@ -72,6 +72,15 @@ El UDID sale de `xcrun simctl list devices booted`.
   cuenta con el perfil completo entra a la app. `signInViaUi` lo cierra con
   SALTAR, que lo marca visto: desde la segunda corrida contra el mismo emulador
   ya no aparece.
+- **Ninguna sesión de entreno activa.** Con una, Inicio abre "Entrenamiento en
+  curso" encima de lo que haya, tarde y sin poder cerrarse tocando afuera. Las
+  suites de Martín la cierran antes del login con `closeActiveSessionsOf`
+  (`support/emulator_admin.dart`), y NO tocando DESCARTAR en el modal, que hace
+  dos `pop` y se lleva la página de abajo (bug de la app, reportado aparte).
+- **El player se abre desde la pestaña Entrenar y con `push`**, como en la app.
+  Empujado desde Inicio, Inicio sigue siendo la ruta actual de su navigator (el
+  del `ShellRoute`) y su listener abre el modal de sesión en curso sobre la
+  sesión que el player acaba de crear.
 - **El registro prende el gate del mail** (`app_config/email_gate`) para la
   corrida y lo deja como estaba al terminar. Lee el código del mail encolado en
   `mail_queue` —el único lugar donde existe en claro— con

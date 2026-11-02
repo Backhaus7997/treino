@@ -41,6 +41,8 @@ void main() {
   testWidgets('my routine: open editor in edit mode → change → save',
       (tester) async {
     await ensureSignedOut(tester);
+    // Sin sesión activa, Inicio no abre "Entrenamiento en curso" encima.
+    await closeActiveSessionsOf(kMartin.uid);
     await pumpTreinoApp(tester);
 
     await signInViaUi(tester, email: kMartin.email, password: kSeedPassword);

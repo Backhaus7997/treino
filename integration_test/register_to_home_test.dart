@@ -72,9 +72,11 @@ Future<String> _codigoDelMail(String uid) async {
   while (DateTime.now().isBefore(end)) {
     final mails = await adminWhereEqual('mail_queue', 'toUid', uid);
     for (final m in mails) {
-      final params = m['params'] as Map<String, Object?>?;
+      final params = m.data['params'] as Map<String, Object?>?;
       final codigo = params?['codigo'];
-      if (m['kind'] == 'email-code-athlete' && codigo is String) return codigo;
+      if (m.data['kind'] == 'email-code-athlete' && codigo is String) {
+        return codigo;
+      }
     }
     await Future<void>.delayed(const Duration(milliseconds: 500));
   }

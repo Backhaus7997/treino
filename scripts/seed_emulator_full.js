@@ -1526,7 +1526,16 @@ async function seedRoutines() {
     // null: la regla de create exige que las claves estén AUSENTES
     // (`RoutineRepository.createUserOwned`), y el seed tiene que dejar el
     // mismo documento que dejaría la app. Las demás los llevan explícitos.
+    //
+    // Tampoco lleva `id`, que la app saca antes de escribir. No es cosmético:
+    // el update de una `user-created` exige `keys().hasOnly(
+    // userCreatedRoutineFields())` (firestore.rules) y `id` no está en esa
+    // lista, así que con él la rutina se sembraba bien pero NO SE PODÍA
+    // GUARDAR — "No tenés permisos para hacer esto", medido con
+    // `my_routine_edit_test`. Un seed verde no dice que lo sembrado sea
+    // editable: el Admin SDK escribe salteando las reglas.
     if (r.source === 'user-created') {
+      delete data.id;
       data.createdBy = r.createdBy;
     } else {
       data.assignedBy = r.assignedBy || null;

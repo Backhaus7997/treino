@@ -22,6 +22,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:treino/features/home/home_screen.dart';
 
 import 'support/e2e_helpers.dart';
+import 'support/emulator_admin.dart';
 import 'support/seed_ids.dart';
 
 // Las credenciales salen de `support/seed_ids.dart`, generado desde el seed.
@@ -37,6 +38,8 @@ void main() {
   testWidgets('login → home: verified athlete signs in and reaches /home',
       (tester) async {
     await ensureSignedOut(tester);
+    // Sin sesión activa, Inicio no abre "Entrenamiento en curso" encima.
+    await closeActiveSessionsOf(kMartin.uid);
     await pumpTreinoApp(tester);
 
     // Anonymous boot resolves to the welcome gate. El texto sale del `.arb`
