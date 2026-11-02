@@ -3982,6 +3982,21 @@ void main() {
       expect(analytics.lastPaywallWriteDenied?['athlete_id'], 'none');
     });
 
+    // E2E 1.3.0: una plantilla no tiene alumno, así que «Asignar rutina»
+    // prometía algo que el botón no hace — sólo la guarda en la biblioteca.
+    testWidgets('el botón de una plantilla nueva dice guardar, no asignar', (
+      tester,
+    ) async {
+      await pumpTemplate(tester);
+
+      final submit = find.byKey(const Key('routine_editor_submit_button'));
+      expect(
+        find.descendant(of: submit, matching: find.text('Guardar plantilla')),
+        findsOneWidget,
+      );
+      expect(find.text('Asignar rutina'), findsNothing);
+    });
+
     testWidgets('header reads "Nueva plantilla" and names no athlete', (
       tester,
     ) async {
