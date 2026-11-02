@@ -636,6 +636,40 @@ const ROUTINES = [
       },
     ],
   },
+  // Rutina PROPIA de Martín (`user-created`, `createdBy`): la que edita
+  // `my_routine_edit_test.dart`. Id, nombre y dueño salen del contrato E2E.
+  // Una semana y un día, dentro de los topes del plan free (firestore.rules,
+  // `freeMaxRoutineDays`/`freeMaxRoutineWeeks`), y con `sets` explícitos como
+  // los escribe el editor: sin ellos el editor dibuja «4 × —» en vez de las
+  // series, porque no lee los campos legacy.
+  {
+    id: E2E.ROUTINES.propiaDeMartin.id,
+    name: E2E.ROUTINES.propiaDeMartin.name,
+    split: 'Push',
+    level: 'intermediate',
+    numWeeks: 1,
+    source: E2E.ROUTINES.propiaDeMartin.source,
+    createdBy: E2E.ROUTINES.propiaDeMartin.createdBy,
+    assignedBy: null,
+    assignedTo: null,
+    visibility: 'private',
+    estimatedMinutesPerDay: 40,
+    imageUrl: null,
+    days: [
+      {
+        dayNumber: 1,
+        name: E2E.ROUTINES.propiaDeMartin.firstDayName,
+        estimatedMinutes: 40,
+        slots: [
+          {
+            exerciseId: 'press-banca', exerciseName: 'Press de Banca', muscleGroup: 'chest',
+            targetSets: 3, targetRepsMin: 8, targetRepsMax: 10, restSeconds: 120, targetWeightKg: 60,
+            sets: [1, 2, 3].map(() => ({ type: 'normal', weightKg: 60, reps: 10, repsMin: null, repsMax: null, durationSeconds: null, distanceMeters: null })),
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 // ── Historical sessions ───────────────────────────────────────────────────────
@@ -1455,8 +1489,6 @@ async function seedRoutines() {
       level: r.level,
       numWeeks: r.numWeeks,
       source: r.source,
-      assignedBy: r.assignedBy || null,
-      assignedTo: r.assignedTo || null,
       visibility: r.visibility,
       estimatedMinutesPerDay: r.estimatedMinutesPerDay || null,
       imageUrl: r.imageUrl || null,
@@ -1479,7 +1511,7 @@ async function seedRoutines() {
           durationSeconds: s.durationSeconds || null,
           exerciseMode: 'reps',
           repMode: 'single',
-          sets: [],
+          sets: s.sets || [],
           weeklySets: [],
           activeWeeks: [],
         })),
@@ -1490,6 +1522,16 @@ async function seedRoutines() {
       // field, so a routine without it is invisible to the athlete.
       createdAt: r.createdAt || daysAgo(60),
     };
+    // Una `user-created` NO lleva `assignedBy`/`assignedTo`, ni siquiera en
+    // null: la regla de create exige que las claves estén AUSENTES
+    // (`RoutineRepository.createUserOwned`), y el seed tiene que dejar el
+    // mismo documento que dejaría la app. Las demás los llevan explícitos.
+    if (r.source === 'user-created') {
+      data.createdBy = r.createdBy;
+    } else {
+      data.assignedBy = r.assignedBy || null;
+      data.assignedTo = r.assignedTo || null;
+    }
     await db.collection('routines').doc(r.id).set(data);
     console.log(`  ✓ routines/${r.id} — ${r.name} (${r.numWeeks}w, ${r.source})`);
   }

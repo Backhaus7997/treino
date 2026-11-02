@@ -113,16 +113,28 @@ const CHATS = {
 
 /// Rutinas sembradas.
 ///
-/// ⚠️  NO hay ninguna rutina de la que el alumno sea DUEÑO. Las dos rutinas con
-/// contenido son `trainer-assigned` y la tercera es una plantilla `system`. Por
-/// eso `my_routine_edit_test.dart` sigue con su `REPLACE_WITH_SEEDED_SELF_
-/// ROUTINE_ID` sin llenar: no existe el documento que pide, y poner acá el id
-/// de una asignada sería exactamente la mentira plausible que este archivo vino
-/// a evitar — la suite abriría un editor sobre una rutina que el alumno no
-/// puede editar, y fallaría hablando de permisos.
+/// Las dos primeras ya estaban; `propiaDeMartin` es la que faltaba, y por eso
+/// `my_routine_edit_test.dart` vivió con un `REPLACE_WITH_SEEDED_SELF_
+/// ROUTINE_ID` sin llenar: no existía ninguna rutina de la que el alumno fuera
+/// DUEÑO. Las dos con contenido eran `trainer-assigned` y la tercera una
+/// plantilla `system`, y poner el id de una asignada habría sido la mentira
+/// plausible que este archivo vino a evitar — la suite abría el editor sobre
+/// una rutina que el alumno no puede editar y fallaba hablando de permisos.
+///
+/// `source` y `createdBy` son parte del contrato y no un detalle del seed: la
+/// lista de "mis rutinas" consulta por `createdBy` + `source == 'user-created'`
+/// (`RoutineRepository.listUserCreated`), y con cualquiera de los dos errado la
+/// rutina existe pero el alumno no la ve, sin ningún error.
 const ROUTINES = {
   asignadaAMartin: { id: 'seed-routine-001', name: 'Fuerza Base – 3 semanas' },
   plantillaSistema: { id: 'seed-routine-003', name: 'Full Body Principiante' },
+  propiaDeMartin: {
+    id: 'seed-routine-004',
+    name: 'Mi Empuje',
+    source: 'user-created',
+    createdBy: USERS.martin.uid,
+    firstDayName: 'Empuje',
+  },
 };
 
 module.exports = {
