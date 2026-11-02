@@ -2,8 +2,19 @@
 // E2E (c) — Start workout → Session player → Summary
 // ─────────────────────────────────────────────────────────────────────────────
 // Critical flow: a signed-in athlete with an assigned routine starts a fresh
-// training session, logs the sets in the SessionPlayer, taps "terminar", and
-// lands on the PostWorkoutSummary screen.
+// training session, confirms a set in the SessionPlayer, taps "TERMINAR
+// SESIÓN", accepts "TERMINAR IGUAL", and lands on the PostWorkoutSummary
+// screen.
+//
+// Se confirma UNA serie y no todas a propósito: alcanza para habilitar el
+// botón de terminar (`doneSetsTotal > 0`) y además recorre el diálogo de
+// terminar antes de tiempo, que es la rama que un usuario real toca casi
+// siempre. Completar las 10 series del día sólo alargaría la suite.
+//
+// NADA de `pumpAndSettle` adentro del player: tiene un timer que corre siempre
+// (cronómetro y descanso) y el árbol no se asienta nunca. Con el `goTo` de
+// antes esta suite colgaba 10 min 25 s hasta el timeout. Van `pumpFor` y
+// `pumpUntilFound`, acotados.
 //
 // Route map (lib/app/router.dart):
 //   /workout/session/:routineId/:dayNumber   → SessionPlayerScreen(FreshSession)
@@ -12,31 +23,29 @@
 // Runs against the Firebase EMULATORS only (Auth 9099, Firestore 8080 on
 // 127.0.0.1). Never cloud. See integration_test/README.md to enable + run.
 //
-// SEED CONTRACT:
-//   • Auth emulator: verified user { kSeedEmail / kSeedPassword }, displayName
-//     set (so login lands on /home, not /profile-setup).
-//   • Firestore emulator: a routine document owned by / assigned to that uid
-//     with at least day `kDayNumber` and one exercise + one set, so the player
-//     can reach `isFullyCompleted` after the sets are logged. Put its id in
-//     kRoutineId.
+// SEED CONTRACT — ya lo cumple `scripts/seed_emulator_full.js`:
+//   • Auth emulator: Martín (`kMartin` / `kSeedPassword`), verificado.
+//   • Firestore emulator: `kAssignedRoutineId`, asignada a Martín, con el día
+//     `kDayNumber`. Sus slots usan los campos legacy (`targetSets`,
+//     `targetRepsMax`, `targetWeightKg`), y el player precarga reps y kg desde
+//     ahí: tocar el check alcanza para confirmar la serie.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/workout/presentation/post_workout_summary_screen.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 
 import 'support/e2e_helpers.dart';
 import 'support/seed_ids.dart';
 
-// Credenciales e ids: `support/seed_ids.dart`, generado desde el seed. Acá
-// decía `e2e.athlete@treino.test`, que no corresponde a ningún usuario
-// sembrado. Ver el encabezado de `seed_ids.dart`.
-
-// TODO(seed): id of the routine assigned to the seeded athlete, and the day to
-// train. `dayNumber` is 1-based on the wire (see router).
+// Credenciales e ids: `support/seed_ids.dart`, generado desde el seed.
 const String kRoutineId = kAssignedRoutineId;
+
+/// `dayNumber` is 1-based on the wire (see router).
 const int kDayNumber = 1;
 
 void main() {
@@ -44,7 +53,7 @@ void main() {
 
   setUpAll(initFirebaseForEmulators);
 
-  testWidgets('workout: start session → log sets → finish → summary',
+  testWidgets('workout: start session → confirm a set → finish → summary',
       (tester) async {
     await ensureSignedOut(tester);
     await pumpTreinoApp(tester);
@@ -54,48 +63,64 @@ void main() {
     // Deep-link straight into a fresh session for the seeded routine/day.
     // (Tapping through Home's "empezar entrenamiento" card is the fuller path;
     //  deep-linking keeps the suite robust to Home layout changes.)
-    await goTo(tester, '/workout/session/$kRoutineId/$kDayNumber');
-
-    expect(
+    await goTo(
+      tester,
+      '/workout/session/$kRoutineId/$kDayNumber',
+      settle: false,
+    );
+    await pumpUntilFound(
+      tester,
       find.byType(SessionPlayerScreen),
-      findsOneWidget,
       reason: 'fresh-session route should mount the player',
     );
 
-    // ── Log the work ─────────────────────────────────────────────────────────
-    // TODO(finder/seed): for each set, enter reps + weight and tap the set's
-    // check control (TreinoIcon.checkCircleEmpty → checkCircleFill). Once every
-    // set is confirmed the session becomes `isFullyCompleted` and the
-    // "terminar" button (_TerminarSessionButton) enables.
-    // Example skeleton for a single-set seed:
-    //   final repsField = find.byType(TextField).first;
-    //   await tester.enterText(repsField, '10');
-    //   await tester.pump();
-    //   await tester.tap(find.byIcon(/* the set-confirm icon */));
-    //   await tester.pumpAndSettle();
+    // ── Confirmar la primera serie ───────────────────────────────────────────
+    // El check de la serie actual es el PRIMER círculo vacío: las series
+    // futuras también lo dibujan (al 40 %), pero tocarlas no hace nada.
+    final setCheck = find.byIcon(TreinoIcon.checkCircleEmpty);
+    await pumpUntilFound(
+      tester,
+      setCheck,
+      reason: 'el player tiene que mostrar la serie actual con su check',
+    );
+    await tester.tap(setCheck.first);
+    await pumpFor(tester, const Duration(seconds: 1));
 
-    // Finish the session. The button reads the localized "terminar" copy; drive
-    // it by its widget type to stay decoupled from the exact label.
-    // TODO(finder): if multiple tap targets match, scope to the bottom
-    // _TerminarSessionButton (it sits in the fixed footer Padding).
-    final finishButton = find.byType(SessionPlayerScreen);
-    expect(finishButton, findsOneWidget);
-    // TODO(finder): replace the line below with a tap on the enabled
-    // "terminar" button once the sets above are logged, e.g.
-    //   await tester.tap(find.text('TERMINAR'));
-    //   await tester.pumpAndSettle(const Duration(seconds: 4));
+    // ── Terminar ─────────────────────────────────────────────────────────────
+    // "TERMINAR SESIÓN" está escrito a mano en `_TerminarSessionButton`, no
+    // sale del `.arb`. Se habilita con la primera serie confirmada.
+    final finish = find.widgetWithText(ElevatedButton, 'TERMINAR SESIÓN');
+    expect(finish, findsOneWidget, reason: 'el footer tiene el botón');
+    expect(
+      tester.widget<ElevatedButton>(finish).onPressed,
+      isNotNull,
+      reason: 'con una serie confirmada, terminar tiene que estar habilitado',
+    );
+    await tester.tap(finish);
+    await pumpFor(tester, const Duration(seconds: 1));
+
+    // Quedan series sin hacer → `_FinishEarlyDialog` ("¿TERMINAR IGUAL?").
+    final l10n = l10nOf(tester);
+    final confirmEarly = find.widgetWithText(
+      ElevatedButton,
+      l10n.sessionFinishEarlyConfirm,
+    );
+    await pumpUntilFound(
+      tester,
+      confirmEarly,
+      reason: 'con series pendientes, terminar pide confirmación',
+    );
+    await tester.tap(confirmEarly);
 
     // ── Summary ──────────────────────────────────────────────────────────────
     // finishSession() writes the finished session and navigates to
-    // /workout/session-summary/:sessionId.
-    // TODO(activate): this assertion is the real acceptance gate — enable it
-    // once the finish tap above is wired to the seeded single-set routine.
-    // expect(
-    //   find.byType(PostWorkoutSummaryScreen),
-    //   findsOneWidget,
-    //   reason: 'finishing a session should open the post-workout summary',
-    // );
-    // Keep a type reference so the import is validated by the analyzer.
-    expect(PostWorkoutSummaryScreen, isNotNull);
+    // /workout/session-summary/:sessionId. The summary has a confetti overlay,
+    // so this is bounded too.
+    await pumpUntilFound(
+      tester,
+      find.byType(PostWorkoutSummaryScreen),
+      reason: 'finishing a session should open the post-workout summary',
+    );
+    expect(find.byType(PostWorkoutSummaryScreen), findsOneWidget);
   });
 }

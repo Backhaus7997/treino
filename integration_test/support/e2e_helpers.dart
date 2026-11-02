@@ -7,17 +7,16 @@
 // this folder imports it to share the Firebase-emulator bootstrap and a couple
 // of driving helpers.
 //
-// REQUIREMENT: the `integration_test` package is NOT yet in dev_dependencies.
-// See integration_test/README.md for the one-step enable command. Until it is
-// added, these files intentionally reference `package:integration_test/...`
-// (via the suites, not here) and will not compile — that is by design; QA
-// leaves them as a ready-to-run deliverable.
-//
-// EMULATORS ONLY — NEVER cloud. Auth 9099 / Firestore 8080 on 127.0.0.1.
-// Start them first with:  ./scripts/emulator.sh  (JAVA_HOME → JDK 21).
+// EMULATORS ONLY — NEVER cloud. Firestore 8080, Auth 9099, Functions 5001 y
+// Storage 9199, vía `conectarEmuladores()` — la MISMA función que llama
+// `main.dart` con `USE_EMULATOR=true`. Levantalos con `./scripts/emulator.sh`
+// (completo, con Functions: el registro pide el código de verificación a una
+// callable).
 // El script fija `--project treino-dev`; el default de .firebaserc es
 // `demo-treino` y dejaría los datos en otro namespace (#840).
 // ─────────────────────────────────────────────────────────────────────────────
+
+import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -29,24 +28,26 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:treino/app/app.dart';
+import 'package:treino/core/firebase/emuladores.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/firebase_options.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
-/// Loopback host for the Firebase emulator suite. NEVER point these at cloud.
-/// `127.0.0.1` (not `localhost`) so it resolves identically on the Android AVD
-/// bridge and desktop hosts — the app's own `main.dart` uses `localhost`, but
-/// for the AVD the numeric loopback is the safe, unambiguous choice.
-const String kEmulatorHost = '127.0.0.1';
-const int kAuthEmulatorPort = 9099;
-const int kFirestoreEmulatorPort = 8080;
-
-/// Guards `useAuthEmulator`/`useFirestoreEmulator` so re-running suites in one
-/// process does not throw "already configured".
+/// Guards `conectarEmuladores` so re-running suites in one process does not
+/// throw "already configured".
 bool _emulatorsWired = false;
 
-/// Initializes Firebase and pins Auth + Firestore to the local emulators.
-/// Call once from each suite's `setUpAll`. Idempotent across suites in the same
-/// test process.
+/// Initializes Firebase and pins Firestore, Auth, Functions and Storage to the
+/// local emulators. Call once from each suite's `setUpAll`. Idempotent across
+/// suites in the same test process.
+///
+/// Llama a `conectarEmuladores()` y no a `useAuthEmulator` /
+/// `useFirestoreEmulator` sueltos. Acá había exactamente esos dos, y el
+/// encabezado decía "EMULATORS ONLY — NEVER cloud": las callables (el código de
+/// verificación del mail, entre otras) y las subidas a Storage salían al
+/// proyecto real, porque `pumpTreinoApp` monta `TreinoApp` sin pasar por
+/// `main.dart`, que es quien conecta los cuatro. Con la función compartida, si
+/// mañana se emula un servicio más, las suites lo heredan solas.
 Future<void> initFirebaseForEmulators() async {
   if (Firebase.apps.isEmpty) {
     await Firebase.initializeApp(
@@ -55,11 +56,7 @@ Future<void> initFirebaseForEmulators() async {
   }
   if (_emulatorsWired) return;
 
-  await FirebaseAuth.instance.useAuthEmulator(kEmulatorHost, kAuthEmulatorPort);
-  FirebaseFirestore.instance.useFirestoreEmulator(
-    kEmulatorHost,
-    kFirestoreEmulatorPort,
-  );
+  await conectarEmuladores();
   // Deterministic reads in E2E: no offline cache masking emulator state.
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: false,
@@ -124,17 +121,97 @@ Future<void> ensureSignedOut(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 300));
 }
 
-/// Drives the UI login flow: `/welcome` → tap "Iniciar sesión" → fill the two
-/// [TextFormField]s → tap "ENTRAR" (`authLoginCta`) → settle on `/home`.
+/// Los textos de la app en el idioma con el que arrancó, para buscar por
+/// `find.text` sin copiar el literal.
+///
+/// Las suites buscaban `'Iniciar sesión'` y la bienvenida dice
+/// `'INICIAR SESIÓN'`: un cambio de copy en el `.arb` dejó a TODAS las suites que
+/// loguean paradas en el primer frame, con un error que hablaba de campos que
+/// no aparecían. Leyendo la clave en vez del literal, el copy puede cambiar.
+AppL10n l10nOf(WidgetTester tester) =>
+    AppL10n.of(tester.element(find.byType(Navigator).first));
+
+/// Pumps frames for [total] in [step] increments, WITHOUT waiting for the tree
+/// to settle.
+///
+/// Para pantallas que nunca se asientan: el player de la sesión tiene un timer
+/// que corre siempre (cronómetro y descanso), así que un `pumpAndSettle` ahí
+/// adentro cuelga hasta el timeout del test — medido: 10 min 25 s.
+Future<void> pumpFor(
+  WidgetTester tester,
+  Duration total, {
+  Duration step = const Duration(milliseconds: 100),
+}) async {
+  final end = DateTime.now().add(total);
+  while (DateTime.now().isBefore(end)) {
+    await tester.pump(step);
+  }
+}
+
+/// Pumps until [finder] matches something, or fails after [timeout] naming
+/// [reason]. Bounded alternative to `pumpAndSettle` for async results (a
+/// Firestore round-trip, a callable) on screens that never settle.
+Future<void> pumpUntilFound(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 20),
+  String? reason,
+}) async {
+  final end = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(end)) {
+    await tester.pump(const Duration(milliseconds: 200));
+    if (finder.evaluate().isNotEmpty) return;
+  }
+  throw TestFailure(
+    'pumpUntilFound: $finder no apareció en ${timeout.inSeconds} s'
+    '${reason == null ? '' : ' — $reason'}',
+  );
+}
+
+/// Cierra el tour de onboarding si está abierto (botón SALTAR).
+///
+/// El tour lo abre `OnboardingGate` encima de Inicio la primera vez que un
+/// usuario con el perfil completo llega a la app, y es una ruta opaca: con él
+/// arriba `find.byType(HomeScreen)` da 0 onstage / 1 offstage. Se descarta en
+/// la suite —y no apagándolo desde el seed— porque el tour ES parte del
+/// producto que un usuario nuevo ve, y el recorrido manual de la E2E lo prueba
+/// sobre las cuentas sembradas. SALTAR lo marca visto (`onboardingSeen`), así
+/// que en las corridas siguientes contra el mismo emulador ya no aparece y
+/// esto no hace nada.
+Future<void> dismissOnboardingTourIfPresent(WidgetTester tester) async {
+  final skip = find.text(l10nOf(tester).onboardingTourSkip);
+  if (skip.evaluate().isEmpty) return;
+  await tester.tap(skip.first);
+  await tester.pumpAndSettle();
+}
+
+/// Descarta el modal "Entrenamiento en curso" si Inicio lo abrió.
+///
+/// Inicio lo muestra cuando el usuario tiene una sesión `active` (lo deja una
+/// corrida de `workout_session_flow_test` que se cortó a la mitad, o el
+/// recorrido manual). No se puede cerrar tocando afuera, así que sin esto la
+/// suite siguiente queda trabada debajo. El texto está escrito a mano en
+/// `resume_session_modal.dart`, no sale del `.arb`.
+Future<void> dismissResumeSessionPromptIfPresent(WidgetTester tester) async {
+  if (find.text('Entrenamiento en curso').evaluate().isEmpty) return;
+  await tester.tap(find.widgetWithText(OutlinedButton, 'Descartar'));
+  await tester.pumpAndSettle();
+}
+
+/// Drives the UI login flow: `/welcome` → tap "INICIAR SESIÓN"
+/// (`authWelcomeSignIn`) → fill the two [TextFormField]s → tap "ENTRAR"
+/// (`authLoginCta`) → settle on `/home` → close the onboarding tour if it
+/// opened.
 ///
 /// Precondition: a verified user with [email]/[password] must exist in the
-/// Auth emulator. TODO(seed) — see each suite for the seeding contract.
+/// Auth emulator — the seeded accounts of `support/seed_ids.dart`.
 Future<void> signInViaUi(
   WidgetTester tester, {
   required String email,
   required String password,
 }) async {
-  final signInLink = find.text('Iniciar sesión');
+  final l10n = l10nOf(tester);
+  final signInLink = find.text(l10n.authWelcomeSignIn);
   if (signInLink.evaluate().isNotEmpty) {
     await tester.tap(signInLink.first);
     await tester.pumpAndSettle();
@@ -150,19 +227,51 @@ Future<void> signInViaUi(
   await tester.enterText(fields.at(1), password);
   await tester.pump();
 
-  await tester.tap(find.text('ENTRAR'));
+  await tester.tap(find.text(l10n.authLoginCta));
   await tester.pumpAndSettle(const Duration(seconds: 4));
+
+  // El tour va por el navigator raíz y el modal de sesión en curso sólo se
+  // abre con Inicio arriba, así que el modal puede aparecer recién cuando se
+  // cierra el tour. El orden importa; las dos llamadas no hacen nada si no hay
+  // nada que cerrar.
+  await dismissOnboardingTourIfPresent(tester);
+  await dismissResumeSessionPromptIfPresent(tester);
 }
 
-/// Navigates the live GoRouter to [location] (optionally passing [extra]).
-/// Used by suites that need to deep-link past a seeded document (a routine,
-/// a chat) rather than tapping through every intermediate screen.
-Future<void> goTo(
+/// Como [goTo], pero con `push`: la pantalla queda ENCIMA de la actual.
+///
+/// Para pantallas que al terminar hacen `context.pop()` —el editor de rutina
+/// después de GUARDAR CAMBIOS—: con `go` quedan como única ruta del stack y el
+/// `pop` no tiene adónde volver.
+Future<void> pushTo(
   WidgetTester tester,
   String location, {
   Object? extra,
 }) async {
   final ctx = tester.element(find.byType(Navigator).first);
-  GoRouter.of(ctx).go(location, extra: extra);
+  unawaited(GoRouter.of(ctx).push<void>(location, extra: extra));
   await tester.pumpAndSettle(const Duration(seconds: 3));
+}
+
+/// Navigates the live GoRouter to [location] (optionally passing [extra]).
+/// Used by suites that need to deep-link past a seeded document (a routine,
+/// a chat) rather than tapping through every intermediate screen.
+///
+/// [settle] en `false` para destinos que nunca se asientan (el player de la
+/// sesión): ahí pumpea [settleFor] y vuelve, en vez de colgarse en un
+/// `pumpAndSettle`.
+Future<void> goTo(
+  WidgetTester tester,
+  String location, {
+  Object? extra,
+  bool settle = true,
+  Duration settleFor = const Duration(seconds: 3),
+}) async {
+  final ctx = tester.element(find.byType(Navigator).first);
+  GoRouter.of(ctx).go(location, extra: extra);
+  if (settle) {
+    await tester.pumpAndSettle(settleFor);
+  } else {
+    await pumpFor(tester, settleFor);
+  }
 }
