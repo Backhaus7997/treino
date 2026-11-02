@@ -7,11 +7,15 @@
 // this folder imports it to share the Firebase-emulator bootstrap and a couple
 // of driving helpers.
 //
-// EMULATORS ONLY — NEVER cloud. Firestore 8080, Auth 9099, Functions 5001 y
-// Storage 9199, vía `conectarEmuladores()` — la MISMA función que llama
-// `main.dart` con `USE_EMULATOR=true`. Levantalos con `./scripts/emulator.sh`
-// (completo, con Functions: el registro pide el código de verificación a una
-// callable).
+// SIN NUBE: Firestore 8080, Auth 9099, Functions 5001 y Storage 9199 van al
+// emulador vía `conectarEmuladores()` —la MISMA función que llama `main.dart`
+// con `USE_EMULATOR=true`—, y lo que no tiene emulador va APAGADO en
+// `pumpTreinoApp`: Analytics (un no-op) y el registro del token de FCM. Este
+// encabezado decía "EMULATORS ONLY — NEVER cloud" mientras las callables, las
+// subidas a Storage, los eventos de Analytics y el token de FCM salían al
+// proyecto real, que es PRODUCCIÓN. Levantá los emuladores con
+// `./scripts/emulator.sh` (completo, con Functions: el registro pide el código
+// de verificación a una callable).
 // El script fija `--project treino-dev`; el default de .firebaserc es
 // `demo-treino` y dejaría los datos en otro namespace (#840).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,8 +32,10 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:treino/app/app.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/firebase/emuladores.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
+import 'package:treino/features/notifications/application/notification_providers.dart';
 import 'package:treino/firebase_options.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -57,6 +63,10 @@ Future<void> initFirebaseForEmulators() async {
   if (_emulatorsWired) return;
 
   await conectarEmuladores();
+  // Lo que `kUsaEmuladores` decide (p. ej. aceptar URLs de descarga del
+  // emulador de Storage) tiene que seguir a la conexión de arriba y no a que
+  // quien corre la suite se acuerde del `--dart-define=USE_EMULATOR=true`.
+  debugUsaEmuladoresOverride = true;
   // Deterministic reads in E2E: no offline cache masking emulator state.
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: false,
@@ -90,11 +100,14 @@ Future<T> _timed<T>(String label, Future<T> Function() body) async {
 /// [overrides] lets a suite stub providers that would otherwise reach out to
 /// device-only services.
 ///
-/// TODO(e2e-infra): [TreinoApp.initState] eagerly reads the FCM / notification
-/// providers (`fcmLifecycleProvider`, `fcmServiceProvider`). On a bare AVD
-/// without Google Play services — or against the emulator project — token
-/// registration can throw and block first frame. If boot hangs, pass overrides
-/// here that stub `fcmServiceProvider` / `notificationProviders` with fakes.
+/// Dos overrides fijos, porque no tienen emulador y si no saldrían a
+/// producción:
+///  - `analyticsServiceProvider` → [NoopAnalyticsService]. El provider sólo
+///    devuelve el no-op cuando `Firebase.apps` está vacío, y acá ya se
+///    inicializó: sin el override, cada pantalla y cada login de una suite era
+///    un evento en la propiedad real de Analytics.
+///  - `fcmLifecycleProvider` → nada. Es el que pide el token de FCM al loguear
+///    y lo guarda. Ninguna suite prueba notificaciones.
 Future<void> pumpTreinoApp(
   WidgetTester tester, {
   List<Override> overrides = const [],
@@ -118,6 +131,10 @@ Future<void> pumpTreinoApp(
             // llegaba a montar la app, y el mensaje hablaba de Riverpod, no del
             // override. Nadie lo vio porque nunca se había corrido ninguna.
             sharedPreferencesOverride(prefs),
+            analyticsServiceProvider.overrideWithValue(
+              const NoopAnalyticsService(),
+            ),
+            fcmLifecycleProvider.overrideWith((_) {}),
             ...overrides,
           ],
           child: const TreinoApp(),

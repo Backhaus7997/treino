@@ -14,18 +14,20 @@
 // Para eso está la API REST del emulador con `Authorization: Bearer owner`, que
 // es el bypass de reglas que el emulador documenta para tests. SÓLO existe en
 // el emulador: contra un Firestore real ese token es inválido y la request da
-// 401. Igual, el host está fijo en el loopback a propósito — este archivo no
+// 401. Igual, el host está fijo en `localhost` a propósito — este archivo no
 // sabe hablar con otro lado.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:treino/core/firebase/emuladores.dart';
 import 'package:treino/firebase_options.dart';
 
-/// Mismo host y puerto que `conectarEmuladores()`.
+/// Mismo host y puerto que `conectarEmuladores()`: el puerto es la constante
+/// que usa ella.
 const String _host = 'localhost';
-const int _port = 8080;
+const int _port = kPuertoEmuladorFirestore;
 
 String get _docsBase =>
     '/v1/projects/${DefaultFirebaseOptions.currentPlatform.projectId}'
@@ -66,7 +68,9 @@ Object? _decode(Map<String, dynamic> v) {
   if (v.containsKey('booleanValue')) return v['booleanValue'];
   if (v.containsKey('integerValue')) return int.parse('${v['integerValue']}');
   if (v.containsKey('doubleValue')) return (v['doubleValue'] as num).toDouble();
-  if (v.containsKey('timestampValue')) return v['timestampValue'];
+  if (v.containsKey('timestampValue')) {
+    return DateTime.parse(v['timestampValue'] as String);
+  }
   if (v.containsKey('mapValue')) {
     return _decodeFields(
       (v['mapValue'] as Map<String, dynamic>)['fields']
@@ -79,7 +83,10 @@ Object? _decode(Map<String, dynamic> v) {
         const [];
     return values.map((e) => _decode(e as Map<String, dynamic>)).toList();
   }
-  return v;
+  // Bytes, geopoints, referencias: ninguna suite los lee. Fallar acá evita
+  // devolver un mapa crudo que, reescrito con `adminSetDoc`, corrompería el
+  // documento en silencio.
+  throw UnsupportedError('emulator_admin: tipo de valor no soportado: $v');
 }
 
 Map<String, Object?> _decodeFields(Map<String, dynamic>? fields) => {

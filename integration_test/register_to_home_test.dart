@@ -95,8 +95,9 @@ void main() {
       'register → profile-setup → mail code → home: new athlete completes '
       'onboarding', (tester) async {
     // Prender el gate y devolverlo como estaba, pase lo que pase.
+    // El teardown se registra ANTES de escribir: si el PATCH llega al emulador
+    // y la respuesta se pierde, el gate tiene que volver igual.
     final gateAntes = await adminGetDoc(_emailGatePath);
-    await adminSetDoc(_emailGatePath, {'enabled': true});
     addTearDown(() async {
       if (gateAntes == null) {
         await adminDeleteDoc(_emailGatePath);
@@ -104,6 +105,7 @@ void main() {
         await adminSetDoc(_emailGatePath, gateAntes);
       }
     });
+    await adminSetDoc(_emailGatePath, {'enabled': true});
 
     await ensureSignedOut(tester);
     await pumpTreinoApp(tester);

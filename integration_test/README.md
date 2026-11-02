@@ -6,11 +6,13 @@ Cinco suites end-to-end que manejan la `TreinoApp` **real** contra los
 se verificaron, la última vez el 2026-11-02) y deberían correr igual en un AVD
 de Android, que hoy no hay ninguno creado en la máquina.
 
-> ⚠️ **Emuladores, nunca la nube.** `initFirebaseForEmulators()` llama a
+> ⚠️ **Sin nube.** `initFirebaseForEmulators()` llama a
 > `conectarEmuladores()` —la misma función que usa `main.dart` con
-> `USE_EMULATOR=true`— y conecta los cuatro servicios. Hasta el 2026-11-02 el
-> helper conectaba solamente Auth y Firestore: las callables y Storage de una
-> suite salían al proyecto real, que es **producción** (ver `AGENTS.md`,
+> `USE_EMULATOR=true`— y conecta los cuatro servicios emulados. Lo que no tiene
+> emulador lo apaga `pumpTreinoApp`: Analytics va con un no-op y no se registra
+> el token de FCM. Hasta el 2026-11-02 el helper conectaba solamente Auth y
+> Firestore: las callables, Storage, los eventos de Analytics y el token de FCM
+> de una suite salían al proyecto real, que es **producción** (ver `AGENTS.md`,
 > § Entornos).
 
 ## Suites
@@ -100,9 +102,11 @@ El UDID sale de `xcrun simctl list devices booted`.
   corre siempre y el test cuelga hasta el timeout (medido: 10 min 25 s). Ahí van
   `pumpFor` / `pumpUntilFound` de `support/e2e_helpers.dart`, y `goTo(...,
   settle: false)`.
-- **Los finders leen el copy del `.arb`** (`l10nOf(tester)`), no literales:
-  el día que "Iniciar sesión" pasó a "INICIAR SESIÓN" se cayeron todas las
-  suites que loguean, sin que el login tuviera nada roto.
+- **Los finders leen el copy del `.arb`** (`l10nOf(tester)`) siempre que la
+  app lo saca de ahí: el día que "Iniciar sesión" pasó a "INICIAR SESIÓN" se
+  cayeron todas las suites que loguean, sin que el login tuviera nada roto. Los
+  textos que la app escribe a mano ("TERMINAR SESIÓN", "OTRO GYM / SIN GYM",
+  los pasos del profile-setup) van como literales, con un comentario que lo dice.
 - **Un build de iOS ocupa varios GB** (DerivedData + `build/`). Mirá
   `df -h /System/Volumes/Data` antes de culpar a un error de compilación raro.
 - CI no corre estas suites: necesitan un simulador y los emuladores.
