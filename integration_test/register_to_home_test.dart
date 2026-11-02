@@ -24,13 +24,16 @@
 // recorre cualquier cuenta nueva. La suite lo prende para su corrida y lo deja
 // como estaba al terminar (`addTearDown`), aunque falle.
 //
-// EL CÓDIGO. El backend guarda sólo el hash en `verificaciones_de_mail`; en
-// claro existe únicamente en los `params` del mail que encola en `mail_queue`.
-// La suite lo lee de ahí con `support/emulator_admin.dart`, que saltea las
-// reglas con el token `owner` del emulador — ningún cliente puede leer esa
-// colección, y está bien que así sea.
+// EL CÓDIGO. El backend guarda sólo su hash en `verificaciones_de_mail`, y la
+// suite lo recupera de ahí (ver `_codigoDeVerificacion`) con
+// `support/emulator_admin.dart`, que saltea las reglas con el token `owner`
+// del emulador — ningún cliente puede leer esa colección, y está bien que así
+// sea.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,23 +69,43 @@ Future<void> _next(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
-/// El código del mail encolado para [uid], tal como lo recibiría el usuario.
-Future<String> _codigoDelMail(String uid) async {
+/// El código de verificación de [uid], el mismo que le llega por mail.
+///
+/// Se recupera del HASH que guarda el backend en `verificaciones_de_mail/{uid}`
+/// (`sha256("uid:código")`, ver `hashDelCodigo` en
+/// `functions/src/auth/codigo-de-verificacion.ts`): son 6 dígitos, así que
+/// probar el millón de candidatos alcanza y no depende de nadie.
+///
+/// NO se lee de `mail_queue`, aunque el código esté ahí en claro. La primera
+/// versión de esta suite lo hacía y pasó una vez: `sendQueuedMail` BORRA
+/// `params.codigo` apenas intenta mandar el mail (`SECRET_PARAMS`, a propósito,
+/// para que el código no quede en la base), así que la suite competía contra
+/// el trigger y la corrida siguiente perdió la carrera — medido, el documento
+/// quedó con `params: {showPlans}` y nada más.
+Future<String> _codigoDeVerificacion(String uid) async {
   final end = DateTime.now().add(const Duration(seconds: 20));
-  while (DateTime.now().isBefore(end)) {
-    final mails = await adminWhereEqual('mail_queue', 'toUid', uid);
-    for (final m in mails) {
-      final params = m.data['params'] as Map<String, Object?>?;
-      final codigo = params?['codigo'];
-      if (m.data['kind'] == 'email-code-athlete' && codigo is String) {
-        return codigo;
-      }
+  String? hash;
+  while (hash == null && DateTime.now().isBefore(end)) {
+    final doc = await adminGetDoc('verificaciones_de_mail/$uid');
+    hash = doc?['codigoHash'] as String?;
+    if (hash == null) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
     }
-    await Future<void>.delayed(const Duration(milliseconds: 500));
+  }
+  if (hash == null) {
+    throw TestFailure(
+      'no apareció verificaciones_de_mail/$uid: ¿el emulador tiene '
+      'Functions? (`./scripts/emulator.sh` sin SKIP_FUNCTIONS)',
+    );
+  }
+  for (var i = 0; i < 1000000; i++) {
+    final codigo = '$i'.padLeft(6, '0');
+    if (sha256.convert(utf8.encode('$uid:$codigo')).toString() == hash) {
+      return codigo;
+    }
   }
   throw TestFailure(
-    'no apareció el mail con el código en mail_queue para $uid: ¿el emulador '
-    'tiene Functions? (`./scripts/emulator.sh` sin SKIP_FUNCTIONS)',
+    'ningún código de 6 dígitos da el hash de $uid: ¿cambió `hashDelCodigo`?',
   );
 }
 
@@ -203,7 +226,10 @@ void main() {
 
     // La pantalla pide el código sola al montarse.
     final uid = FirebaseAuth.instance.currentUser!.uid;
-    final codigo = await _codigoDelMail(uid);
+    final sw = Stopwatch()..start();
+    final codigo = await _codigoDeVerificacion(uid);
+    // ignore: avoid_print
+    print('[e2e] código de verificación: ${sw.elapsed.inMilliseconds} ms');
     await tester.enterText(
       find.byKey(const Key('verify_mail_code_field')),
       codigo,
