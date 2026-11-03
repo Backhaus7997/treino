@@ -434,7 +434,7 @@ void main() {
       // igual: un perfil que no carga también cae a «Plan Free».
       expect(find.text('Sofía Ramírez'), findsOneWidget);
       expect(find.text('Plan Free'), findsOneWidget);
-      expect(find.text('Plan 1'), findsNothing);
+      expect(find.text('Plus'), findsNothing);
     });
 
     // Control del de arriba: misma baja, mismo reloj, sólo cambia la fecha. Si
@@ -444,7 +444,7 @@ void main() {
       await _pumpSidebar(tester, overrides: [perfil(fin: conDiasPagos)]);
 
       expect(find.text('Sofía Ramírez'), findsOneWidget);
-      expect(find.text('Plan 1'), findsOneWidget);
+      expect(find.text('Plus'), findsOneWidget);
       expect(find.text('Plan Free'), findsNothing);
     });
 
@@ -458,7 +458,7 @@ void main() {
         overrides: [perfil(status: SubscriptionStatus.active, fin: vencida)],
       );
 
-      expect(find.text('Plan 1'), findsOneWidget);
+      expect(find.text('Plus'), findsOneWidget);
       expect(find.text('Plan Free'), findsNothing);
     });
 
@@ -471,7 +471,7 @@ void main() {
       final fin = DateTime.utc(2026, 10, 15, 15);
       AppClock.freeze(fin.subtract(const Duration(hours: 1)).toLocal());
       await _pumpSidebar(tester, overrides: [perfil(fin: fin)]);
-      expect(find.text('Plan 1'), findsOneWidget);
+      expect(find.text('Plus'), findsOneWidget);
 
       // Sólo pasa la hora: el reloj cruza el fin y nada más cambia.
       AppClock.freeze(fin.add(const Duration(minutes: 1)).toLocal());
@@ -480,7 +480,7 @@ void main() {
 
       expect(find.text('Sofía Ramírez'), findsOneWidget);
       expect(find.text('Plan Free'), findsOneWidget);
-      expect(find.text('Plan 1'), findsNothing);
+      expect(find.text('Plus'), findsNothing);
     });
   });
 

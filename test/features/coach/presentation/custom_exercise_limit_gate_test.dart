@@ -334,7 +334,7 @@ void main() {
       );
 
       expect(ok, isFalse);
-      expect(find.textContaining('Tu plan Plan 2 incluye'), findsOneWidget);
+      expect(find.textContaining('Tu plan Pro incluye'), findsOneWidget);
       expect(find.textContaining('Tu plan Free incluye'), findsNothing);
     });
 
@@ -359,12 +359,12 @@ void main() {
 
       expect(ok, isFalse);
       expect(
-        find.textContaining('Tu suscripción a Plan 1 no está activa'),
+        find.textContaining('Tu suscripción a Plus no está activa'),
         findsOneWidget,
       );
-      expect(find.textContaining('Tu plan Plan 1 incluye'), findsNothing);
+      expect(find.textContaining('Tu plan Plus incluye'), findsNothing);
       // Sin upsell: no se le ofrece "el siguiente" a quien ya pagó Plan 1.
-      expect(find.text('PLAN 2'), findsNothing);
+      expect(find.text('PRO'), findsNothing);
     });
 
     testWidgets(
@@ -398,8 +398,8 @@ void main() {
             'borrar los que ya tenés.'),
         findsOneWidget,
       );
-      expect(find.textContaining('Plan 1 incluye'), findsNothing);
-      expect(find.text('PLAN 2'), findsNothing);
+      expect(find.textContaining('Plus incluye'), findsNothing);
+      expect(find.text('PRO'), findsNothing);
     });
   });
 }

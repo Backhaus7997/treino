@@ -59,9 +59,9 @@ String plantillasTexto(SubscriptionTier tier) {
 /// las mismas cuatro palabras.
 String tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => 'Free', // i18n: Fase W3
-      SubscriptionTier.plan1 => 'Plan 1', // i18n: Fase W3
-      SubscriptionTier.plan2 => 'Plan 2', // i18n: Fase W3
-      SubscriptionTier.plan3 => 'Plan 3', // i18n: Fase W3
+      SubscriptionTier.plan1 => 'Plus', // i18n: Fase W3
+      SubscriptionTier.plan2 => 'Pro', // i18n: Fase W3
+      SubscriptionTier.plan3 => 'Max', // i18n: Fase W3
     };
 
 /// `d/m` de un instante, en calendario argentino: la fecha corta de «tu plan
