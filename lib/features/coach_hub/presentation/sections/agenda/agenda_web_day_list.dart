@@ -144,13 +144,15 @@ class _AgendaWebDayListState extends ConsumerState<AgendaWebDayList> {
       _exitSelectionMode();
       // Mismo patrón que las 4 snackbars de éxito de Agenda
       // (appointment_detail_dialog.dart): el cobro de 1 turno mostraba el
-      // check, el cobro en lote (mismo string "Turno cobrado.") no —
-      // misma acción, feedback distinto sin razón.
+      // check, el cobro en lote (mismo string que el de 1 turno) no —
+      // misma acción, feedback distinto sin razón. Y el mismo copy: los
+      // pagos nacen `pending`, no cobrados (E2E 1.3.0).
       showTreinoToast(
         context,
         selected.length == 1
-            ? 'Turno cobrado.' // i18n
-            : '${selected.length} turnos cobrados.', // i18n
+            ? 'Cobro registrado: queda pendiente hasta que lo marques pagado.' // i18n
+            : '${selected.length} cobros registrados: quedan pendientes '
+                'hasta que los marques pagados.', // i18n
         type: TreinoToastType.success,
       );
     }

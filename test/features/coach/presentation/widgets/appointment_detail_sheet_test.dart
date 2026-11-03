@@ -177,6 +177,16 @@ void main() {
         expect(paymentData['amountArs'], 8000);
         expect(paymentData['status'], 'pending');
 
+        // E2E 1.3.0: «Turno cobrado.» decía que la plata había entrado, y el
+        // pago nace `pending` — hay que marcarlo pagado después en Pagos.
+        expect(find.text('Turno cobrado.'), findsNothing);
+        expect(
+          find.text(
+            'Cobro registrado: queda pendiente hasta que lo marques pagado.',
+          ),
+          findsOneWidget,
+        );
+
         // El turno quedó marcado como cobrado (mismo id que el Payment).
         final apptSnap =
             await firestore.collection('appointments').doc(appt.id).get();

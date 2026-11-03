@@ -105,6 +105,69 @@ void main() {
       expect(find.byIcon(TreinoIcon.eyeOff), findsNothing);
     });
 
+    // E2E 1.3.0: el autocorrector de iOS reescribía lo que no es prosa.
+    group('autocorrector', () {
+      Future<TextField> pumpField(WidgetTester tester, AuthInput input) async {
+        await tester.pumpWidget(_wrap(input));
+        await tester.pump();
+        return tester.widget<TextField>(find.byType(TextField));
+      }
+
+      testWidgets('un email no se autocorrige ni sugiere', (tester) async {
+        final field = await pumpField(
+          tester,
+          AuthInput(
+            controller: TextEditingController(),
+            leadingIcon: TreinoIcon.mail,
+            keyboardType: TextInputType.emailAddress,
+          ),
+        );
+        expect(field.autocorrect, isFalse);
+        expect(field.enableSuggestions, isFalse);
+      });
+
+      testWidgets('una contraseña no se autocorrige ni sugiere',
+          (tester) async {
+        final field = await pumpField(
+          tester,
+          AuthInput(
+            controller: TextEditingController(),
+            leadingIcon: TreinoIcon.lock,
+            obscureText: true,
+          ),
+        );
+        expect(field.autocorrect, isFalse);
+        expect(field.enableSuggestions, isFalse);
+      });
+
+      testWidgets('un texto libre conserva el default de la plataforma',
+          (tester) async {
+        final field = await pumpField(
+          tester,
+          AuthInput(
+            controller: TextEditingController(),
+            leadingIcon: TreinoIcon.mapPin,
+          ),
+        );
+        expect(field.autocorrect, isTrue);
+        expect(field.enableSuggestions, isTrue);
+      });
+
+      testWidgets('el caller puede apagarlo explícito', (tester) async {
+        final field = await pumpField(
+          tester,
+          AuthInput(
+            controller: TextEditingController(),
+            leadingIcon: TreinoIcon.atSign,
+            autocorrect: false,
+            enableSuggestions: false,
+          ),
+        );
+        expect(field.autocorrect, isFalse);
+        expect(field.enableSuggestions, isFalse);
+      });
+    });
+
     testWidgets('filled background uses TextFormField', (tester) async {
       final ctrl = TextEditingController();
       await tester.pumpWidget(_wrap(
