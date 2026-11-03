@@ -46,7 +46,7 @@ class PaywallPreviewScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _PreviewButton(
-            label: 'Bloqueo desde FREE (upsell → Plan 1)',
+            label: 'Bloqueo desde FREE (upsell → Plus)',
             palette: palette,
             onTap: () => showPlanLimitPaywall(
               context,
@@ -54,7 +54,7 @@ class PaywallPreviewScreen extends StatelessWidget {
             ),
           ),
           _PreviewButton(
-            label: 'Bloqueo desde PLAN 1 (upsell → Plan 2)',
+            label: 'Bloqueo desde PLUS (upsell → Pro)',
             palette: palette,
             onTap: () => showPlanLimitPaywall(
               context,
@@ -62,7 +62,7 @@ class PaywallPreviewScreen extends StatelessWidget {
             ),
           ),
           _PreviewButton(
-            label: 'Bloqueo desde PLAN 2 (tope → plan a medida)',
+            label: 'Bloqueo desde PRO (tope → plan a medida)',
             palette: palette,
             onTap: () => showPlanLimitPaywall(
               context,

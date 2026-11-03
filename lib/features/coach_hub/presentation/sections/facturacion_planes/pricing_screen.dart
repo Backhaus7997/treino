@@ -743,9 +743,9 @@ class _PlanCards extends StatelessWidget {
 
 String _tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => 'FREE', // i18n: Fase W3
-      SubscriptionTier.plan1 => 'PLAN 1', // i18n: Fase W3
-      SubscriptionTier.plan2 => 'PLAN 2', // i18n: Fase W3
-      SubscriptionTier.plan3 => 'PLAN 3', // i18n: Fase W3
+      SubscriptionTier.plan1 => 'PLUS', // i18n: Fase W3
+      SubscriptionTier.plan2 => 'PRO', // i18n: Fase W3
+      SubscriptionTier.plan3 => 'MAX', // i18n: Fase W3
     };
 
 /// (numeroAlumnos, labelAlumnos) para el bloque de features.

@@ -312,9 +312,9 @@ String _sufijoDeTier(SubscriptionTier? tier) =>
 /// Nombre del tier dentro del medidor — UPPERCASE, es un eyebrow.
 String _tierLabel(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => 'PLAN FREE', // i18n: Fase W3
-      SubscriptionTier.plan1 => 'PLAN 1', // i18n: Fase W3
-      SubscriptionTier.plan2 => 'PLAN 2', // i18n: Fase W3
-      SubscriptionTier.plan3 => 'PLAN 3', // i18n: Fase W3
+      SubscriptionTier.plan1 => 'PLAN PLUS', // i18n: Fase W3
+      SubscriptionTier.plan2 => 'PLAN PRO', // i18n: Fase W3
+      SubscriptionTier.plan3 => 'PLAN MAX', // i18n: Fase W3
     };
 
 // ── Active alumno card ────────────────────────────────────────────────────────

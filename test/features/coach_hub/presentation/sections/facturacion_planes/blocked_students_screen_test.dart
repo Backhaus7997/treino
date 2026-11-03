@@ -207,7 +207,7 @@ void main() {
 
       expect(find.text('NINGUNO'), findsOneWidget);
       final text = _allText(tester);
-      expect(text, contains('Plan 1'));
+      expect(text, contains('Plus'));
       // El valor real del estado vacío: dejar de mandarlo a mirar facturación.
       expect(text, contains('no fue por el cupo de tu plan'));
     });
@@ -310,7 +310,7 @@ void main() {
       final text = _allText(tester);
       expect(text, isNot(contains('hoy tenés más')));
       expect(text, contains('superó ese cupo'));
-      expect(text, contains('pausado cuenta mitad'));
+      expect(text, contains('pausado cuenta como medio alumno'));
     });
 
     testWidgets('dice explícitamente qué conserva el alumno', (tester) async {
@@ -413,7 +413,7 @@ void main() {
             _sub(SubscriptionTier.plan1, status: SubscriptionStatus.grace),
       );
 
-      expect(_allText(tester), contains('Tu plan Plan 1 incluye 7 alumnos'));
+      expect(_allText(tester), contains('Tu plan Plus incluye 7 alumnos'));
       expect(find.text('AMPLIAR MI PLAN'), findsOneWidget);
     });
 
@@ -559,7 +559,7 @@ void main() {
       );
 
       final text = _allText(tester);
-      expect(text, contains('Tu plan Plan 2 incluye 15 alumnos'));
+      expect(text, contains('Tu plan Pro incluye 15 alumnos'));
       expect(find.text('AMPLIAR MI PLAN'), findsOneWidget);
       expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsNothing);
       // Free aparece sólo como lo que viene DESPUÉS (el aviso), nunca como lo
@@ -585,7 +585,7 @@ void main() {
       );
 
       final text = _allText(tester);
-      expect(text, contains('Tu plan Plan 2 incluye 15 alumnos'));
+      expect(text, contains('Tu plan Pro incluye 15 alumnos'));
       expect(find.text('AMPLIAR MI PLAN'), findsOneWidget);
       expect(text, isNot(contains('Cancelaste')));
     });
@@ -645,7 +645,7 @@ void main() {
       expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsOneWidget);
       // El plan que dejó de regir se nombra con el tier del DOC: con
       // `tierEfectivo` diría «no con el de tu plan Free».
-      expect(text, contains('no con el de tu plan Plan 2'));
+      expect(text, contains('no con el de tu plan Pro'));
     });
 
     // Su control: con días pagos el cupo sigue siendo el del Plan 2, así que
@@ -664,7 +664,7 @@ void main() {
       );
 
       final text = _allText(tester);
-      expect(text, contains('del cupo de tu plan Plan 2 (15 alumnos)'));
+      expect(text, contains('del cupo de tu plan Pro (15 alumnos)'));
       expect(text, contains('no fue por el cupo de tu plan'));
       expect(text, contains('rige hasta el 15/10'));
       expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsNothing);
@@ -731,7 +731,7 @@ void main() {
           currentPeriodEnd: fin,
         ),
       );
-      expect(_allText(tester), contains('Tu plan Plan 2 incluye 15 alumnos'));
+      expect(_allText(tester), contains('Tu plan Pro incluye 15 alumnos'));
       expect(find.text('AMPLIAR MI PLAN'), findsOneWidget);
 
       // Sólo pasa la hora: el reloj cruza el fin y nada más cambia (ni el

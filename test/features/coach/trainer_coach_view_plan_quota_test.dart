@@ -150,7 +150,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_headerText(tester), '3 DE 7 · PLAN 1');
+      expect(_headerText(tester), '3 DE 7 · PLAN PLUS');
     });
 
     testWidgets('Plan 2: 1 activo → "1 DE 15 · PLAN 2"', (tester) async {
@@ -160,7 +160,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_headerText(tester), '1 DE 15 · PLAN 2');
+      expect(_headerText(tester), '1 DE 15 · PLAN PRO');
     });
 
     testWidgets(
@@ -188,7 +188,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final text = _headerText(tester);
-      expect(text, '2 ALUMNOS · PLAN 3');
+      expect(text, '2 ALUMNOS · PLAN MAX');
       expect(text, isNot(contains('DE')));
       expect(text.toLowerCase(), isNot(contains('null')));
     });
@@ -209,7 +209,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_headerText(tester), '1 ALUMNO · PLAN 3');
+      expect(_headerText(tester), '1 ALUMNO · PLAN MAX');
     });
 
     // Un testWidgets POR tier, no un loop adentro de uno solo. Re-pumpear
@@ -234,9 +234,9 @@ void main() {
           // dibujara otro perfil pasaría el chequeo de abajo sin probar nada.
           final etiqueta = switch (tier) {
             SubscriptionTier.free => 'PLAN FREE',
-            SubscriptionTier.plan1 => 'PLAN 1',
-            SubscriptionTier.plan2 => 'PLAN 2',
-            SubscriptionTier.plan3 => 'PLAN 3',
+            SubscriptionTier.plan1 => 'PLUS',
+            SubscriptionTier.plan2 => 'PRO',
+            SubscriptionTier.plan3 => 'MAX',
           };
           expect(text, endsWith(etiqueta));
           expect(text.toLowerCase(), isNot(contains('null')));
@@ -267,7 +267,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_headerText(tester), '1.5 DE 7 · PLAN 1');
+      expect(_headerText(tester), '1.5 DE 7 · PLAN PLUS');
     });
 
     testWidgets('entero no arrastra decimal ("2", no "2.0")', (tester) async {
@@ -282,7 +282,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_headerText(tester), '2 DE 7 · PLAN 1');
+      expect(_headerText(tester), '2 DE 7 · PLAN PLUS');
     });
 
     testWidgets('sin tope: 1 exacto va en singular, 0.5 en plural',
@@ -293,7 +293,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_headerText(tester), '0.5 ALUMNOS · PLAN 3');
+      expect(_headerText(tester), '0.5 ALUMNOS · PLAN MAX');
     });
   });
 
@@ -366,7 +366,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_headerText(tester), '20 ALUMNOS · PLAN 3');
+      expect(_headerText(tester), '20 ALUMNOS · PLAN MAX');
       expect(_headerColor(tester), palette.textMuted);
     });
   });
@@ -464,7 +464,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_headerText(tester), '3 DE 7 · PLAN 1');
+      expect(_headerText(tester), '3 DE 7 · PLAN PLUS');
     });
 
     // Control del eje del estado: con el plan ACTIVO el servidor ni mira la
@@ -481,7 +481,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_headerText(tester), '3 DE 7 · PLAN 1');
+      expect(_headerText(tester), '3 DE 7 · PLAN PLUS');
     });
 
     // Plan 3 no tiene tope, así que acá no cambia sólo el nombre: vencida la
@@ -515,7 +515,7 @@ void main() {
         links: tresActivos,
       ));
       await tester.pumpAndSettle();
-      expect(_headerText(tester), '3 DE 7 · PLAN 1');
+      expect(_headerText(tester), '3 DE 7 · PLAN PLUS');
 
       // Sólo pasa la hora: el reloj cruza el fin y nada más cambia (ni el
       // perfil ni los vínculos emiten de nuevo).
@@ -537,7 +537,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_headerText(tester), '1 ALUMNO · PLAN 3');
+      expect(_headerText(tester), '1 ALUMNO · PLAN MAX');
     });
   });
 
@@ -581,7 +581,7 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        expect(_headerText(tester), '3 DE 7 · PLAN 1');
+        expect(_headerText(tester), '3 DE 7 · PLAN PLUS');
       });
 
       testWidgets('una baja vencida sigue siendo Free por el reloj local',
@@ -612,7 +612,7 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        expect(_headerText(tester), '3 DE 7 · PLAN 1');
+        expect(_headerText(tester), '3 DE 7 · PLAN PLUS');
       });
 
       testWidgets('un valor que no se entiende cuenta como ausente',
@@ -624,7 +624,7 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        expect(_headerText(tester), '3 DE 7 · PLAN 1');
+        expect(_headerText(tester), '3 DE 7 · PLAN PLUS');
       });
     });
 
@@ -683,7 +683,7 @@ void main() {
       expect(perfil?.subscription?.tier, SubscriptionTier.plan1);
 
       final text = _headerText(tester);
-      expect(text, '3 ALUMNOS · PLAN 3');
+      expect(text, '3 ALUMNOS · PLAN MAX');
       expect(text, isNot(contains('DE')));
       expect(text.toLowerCase(), isNot(contains('null')));
     });
@@ -711,8 +711,8 @@ void main() {
       await tester.pumpAndSettle();
       final ausente = _headerText(tester);
 
-      expect(conNull, '3 ALUMNOS · PLAN 3');
-      expect(ausente, '3 DE 7 · PLAN 1');
+      expect(conNull, '3 ALUMNOS · PLAN MAX');
+      expect(ausente, '3 DE 7 · PLAN PLUS');
     });
 
     testWidgets('un tope que ningún plan de la tabla tiene: sin nombre de plan',
@@ -743,7 +743,7 @@ void main() {
         links: tresActivos,
       ));
       await tester.pumpAndSettle();
-      expect(_headerText(tester), '3 DE 7 · PLAN 1');
+      expect(_headerText(tester), '3 DE 7 · PLAN PLUS');
 
       // Sólo pasa la hora. Ni el perfil ni el doc ni los vínculos emiten.
       AppClock.freeze(hasta.add(const Duration(minutes: 1)).toLocal());
@@ -773,7 +773,7 @@ void main() {
 
       // 15 y no 7: con 7 el cálculo del cliente (Plan 1) daría lo mismo y el
       // test no distinguiría al servidor de su fallback.
-      expect(_headerText(tester), '3 DE 15 · PLAN 2');
+      expect(_headerText(tester), '3 DE 15 · PLAN PRO');
     });
 
     testWidgets('un borde que ya pasó al montar rige de entrada',

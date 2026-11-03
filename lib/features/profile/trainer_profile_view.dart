@@ -355,14 +355,13 @@ class _IdentityCard extends StatelessWidget {
   }
 }
 
-/// «Plan Free» / «Plan 1»: [tierName] a secas diría sólo «Free» para el tier
-/// gratuito, que sin la palabra «Plan» no se lee como un plan.
+/// «Plan Free» / «Plan Pro»: [tierName] a secas diría sólo «Free» o «Pro»,
+/// que sin la palabra «Plan» no se leen como un plan.
 ///
 /// Se usa `plan_copy.dart` y no `tierPlanLabel` (de `plan_upsell_banner.dart`)
 /// porque ese archivo es del Hub web y trae el banner de upsell: esta vista
 /// viaja en el binario móvil, donde un llamado a comprar no entra (3.1.3(f)).
-String _planLabel(SubscriptionTier tier) =>
-    tier == SubscriptionTier.free ? 'Plan Free' : tierName(tier);
+String _planLabel(SubscriptionTier tier) => 'Plan ${tierName(tier)}';
 
 /// «Coach · Plan Free» bajo el nombre.
 ///

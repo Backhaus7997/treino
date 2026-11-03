@@ -129,7 +129,7 @@ void main() {
     await open(tester, SubscriptionTier.free);
 
     expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsOneWidget);
-    expect(find.text('PLAN 1'), findsOneWidget);
+    expect(find.text('PLUS'), findsOneWidget);
     expect(find.textContaining('PASATE A'), findsNothing);
     expect(find.text('12.000'), findsOneWidget); // precio Plan 1
     expect(find.text('Hasta 7 alumnos'), findsOneWidget);
@@ -139,7 +139,7 @@ void main() {
   testWidgets('desde Plan 1 → upsell a Plan 2', (tester) async {
     await open(tester, SubscriptionTier.plan1);
 
-    expect(find.text('PLAN 2'), findsOneWidget);
+    expect(find.text('PRO'), findsOneWidget);
     expect(find.text('22.000'), findsOneWidget); // precio Plan 2
     expect(find.text('Hasta 15 alumnos'), findsOneWidget);
   });
@@ -149,7 +149,7 @@ void main() {
     // salida para el PF que MAS paga. Con plan3 ya tiene a donde ir.
     await open(tester, SubscriptionTier.plan2);
 
-    expect(find.text('PLAN 3'), findsOneWidget);
+    expect(find.text('MAX'), findsOneWidget);
     expect(find.text('39.000'), findsOneWidget);
     expect(find.text('PLAN A MEDIDA'), findsNothing);
   });
@@ -189,7 +189,7 @@ void main() {
   //
   // REGRESIÓN REAL, publicada en main: `weightLimit` es `null` para plan3, y
   // se interpolaba directo. El upsell al plan MÁS CARO decía «Hasta null
-  // alumnos». El test que había verificaba el título («PASATE A PLAN 3») y el
+  // alumnos». El test que había verificaba el título («PASATE A MAX») y el
   // precio, pero no el renglón de abajo — pasaba verde con la pantalla rota.
   //
   // Estos tests miran el CUERPO, y hay uno que barre las tres ramas buscando
@@ -198,7 +198,7 @@ void main() {
   testWidgets('el upsell a Plan 3 no dice «null»', (tester) async {
     await open(tester, SubscriptionTier.plan2);
 
-    expect(find.text('PLAN 3'), findsOneWidget);
+    expect(find.text('MAX'), findsOneWidget);
     expect(find.text('Alumnos sin límite'), findsOneWidget);
     expect(find.textContaining('null'), findsNothing);
   });
@@ -395,7 +395,7 @@ void main() {
     // siguen compilando y renderizando exactamente igual.
     await open(tester, SubscriptionTier.free);
 
-    expect(find.text('PLAN 1'), findsOneWidget);
+    expect(find.text('PLUS'), findsOneWidget);
     expect(find.text('REGULARIZAR'), findsNothing);
     expect(find.text('VER ESTADO'), findsNothing);
   });
@@ -520,12 +520,12 @@ void main() {
           'VER PLANES',
         ],
         propiosMovil: [
-          'PLAN 1',
+          'PLUS',
           'Entendido',
           'Tu plan Free incluye 2 alumnos.',
         ],
         propiosWeb: [
-          'PASATE A PLAN 1',
+          'PASATE A PLUS',
           'Ahora no',
           'Tu plan Free incluye 2 alumnos. Para sumar más, subí de plan.',
         ],
@@ -541,11 +541,11 @@ void main() {
         ],
         propiosMovil: [
           'Entendido',
-          'Tu plan Plan 3 incluye alumnos sin límite.',
+          'Tu plan Max incluye alumnos sin límite.',
         ],
         propiosWeb: [
           'Ahora no',
-          'Tu plan Plan 3 incluye alumnos sin límite. Para sumar más, subí '
+          'Tu plan Max incluye alumnos sin límite. Para sumar más, subí '
               'de plan.',
         ],
       ),
@@ -555,7 +555,7 @@ void main() {
         reason: PlanLimitReason.subscriptionInactive,
         comunes: [
           'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA',
-          'TU PLAN: PLAN 1',
+          'TU PLAN: PLUS',
         ],
         propiosMovil: [
           'VER ESTADO',
@@ -785,7 +785,7 @@ void main() {
         findsOneWidget,
       );
       // La tarjeta del siguiente plan: nombre, precio, sufijo y beneficio.
-      expect(find.text('PLAN 1'), findsOneWidget);
+      expect(find.text('PLUS'), findsOneWidget);
       expect(find.text('12.000'), findsOneWidget);
       expect(find.text('/month'), findsOneWidget);
       expect(find.text('/mes'), findsNothing);
@@ -800,7 +800,7 @@ void main() {
         (tester) async {
       await abrirEn(tester, SubscriptionTier.plan2);
 
-      expect(find.text('PLAN 3'), findsOneWidget);
+      expect(find.text('MAX'), findsOneWidget);
       expect(find.text('Unlimited students'), findsOneWidget);
       expect(find.textContaining('null'), findsNothing);
     });
@@ -811,7 +811,7 @@ void main() {
       await abrirEn(tester, SubscriptionTier.plan3);
 
       expect(
-        find.text('Your Plan 3 plan includes unlimited students.'),
+        find.text('Your Max plan includes unlimited students.'),
         findsOneWidget,
       );
       expect(find.text('CUSTOM PLAN'), findsOneWidget);
@@ -852,7 +852,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('YOUR PLAN: PLAN 1'), findsOneWidget);
+      expect(find.text('YOUR PLAN: PLUS'), findsOneWidget);
       expect(
         find.text(
           "It isn't active. Meanwhile, your account has the Free plan "
@@ -972,7 +972,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+      expect(find.text('PASATE A PLUS'), findsOneWidget);
       expect(find.text('/mes'), findsOneWidget);
       expect(find.text('VER PLANES'), findsOneWidget);
       expect(find.text('Ahora no'), findsOneWidget);
