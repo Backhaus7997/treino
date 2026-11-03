@@ -22,6 +22,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:treino/features/home/home_screen.dart';
 
 import 'support/e2e_helpers.dart';
+import 'support/emulator_admin.dart';
 import 'support/seed_ids.dart';
 
 // Las credenciales salen de `support/seed_ids.dart`, generado desde el seed.
@@ -37,15 +38,22 @@ void main() {
   testWidgets('login → home: verified athlete signs in and reaches /home',
       (tester) async {
     await ensureSignedOut(tester);
+    // Sin sesión activa, Inicio no abre "Entrenamiento en curso" encima.
+    await closeActiveSessionsOf(kMartin.uid);
     await pumpTreinoApp(tester);
 
-    // Anonymous boot resolves to the welcome gate.
+    // Anonymous boot resolves to the welcome gate. El texto sale del `.arb`
+    // (`authWelcomeSignIn`, "INICIAR SESIÓN"), no de un literal: con
+    // `'Iniciar sesión'` esta línea se puso roja el día que el copy pasó a
+    // mayúsculas, sin que el login tuviera nada roto.
     expect(
-      find.text('Iniciar sesión'),
+      find.text(l10nOf(tester).authWelcomeSignIn),
       findsWidgets,
       reason: 'anonymous user should land on /welcome',
     );
 
+    // `signInViaUi` también cierra el tour de onboarding: es una ruta opaca
+    // encima de Inicio y con él abierto `HomeScreen` queda offstage.
     await signInViaUi(tester, email: kMartin.email, password: kSeedPassword);
 
     // Landed on the home tab of the shell.
