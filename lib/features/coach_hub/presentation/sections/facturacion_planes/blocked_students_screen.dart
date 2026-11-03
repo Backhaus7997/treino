@@ -464,7 +464,7 @@ String _explanation({
       // leyendo una resta que no cierra.
       _BlockCause.planLimit => 'Tu plan ${tierName(tier)} incluye '
           '${cupoTexto(tier)} y tu cuenta superó ese cupo (un alumno pausado '
-          'cuenta mitad). Sobre estos $count pasás a solo lectura: los seguís '
+          'cuenta como medio alumno). Sobre estos $count pasás a solo lectura: los seguís '
           'viendo y podés chatear, pero no podés editarles rutinas ni '
           'notas.', // i18n: Fase W3
       // Sin causa demostrable no se inventa una. Se describe el ESTADO, que

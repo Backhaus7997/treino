@@ -138,7 +138,7 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('TREINO Coach · Plan 1'), findsOneWidget);
+    expect(find.text('TREINO Coach · Plus'), findsOneWidget);
     // 2×1.0 + 1×0.5 = 2.5, límite del Plan 1 = 7.
     expect(find.text('2.5 / 7'), findsOneWidget);
   });
@@ -381,7 +381,7 @@ void main() {
         findsOneWidget,
       );
       // El plan sigue siendo el que rige.
-      expect(find.text('TREINO Coach · Plan 1'), findsOneWidget);
+      expect(find.text('TREINO Coach · Plus'), findsOneWidget);
       expect(linkDeBaja, findsNothing);
       // Y la palabra vieja no volvió: la tab dice «dado de baja», como su link.
       expect(find.textContaining('Cancelado'), findsNothing);
@@ -463,7 +463,7 @@ void main() {
         await tester.pump();
 
         expect(find.text('TREINO Coach · Free'), findsOneWidget);
-        expect(find.text('TREINO Coach · Plan 1'), findsNothing);
+        expect(find.text('TREINO Coach · Plus'), findsNothing);
         // Tope de Free (2), no el 7 del doc: es el del plan que ya no rige.
         expect(find.text('1 / 2'), findsOneWidget);
         expect(find.textContaining('/ 7'), findsNothing);
@@ -502,7 +502,7 @@ void main() {
         await tester.pump();
 
         expect(find.text('TREINO Coach · Free'), findsOneWidget);
-        expect(find.text('TREINO Coach · Plan 3'), findsNothing);
+        expect(find.text('TREINO Coach · Max'), findsNothing);
         expect(find.text('1 / 2'), findsOneWidget);
         expect(find.textContaining('sin límite'), findsNothing);
       });
@@ -524,7 +524,7 @@ void main() {
         ));
         await tester.pump();
 
-        expect(find.text('TREINO Coach · Plan 1'), findsOneWidget);
+        expect(find.text('TREINO Coach · Plus'), findsOneWidget);
         expect(find.text('TREINO Coach · Free'), findsNothing);
         expect(find.text('1 / 9'), findsOneWidget);
         // Plan 1 no tiene tope de plantillas: la línea no aparece aunque el
@@ -542,7 +542,7 @@ void main() {
         ));
         await tester.pump();
 
-        expect(find.text('TREINO Coach · Plan 1'), findsOneWidget);
+        expect(find.text('TREINO Coach · Plus'), findsOneWidget);
         expect(find.text('1 / 9'), findsOneWidget);
       });
     });
@@ -564,7 +564,7 @@ void main() {
         expect(lineaDeBaja, findsNothing);
         // La card sigue con el tier del doc: sólo una BAJA vencida cambia el
         // plan que se muestra.
-        expect(find.text('TREINO Coach · Plan 1'), findsOneWidget);
+        expect(find.text('TREINO Coach · Plus'), findsOneWidget);
       });
     }
 

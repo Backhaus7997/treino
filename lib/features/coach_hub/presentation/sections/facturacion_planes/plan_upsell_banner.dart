@@ -16,9 +16,9 @@ import 'package:treino/features/coach/application/vigencia_del_plan_provider.dar
 /// de acá para que no se desincronice como pasó con los carteles duplicados.
 String tierLabel(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => 'Free', // i18n: Fase W3
-      SubscriptionTier.plan1 => 'Plan 1', // i18n: Fase W3
-      SubscriptionTier.plan2 => 'Plan 2', // i18n: Fase W3
-      SubscriptionTier.plan3 => 'Plan 3', // i18n: Fase W3
+      SubscriptionTier.plan1 => 'Plus', // i18n: Fase W3
+      SubscriptionTier.plan2 => 'Pro', // i18n: Fase W3
+      SubscriptionTier.plan3 => 'Max', // i18n: Fase W3
     };
 
 /// Etiqueta de plan para superficies angostas (subtítulo del sidebar), donde

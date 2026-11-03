@@ -335,9 +335,11 @@ class _AppointmentDetailDialogState
       // compite con la navegación.
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
+      // El pago nace `pending`: «Turno cobrado.» decía que la plata ya
+      // había entrado (E2E 1.3.0).
       showTreinoToastOn(
         messenger,
-        'Turno cobrado.', // i18n
+        'Cobro registrado: queda pendiente hasta que lo marques pagado.', // i18n
         type: TreinoToastType.success,
       );
     } on AppointmentAlreadyBilledException {

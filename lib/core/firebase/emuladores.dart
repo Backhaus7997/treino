@@ -12,6 +12,10 @@ const kUsaEmuladores = bool.fromEnvironment('USE_EMULATOR');
 /// [esUrlDeDescargaDelEmuladorDeStorage]: si cambia en uno, cambia en el otro.
 const kPuertoEmuladorStorage = 9199;
 
+/// Puerto del emulador de Firestore. Constante para que las suites de
+/// `integration_test/` (que le hablan por REST) no lo copien a mano.
+const kPuertoEmuladorFirestore = 8080;
+
 /// Pisa [kUsaEmuladores] SÓLO en tests, al estilo de
 /// `debugDefaultTargetPlatformOverride`. Quien lo setea lo vuelve a `null` en
 /// un `addTearDown`. En release no tiene efecto.
@@ -91,7 +95,8 @@ const kFunctionsRegion = 'southamerica-east1';
 /// Si un emulador no está levantado, ese servicio FALLA en local en vez de
 /// salir a producción. Es lo que tiene que pasar.
 Future<void> conectarEmuladores() async {
-  FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
+  FirebaseFirestore.instance
+      .useFirestoreEmulator('localhost', kPuertoEmuladorFirestore);
   await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
   FirebaseFunctions.instanceFor(region: kFunctionsRegion)
       .useFunctionsEmulator('localhost', 5001);

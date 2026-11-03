@@ -116,8 +116,8 @@ void main() {
     await pumpDesktop(tester);
 
     expect(find.text('FREE'), findsOneWidget);
-    expect(find.text('PLAN 1'), findsOneWidget);
-    expect(find.text('PLAN 2'), findsOneWidget);
+    expect(find.text('PLUS'), findsOneWidget);
+    expect(find.text('PRO'), findsOneWidget);
     // Números de alumnos destacados por card.
     expect(find.text('2'), findsOneWidget);
     expect(find.text('3-7'), findsOneWidget);
@@ -335,9 +335,9 @@ void main() {
       final esperado = SubscriptionTier.values
           .map((t) => switch (t) {
                 SubscriptionTier.free => 'FREE',
-                SubscriptionTier.plan1 => 'PLAN 1',
-                SubscriptionTier.plan2 => 'PLAN 2',
-                SubscriptionTier.plan3 => 'PLAN 3',
+                SubscriptionTier.plan1 => 'PLUS',
+                SubscriptionTier.plan2 => 'PRO',
+                SubscriptionTier.plan3 => 'MAX',
               })
           .toList();
 
@@ -410,7 +410,7 @@ void main() {
         (tester) async {
       await pumpMobile(tester);
 
-      expect(find.text('PLAN 3'), findsOneWidget);
+      expect(find.text('MAX'), findsOneWidget);
       expect(find.text('+15'), findsOneWidget);
       expect(find.text('39.000'), findsOneWidget);
 
@@ -1605,7 +1605,7 @@ void main() {
 
 String _nombreDeTier(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => 'FREE',
-      SubscriptionTier.plan1 => 'PLAN 1',
-      SubscriptionTier.plan2 => 'PLAN 2',
-      SubscriptionTier.plan3 => 'PLAN 3',
+      SubscriptionTier.plan1 => 'PLUS',
+      SubscriptionTier.plan2 => 'PRO',
+      SubscriptionTier.plan3 => 'MAX',
     };

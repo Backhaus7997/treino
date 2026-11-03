@@ -120,7 +120,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(_planText(tester), 'Coach · Plan 2');
+      expect(_planText(tester), 'Coach · Plan Pro');
     });
 
     testWidgets('un tope que ningún plan tiene → «Coach» sin plan inventado',

@@ -422,7 +422,7 @@ void main() {
         expect(find.byType(MobileBanner), findsNothing);
         expect(find.byType(CoachHubSidebar), findsNothing);
         expect(find.byType(PricingScreen), findsOneWidget);
-        expect(find.text('PLAN 1'), findsOneWidget);
+        expect(find.text('PLUS'), findsOneWidget);
       },
     );
 

@@ -5004,17 +5004,26 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
             onAddSuperset: widget.onAddSuperset,
           ),
           // Los atajos del ⋮ no los descubría nadie: el menú no se ve
-          // hasta que se toca.
+          // hasta que se toca. El ícono va dibujado, no escrito: la Barlow
+          // no tiene el glifo ⋮ y lo pintaba como «:» (E2E 1.3.0).
           if (_slotsVisibles.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.s8),
-            Text(
-              l10n.routineEditorSlotMenuHint,
+            Row(
               key: const Key('slot_menu_hint'),
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w400,
-                fontSize: 11,
-                color: palette.textFaint,
-              ),
+              children: [
+                Icon(TreinoIcon.dotsThree, size: 14, color: palette.textFaint),
+                const SizedBox(width: AppSpacing.hairline),
+                Expanded(
+                  child: Text(
+                    l10n.routineEditorSlotMenuHint,
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 11,
+                      color: palette.textFaint,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
