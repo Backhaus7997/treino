@@ -60,9 +60,9 @@ plan anual equivale a diez meses.
 | Plan | Alumnos | Ejercicios propios | Plantillas | Por mes | Por año |
 |---|---|---|---|---|---|
 | Gratuito | 2 | 20 | 3 | — | — |
-| Plan 1 | 7 | 60 | Sin límite | $12.000 | $120.000 |
-| Plan 2 | 15 | 120 | Sin límite | $22.000 | $220.000 |
-| Plan 3 | Sin límite | Sin límite | Sin límite | $39.000 | $390.000 |
+| Plus | 7 | 60 | Sin límite | $12.000 | $120.000 |
+| Pro | 15 | 120 | Sin límite | $22.000 | $220.000 |
+| Max | Sin límite | Sin límite | Sin límite | $39.000 | $390.000 |
 
 Un alumno **pausado ocupa media plaza** y uno activo una entera. El detalle está
 en la sección 8.2 de los Términos para Entrenadores.
