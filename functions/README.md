@@ -8,9 +8,10 @@ Firebase Cloud Functions for the TREINO app — Node.js 20 + TypeScript 5.
 > there is no separate cloud dev environment. Real users live there. The
 > `firebase deploy` under [Deploying](#deploying) publishes to them.
 >
-> **A bare `firebase deploy`, with no `--project`, goes there too.**
-> `.firebaserc` declares `"default": "treino-dev"` and the CLI fills it in
-> silently, so nothing on the command line warns you. Run `firebase use`
+> **A bare `firebase deploy`, with no `--project`, no longer goes there** (#840):
+> `.firebaserc` declares `"default": "demo-treino"`, so the command fails. That
+> protection is fragile: a `firebase use` pin on this directory or any parent
+> beats the default, silently. Pass `--project` explicitly, and run `firebase use`
 > (read-only) first to see which project you are actually pointed at.
 >
 > Emulators are the only disposable environment — everything under
