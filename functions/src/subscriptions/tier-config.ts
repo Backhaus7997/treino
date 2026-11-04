@@ -6,7 +6,7 @@
  * `lib/features/coach/domain/subscription_tier.dart` (client shows N/limit;
  * server enforces).
  *
- * Fase 1 = three flat tiers. Free 2 · Plan 1 7 · Plan 2 15. The usage-based
+ * Fase 1 = three flat tiers. Free 2 · Plus 7 · Pro 15. The usage-based
  * 16+ tier is Fase 2 and lives nowhere yet.
  */
 
@@ -24,9 +24,9 @@ export type SubscriptionCycle = "monthly" | "annual";
  */
 export const TIER_LABELS: Record<SubscriptionTier, string> = {
   free: "Free",
-  plan1: "Plan 1",
-  plan2: "Plan 2",
-  plan3: "Plan 3",
+  plan1: "Plus",
+  plan2: "Pro",
+  plan3: "Max",
 };
 
 /**
@@ -127,11 +127,11 @@ export const TIER_PDF_IMPORT_LIMITS: Record<
  * ACTrainers/EntrenadorPro (producto más completo), debajo de Fibrit
  * (outlier). El anual da 2 meses gratis (~17% off): `monthly × 10`.
  *
- *   Plan 1 (3-7 alumnos):   $12.000/mes · $120.000/año
- *   Plan 2 (8-15 alumnos):  $22.000/mes · $220.000/año
- *   Plan 3 (ilimitado):     $39.000/mes · $390.000/año
+ *   Plus (3-7 alumnos):   $12.000/mes · $120.000/año
+ *   Pro (8-15 alumnos):  $22.000/mes · $220.000/año
+ *   Max (ilimitado):     $39.000/mes · $390.000/año
  *
- * Plan 3 mantiene el ritmo de la escalera: el salto plan1→plan2 es 1,83x y
+ * Max mantiene el ritmo de la escalera: el salto plan1→plan2 es 1,83x y
  * plan2→plan3 es 1,77x. Se equilibra contra plan2 alrededor de los 27 alumnos.
  * NOTA: el diseño original preveia un tier USAGE-BASED para 16+ ("Fase 2");
  * se opto por ilimitado plano por simplicidad, con la idea de revisarlo cuando

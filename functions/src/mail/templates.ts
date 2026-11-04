@@ -707,7 +707,7 @@ export function cupoLabel(limit: number | null): string {
 
 /**
  * Un plan del PF como card: el nombre, lo que trae (`detalle`) y, si es pago,
- * el precio por mes. En texto plano: «Plan 1 · 7 alumnos · $ 12.000 por mes».
+ * el precio por mes. En texto plano: «Plus · 7 alumnos · $ 12.000 por mes».
  * El Free no lleva precio, ni en la card ni en la línea.
  */
 function cardDePlanPf(tier: SubscriptionTier, detalle: string): PlanCard {
@@ -725,11 +725,11 @@ function cardDePlanPf(tier: SubscriptionTier, detalle: string): PlanCard {
 /**
  * Los planes del PF en el mail del código: una ficha por plan, SIN precio, con
  * el mismo lenguaje que las cards de la landing (/es/gym): el cupo de alumnos
- * como héroe y debajo ejercicios propios y plantillas. Plan 1 va destacado,
+ * como héroe y debajo ejercicios propios y plantillas. Plus va destacado,
  * como la «recomendada» de la pantalla de planes.
  *
  * Todo sale de `tier-config.ts`, en el orden de `TIER_LABELS` (de Free a
- * Plan 3). El precio no va: se ve en el checkout al que lleva VER LOS PLANES, y
+ * Max). El precio no va: se ve en el checkout al que lleva VER LOS PLANES, y
  * un monto escrito acá es un monto más que mantener de memoria.
  */
 function planesDelPf(): Block[] {
@@ -814,7 +814,7 @@ function planesDelAlumno(): Block[] {
 
 /**
  * Los planes pagos con MÁS lugar que el tope que el PF acaba de chocar, como
- * cards. En texto plano: «Plan 2 · 15 alumnos · $ 22.000 por mes».
+ * cards. En texto plano: «Pro · 15 alumnos · $ 22.000 por mes».
  *
  * `limites` es el mapa de ESE tope (alumnos, ejercicios o plantillas, de
  * `tier-config.ts`) y `etiqueta` lo escribe: al que chocó ejercicios le sirve

@@ -64,7 +64,7 @@ import type { SubscriptionCycle } from "./tier-config";
  * No hay que recordarlo: el indice `BY_AMOUNT` tira al importar el modulo si
  * detecta la colision, y el deploy no arranca. Pero conviene saber por que
  * rompe. Valores prohibidos hoy: **2.200** (su anual seria 22.000, el mensual
- * del Plan 2) y **12.000**.
+ * del Pro del entrenador) y **12.000**.
  */
 export const ATHLETE_PRICE_MONTHLY_ARS = 3500;
 

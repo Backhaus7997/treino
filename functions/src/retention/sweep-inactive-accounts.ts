@@ -22,10 +22,11 @@
  * escrito por el cliente arrancaría el reloj el día del deploy y el primer
  * aviso legítimo saldría recién dentro de dos años.
  *
- * La contracara de esa historia es que **en la primera corrida real hay
- * backlog**: cuentas que ya pasaron los 24 meses y a las que el barrido les
- * mandaría el aviso todas juntas. Por eso `dryRun` y `maxPerRun` no son
- * adorno — ver el bloque de opciones.
+ * La contracara de esa historia es que **la primera corrida real podía
+ * encontrar backlog**: cuentas pasadas de 24 meses a las que el barrido les
+ * mandaría el aviso todas juntas. Por eso existen `dryRun` y `maxPerRun` — ver
+ * el bloque de opciones. Medido antes de encender, ese backlog era cero
+ * (`docs/legal/retencion-y-borrado.md` §8.1).
  *
  * ─── Por qué el orden de las guardas NO contradice al spec §4.5 ─────────────
  *
@@ -625,10 +626,10 @@ export async function sweepInactiveAccountsHandler(
 /**
  * El interruptor del barrido.
  *
- * Arranca en `true` y así se despliega: la primera corrida en producción NO
- * escribe nada, deja el conteo del backlog en el log, y se lee ANTES de
- * apagarlo (spec §4.6). Prenderlo de verdad es cambiar este valor a `false` y
- * redeployar — un cambio de una línea que alguien tiene que hacer a propósito.
+ * En `false`: el barrido está ENCENDIDO desde el 2026-09-17 (#1184). Se desplegó
+ * primero en `true`, sin escribir nada, para leer el conteo del backlog en el log
+ * antes de encenderlo (spec §4.6); dio cero. Detalle y medición en
+ * `docs/legal/retencion-y-borrado.md` §8.1.
  */
 export const RETENTION_SWEEP_DRY_RUN = false;
 
