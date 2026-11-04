@@ -12,12 +12,19 @@ planificación**, no una fuente de comandos aprobados.
 > los usuarios reales de la app: sus pagos, turnos, mediciones, chats y perfiles
 > comerciales publicados.
 >
-> **Un `firebase deploy` pelado, sin `--project`, también va ahí.** `.firebaserc`
-> declara `"default": "treino-dev"` y la CLI lo completa en silencio: el comando
-> no nombra al proyecto que está por tocar. Y `.firebaserc` no es uno solo — hay
-> una copia por worktree de agente más la de la raíz, más de veinte ahora mismo,
-> todas con el mismo default cargado. Que estés en un worktree aislado no te
-> aísla de producción: el filesystem está sandboxeado, Firebase no.
+> **Un `firebase deploy` pelado, sin `--project`, ya NO va ahí** (#840):
+> `.firebaserc` declara `"default": "demo-treino"` —prefijo `demo-`, proyecto
+> offline del emulador—, así que el comando falla en vez de resolver a
+> producción. (Hasta #840 el default era `treino-dev` y la CLI lo completaba en
+> silencio; esta nota lo decía todavía después de que cambió.) **Pero esa
+> protección es frágil y no cubre lo que importa:** un `firebase use` previo
+> —que guarda el pin en `~/.config/configstore/firebase-tools.json`, fuera del
+> repo, y se hereda de los directorios padre— le gana al default; y los
+> comandos de los checklists de acá **llevan `--project` explícito** (`prod` o
+> `treino-dev`), así que le pegan a producción igual: el default no los frena.
+> Que estés en un worktree aislado no te aísla de producción: el filesystem
+> está sandboxeado, Firebase no. Detalle:
+> [AGENTS.md § Entornos](../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando).
 
 ## Las tres reglas
 
@@ -36,7 +43,7 @@ planificación**, no una fuente de comandos aprobados.
 3. **Si igual va a producción, que el destino se vea**: escribí `--project prod`
    — alias del mismo project ID, definido en `.firebaserc`. No cambia a dónde va
    el comando; lo hace **visible** en pantalla y en el log, que es exactamente
-   lo que falta cuando el default resuelve solo.
+   lo que falta cuando el destino lo resuelve un pin ajeno.
 
 ## Qué es irreversible
 

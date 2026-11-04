@@ -11,7 +11,7 @@ Stack, estructura de carpetas, modelos y memoria persistente.
 - **Íconos**: `phosphor_flutter` (regular + fill)
 - **Modelos**: `freezed_annotation` + `json_annotation` + `build_runner` + `freezed` + `json_serializable`
 - **Lints**: `flutter_lints` 4 (`analysis_options.yaml` extiende `flutter.yaml`)
-- **Firebase**: `firebase_core` (init en Etapa 1 ✅). El resto se suma por etapas en Fase 1 (ver [roadmap.md](./roadmap.md)).
+- **Firebase**: `firebase_core`, `firebase_auth`, `cloud_firestore` y más (ver `pubspec.yaml`). Las etapas de Fase 1 ya cerraron (ver [roadmap.md](./roadmap.md)).
 - **MCP local**: Engram (memoria persistente, `engram mcp`)
 
 ## Estructura de carpetas
@@ -33,23 +33,30 @@ lib/
 │   ├── widgets/
 │   │   ├── treino_icon.dart     # wrapper semántico sobre Phosphor
 │   │   └── treino_bottom_bar.dart
-│   └── utils/
-└── features/
-    ├── home/        view: HomeScreen, state: <home_notifier>, data: <repository>
+│   └── utils/                   # (más: analytics, firebase, moderation, persistence, router, telemetry…)
+├── l10n/                        # ARBs + AppL10n generado
+└── features/                    # 23 features hoy: `eza -D lib/features`
+    ├── home/        application/ + widgets/ (feature chica, sin data/domain)
     ├── workout/     rutinas, player, ejercicios, historial
-    ├── feed/        amigos · comunidad · público
+    ├── feed/        seguidores · mi gym · público (+ Rankings)
     ├── coach/       PF discovery, chat, agenda, planes asignados
-    └── profile/     ajustes, paleta, gym, datos personales
+    ├── profile/     ajustes, paleta, gym, datos personales
+    └── …            auth, chat, checkins, coach_hub, gym_rankings, gyms, insights,
+                     measurements, moderation, notifications, onboarding, payments,
+                     paywall, performance, profile_setup, reviews, watch, app_update
 ```
 
 Por feature:
 
 ```
-features/<name>/
-├── view/         # widgets de pantalla y subcomponentes
-├── state/        # Notifiers / Providers de Riverpod
+features/<name>/                # layout de las grandes (feed, workout, coach, profile)
+├── presentation/ # pantallas y widgets
+├── application/  # Notifiers / Providers de Riverpod
+├── domain/       # modelos freezed y reglas de dominio
 └── data/         # Repositories (interface) + Impl Firestore
 ```
+
+Las features chicas no repiten las cuatro capas (p. ej. `home/` tiene `application/` y `widgets/`), y algunas pantallas raíz viven sueltas en la carpeta de la feature (`coach/coach_screen.dart`, `workout/workout_screen.dart`).
 
 ## Modelos
 

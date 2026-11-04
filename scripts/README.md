@@ -10,8 +10,11 @@ Admin SDK utilities operated by the team against `treino-dev`.
 > `lib/firebase_options.dart`, `android/app/google-services.json` and
 > `ios/Runner/GoogleService-Info.plist` all point at `treino-dev`).
 >
-> **39 of the 43 scripts** here write through the Admin SDK, which **bypasses
-> the Firestore security rules**. A mis-pointed `backfill_*` / `seed_*` /
+> **Most of the 54 scripts** here that initialise the Admin SDK write through
+> it, which **bypasses the Firestore security rules**. (54 =
+> `rg -l 'inicializarAdmin\(' --max-depth 1 -g '*.js' -g '*.mjs' scripts/ | wc -l`;
+> there are 88 top-level js/mjs/sh/py files. The exact number of writers is not
+> counted: this file used to say "39 of 43" and that figure went stale.) A mis-pointed `backfill_*` / `seed_*` /
 > `cleanup_*` / `migrate_*` run destroys real user data.
 >
 > Firestore has a daily backup schedule with 28-day retention
@@ -20,10 +23,10 @@ Admin SDK utilities operated by the team against `treino-dev`.
 > between. **The schedule does not cover Cloud Storage or Auth users**: anything
 > a script does there is irreversible.
 >
-> The four that do **not** write are `audit_trainer_profiles.mjs`,
-> `audit_ranking_optin.js`, `build_catalog_proposal.js` and
-> `match_drive_videos_to_catalog.js` (the last two write only local files under
-> `docs/`). Assume "writes" for anything not on that list — but do not assume
+> Known not to write: `audit_trainer_profiles.mjs`, `audit_ranking_optin.js`,
+> `build_catalog_proposal.js` and `match_drive_videos_to_catalog.js` (the last
+> two write only local files under `docs/`), plus `medir_ejercicios_propios.js`
+> (its header says read-only). The list may be incomplete. Assume "writes" for anything not on that list — but do not assume
 > a script is dangerous just because it is here, either: a doc that cries wolf
 > stops being read, which is the failure mode this whole banner exists to fix.
 >
@@ -48,8 +51,10 @@ legible por cualquier proceso del usuario y alcanzable con
 `../../../scripts/sa-key.json` desde cualquiera de los ~27 worktrees de agente
 que corren en paralelo.
 
-**Los 44 scripts de `scripts/` pasan por dos archivos, y sólo por esos dos.**
-Antes eran 21 de 43 los que ramificaban en `FIRESTORE_EMULATOR_HOST` antes de
+**Los 54 scripts de primer nivel que usan el Admin SDK pasan por dos archivos,
+y sólo por esos dos** (cuenta: `rg -l 'inicializarAdmin\(' --max-depth 1 -g '*.js'
+-g '*.mjs' scripts/ | wc -l`; los otros 13 archivos js/mjs no inicializan el
+SDK). Antes eran 21 de 43 los que ramificaban en `FIRESTORE_EMULATOR_HOST` antes de
 cargar la clave; ahora ramifican **todos**, en un solo lugar (#834).
 
 
@@ -118,7 +123,7 @@ Verificá que quedó bien:
 stat -f '%Sp' "$TREINO_SA_KEY"   # tiene que decir -rw-------
 ```
 
-**Qué se rompe si NO hacés esto, y por qué está bien:** todo. Los 43 scripts
+**Qué se rompe si NO hacés esto, y por qué está bien:** todo. Los 54 scripts
 que tocan credenciales fallan cerrado hasta que exportes la variable — no hay
 default y no hay fallback a `scripts/sa-key.json`. Es el punto: mientras
 existiera un camino que funcionara sin migrar, nadie migraba, y la clave seguía
@@ -346,28 +351,34 @@ verificar la máquina entera:
 fd -HI 'sa-key.json|.*-firebase-adminsdk-.*\.json' ~ --exec stat -f '%Sp %N'
 ```
 
-> ⚠️ **The other 22 have no such branch** — they call `admin.initializeApp()`
-> straight away and go to production with whatever the service account points
-> at. (#826)
+> ⚠️ **Historical (pre-#834).** This used to read "the other 22 have no such
+> branch — they call `admin.initializeApp()` straight away". It no longer holds:
+> there is no top-level `initializeApp(` left in `scripts/*.js|mjs` outside a
+> comment (`rg -n 'initializeApp\(' --max-depth 1 -g '*.js' -g '*.mjs' scripts/`
+> returns one hit, a comment in `check_emulator_sin_produccion.js`). What did not
+> change: with a production key in `$TREINO_SA_KEY`, the script still writes to
+> production. (#826)
 >
-> **Do not settle this with grep.** A previous version of this file said "23
+> **Do not settle this with grep** (the lesson outlives the code it was about). A previous version of this file said "23
 > check" and told you to `grep -n FIRESTORE_EMULATOR_HOST scripts/<script>.js`
 > before running one. Both halves were wrong in the reassuring direction:
 > `seed_posts.js` and `seed_sessions.js` name the variable **only in their
 > usage docstring** and then call `admin.initializeApp()` bare. A grep hit
 > there looks exactly like a grep hit on a script that really branches. Read
-> the `initializeApp` call, not the file.
+> the `initializeApp` call, not the file. (Both scripts now go through `inicializarAdmin()`, which
+> rejects a credential path inside the repo; they still write to production
+> if given a production key without the emulator variable.)
 >
-> (Setting the variable still routes *Firestore* to the emulator in those two —
+> (Pre-#834: setting the variable still routes *Firestore* to the emulator in those two —
 > the Admin SDK reads it on its own. What is missing is the credential branch:
-> they demand a real `sa-key.json` anyway, and anything they touch outside
+> they demanded a real `sa-key.json` anyway, and anything they touch outside
 > Firestore is not redirected at all.)
 
 ### 🚨 The npm scripts — the shortest path to production in this repo
 
-`scripts/package.json` exposes six one-liners that write to production, and
-**none of them names the project on screen**: the Admin SDK resolves it from
-`GOOGLE_APPLICATION_CREDENTIALS`.
+`scripts/package.json` exposes five one-liners that write to production, and
+**none of them names the project on screen**: the Admin SDK resolves it from the credential in
+`$TREINO_SA_KEY` or `GOOGLE_APPLICATION_CREDENTIALS`.
 
 | `npm run …` | Runs | Blast radius |
 |---|---|---|
@@ -379,16 +390,18 @@ fd -HI 'sa-key.json|.*-firebase-adminsdk-.*\.json' ~ --exec stat -f '%Sp %N'
 
 That `seed:emulator` and `seed:emulator:clear` carry
 `FIREBASE_AUTH_EMULATOR_HOST` + `FIRESTORE_EMULATOR_HOST` **inline** while the
-six above carry nothing reads like the bare ones are the safe default. It is
-the other way round: **the safe one is the exception.** To point any of the six
+five above carry nothing reads like the bare ones are the safe default. It is
+the other way round: **the safe one is the exception.** To point any of the five
 at the emulator you have to add the variables by hand.
 
-All six now print the production banner before their first write. The banner is
+Four of the five print the production banner before their first write
+(`seed:templates` prints none: it is dry-run by default and
+`rg bannerDeProduccion scripts/seed_templates.js` finds nothing). The banner is
 visibility, not a gate — exit codes are unchanged, and it stays quiet against
 the emulator and against any non-production project id.
 
-> `deploy_rules.js` is a **44th** write path that this "43" does not even
-> count: it never loads `firebase-admin`. See its own entry below.
+> `deploy_rules.js` is a write path that does not go through
+> `inicializarAdmin` at all: it never loads `firebase-admin`. See its own entry below.
 
 ---
 
