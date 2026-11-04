@@ -82,8 +82,8 @@ los hace un humano con OK explícito del dueño.
    está `{ "enabled": true, "allowlistUids": [<1 uid>] }`. Con `enabled: true`
    la allowlist se ignora, en la app (`pdfImportEnabledFor`) y en el servidor
    (`readConfig`): **hoy lo ven todos los PF**, no sólo esa cuenta. Para
-   apagarlo a todos no alcanza con vaciar la lista: hay que poner `enabled`
-   en `false`.
+   apagarlo a todos hacen falta **los dos cambios**: `enabled: false` y vaciar
+   `allowlistUids`. Con sólo el primero, las cuentas de la lista siguen pasando.
 7. **Evaluación con 10 a 20 PDFs reales** — **sin cerrar.** Los logs de
    producción registran **7** `parsePlanPdf: ok` con Gemini entre el 2026-10-27
    y el 2026-11-04, y ninguna entrada `ERROR` en esa revisión. Los del
