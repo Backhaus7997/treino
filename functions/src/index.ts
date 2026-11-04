@@ -10,10 +10,11 @@
  * ⚠️ TODO `firebase deploy` de este archivo va a PRODUCCIÓN (#826).
  * `treino-dev` es el único proyecto Firebase de TREINO — el nombre dice "dev"
  * por historia, adentro viven los usuarios reales. Un `firebase deploy` PELADO,
- * sin `--project`, también va ahí: `.firebaserc` declara `"default":
- * "treino-dev"` y la CLI lo completa en silencio, así que el comando no nombra
- * al proyecto que está por tocar. Los comandos de abajo llevan `--project prod`
- * (alias del mismo project ID) para que el destino se vea en pantalla.
+ * sin `--project`, resuelve al default de `.firebaserc`, que es `demo-treino`
+ * (#840): falla en vez de llegar a producción. La excepción es un `firebase use`
+ * en este directorio o en un ancestro, que le gana al default sin dejar rastro
+ * en el repo. Los comandos de abajo llevan `--project prod` (alias de
+ * `treino-dev`) porque es la única forma de apuntar a producción, y gana siempre.
  * Ver AGENTS.md § Entornos antes de deployar.
  */
 
@@ -146,9 +147,9 @@ export { bajaDeCorreosPromocionales } from "./mail/baja-de-promocionales";
 // Las REGLAS PRIMERO: `mail_queue` esta cerrada en los cuatro verbos y conviene
 // que esa proteccion este arriba antes de que la coleccion empiece a existir.
 //
-// El `--project prod` no cambia el destino respecto del comando pelado — lo
-// hace VISIBLE. `prod` y `treino-dev` son el mismo project ID; sin la flag,
-// `.firebaserc` resuelve al mismo lugar sin que aparezca en pantalla. Ademas,
+// El `--project prod` es el que elige el destino: `prod` es alias de
+// `treino-dev`, y sin la flag `.firebaserc` resuelve a `demo-treino` (#840), que
+// no llega a produccion. Ademas,
 // un `--only functions` sin filtros PODA del set desplegado toda funcion
 // ausente de este archivo.
 export { requestPasswordReset, requestEmailVerification } from "./auth/request-auth-email";
@@ -245,11 +246,11 @@ export {
 // Baja automatica de cuentas inactivas: aviso a los 24 meses, baja a los 36
 // (decision del titular del 2026-09-14, `docs/legal/retencion-y-borrado.md` §6).
 //
-// SE DESPLIEGA EN dryRun. La senal de actividad sale de los metadatos de
-// Firebase Auth, que YA TIENEN HISTORIA, asi que la primera corrida ve de una
-// todo el backlog de cuentas que ya pasaron los 24 meses. Encenderlo sin mirar
-// ese numero antes es mandar ese numero de mails de golpe. Ver
-// RETENTION_SWEEP_DRY_RUN en el modulo.
+// ENCENDIDO desde el 2026-09-17: RETENTION_SWEEP_DRY_RUN = false (#1184). Nacio
+// en dryRun porque la senal de actividad sale de los metadatos de Firebase Auth,
+// que YA TIENEN HISTORIA, y la primera corrida podia encontrar un backlog entero
+// de cuentas pasadas de 24 meses. Se leyo antes de encender y el backlog era
+// cero: `docs/legal/retencion-y-borrado.md` §8.1.
 export { sweepInactiveAccounts } from "./retention/sweep-inactive-accounts";
 // Completa los borrados de cuenta que terminaron `partial` (#1353): 06:00 ART,
 // hasta 5 intentos, despues `failed` + log de error. Ver el modulo.
@@ -432,17 +433,16 @@ export { removeFollowEdgesOnBlock } from "./moderation/remove-follows-on-block";
 // Cuarentena de terminos vetados. El filtro del cliente
 // (`lib/core/moderation/`) es el que satisface la Guideline 1.2 de App Review
 // —el contenido no llega a postearse— pero se saltea con el SDK directo. Estos
-// siete triggers son la capa que no se puede evadir.
+// ocho triggers son la capa que no se puede evadir.
 //
 // `onDocumentWritten` y no `onDocumentCreated`: editar un post cambia su
 // texto, y un trigger solo-create deja abierta la puerta de crear algo limpio
 // y editarlo. Ver el encabezado de `moderation/quarantine-vetted-content.ts`.
 //
 // `quarantineRoutine` cubre `routines/{routineId}` (name, split, summary,
-// days[].name, days[].slots[].notes) y `quarantineTrainerProfileName` ya
-// cuarentena `trainerBio` ademas del `displayName` — no tienen export propio
-// distinto porque no son triggers nuevos, son el mismo `trainerPublicProfiles`
-// de siempre con un campo mas.
+// days[].name, days[].slots[].notes). `quarantineTrainerProfileName` cuarentena
+// `trainerBio` ademas del `displayName`: la bio no tiene export propio porque
+// no es un trigger nuevo, es el mismo `trainerPublicProfiles` con un campo mas.
 export {
   quarantineChatMessage,
   quarantineDisplayNameOnWrite,

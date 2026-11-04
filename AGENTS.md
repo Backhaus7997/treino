@@ -44,10 +44,11 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
 
     **Todos los demás** (`backfill_*`, `cleanup_*`, `restore_*`, `seed_*`,
     `import_*`, `migrate_*`) **no leen `.firebaserc` nunca**, y ahí el default
-    no protege nada: resuelven el proyecto por `sa-key.json` o por
-    `GOOGLE_APPLICATION_CREDENTIALS` / ADC. **Un backfill sin `--project` no
-    falla: `--project` ni siquiera existe como flag** (`backfill_gym_ids.js:102`
-    sólo parsea `--dry-run` y `--allow-prod`). Y su guard `assertDevProject()`
+    no protege nada: resuelven el proyecto por la credencial
+    (`$TREINO_SA_KEY` o `GOOGLE_APPLICATION_CREDENTIALS`, vía
+    `scripts/lib/admin.js`; antes de #834, `sa-key.json` o ADC). **Un backfill sin `--project` no
+    falla: `--project` ni siquiera existe como flag** (`parseArgs` de
+    `backfill_gym_ids.js` sólo parsea `--dry-run` y `--allow-prod`). Y su guard `assertDevProject()`
     **no protege**: testea `/dev/i` contra el project id, y `treino-dev`
     matchea — es exactamente el bug de #826.
 
@@ -64,12 +65,30 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     falso —`storage_target.js:60` es código— y encima subestimaba al propio
     #840: hacía creer que del lado de Node el default no cambia nada.)
 
-    **Ojo con "la barrera es `sa-key.json`": son DOS familias, no una.**
+    **Ojo con "la barrera es `sa-key.json`": ya no lo es.** Hasta #834 había
+    DOS familias (~20 scripts con `admin.credential.cert(require('./sa-key.json'))`
+    y 22 con `initializeApp()` sin `credential`, que tomaban
+    `GOOGLE_APPLICATION_CREDENTIALS` o las ADC de `gcloud`). Hoy los de primer nivel pasan por UNA puerta:
+    llaman `inicializarAdmin()` (`scripts/lib/admin.js`) y
+    la credencial sale de `$TREINO_SA_KEY` o `GOOGLE_APPLICATION_CREDENTIALS`;
+    una ruta adentro de un árbol de git se rechaza. **Los subdirectorios quedan
+    fuera de esa puerta:** `scripts/migrations/strip_appointment_reason.mjs` usa
+    `applicationDefault()` sin validar el árbol de git (escribe sólo con `--apply`,
+    ver su header), y los 7 de `scripts/capturas/` llaman a
+    `initializeApp({ projectId: 'treino-dev' })` y lo único que los frena es
+    `exigirSoloEmulador`. Medido (2026-11-04, en `scripts/`):
 
-    | familia | de dónde saca la credencial | qué la frena |
-    | --- | --- | --- |
-    | ~20 scripts (`backfill_athlete_counts`, `cleanup_*`, `restore_*`, `seed_measurements`, `audit_ranking_optin`, …) | `admin.credential.cert(require('./sa-key.json'))` | que exista `scripts/sa-key.json`. **Hoy NO existe** (`ls` → ausente; está gitignoreado). Fallan cerrado y avisan. |
-    | **22 scripts con `initializeApp()` SIN `credential`** | `GOOGLE_APPLICATION_CREDENTIALS` o las ADC de `gcloud` | **`sa-key.json` es irrelevante para éstos.** Que la variable de entorno esté seteada. |
+    ```bash
+    rg -l 'inicializarAdmin\(' --max-depth 1 -g '*.js' -g '*.mjs' scripts/ | wc -l   # 54
+    rg -n 'initializeApp\(' --max-depth 1 -g '*.js' -g '*.mjs' scripts/   # 1 hit: un comentario
+    ```
+
+    **Eso no volvió inocuo a ningún script:** `scripts/sa-key.json` no existe
+    (`ls` → ausente; gitignoreado) y no hace falta —la clave de producción está
+    fuera del repo, ver más abajo—, así que con `$TREINO_SA_KEY` seteada
+    cualquiera de los 54 que escribe, escribe en producción. Lo que sigue hasta
+    el comando de abajo es el estado **previo a #834**, conservado como historia
+    (y porque la enumeración de los † de Storage sigue valiendo).
 
     El criterio NO es `initializeApp()` **pelado**: es `initializeApp()` **sin
     `credential`**, que también incluye `initializeApp({ storageBucket: … })`.
@@ -83,7 +102,7 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     done
     ```
 
-    Los 22 que escriben, para que nadie tenga que adivinar:
+    Los 22 que escribían (previo a #834), para que nadie tenga que adivinar:
     `accept_pending_link`, `apply_catalog_video_fill`†, `apply_technique`,
     `backfill_exercise_aliases`, `backfill_exercise_equipment`,
     `backfill_exercise_videos`, `build_catalog_proposal`‡,
@@ -94,7 +113,7 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     `seed_posts`, `seed_sessions`, `seed_templates`, `seed_workout_catalog`,
     `upload_drive_exercise_videos`†, `upload_enriched_videos`†.
 
-    El comando devuelve 24: los otros dos son `seed_emulator_full` (se niega a
+    Ese comando devolvía 24 (hoy devuelve 1, y ese hit es un comentario): los otros dos son `seed_emulator_full` (se niega a
     correr sin emulador) y `audit_trainer_profiles` (sólo lee).
 
     **† = suben archivos a Firebase Storage** (#838). Para esos cuatro el
@@ -130,11 +149,11 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     **Y la credencial de producción está en la máquina.** Se movió del repo a
     `~/.config/treino/sa-key.json`, exportada como `$TREINO_SA_KEY` en
     `~/.zshrc`. Su `project_id` es **`treino-dev`**, o sea PRODUCCIÓN
-    (`firebase-adminsdk-fbsvc@treino-dev.iam.gserviceaccount.com`). Ningún
-    script del repo lee `$TREINO_SA_KEY`, así que la variable sola no dispara
-    nada — pero un `GOOGLE_APPLICATION_CREDENTIALS=$TREINO_SA_KEY node
-    scripts/seed_gyms.js`, que es literalmente lo que dice el header de varios
-    de esos archivos, **escribe en producción**.
+    (`firebase-adminsdk-fbsvc@treino-dev.iam.gserviceaccount.com`). Esta nota
+    decía que ningún script del repo leía `$TREINO_SA_KEY`; desde #834 es falso:
+    `scripts/lib/credenciales.js` la lee (`VAR_RUTA`). Con la variable
+    exportada, un `node scripts/seed_gyms.js` pelado **escribe en producción**
+    (y `GOOGLE_APPLICATION_CREDENTIALS=$TREINO_SA_KEY` también, igual que antes).
 
     **Las ADC de `gcloud` SÍ existen** —
     `~/.config/gcloud/application_default_credentials.json`, de la cuenta de
@@ -151,11 +170,13 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     `gcloud auth application-default print-access-token >/dev/null` para lo
     segundo.
 
-    **El consejo de "leé qué proyecto imprime en la primera línea" vale sólo
-    para la primera familia.** Los 22 del `initializeApp()` sin `credential` **no imprimen
-    ningún proyecto**: `rg 'projectId|project_id|PROJECT_ID'` da **0 hits**. Antes de correr cualquiera de ellos, mirá `echo
-    $GOOGLE_APPLICATION_CREDENTIALS` y el `project_id` de ese archivo — no hay
-    otra forma de saber a dónde van a escribir.
+    **El consejo de "leé qué proyecto imprime en la primera línea" no vale para
+    todos.** Pre-#834, los 22 del `initializeApp()` sin `credential` no imprimían
+    ningún proyecto. Hoy imprimen proyecto o cartel sólo los que lo piden
+    (`rg -l 'projectId|project_id|PROJECT_ID|proyectoDe' --max-depth 1 -g '*.js' -g '*.mjs' scripts/`
+    da 22 archivos de primer nivel, y no se verificó cuáles imprimen antes de escribir).
+    Antes de correr cualquiera, mirá `echo $TREINO_SA_KEY` /
+    `echo $GOOGLE_APPLICATION_CREDENTIALS` y el `project_id` de ese archivo.
   - Corolario 3: los comandos del **emulador** llevan `--project treino-dev`
     explícito, y no es contradictorio. `emulators:*` no sale a la red de los
     servicios emulados, y para ellos ese id es el *namespace* local donde
@@ -258,15 +279,15 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
   [scripts/README.md](./scripts/README.md).
 - Para desarrollo local **usá el emulador**, no el proyecto real:
   `./scripts/emulator.sh` + `flutter run --dart-define=USE_EMULATOR=true`.
-- **La credencial del Admin SDK no vive adentro del repo** (#834). Los 44
-  scripts de `scripts/` inicializan Firebase por `scripts/lib/admin.js` y por
+- **La credencial del Admin SDK no vive adentro del repo** (#834). Los 54
+  scripts de primer nivel que usan el Admin SDK inicializan Firebase por `scripts/lib/admin.js` y por
   ningún otro lado: la ruta sale de `$TREINO_SA_KEY` (o de
   `$GOOGLE_APPLICATION_CREDENTIALS`, con las mismas reglas) y cualquier ruta
   adentro de un árbol de git —el repo, un worktree, un repo de dotfiles— se
   rechaza antes de inicializar nada. Sin variable, fallan cerrado con la
   migración en el mensaje. Un script nuevo **de primer nivel** que se saltee la
   frontera lo frena `scripts/test/frontera.test.js`; los de subdirectorios
-  (`migrations/`) todavía no están cubiertos. Migración y detalle:
+  (`migrations/`, y `capturas/`, que tiene su propia compuerta de emulador) no están cubiertos. Migración y detalle:
   [scripts/README.md](./scripts/README.md#credenciales--la-frontera-834).
 - Backup: hay un schedule diario de Firestore con 28 días de retención
   (`firebase firestore:backups:schedules:list --project prod`).
@@ -300,7 +321,7 @@ Estas son las que más fácil se olvidan o más fácil rompen el producto. Si el
 
 - **TREINO** = nombre de la marca/app.
 - **Coach** = nombre del módulo y la pestaña de Personal Trainer. **No** decirle "TREINO" al tab.
-- **Entreno IA** = feature de IA generadora (NO usar "Coach IA").
+- **Entreno IA** = feature de IA generadora (NO usar "Coach IA"). Todavía no implementada (ver [docs/product.md](./docs/product.md)).
 - Las clases del dominio del PF mantienen prefijo `Trainer*` (`TrainerProfile`, etc.) porque describen al actor-persona.
 
 → Detalle en [docs/product.md](./docs/product.md).
@@ -594,5 +615,5 @@ flutter run
 ## Estado actual del roadmap
 
 - [x] **Fase 0** — Bootstrap + tema + 5 tabs.
-- [ ] **Fase 1** — Auth + Firebase + ProfileSetup (en curso, etapa 1 ✅).
-- [ ] Fases 2-6 → ver [docs/roadmap.md](./docs/roadmap.md).
+- [x] **Fases 1-6** — completas según [docs/roadmap.md](./docs/roadmap.md) (Auth + Firebase + ProfileSetup, Home, Feed, Workout++, Coach, producto-ready para beta). Esta sección decía «Fase 1 en curso, etapa 1 ✅» y quedó vieja.
+- [ ] **Fase 7** — Monetización + Lanzamiento, en curso (Mercado Pago ya implementado: `functions/src/subscriptions/mp/`; app en `1.3.0+61`, `pubspec.yaml`). Detalle y estado por fase en [docs/roadmap.md](./docs/roadmap.md).

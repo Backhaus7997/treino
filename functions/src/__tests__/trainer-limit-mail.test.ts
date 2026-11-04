@@ -1249,12 +1249,12 @@ describe("el texto", () => {
       // plan, no cuántos alumnos.
       const desdeFree = render(20).text;
       expect(desdeFree).toContain("Si necesitás más lugar, estos planes tienen más:");
-      expect(desdeFree).toMatch(/Plan 1 · 60 ejercicios propios · \$\s?12\.000 por mes/);
-      expect(desdeFree).toContain("Plan 3 · ejercicios propios sin límite");
+      expect(desdeFree).toMatch(/Plus · 60 ejercicios propios · \$\s?12\.000 por mes/);
+      expect(desdeFree).toContain("Max · ejercicios propios sin límite");
 
       const desdePlan1 = render(60).text;
-      expect(desdePlan1).not.toContain("Plan 1 ·");
-      expect(desdePlan1).toContain("Plan 2 · 120 ejercicios propios");
+      expect(desdePlan1).not.toContain("Plus ·");
+      expect(desdePlan1).toContain("Pro · 120 ejercicios propios");
     });
   });
 
@@ -1306,8 +1306,8 @@ describe("el texto", () => {
     it("lista los planes con más plantillas: hoy, los tres pagos sin límite", () => {
       const { text } = render(3);
       expect(text).toContain("Si necesitás más lugar, estos planes tienen más:");
-      expect(text).toMatch(/Plan 1 · plantillas sin límite · \$\s?12\.000 por mes/);
-      expect(text).toContain("Plan 3 · plantillas sin límite");
+      expect(text).toMatch(/Plus · plantillas sin límite · \$\s?12\.000 por mes/);
+      expect(text).toContain("Max · plantillas sin límite");
     });
   });
 
@@ -1352,18 +1352,18 @@ describe("el texto", () => {
     });
 
     it("lista sólo los planes con MÁS alumnos que el suyo", () => {
-      // Con 7 (Plan 1), ofrecerle el Plan 1 es mandarlo a elegir lo que ya tiene.
+      // Con 7 (Plus), ofrecerle el Plus es mandarlo a elegir lo que ya tiene.
       const { text } = render(7);
       expect(text).toContain("Si querés seguir sumando, estos planes tienen más lugar:");
-      expect(text).not.toContain("Plan 1 ·");
-      expect(text).toMatch(/Plan 2 · 15 alumnos · \$\s?22\.000 por mes/);
-      expect(text).toContain("Plan 3 · alumnos sin límite");
+      expect(text).not.toContain("Plus ·");
+      expect(text).toMatch(/Pro · 15 alumnos · \$\s?22\.000 por mes/);
+      expect(text).toContain("Max · alumnos sin límite");
     });
 
     it("sin el dato del tope ofrece todos los pagos", () => {
       const { text } = renderMail("student-limit-reached", { ctaUrl: trainerWebCheckout() });
-      expect(text).toContain("Plan 1 ·");
-      expect(text).toContain("Plan 3 ·");
+      expect(text).toContain("Plus ·");
+      expect(text).toContain("Max ·");
     });
 
     it("⚠️ con el plan sin tope no ofrece «más lugar»: vuelve a la frase de siempre", () => {

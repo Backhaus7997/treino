@@ -1,6 +1,14 @@
 # Paywall del alumno suelto — spec
 
-> Estado: **propuesta, sin código**. Depende de la telemetría de forma de rutina
+> Estado (actualizado 2026-11-04): **el paywall está en el código.** El flag del
+> cliente `kAthletePaywallEnabled` es `true`
+> (`lib/features/paywall/domain/athlete_entitlement.dart`) y el interruptor del
+> servidor `ATHLETE_PAYWALL_ENFORCEMENT_ENABLED` también
+> (`functions/src/subscriptions/athlete-paywall-enforced.ts`); `storage.rules`
+> ya lee `athletePaywallEnforced`. Lo que sigue es la **spec original**
+> (2026-09-03), escrita como propuesta: no se contrastó sección por sección con
+> lo construido, así que cifras, topes y la sección 9 pueden no coincidir con el
+> código. Texto original del estado: *propuesta, sin código*. Depende de la telemetría de forma de rutina
 > (`routine_created`, `routine_day_added`, `routine_week_added`), ya mergeada en
 > `main` en [#943](https://github.com/Backhaus7997/treino/pull/943). No se
 > construye hasta que esos eventos hayan corrido en producción el tiempo

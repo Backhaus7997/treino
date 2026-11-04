@@ -1215,7 +1215,7 @@ describe("código de verificación del mail", () => {
 
   it.each(AMBOS)("⚠️ %s con los planes: el código va DESPUÉS de los planes, y en grande", (kind) => {
     const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
-    const ultimoPlan = kind === "email-code-trainer" ? "Plan 3 ·" : "TREINO Pro ·";
+    const ultimoPlan = kind === "email-code-trainer" ? "Max ·" : "TREINO Pro ·";
 
     expect(out.text.indexOf(ultimoPlan)).toBeGreaterThan(-1);
     expect(out.text.indexOf(CODIGO)).toBeGreaterThan(out.text.indexOf(ultimoPlan));
@@ -1227,9 +1227,9 @@ describe("código de verificación del mail", () => {
     const { text } = renderMail("email-code-trainer", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
 
     expect(text).toContain("Free · Gratis");
-    expect(text).toContain("Plan 1 · Hasta 7 alumnos · Ejercicios propios: 60 · Plantillas: Sin tope");
-    expect(text).toContain("Plan 2 · Hasta 15 alumnos · Ejercicios propios: 120 · Plantillas: Sin tope");
-    expect(text).toContain("Plan 3 · Alumnos sin tope · Ejercicios propios: Sin tope");
+    expect(text).toContain("Plus · Hasta 7 alumnos · Ejercicios propios: 60 · Plantillas: Sin tope");
+    expect(text).toContain("Pro · Hasta 15 alumnos · Ejercicios propios: 120 · Plantillas: Sin tope");
+    expect(text).toContain("Max · Alumnos sin tope · Ejercicios propios: Sin tope");
     expect(text).not.toMatch(/\$\s?\d/);
   });
 
@@ -1241,7 +1241,7 @@ describe("código de verificación del mail", () => {
     expect(text).toContain("hasta 10 rutinas propias");
     expect(text).not.toMatch(/\$\s?\d/);
     // El alumno no ve los planes del PF.
-    expect(text).not.toContain("Plan 1");
+    expect(text).not.toContain("Plus");
   });
 
   // Que los números de arriba coincidan con la config de HOY no prueba que el
@@ -1274,7 +1274,7 @@ describe("código de verificación del mail", () => {
     jest.dontMock("../subscriptions/athlete-plan-config");
 
     expect(pf).toContain("Free · Gratis · Hasta 3 alumnos activos · cada alumno pausado cuenta 0,5 · Ejercicios propios: 21 · Plantillas: 4");
-    expect(pf).toContain("Plan 1 · Hasta 8 alumnos · Ejercicios propios: 61 · Plantillas: Sin tope");
+    expect(pf).toContain("Plus · Hasta 8 alumnos · Ejercicios propios: 61 · Plantillas: Sin tope");
     expect(alumno).toContain("rutinas de hasta 5 días; hasta 12 semanas");
     expect(alumno).toContain("hasta 8 rutinas propias");
     expect(alumno).not.toMatch(/\$\s?\d/);
@@ -1585,7 +1585,7 @@ describe("pie de baja de los correos promocionales", () => {
     it("sin opciones (o con `comercial: true`) sigue llevando el bloque entero", () => {
       for (const { html, text } of [render(), render({ comercial: true })]) {
         expect(text).toContain("Si querés seguir sumando, estos planes tienen más lugar:");
-        expect(text).toMatch(/Plan 1 · 7 alumnos · \$\s?12\.000 por mes/);
+        expect(text).toMatch(/Plus · 7 alumnos · \$\s?12\.000 por mes/);
         expect(html).toContain("VER LOS PLANES");
         expect(ctaHref(html)).toBe(CTA);
         expect(text).toContain(CTA);

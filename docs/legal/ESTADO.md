@@ -16,10 +16,12 @@ primarias, sin esperar al abogado. La edad mínima quedó en **13**, el age gate
 mergeó (#1162) y el barrido de retención se encendió el 17/09 después de medir
 que no hay backlog. **El único marcador que queda es el INPI.**
 
-Lo que bloquea publicar hoy son **dos cosas de código, una de la landing y dos de
-trámite**: el filtrado de términos vetados, la vista de revisión de reportes, las
-páginas legales de `gettreino.com`, la inscripción ante la AAIP y el registro de
-marca.
+Lo que bloquea publicar hoy son **una cosa de la landing, dos de trámite y dos de
+código construido pero sin verificar**: las páginas legales de `gettreino.com`, la
+inscripción ante la AAIP, el registro de marca, y el filtrado de términos vetados
+y la vista de revisión de reportes. *(Actualizado 2026-11-04: esos dos existen y
+están conectados en el código, pero falta verificar su cobertura y su despliegue;
+ver la tabla de §3 y §6.)*
 
 ⚠️ **El alcance se acotó a la Argentina el 17/09.** Con eso se cayeron el
 representante en la Unión Europea, el del Reino Unido y todo el paquete de
@@ -52,7 +54,7 @@ mockup de diseño.
 | D1 | **Titular** | BACKHAUSTIN S.A.S., sociedad constituida |
 | D2 | **Edad mínima** | **13 años** (2026-09-17; antes 16, antes 9), con consentimiento del representante legal para todo menor de 18 |
 | D3 | **Alcance** | **Mundial** |
-| D4 | **Cobro** | Mixto: entrenador por Mercado Pago en la web, atleta por compra integrada |
+| D4 | **Cobro** | ~~Mixto: entrenador por Mercado Pago en la web, atleta por compra integrada~~ **Vigente: Mercado Pago para los dos.** La compra integrada (RevenueCat) se desarmó (#1201, #1206): `create-athlete-preapproval.ts` cobra al alumno por Mercado Pago y `pubspec.yaml` ya no trae `purchases_flutter` ni `in_app_purchase` |
 | D5 | **Alumno ↔ PF** | TREINO **no intermedia** esa plata. Sólo registra la deuda |
 | D6 | **Reembolsos** | **10 días corridos**, el piso legal, para todo el mundo (2026-09-25; antes 14) |
 
@@ -150,7 +152,7 @@ y eso no desplaza la responsabilidad del servicio.
 
 Queda abierto, y **es tema del contador, no del abogado**: las tiendas liquidan
 a la persona mientras la sociedad factura. Con la suscripción del atleta ya
-cobrando por compra integrada, esa plata ya está entrando al CUIT equivocado.
+cobrando por compra integrada, esa plata ya está entrando al CUIT equivocado. *(Desactualizado: la compra integrada se desarmó, ver D4; si el alumno hoy paga por Mercado Pago, a qué CUIT entra esa plata es una pregunta para el contador que este documento no contesta.)*
 
 ---
 
@@ -255,8 +257,8 @@ Sin el fix, bloquear y reportar habrían fallado **siempre** con
 | 2 | ~~Política multi-jurisdicción~~ — bases legales por finalidad, transferencias, portabilidad, oposición, plazos de incidente | Redacción | **HECHO** el 2026-09-16 |
 | 3 | ~~Consentimiento parental **verificable**~~ | — | **NO HACE FALTA** con el piso en 13: COPPA alcanza a menores de 13. El consentimiento del representante **declarado** sí se pide, para todo menor de 18 |
 | 4 | ~~**Age gate en el alta**~~ — `bornAt` pasó a ser obligatorio y se pide en el paso 2 del alta; el router manda a `/birth-date` a las cuentas anteriores, y las reglas de Firestore validan el piso en `create` y en `update` | Desarrollo | **HECHO** — PR #1162, mergeado el 2026-09-17 |
-| 5 | **Filtrado de términos vetados** — cuarto requisito de la Guideline 1.2, el único que #1114 no cubre | Desarrollo | Pendiente |
-| 6 | **Vista de revisión de reportes** — ver la sección 6 | Desarrollo | Pendiente |
+| 5 | ~~**Filtrado de términos vetados**~~ — cuarto requisito de la Guideline 1.2, el único que #1114 no cubre | Desarrollo | **Construido en el código** (verificado 2026-11-04): `lib/core/moderation/moderation_filter.dart`, su espejo `functions/src/moderation/vetted_terms_filter.ts` y `quarantine-vetted-content.ts`. No se verificó que cubra todos los textos publicables ni que esté desplegado |
+| 6 | ~~**Vista de revisión de reportes**~~ — ver la sección 6 | Desarrollo | **Construida en el código** (verificado 2026-11-04): `functions/src/moderation/report-review.ts` (`listPendingReports`, colección aparte `report_reviews`) y la sección Moderación del Coach Hub (`lib/features/coach_hub/presentation/sections/moderacion/`). No se verificó que esté desplegada ni que se cumplan las 24 horas |
 | 7 | **Páginas legales en la landing** — con los marcadores cerrados ya no hay documento bloqueado por texto | Desarrollo | Especificado |
 | 8 | ~~**Encender el barrido de retención**~~ | Titular | **HECHO** el 2026-09-17. El backlog se midió por dos caminos independientes y dio **cero**: a la cuenta más inactiva le faltan 601 días para el umbral de aviso. Ver §8.1 de `retencion-y-borrado.md` |
 | 9 | ~~Representante en la Unión Europea y en el Reino Unido~~ | Titular | **FUERA DE ALCANCE** desde el 17/09, con el lanzamiento acotado a la Argentina. El art. 27 del RGPD los exige y las excepciones del 27(2) no aplican —el tratamiento de datos de salud es continuo y a gran escala—, así que **son obligatorios el día que se abra la Unión Europea**, y hay que publicar su identidad y contacto en la política |
@@ -291,9 +293,12 @@ En las Normas de Comunidad quedó escrito:
 
 > *«Nos comprometemos a revisar todo reporte dentro de las 24 horas.»*
 
-**No hay dónde verlos.** Los reportes entran a Firestore con el `read` cerrado a
-todo cliente —que está bien, un denunciante que lee reportes ajenos es un canal
-de acoso nuevo— pero nadie construyó la vista de revisión.
+**Cuando esto se escribió (2026-09-17) no había dónde verlos.** Los reportes
+entran a Firestore con el `read` cerrado a todo cliente —que está bien, un
+denunciante que lee reportes ajenos es un canal de acoso nuevo—. La vista de
+revisión hoy existe en el código (Coach Hub, sección Moderación, y
+`report-review.ts` del lado del servidor); falta confirmar que esté desplegada y
+que alguien la mire dentro de las 24 horas.
 
 Eso hay que resolverlo **antes** de publicar esas Normas, no después. No es una
 feature que falta: es una afirmación falsa en un documento que estás por
