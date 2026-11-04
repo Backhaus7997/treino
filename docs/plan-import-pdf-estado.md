@@ -1,23 +1,23 @@
 # Import de plan desde PDF — estado y traspaso
 
-> Foto al **2026-10-27**. Para quien retome la feature. La spec (contrato,
+> Foto al **2026-11-04**. Para quien retome la feature. La spec (contrato,
 > cupos, matcheo, rollout y riesgos) vive en
 > [`plan-import-pdf.md`](./plan-import-pdf.md): este documento no la repite,
 > dice **qué está hecho, dónde está y qué falta**.
 
 ## En una línea
 
-El código está **completo y mergeado en `develop`**, con el flag **apagado**.
-**No está en `main`** (la 1.2.0+60 salió sin esto). El 2026-10-27 se desplegaron
-las reglas y `parsePlanPdf` y se creó el kill switch con un PF en la allowlist,
-pero el primer import real falló: **Claude en Vertex no tiene cuota** y Google
-denegó el pedido. El proveedor pasó a **Gemini en Vertex** (`gemini-4-argon`),
-que responde sin pedir nada. Falta desplegar ese cambio, ajustar la política de
-privacidad (nombra a Claude), evaluar con PDFs reales y el release.
+La feature está **prendida para todos los PF** (`enabled: true`, leído en
+producción el 2026-11-04; el documento se modificó ese día a las 13:05 UTC). El
+código está en `main` y en la build **1.3.0+61** (la 1.2.0+60 salió sin esto):
+con una versión anterior no se ve el botón en la app. `parsePlanPdf` corre con
+**Gemini en Vertex** (`gemini-4-argon`), porque Claude en Vertex no tiene cuota,
+y la política publicada ya lo nombra. Queda abierta la evaluación con PDFs
+reales: los logs muestran 7 imports correctos, no los 10 a 20 del plan.
 
 ## Qué está hecho
 
-Todo en `develop`, en este orden de merge:
+Todo en `main`, en este orden de merge:
 
 | PR | Qué trae |
 |---|---|
@@ -64,30 +64,39 @@ los hace un humano con OK explícito del dueño.
 2. ~~**IAM**~~ — hecho: `roles/aiplatform.user` a la service account de las
    functions. Sirve igual para Gemini.
 3. ~~**Org policy de structured outputs**~~ — hecha. Sólo la usa Claude.
-4. **Deploy** desde un worktree de `origin/develop` (el guard
-   `guard_fuente_de_deploy.js` exige que sea idéntico a develop). Reglas y
-   `parsePlanPdf` desplegados el 2026-10-27 desde `c31cb149`; **falta
-   redesplegar `parsePlanPdf`** con #1654 y el cambio a Gemini:
+4. ~~**Deploy**~~ — hecho. La revisión activa de `parsePlanPdf`
+   (`parseplanpdf-00002-xuh`) es del 2026-10-27 a las 16:09 UTC y sus logs
+   registran `gemini-4-argon`. Para volver a desplegar, desde un worktree de
+   `origin/develop` (el guard `guard_fuente_de_deploy.js` exige que sea idéntico
+   a develop):
    - `firebase deploy --only functions:parsePlanPdf --project prod`
      (el deploy de functions resuelve **todos** los secretos: si falla por un
      secret ajeno, no es de esta feature).
-5. **Política publicada ANTES de abrir a PF reales** (spec, *Rollout* paso 2).
-   La **v6** (2026-10-28) nombra «Google Cloud Vertex AI, con el modelo Gemini
-   de Google» en lugar de Claude / Anthropic. Falta que llegue a `main` (release)
-   y a la landing (el autosync de treino-app copia `web/legal/`) antes de cargar
-   en la allowlist a un PF que no sea del equipo. Si algún día se elige un
-   modelo `claude-*` por config, primero hay que volver a nombrar a Anthropic
-   en la política.
-6. ~~**Kill switch**~~ — creado el 2026-10-27:
-   `{ "enabled": false, "allowlistUids": [<uid del PF de Martín>] }`.
-7. **Evaluación con 10 a 20 PDFs reales** desde una cuenta de la allowlist,
-   con un build de `develop` (con `--dart-define-from-file=~/.config/treino/dart_defines.json`).
-   Qué medir: spec, *Rollout* paso 4.
+5. ~~**Política publicada ANTES de abrir a PF reales**~~ — hecho (spec, *Rollout*
+   paso 2). La **v6** (2026-10-28) nombra «Google Cloud Vertex AI, con el modelo
+   Gemini de Google»; verificado el 2026-11-04 en
+   `app.gettreino.com/legal/privacidad.html` y `gettreino.com/es/privacidad`. Si
+   algún día se elige un modelo `claude-*` por config, primero hay que volver a
+   nombrar a Anthropic en la política.
+6. ~~**Kill switch**~~ — creado el 2026-10-27 y prendido: desde el 2026-11-04
+   está `{ "enabled": true, "allowlistUids": [<1 uid>] }`. Con `enabled: true`
+   la allowlist se ignora, en la app (`pdfImportEnabledFor`) y en el servidor
+   (`readConfig`): **hoy lo ven todos los PF**, no sólo esa cuenta. Para
+   apagarlo a todos no alcanza con vaciar la lista: hay que poner `enabled`
+   en `false`.
+7. **Evaluación con 10 a 20 PDFs reales** — **sin cerrar.** Los logs de
+   producción registran **7** `parsePlanPdf: ok` con Gemini entre el 2026-10-27
+   y el 2026-11-04, y ninguna entrada `ERROR` en esa revisión. Los del
+   2026-11-04 tardaron 77 y 83 s. No se miró de qué cuentas ni con qué PDFs
+   vienen esos imports, ni la calidad de lo extraído. Qué medir: spec, *Rollout*
+   paso 4.
 8. **Elegir modelo:** si uno más barato alcanza con los mismos PDFs, cambiar
    el parámetro de config (sin redeploy; un modelo nuevo hay que sumarlo antes
-   a `SUPPORTED_MODELS`).
-9. **Release:** `develop` → `main` y build a las tiendas. Recién con la versión
-   publicada, `enabled: true`.
+   a `SUPPORTED_MODELS`). Hoy el documento no tiene `model`: usa el default.
+9. **Release:** el flag ya está prendido y el código está en la build
+   **1.3.0+61** (commit `5db0b68b` de `main`). Falta confirmar acá que esa
+   versión quedó publicada en las dos tiendas: hasta entonces, el botón sólo
+   existe para quien tenga esa build y para el Coach Hub web que incluya #1657.
 
 Checklist manual en el iPhone (de los PRs #1641 y #1643): botón sin salto de
 layout y oculto fuera de la allowlist; cupo coincide con `pdfImportUsage`; PDF
@@ -109,8 +118,8 @@ deshabilitado hasta resolver todo; modo claro/oscuro y texto grande.
   PDFs de prueba `gemini-4-argon` tardó **66–108 s**: ya está por encima, hay
   que mirarlo con los PDFs reales.
 - **Versión de la política de privacidad.** #1626 la dejó en v5; la sesión
-  verificó que no dispara banner ni re-consentimiento. La política tiene que
-  estar publicada en `main` y en la landing **antes** de encender.
+  verificó que no dispara banner ni re-consentimiento. Hoy va por la v6, ya
+  publicada (paso 5).
 - **Bug ajeno detectado en la exploración:** `addAlias` (aprendizaje de alias
   del import de **Excel** del Hub) tiene `enforceAppCheck: true` y la web
   nunca activa App Check, y el Hub se traga el error: las correcciones del PF
