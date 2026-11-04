@@ -45,12 +45,12 @@ function cards(html: string): Card[] {
 describe("planes del PF en el mail del código", () => {
   const { html, text } = renderMail("email-code-trainer", { codigo: "048213", showPlans: "1" }, PIE);
 
-  it("una card por plan, de Free a Plan 3, con su cupo de alumnos y SIN precio", () => {
+  it("una card por plan, de Free a Max, con su cupo de alumnos y SIN precio", () => {
     expect(cards(html).map((c) => [c.nombre, c.detalle])).toEqual([
       ["Free", "Gratis"],
-      ["Plan 1", "Hasta 7 alumnos"],
-      ["Plan 2", "Hasta 15 alumnos"],
-      ["Plan 3", "Alumnos sin tope"],
+      ["Plus", "Hasta 7 alumnos"],
+      ["Pro", "Hasta 15 alumnos"],
+      ["Max", "Alumnos sin tope"],
     ]);
   });
 
@@ -68,19 +68,19 @@ describe("planes del PF en el mail del código", () => {
     expect(html).toContain("Hasta 2 alumnos activos");
   });
 
-  it("Plan 1 va destacada con borde mint, como la recomendada de la pantalla de planes", () => {
+  it("Plus va destacada con borde mint, como la recomendada de la pantalla de planes", () => {
     const trozos = html.split("background:#1D2321").slice(1);
     expect(trozos.map((t) => t.includes("border:1.5px solid #2CE5A2"))).toEqual([false, true, false, false]);
   });
 
   it("en el HTML los planes ya no son párrafos", () => {
-    expect(html).not.toMatch(/<p[^>]*><strong[^>]*>Plan 1<\/strong>/);
+    expect(html).not.toMatch(/<p[^>]*><strong[^>]*>Plus<\/strong>/);
     expect(html).not.toMatch(/<p[^>]*><strong[^>]*>Free<\/strong>/);
   });
 
   it("el texto plano: una línea por plan, en minúscula dentro de la frase", () => {
     expect(text).toContain("Free · Gratis · Hasta 2 alumnos activos · cada alumno pausado cuenta 0,5 · Ejercicios propios: 20 · Plantillas: 3");
-    expect(text).toContain("Plan 3 · Alumnos sin tope · Ejercicios propios: Sin tope · Plantillas: Sin tope");
+    expect(text).toContain("Max · Alumnos sin tope · Ejercicios propios: Sin tope · Plantillas: Sin tope");
   });
 
   it("el código sigue después de los planes", () => {
@@ -107,7 +107,7 @@ describe("colores del mail del código", () => {
 
   it("entrenador: el nombre del plan va en morado y el héroe en verde", () => {
     const { html } = renderMail("email-code-trainer", { codigo: "048213", showPlans: "1" }, PIE);
-    for (const plan of ["Free", "Plan 1", "Plan 2", "Plan 3"]) {
+    for (const plan of ["Free", "Plus", "Pro", "Max"]) {
       expect(html).toContain(`color:#D457EC;">${plan}</div>`);
     }
     expect(html).toMatch(/color:#2CE5A2;">Hasta 15 alumnos<\/div>/);
@@ -150,16 +150,16 @@ describe("planes con más lugar en los mails de tope del PF", () => {
     const { html, text } = renderMail("template-limit-reached", { limit: 3 }, PIE);
 
     expect(cards(html).map((c) => [c.nombre, c.detalle])).toEqual([
-      ["Plan 1", "Plantillas sin límite"],
-      ["Plan 2", "Plantillas sin límite"],
-      ["Plan 3", "Plantillas sin límite"],
+      ["Plus", "Plantillas sin límite"],
+      ["Pro", "Plantillas sin límite"],
+      ["Max", "Plantillas sin límite"],
     ]);
-    expect(text).toMatch(/Plan 1 · plantillas sin límite · \$\s?12\.000 por mes/);
+    expect(text).toMatch(/Plus · plantillas sin límite · \$\s?12\.000 por mes/);
   });
 
   it("ejercicios: sólo los planes que traen más lugar que el tope que chocó", () => {
     const { html } = renderMail("exercise-limit-reached", { limit: 60 }, PIE);
-    expect(cards(html).map((c) => c.nombre)).toEqual(["Plan 2", "Plan 3"]);
+    expect(cards(html).map((c) => c.nombre)).toEqual(["Pro", "Max"]);
   });
 
   it("alumnos: las cards dicen el cupo de alumnos", () => {
