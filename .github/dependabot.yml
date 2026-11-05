@@ -35,6 +35,13 @@ updates:
       functions-minor-patch:
         patterns: ['*']
         update-types: [minor, patch]
+    # `@types/node` va con el runtime (`engines.node` y `nodejs22`): con tipos de
+    # un Node más nuevo, el código puede compilar usando APIs que en producción no
+    # existen, y el CI sale verde igual. Ignorar sólo la versión del PR no alcanza:
+    # cerrar la 26 (#1669) trajo la 25 (#1687). Se saca al migrar el runtime.
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
 
   # ---------------------------------------------------------------------------
   # Tooling local de seed (scripts/) — no corre en producción, pero comparte
