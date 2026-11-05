@@ -186,17 +186,20 @@ async function dropUnknownCandidates(db: Firestore, plan: PdfPlanExtraction): Pr
 }
 
 /**
- * ¿El fallo puede haber costado tokens? Si el proveedor ni llego a responder
- * (un HTTP de error o la red: `provider`, o la politica de Vertex:
- * `feature_disabled`) no se facturo nada. En cambio una salida invalida, una
- * truncada, un rechazo del modelo o un timeout ocurren con el modelo ya
- * generando, y esos tokens se pagan. Un error que no es de ningun tipo
- * conocido, tras llamar al modelo, se trata como facturable: es el lado seguro.
+ * ¿El fallo puede haber costado tokens? Solo NO cuesta lo que el proveedor
+ * rechazo con un HTTP de error (`status` presente: 429 de cuota, 403, 5xx) o la
+ * politica de Vertex (`feature_disabled`, tambien un HTTP 400): ahi no se llego
+ * a generar nada. Todo lo demas, tras llamar al modelo, se trata como
+ * facturable: una salida invalida, truncada, un rechazo o un timeout, y tambien
+ * un `provider` SIN `status` —un `finishReason` raro en una respuesta 200
+ * (`interpretGeminiResponse`) o un corte de red, donde el modelo pudo haber
+ * generado—. Ante la duda, facturable: es el lado seguro.
  */
 function isBilledFailure(e: unknown, llmCalled: boolean): boolean {
   if (!llmCalled) return false;
-  if (e instanceof ExtractorError && (e.kind === "provider" || e.kind === "feature_disabled")) {
-    return false;
+  if (e instanceof ExtractorError) {
+    if (e.kind === "feature_disabled") return false;
+    if (e.kind === "provider" && e.status !== undefined) return false;
   }
   return true;
 }

@@ -200,6 +200,12 @@ export async function refundQuota(
     const doc = snap.data() as UsageDoc;
     const update: Record<string, unknown> = {};
     if (opts.billed) {
+      // Un fallo del dia anterior que termina pasada la medianoche, con el
+      // contador del dia nuevo ya escrito: no se devuelve ni se pisa ese
+      // contador (si no, el dia nuevo recuperaria un tope que ya gasto). Las
+      // claves son `YYYY-MM-DD`, asi que comparar strings ordena por fecha.
+      const recordedDay = typeof doc.refundDayKey === "string" ? doc.refundDayKey : "";
+      if (recordedDay > keys.dayKey) return false;
       const refunded = countFor(doc, keys.dayKey, "refundDay");
       if (refunded >= MAX_BILLED_REFUNDS_PER_DAY) return false;
       update.refundDayKey = keys.dayKey;

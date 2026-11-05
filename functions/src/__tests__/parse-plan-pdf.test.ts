@@ -20,7 +20,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 
 import { parsePlanPdf, runParsePlanPdf, ParsePlanPdfDeps } from "../pdf-import/parse-plan-pdf";
 import { DEFAULT_MODEL, ExtractorError, ExtractRequest, PlanExtractor } from "../pdf-import/provider";
-import { quotaKeys, resetsAt } from "../pdf-import/quota";
+import { consumeQuota, quotaKeys, refundQuota, resetsAt } from "../pdf-import/quota";
 
 let app: App;
 const db = () => getFirestore(app);
@@ -449,6 +449,17 @@ describe("la devolucion de un fallo que ya gasto tokens tiene tope diario", () =
     expect(u?.refundDayCount).toBeUndefined();
   });
 
+  it("un `provider` SIN status (finishReason raro en un 200, o corte de red) es facturable: tiene tope", async () => {
+    // `interpretGeminiResponse` lo lanza cuando el modelo YA genero (finishReason
+    // OTHER con HTTP 200): se pago, no puede devolverse sin limite.
+    await seedTrainer();
+    const f = fakeExtractor(() => { throw new ExtractorError("provider", "Unexpected finishReason: OTHER."); });
+    for (let i = 0; i < 4; i++) await expectHttpsError(run(f), "internal");
+    expect(await usage()).toMatchObject({ weekCount: 2, dayCount: 2, refundDayKey: DAY, refundDayCount: 2 });
+    await expectHttpsError(run(f), "resource-exhausted");
+    expect(f.calls).toHaveLength(4);
+  });
+
   it("un fallo antes de llamar al modelo (catalogo caido) tampoco gasta el tope", async () => {
     await seedTrainer();
     const f = fakeExtractor(() => planWith([null]));
@@ -467,6 +478,22 @@ describe("la devolucion de un fallo que ya gasto tokens tiene tope diario", () =
     expect(await usage()).toMatchObject({
       weekCount: 1, dayCount: 1, refundDayKey: DAY, refundDayCount: 1,
     });
+  });
+
+  it("un fallo del dia anterior que termina pasada la medianoche no pisa el contador del dia nuevo", async () => {
+    await seedTrainer();
+    const manana = new Date(NOW.getTime() + 24 * 60 * 60 * 1000);
+    const viejo = await consumeQuota(db(), uid, "plan3", NOW);
+    const a = await consumeQuota(db(), uid, "plan3", manana);
+    const b = await consumeQuota(db(), uid, "plan3", manana);
+    expect(await refundQuota(db(), uid, a.keys, { billed: true })).toBe(true);
+    expect(await refundQuota(db(), uid, b.keys, { billed: true })).toBe(true);
+    // El del dia 1 termina tarde: no se devuelve y el contador del dia 2 queda como estaba.
+    expect(await refundQuota(db(), uid, viejo.keys, { billed: true })).toBe(false);
+    expect(await usage()).toMatchObject({ refundDayKey: "2026-10-23", refundDayCount: 2 });
+    // Y el tope del dia 2 sigue en pie.
+    const c = await consumeQuota(db(), uid, "plan3", manana);
+    expect(await refundQuota(db(), uid, c.keys, { billed: true })).toBe(false);
   });
 
   it("al dia siguiente el tope se renueva", async () => {
