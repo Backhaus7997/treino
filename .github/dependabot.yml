@@ -166,27 +166,28 @@ updates:
   # ---------------------------------------------------------------------------
   # pub.dev — las 61 dependencias de pubspec.yaml.
   #
-  # LEER ESTO ANTES DE CONFIAR EN EL BLOQUE: Dependabot hace VERSION updates
-  # para pub, pero NO security updates ni alertas. pub.dev no está en la GitHub
-  # Advisory Database, así que no existe un feed de CVEs de paquetes Dart que
-  # GitHub pueda mirar. En criollo: esto avisa "salió firebase_auth 5.4", no
-  # "firebase_auth 5.3 tiene una vulnerabilidad".
+  # LOS VERSION UPDATES DE PUB ESTÁN APAGADOS: `open-pull-requests-limit: 0`.
+  # Es la forma que documenta GitHub para apagar un package manager, y la única
+  # que encontramos que no depende de cómo resuelve Dependabot. Motivo, abajo.
   #
-  # O sea que el ecosistema Dart —la mayor parte del código de TREINO— NO tiene
-  # hoy escaneo de vulnerabilidades de dependencias, del mismo modo que no tiene
-  # SAST (CodeQL tampoco soporta Dart). Es un hueco conocido y sin herramienta
-  # gratuita que lo tape; queda anotado acá para que nadie lea "Dependabot para
-  # pub" y asuma cobertura que no existe.
+  # OJO, ESTO NO ES ESCANEO DE VULNERABILIDADES, y hoy tampoco hay otro. Este
+  # bloque decía que para pub no existían security updates ni alertas porque
+  # pub.dev no estaba en la GitHub Advisory Database. Era falso: la base tiene
+  # advisories de pub y GitHub lista security updates para pub. Lo que está
+  # apagado son las alertas de ESTE repo, y sin ellas no hay security updates:
   #
-  # Mensual y agrupado: un bump de Flutter/Firebase obliga a correr la suite
-  # entera (~13 min) y a probar en device. Semanal sería ruido puro.
+  #     gh api '/advisories?ecosystem=pub&per_page=3' --jq '.[].ghsa_id'
+  #     gh api repos/Backhaus7997/treino/vulnerability-alerts   # 404 = apagadas
+  #
+  # Medido el 2026-11-05. El límite de acá no toca security updates: tienen el
+  # suyo, fijo (ver "Dependabot options reference").
   - package-ecosystem: pub
     # A main sólo entra develop (docs/workflow.md): los bumps también.
     target-branch: develop
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     commit-message:
       prefix: chore
       include: scope
@@ -197,38 +198,55 @@ updates:
         patterns: ['*']
         update-types: [minor, patch]
 
-    # LOS MAJORS DE PUB NO SE PROPONEN. No es preferencia: el grupo de arriba
-    # NO alcanza para dejarlos afuera, y lo probamos caro.
+    # `groups` e `ignore` quedan para el día que se reactive, y NINGUNO DE LOS DOS
+    # FRENA LOS MAJORS DE PUB. Este comentario decía que `ignore` «corta antes».
+    # Es falso: con este `ignore` en main desde el #925 (2026-09-02), los ocho PRs
+    # agrupados siguientes trajeron majors directos (#930, #976, #1028, #1130,
+    # #1181, #1373, #1430 y #1667). El último, de un grupo "minor-patch":
     #
-    # El PR #903 se llamaba "bump the pub-minor-patch group con 23 updates" y
-    # traía TRECE majors de dependencias DIRECTAS de pubspec.yaml:
+    #     firebase_core ^3.6.0 -> ^5.1.0      cloud_firestore ^5.4.0 -> ^7.1.0
+    #     firebase_auth ^5.3.1 -> ^7.0.1      freezed         ^2.5.7 -> ^4.0.3
     #
-    #     firebase_core   ^3.6.0  -> ^4.14.0      cloud_firestore ^5.4.0 -> ^6.9.0
-    #     firebase_auth   ^5.3.1  -> ^6.6.1       cloud_functions ^5.2.0 -> ^6.4.0
-    #     file_picker     ^8.1.2  -> ^12.0.0-beta.7   <- ademas PRERELEASE
+    # POR QUÉ. Los dos filtros de versión miran SÓLO la dependencia que Dependabot
+    # está evaluando (la "líder"), comparando su `latest_version`. A los arrastrados
+    # sólo los revisa `group_dependency_selector.rb`, y ahí descarta únicamente lo
+    # ignorado del todo (`>= 0`), no por major. Leído en dependabot-core 450bd7af,
+    # el HEAD del 2026-11-05 (el código que abrió los PRs viejos puede diferir):
     #
-    # La sintaxis del grupo es correcta —con npm el mismo `update-types` sí deja
-    # los majors afuera, y por eso eslint 8->10 y firebase-admin 12->14 vinieron
-    # en PRs propios—. Lo que falla es el flujo agrupado de pub: el grupo filtra
-    # los CANDIDATOS por tipo, pero después la resolución conjunta (`multiBreaking`
-    # en dependabot-core/pub) puede cruzar majors en cualquier dependencia directa
-    # como efecto colateral de resolver el conjunto. Por el mismo agujero se coló
-    # el prerelease: la integración de pub dice que los ignora salvo que la
-    # versión actual ya sea prerelease, y `8.1.2` no lo es.
+    #   1. firebase_app_check 0.3.2 -> 0.5.1 pasa los dos: el `ignore` de major
+    #      sobre 0.3.2 es `>= 1.a`, y el grupo lo ve como minor.
+    #   2. 0.5.1 pide firebase_core ^5.1.0, así que soltar sólo a la líder no
+    #      resuelve (`requirements_to_unlock: :own`). Se reproduce:
+    #          flutter pub add firebase_app_check:0.5.1 --dry-run
+    #   3. Entonces pasa a `:all`: `updated_dependencies_after_full_unlock`
+    #      devuelve TODO el `multiBreaking` directo, sin `version_unless_ignored`
+    #      (pub/lib/dependabot/pub/update_checker.rb). Ahí entra firebase_core 5.
     #
-    # `ignore` sí se aplica como filtro de actualización y corta antes.
+    # La doc de GitHub no menciona este caso: "Dependabot supported ecosystems"
+    # sólo dice que pub no actualiza si la versión a la que apunta está ignorada,
+    # lo cual es cierto para la líder.
+    # Cómo entró freezed o el prerelease de file_picker no se trazó paquete por
+    # paquete; que el mecanismo sea éste es inferencia.
     #
-    # OJO CON EL PREFIJO, que es el detalle que hace perder una tarde: adentro de
-    # `groups` los valores van pelados (`minor`, `patch`) y adentro de `ignore`
-    # van con prefijo (`version-update:semver-major`). No son intercambiables.
+    # LO QUE NO ARREGLA (leído en el código, no ejecutado: requiere Docker):
+    #   - Sacar el grupo: `update_all_versions.rb` hace el mismo `:all`.
+    #   - `versioning-strategy: lockfile-only`: pub no lo implementa. Su
+    #     `resolve_requirements_update_strategy` hace `raise` con ese valor.
+    #   - `ignore` por paquete: sin `versions` ni `update-types` también descarta
+    #     al arrastrado, pero hay que listar a mano cada paquete, pierde sus
+    #     minors, y deja sin cubrir al próximo que aparezca.
     #
-    # QUÉ SE PIERDE: los majors de pub dejan de aparecer solos también, así que
-    # una migración de flutterfire hay que arrancarla a mano. Es lo que ya
-    # queríamos: acá arriba está escrito que para pub NO hay feed de CVEs
-    # —pub.dev no está en la GitHub Advisory Database—, o sea que un major de pub
-    # no trae urgencia de seguridad, y mover toda la familia Firebase obliga a
-    # correr la suite entera y a probar en device. Eso es trabajo planificado,
-    # no un PR para revisar un lunes a la mañana.
+    # QUÉ SE PIERDE: casi nada. De los 15 PRs de Dependabot que tocaron pubspec,
+    # 13 agrupados se cerraron sin mergear y sólo entraron dos sueltos, previos
+    # al `ignore` (#747 y #748, los dos majors). Los bumps de pub quedan a mano,
+    # con la suite entera y prueba en device.
+    #
+    # CUÁNDO REACTIVAR: si dependabot-core filtra los arrastrados por `ignore`.
+    # Hasta entonces, reactivar es volver a recibir estos PRs.
+    #
+    # OJO CON EL PREFIJO: adentro de `groups` los valores van pelados (`minor`,
+    # `patch`) y adentro de `ignore` van con prefijo
+    # (`version-update:semver-major`). No son intercambiables.
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
