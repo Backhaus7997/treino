@@ -17,7 +17,10 @@
  *   4. descuento del cupo en transaccion (`quota.ts`).
  *   5. el LLM, a traves de un `PlanExtractor` inyectable.
  *   6. validacion de la salida y de los candidatos contra el catalogo.
- *   Si 5 o 6 fallan es error NUESTRO: se devuelve el cupo.
+ *   Si 5 o 6 fallan es error NUESTRO: se devuelve el cupo. Si el modelo ya
+ *   habia empezado a generar (salida invalida, truncada, timeout) los tokens
+ *   se gastaron igual, asi que esa devolucion tiene tope diario (`quota.ts`,
+ *   "Por que la devolucion tiene tope").
  *
  * ─── App Check: NO ──────────────────────────────────────────────────────────
  *
@@ -57,7 +60,7 @@ import {
   SupportedModel,
   vertexPlanExtractor,
 } from "./provider";
-import { consumeQuota, QuotaSnapshot, refundQuota } from "./quota";
+import { consumeQuota, MAX_BILLED_REFUNDS_PER_DAY, QuotaSnapshot, refundQuota } from "./quota";
 
 export const PDF_IMPORT_CONFIG_DOC = "app_config/pdf_import";
 
@@ -182,6 +185,22 @@ async function dropUnknownCandidates(db: Firestore, plan: PdfPlanExtraction): Pr
   return dropped;
 }
 
+/**
+ * ¿El fallo puede haber costado tokens? Si el proveedor ni llego a responder
+ * (un HTTP de error o la red: `provider`, o la politica de Vertex:
+ * `feature_disabled`) no se facturo nada. En cambio una salida invalida, una
+ * truncada, un rechazo del modelo o un timeout ocurren con el modelo ya
+ * generando, y esos tokens se pagan. Un error que no es de ningun tipo
+ * conocido, tras llamar al modelo, se trata como facturable: es el lado seguro.
+ */
+function isBilledFailure(e: unknown, llmCalled: boolean): boolean {
+  if (!llmCalled) return false;
+  if (e instanceof ExtractorError && (e.kind === "provider" || e.kind === "feature_disabled")) {
+    return false;
+  }
+  return true;
+}
+
 export async function runParsePlanPdf(
   deps: ParsePlanPdfDeps,
   uid: string | undefined,
@@ -214,9 +233,13 @@ export async function runParsePlanPdf(
   const { keys, snapshot } = await consumeQuota(db, uid, tier, deps.now());
 
   // ── 5 y 6. LLM y validacion; si fallan, se devuelve el cupo ───────────────
+  // `llmCalled`: desde ahi un fallo puede haber costado tokens (ver
+  // `isBilledFailure`). Cargar el catalogo, antes, no gasta nada.
+  let llmCalled = false;
   try {
     const catalog = await deps.loadCatalog();
     const llmStartedAt = Date.now();
+    llmCalled = true;
     const result = await withDeadline(
       deps.extractor.extract({
         pdfBase64: data.pdfBase64 as string,
@@ -257,9 +280,21 @@ export async function runParsePlanPdf(
     // firebase-functions la pisa con su propio texto (en `error`, con el
     // stack), y el error real no llega a Cloud Logging. Tampoco un `Error`
     // crudo: se serializa sin `message` ni `stack` (no son enumerables).
-    await refundQuota(db, uid, keys).catch((refundErr) =>
-      logger.error("parsePlanPdf: no se pudo devolver el cupo", { uid, refundError: String(refundErr) }),
-    );
+    const billed = isBilledFailure(e, llmCalled);
+    const refunded = await refundQuota(db, uid, keys, { billed }).catch((refundErr) => {
+      logger.error("parsePlanPdf: no se pudo devolver el cupo", { uid, refundError: String(refundErr) });
+      return null;
+    });
+    if (billed && refunded === false) {
+      // El fallo ya gasto tokens y el tope diario de devoluciones se agoto: el
+      // cupo se queda descontado. Es la senal de alguien reintentando un PDF
+      // que rompe al modelo.
+      logger.warn("parsePlanPdf: devolucion de cupo agotada, el fallo conserva el cupo", {
+        uid,
+        tier,
+        maxRefundsPerDay: MAX_BILLED_REFUNDS_PER_DAY,
+      });
+    }
     if (e instanceof HttpsError) throw e;
     if (e instanceof ExtractorError) {
       logger.error("parsePlanPdf: fallo el LLM", {

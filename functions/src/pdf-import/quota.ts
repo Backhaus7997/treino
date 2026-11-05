@@ -5,7 +5,7 @@
  * ─── La forma del documento ─────────────────────────────────────────────────
  *
  *   { weekKey: "2026-10-19", weekCount: 3, dayKey: "2026-10-22", dayCount: 1,
- *     updatedAt: Timestamp }
+ *     refundDayKey: "2026-10-22", refundDayCount: 1, updatedAt: Timestamp }
  *
  * `weekKey` es el LUNES de la semana y `dayKey` el dia, los dos en
  * `America/Argentina/Buenos_Aires`. No hay barrido que resetee nada: un
@@ -20,6 +20,18 @@
  * gana, la siguiente rebota. Si el import falla por error nuestro, `refund`
  * devuelve la unidad.
  *
+ * ─── Por que la devolucion tiene tope ───────────────────────────────────────
+ *
+ * Un fallo que llego DESPUES de que el modelo empezo a generar (salida
+ * invalida, truncada, timeout) ya gasto tokens, y cuestan igual. Si el cupo
+ * volviera siempre, un PDF que haga fallar al modelo se podria reintentar sin
+ * limite: cada vuelta gasta hasta el tope de salida y no cuesta un import. Por
+ * eso esas devoluciones ("facturables") se acotan a `MAX_BILLED_REFUNDS_PER_DAY`
+ * por dia (`refundDayKey` / `refundDayCount`); pasado el tope el fallo se
+ * queda con el cupo y el costo total por dia queda en `limite diario + 2`. Los
+ * fallos donde el proveedor ni llego a responder (HTTP de error, red) no
+ * gastan nada y se devuelven siempre.
+ *
  * El doc lo escribe solo el Admin SDK: `firestore.rules` le niega toda
  * escritura al cliente (`pdfImportUsage/{uid}`).
  */
@@ -28,6 +40,13 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { SubscriptionTier, TIER_PDF_IMPORT_LIMITS } from "../subscriptions/tier-config";
 
 export const PDF_IMPORT_USAGE_COLLECTION = "pdfImportUsage";
+
+/**
+ * Cuantas veces por dia se devuelve el cupo de un fallo que ya gasto tokens.
+ * Cubre el mal rato ocasional de un modelo (una salida invalida, un timeout)
+ * sin que el reintento sea gratis para siempre.
+ */
+export const MAX_BILLED_REFUNDS_PER_DAY = 2;
 const TIME_ZONE = "America/Argentina/Buenos_Aires";
 /**
  * Argentina no tiene horario de verano desde 2009. El offset solo se usa para
@@ -86,11 +105,17 @@ interface UsageDoc {
   weekCount?: unknown;
   dayKey?: unknown;
   dayCount?: unknown;
+  refundDayKey?: unknown;
+  refundDayCount?: unknown;
 }
 
-function countFor(doc: UsageDoc | undefined, key: string, field: "week" | "day"): number {
-  const docKey = field === "week" ? doc?.weekKey : doc?.dayKey;
-  const count = field === "week" ? doc?.weekCount : doc?.dayCount;
+function countFor(
+  doc: UsageDoc | undefined,
+  key: string,
+  field: "week" | "day" | "refundDay",
+): number {
+  const docKey = field === "week" ? doc?.weekKey : field === "day" ? doc?.dayKey : doc?.refundDayKey;
+  const count = field === "week" ? doc?.weekCount : field === "day" ? doc?.dayCount : doc?.refundDayCount;
   if (docKey !== key || typeof count !== "number" || !Number.isFinite(count)) return 0;
   return Math.max(0, Math.floor(count));
 }
@@ -130,13 +155,15 @@ export async function consumeQuota(
       });
     }
 
+    // `merge`: el doc tambien lleva el contador de devoluciones facturables, y
+    // pisarlo aca lo pondria en cero en cada import y dejaria el tope sin efecto.
     tx.set(ref, {
       weekKey: keys.weekKey,
       weekCount: week + 1,
       dayKey: keys.dayKey,
       dayCount: day + 1,
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }, { merge: true });
     return {
       keys,
       snapshot: {
@@ -154,20 +181,37 @@ export async function consumeQuota(
  * siguen vigentes. Si el import cruzo la medianoche, ese dia ya no cuenta y
  * no hay nada que devolver de ese lado (descontar del dia nuevo le regalaria
  * un import). Nunca deja un contador por debajo de cero.
+ *
+ * `billed`: el fallo llego despues de que el modelo empezo a generar, o sea
+ * que ya costo. Esas devoluciones se acotan a `MAX_BILLED_REFUNDS_PER_DAY`
+ * por dia (ver el encabezado); pasado el tope no se devuelve nada. Devuelve
+ * `true` si devolvio la unidad.
  */
-export async function refundQuota(db: Firestore, uid: string, keys: QuotaKeys): Promise<void> {
+export async function refundQuota(
+  db: Firestore,
+  uid: string,
+  keys: QuotaKeys,
+  opts: { billed?: boolean } = {},
+): Promise<boolean> {
   const ref = db.collection(PDF_IMPORT_USAGE_COLLECTION).doc(uid);
-  await db.runTransaction(async (tx) => {
+  return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    if (!snap.exists) return;
+    if (!snap.exists) return false;
     const doc = snap.data() as UsageDoc;
     const update: Record<string, unknown> = {};
+    if (opts.billed) {
+      const refunded = countFor(doc, keys.dayKey, "refundDay");
+      if (refunded >= MAX_BILLED_REFUNDS_PER_DAY) return false;
+      update.refundDayKey = keys.dayKey;
+      update.refundDayCount = refunded + 1;
+    }
     const week = countFor(doc, keys.weekKey, "week");
     const day = countFor(doc, keys.dayKey, "day");
     if (week > 0) update.weekCount = week - 1;
     if (day > 0) update.dayCount = day - 1;
-    if (Object.keys(update).length === 0) return;
+    if (week === 0 && day === 0) return false;
     update.updatedAt = FieldValue.serverTimestamp();
     tx.update(ref, update);
+    return true;
   });
 }

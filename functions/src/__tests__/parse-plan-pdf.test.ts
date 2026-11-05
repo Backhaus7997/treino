@@ -410,6 +410,78 @@ describe("falla nuestra: se devuelve el cupo", () => {
   });
 });
 
+describe("la devolucion de un fallo que ya gasto tokens tiene tope diario", () => {
+  // Una salida invalida llega DESPUES de que el modelo genero: esos tokens se
+  // pagaron. Si el cupo volviera siempre, un PDF que rompa al modelo se podria
+  // reintentar sin limite (cada vuelta cuesta y no gasta un import).
+  const badOutput = () => ({ ...planWith([null]), numWeeks: 99 });
+  const run = (f: { extractor: PlanExtractor }, over: Partial<ParsePlanPdfDeps> = {}) =>
+    runParsePlanPdf({ ...deps(f.extractor), ...over }, uid, { pdfBase64: pdf1 });
+
+  it("free (2 por dia): se devuelven 2 fallos facturables, los siguientes conservan el cupo y se agota", async () => {
+    await seedTrainer();
+    const f = fakeExtractor(badOutput);
+    const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+    try {
+      for (let i = 0; i < 4; i++) await expectHttpsError(run(f), "internal");
+      // Tope = limite diario (2) + 2 devoluciones: 4 llamadas al modelo, ni una mas.
+      expect(f.calls).toHaveLength(4);
+      expect(await usage()).toMatchObject({
+        weekCount: 2, dayCount: 2, refundDayKey: DAY, refundDayCount: 2,
+      });
+      // Los dos primeros se devolvieron y no avisan; el 3ro y el 4to, si.
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(warn.mock.calls[0][1]).toMatchObject({ uid, maxRefundsPerDay: 2 });
+    } finally {
+      warn.mockRestore();
+    }
+    await expectHttpsError(run(f), "resource-exhausted");
+    expect(f.calls).toHaveLength(4);
+  });
+
+  it("un fallo donde el proveedor no respondio se devuelve siempre y no gasta el tope", async () => {
+    await seedTrainer();
+    const f = fakeExtractor(() => { throw new ExtractorError("provider", "503", 503); });
+    for (let i = 0; i < 5; i++) await expectHttpsError(run(f), "internal");
+    expect(f.calls).toHaveLength(5);
+    const u = await usage();
+    expect(u).toMatchObject({ weekCount: 0, dayCount: 0 });
+    expect(u?.refundDayCount).toBeUndefined();
+  });
+
+  it("un fallo antes de llamar al modelo (catalogo caido) tampoco gasta el tope", async () => {
+    await seedTrainer();
+    const f = fakeExtractor(() => planWith([null]));
+    const loadCatalog = async () => { throw new Error("firestore caido"); };
+    for (let i = 0; i < 3; i++) await expectHttpsError(run(f, { loadCatalog }), "internal");
+    expect(f.calls).toHaveLength(0);
+    const u = await usage();
+    expect(u).toMatchObject({ weekCount: 0, dayCount: 0 });
+    expect(u?.refundDayCount).toBeUndefined();
+  });
+
+  it("el contador de devoluciones sobrevive a un import posterior (consumeQuota no lo pisa)", async () => {
+    await seedTrainer();
+    await expectHttpsError(run(fakeExtractor(badOutput)), "internal");
+    await run(fakeExtractor(() => planWith([null])));
+    expect(await usage()).toMatchObject({
+      weekCount: 1, dayCount: 1, refundDayKey: DAY, refundDayCount: 1,
+    });
+  });
+
+  it("al dia siguiente el tope se renueva", async () => {
+    await seedTrainer();
+    const f = fakeExtractor(badOutput);
+    for (let i = 0; i < 2; i++) await expectHttpsError(run(f), "internal");
+    expect(await usage()).toMatchObject({ refundDayKey: DAY, refundDayCount: 2 });
+    const manana = { now: () => new Date(NOW.getTime() + 24 * 60 * 60 * 1000) };
+    await expectHttpsError(run(f, manana), "internal");
+    expect(await usage()).toMatchObject({
+      weekCount: 0, dayCount: 0, refundDayKey: "2026-10-23", refundDayCount: 1,
+    });
+  });
+});
+
 describe("candidatos del catalogo", () => {
   it("un id inexistente se anula (id y confianza); uno existente se conserva", async () => {
     await seedTrainer();
