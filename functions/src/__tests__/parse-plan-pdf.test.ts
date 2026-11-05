@@ -449,6 +449,29 @@ describe("la devolucion de un fallo que ya gasto tokens tiene tope diario", () =
     expect(u?.refundDayCount).toBeUndefined();
   });
 
+  it("un rechazo HTTP sin tiempo de reintento (`timeout` CON status) se devuelve siempre, sin tope", async () => {
+    // `gemini-provider.ts` lo lanza cuando un 429/503 cae tan cerca del deadline
+    // que el reintento no entra: todos los intentos se rechazaron, no se genero nada.
+    await seedTrainer();
+    const f = fakeExtractor(() => {
+      throw new ExtractorError("timeout", "LLM call timed out while retrying.", 503);
+    });
+    for (let i = 0; i < 5; i++) await expectHttpsError(run(f), "deadline-exceeded");
+    expect(f.calls).toHaveLength(5);
+    const u = await usage();
+    expect(u).toMatchObject({ weekCount: 0, dayCount: 0 });
+    expect(u?.refundDayCount).toBeUndefined();
+  });
+
+  it("un `timeout` SIN status (el modelo pudo haber generado) es facturable: tiene tope", async () => {
+    await seedTrainer();
+    const f = fakeExtractor(() => { throw new ExtractorError("timeout", "LLM call timed out."); });
+    for (let i = 0; i < 4; i++) await expectHttpsError(run(f), "deadline-exceeded");
+    expect(await usage()).toMatchObject({ weekCount: 2, dayCount: 2, refundDayKey: DAY, refundDayCount: 2 });
+    await expectHttpsError(run(f), "resource-exhausted");
+    expect(f.calls).toHaveLength(4);
+  });
+
   it("un `provider` SIN status (finishReason raro en un 200, o corte de red) es facturable: tiene tope", async () => {
     // `interpretGeminiResponse` lo lanza cuando el modelo YA genero (finishReason
     // OTHER con HTTP 200): se pago, no puede devolverse sin limite.
