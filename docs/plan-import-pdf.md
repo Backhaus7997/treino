@@ -97,8 +97,8 @@ Errores (`HttpsError`):
 | `failed-precondition` | kill switch apagado (sin `details`); o Vertex rechaza los structured outputs por la org policy (`details: { reason: "structured_outputs_disabled" }`, ver Rollout paso 3) | no se toca / **se devuelve** |
 | `invalid-argument` | no es PDF, > 5 MB, > 20 páginas o cifrado/con contraseña; `details: { reason: "not_pdf" \| "too_big" \| "too_many_pages" \| "encrypted" }` | no se toca |
 | `resource-exhausted` | sin cupo; `details: { scope: "week" \| "day", resetsAt: ISO }` | — |
-| `deadline-exceeded` | el LLM tardó demasiado | **se devuelve** |
-| `internal` | salida del LLM inválida tras validar | **se devuelve** |
+| `deadline-exceeded` | el LLM tardó demasiado | **se devuelve** (con tope diario) |
+| `internal` | salida del LLM inválida tras validar | **se devuelve** (con tope diario) |
 
 **Proveedor.** **Gemini en Vertex AI** (`gemini-provider.ts`: un POST REST a
 `generateContent`, endpoint `global` —el regional no existe para los modelos
@@ -232,6 +232,16 @@ Cómo se cuentan:
   dejaría una ventana en la que N requests concurrentes pasan todos el chequeo.
 - **Se devuelve** si el import falla por culpa nuestra: LLM caído, timeout
   (`deadline-exceeded`), salida inválida (`internal`).
+  - **Con tope.** Si el fallo llegó después de que el modelo empezó a generar
+    (salida inválida, truncada, rechazo, timeout) los tokens ya se pagaron: esas
+    devoluciones se acotan a **2 por día** por PF (`MAX_BILLED_REFUNDS_PER_DAY`,
+    contador `refundDayKey` / `refundDayCount` en `pdfImportUsage/{uid}`). Pasado
+    el tope, el fallo conserva el cupo y el servidor deja un `warn`. Sin tope, un
+    PDF que rompa al modelo se podría reintentar sin límite a costo nuestro. El
+    gasto máximo por día queda en `límite diario + 2` llamadas al modelo.
+  - Los fallos donde el proveedor ni respondió (HTTP de error, red) y los
+    anteriores a la llamada (catálogo caído) no cuestan nada: se devuelven
+    siempre y no gastan el tope.
 - **No se devuelve** si el archivo es el problema: un PDF que pasó las
   validaciones de entrada pero resultó ilegible consume. El modelo ya se
   pagó.
