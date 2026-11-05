@@ -34,6 +34,8 @@ import 'package:treino/features/coach/presentation/widgets/trainer_specialty_chi
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
+    show fmtArs;
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 const double _bannerHeight = 56;
@@ -249,7 +251,7 @@ class CoachDiscoveryPreviewCard extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          '\$$rate/mes', // i18n: Fase 11
+                          '${fmtArs(rate)}/mes', // i18n: Fase 11
                           style: TextStyle(
                             fontFamily: AppFonts.barlowCondensed,
                             fontWeight: AppFonts.w700,

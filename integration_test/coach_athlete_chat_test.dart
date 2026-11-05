@@ -36,6 +36,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/presentation/chat_screen.dart';
 
 import 'support/e2e_helpers.dart';
+import 'support/emulator_admin.dart';
 import 'support/seed_ids.dart';
 
 void main() {
@@ -46,6 +47,8 @@ void main() {
   testWidgets('chat: athlete opens 1-1 with coach and sends a message',
       (tester) async {
     await ensureSignedOut(tester);
+    // Sin sesión activa, Inicio no abre "Entrenamiento en curso" encima.
+    await closeActiveSessionsOf(kMartin.uid);
     await pumpTreinoApp(tester);
 
     await signInViaUi(tester, email: kMartin.email, password: kSeedPassword);

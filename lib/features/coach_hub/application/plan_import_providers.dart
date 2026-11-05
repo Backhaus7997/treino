@@ -23,5 +23,13 @@ final planImportRepositoryProvider = Provider<PlanImportRepository>((ref) {
 
 /// Estado del import en memoria — la vista previa lo consume después de que
 /// la pantalla de subir empuje el resultado acá.
-final periodizedImportProvider =
-    StateProvider<PeriodizedImportDraft?>((ref) => null);
+///
+/// Mira [currentUidProvider] para volver a `null` cuando cambia la cuenta,
+/// igual que `selectedChatIdProvider` (#1670). El job de PDF ya borraba SU
+/// borrador al cambiar de cuenta, pero el de un Excel sobrevivía al logout y
+/// el PF siguiente abría la vista previa con el plan del anterior. Un uid
+/// igual no lo resetea, así que un refresh de token no tira el import.
+final periodizedImportProvider = StateProvider<PeriodizedImportDraft?>((ref) {
+  ref.watch(currentUidProvider);
+  return null;
+});

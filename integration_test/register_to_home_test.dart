@@ -4,37 +4,110 @@
 // Critical flow: a brand-new athlete signs up on /register (email + password +
 // Terms), gets routed to /profile-setup (because the freshly created
 // users/{uid} doc has displayName == null), completes the 5 onboarding steps,
-// and the submit persists displayName → router's onboarding-complete gate
-// pushes them to /home. See lib/app/router.dart `authRedirect`.
+// and the submit persists displayName → the email gate sends them to
+// /verificar-mail → they type the 6-digit code from the mail → /home. See
+// lib/app/router.dart `authRedirect`.
 //
 // Runs against the Firebase EMULATORS only (Auth 9099, Firestore 8080 on
 // 127.0.0.1). Never cloud. See integration_test/README.md to enable + run.
 //
 // SEED CONTRACT:
-//   • No pre-seeded user needed — this flow CREATES one. But the Auth emulator
-//     must be empty of `kNewEmail` (use a per-run unique email, below) so
-//     signUp does not fail with email-already-in-use.
-//   • The AuthService.signUpWithEmail path creates users/{uid} with
-//     displayName == null; ProfileSetup's submit fills it. No manual Firestore
-//     seed required.
+//   • No pre-seeded user needed — this flow CREATES one, with a per-run unique
+//     email and username so re-runs don't collide.
+//   • Emulador COMPLETO, con Functions: el código lo pide la callable
+//     `solicitarCodigoDeVerificacion` y lo confirma `verificarCodigoDeMail`.
+//
+// EL GATE DEL MAIL. Lo prende `app_config/email_gate` con `{enabled: true}` y
+// el seed no lo siembra, así que contra el emulador el gate no existe: el
+// recorrido llegaba a Inicio sin pedir código (así lo vio el recorrido manual
+// de la E2E de 1.3.0). En producción sí está prendido, y este es el camino que
+// recorre cualquier cuenta nueva. La suite lo prende para su corrida y lo deja
+// como estaba al terminar (`addTearDown`), aunque falle.
+//
+// EL CÓDIGO. El backend guarda sólo su hash en `verificaciones_de_mail`, y la
+// suite lo recupera de ahí (ver `_codigoDeVerificacion`) con
+// `support/emulator_admin.dart`, que saltea las reglas con el token `owner`
+// del emulador — ningún cliente puede leer esa colección, y está bien que así
+// sea.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import 'package:treino/features/auth/presentation/verify_mail_screen.dart';
+import 'package:treino/features/home/home_screen.dart';
 import 'package:treino/features/profile_setup/presentation/profile_setup_flow.dart';
 
 import 'support/e2e_helpers.dart';
+import 'support/emulator_admin.dart';
 
-/// Per-run unique email so re-runs don't collide in the Auth emulator.
-/// TODO(seed): if you prefer a fixed account, clear it from the Auth emulator
-/// between runs instead.
-final String kNewEmail =
-    'e2e.new+${DateTime.now().millisecondsSinceEpoch}@treino.test';
+/// Per-run suffix so re-runs don't collide in the Auth emulator nor in the
+/// username index.
+final String _runId = '${DateTime.now().millisecondsSinceEpoch % 10000000000}';
+final String kNewEmail = 'e2e.new+$_runId@treino.test';
 const String kNewPassword = 'Treino1234';
-const String kNewUsername = 'e2e_athlete';
+// 3–20 de `[A-Za-z0-9_.]`: `e2e_` + 10 dígitos = 14.
+final String kNewUsername = 'e2e_$_runId';
+
+const String _emailGatePath = 'app_config/email_gate';
+
+/// Toca el botón primario del footer del profile-setup ([label]) y espera la
+/// animación del PageView.
+Future<void> _next(WidgetTester tester, String label) async {
+  final button = find.widgetWithText(ElevatedButton, label);
+  expect(
+    tester.widget<ElevatedButton>(button).onPressed,
+    isNotNull,
+    reason: '"$label" tiene que estar habilitado: el paso quedó incompleto',
+  );
+  await tester.tap(button);
+  await tester.pumpAndSettle();
+}
+
+/// El código de verificación de [uid], el mismo que le llega por mail.
+///
+/// Se recupera del HASH que guarda el backend en `verificaciones_de_mail/{uid}`
+/// (`sha256("uid:código")`, ver `hashDelCodigo` en
+/// `functions/src/auth/codigo-de-verificacion.ts`): son 6 dígitos, así que
+/// probar el millón de candidatos alcanza y no depende de nadie.
+///
+/// NO se lee de `mail_queue`, aunque el código esté ahí en claro. La primera
+/// versión de esta suite lo hacía y pasó una vez: `sendQueuedMail` BORRA
+/// `params.codigo` apenas intenta mandar el mail (`SECRET_PARAMS`, a propósito,
+/// para que el código no quede en la base), así que la suite competía contra
+/// el trigger y la corrida siguiente perdió la carrera — medido, el documento
+/// quedó con `params: {showPlans}` y nada más.
+Future<String> _codigoDeVerificacion(String uid) async {
+  final end = DateTime.now().add(const Duration(seconds: 20));
+  String? hash;
+  while (hash == null && DateTime.now().isBefore(end)) {
+    final doc = await adminGetDoc('verificaciones_de_mail/$uid');
+    hash = doc?['codigoHash'] as String?;
+    if (hash == null) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+  }
+  if (hash == null) {
+    throw TestFailure(
+      'no apareció verificaciones_de_mail/$uid: ¿el emulador tiene '
+      'Functions? (`./scripts/emulator.sh` sin SKIP_FUNCTIONS)',
+    );
+  }
+  for (var i = 0; i < 1000000; i++) {
+    final codigo = '$i'.padLeft(6, '0');
+    if (sha256.convert(utf8.encode('$uid:$codigo')).toString() == hash) {
+      return codigo;
+    }
+  }
+  throw TestFailure(
+    'ningún código de 6 dígitos da el hash de $uid: ¿cambió `hashDelCodigo`?',
+  );
+}
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -42,92 +115,142 @@ void main() {
   setUpAll(initFirebaseForEmulators);
 
   testWidgets(
-      'register → profile-setup → home: new athlete completes onboarding',
-      (tester) async {
+      'register → profile-setup → mail code → home: new athlete completes '
+      'onboarding', (tester) async {
+    // Prender el gate y devolverlo como estaba, pase lo que pase.
+    // El teardown se registra ANTES de escribir: si el PATCH llega al emulador
+    // y la respuesta se pierde, el gate tiene que volver igual.
+    final gateAntes = await adminGetDoc(_emailGatePath);
+    addTearDown(() async {
+      if (gateAntes == null) {
+        await adminDeleteDoc(_emailGatePath);
+      } else {
+        await adminSetDoc(_emailGatePath, gateAntes);
+      }
+    });
+    await adminSetDoc(_emailGatePath, {'enabled': true});
+
     await ensureSignedOut(tester);
     await pumpTreinoApp(tester);
+    final l10n = l10nOf(tester);
 
     // /welcome → tap primary CTA "EMPEZAR" (authWelcomeCta) → /register.
-    await tester.tap(find.text('EMPEZAR'));
+    await tester.tap(find.text(l10n.authWelcomeCta));
     await tester.pumpAndSettle();
 
-    // Fill the register form: email, password, confirm password.
+    // Fill the register form: email + password. Antes esperaba tres campos
+    // (había un "confirmar contraseña") y la suite se caía en esta línea.
     final fields = find.byType(TextFormField);
     expect(
       fields,
-      findsNWidgets(3),
-      reason: 'RegisterScreen has email + password + confirm fields',
+      findsNWidgets(2),
+      reason: 'RegisterScreen has email + password fields',
     );
     await tester.enterText(fields.at(0), kNewEmail);
     await tester.enterText(fields.at(1), kNewPassword);
-    await tester.enterText(fields.at(2), kNewPassword);
     await tester.pump();
 
-    // Accept Terms — the checkbox gates the submit button (`_canSubmit`).
-    // TODO(finder): TermsCheckbox renders a tappable row; tapping the visible
-    // Checkbox is the stable target. If the label intercepts the tap, switch to
-    // find.byType(TermsCheckbox) and tap its center.
+    // Accept Terms — the checkbox gates the submit button (`_canSubmit`). El
+    // label de al lado no es tocable (sus dos links abren los textos legales),
+    // así que el blanco es el Checkbox.
     await tester.tap(find.byType(Checkbox).first);
     await tester.pump();
 
-    // "CREAR CUENTA" (authRegisterCta).
-    await tester.tap(find.text('CREAR CUENTA'));
-    await tester.pumpAndSettle(const Duration(seconds: 4));
-
-    // New user → redirected to the profile-setup flow.
-    expect(
+    await tester.tap(find.widgetWithText(ElevatedButton, l10n.authRegisterCta));
+    await pumpUntilFound(
+      tester,
       find.byType(ProfileSetupFlow),
-      findsOneWidget,
       reason: 'signup with displayName == null routes to /profile-setup',
     );
+    await tester.pumpAndSettle();
 
     // ── Step 1: username + avatar ────────────────────────────────────────────
-    // The first field of Step1UsernameAvatar is the username AuthInput.
+    // El único TextFormField del paso. SIGUIENTE espera el chequeo de
+    // disponibilidad, que tiene un debounce de 450 ms.
     await tester.enterText(find.byType(TextFormField).first, kNewUsername);
-    await tester.pump();
-    await tester.tap(find.text('SIGUIENTE'));
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await _next(tester, 'SIGUIENTE');
 
     // ── Step 2: fecha de nacimiento (gate de edad mínima) ────────────────────
-    // TODO(finder): Step2BornAt gates `canGoNext` on a date that passes
-    // `ProfileSetupValidators.validateBornAt` — tap the field
-    // (`profile_setup_born_at_field`) and drive the Material date picker to a
-    // date at or above the minimum age. Un SIGUIENTE pelado acá NO avanza.
-    await tester.tap(find.text('SIGUIENTE'));
+    // Es un `showDatePicker` de Material. Arranca el 1/1 de hace 25 años, muy
+    // por encima de la edad mínima (13): aceptar sin tocar nada es la fecha
+    // válida más estable que hay.
+    await tester.tap(find.byKey(const Key('profile_setup_born_at_field')));
     await tester.pumpAndSettle();
+    final picker = find.byType(DatePickerDialog);
+    expect(picker, findsOneWidget, reason: 'el campo abre el date picker');
+    await tester.tap(
+      find.text(MaterialLocalizations.of(tester.element(picker)).okButtonLabel),
+    );
+    await tester.pumpAndSettle();
+    await _next(tester, 'SIGUIENTE');
 
     // ── Step 3: gym ──────────────────────────────────────────────────────────
-    // TODO(seed/finder): Step3Gym gates `canGoNext` on a gym selection (search
-    // + pick, or "entreno solo"). Drive the real selector here — e.g. tap the
-    // "Entreno por mi cuenta / sin gimnasio" affordance so the step validates.
-    await tester.tap(find.text('SIGUIENTE'));
+    // "OTRO GYM / SIN GYM" (escrito a mano en `gym_search_box.dart`) valida el
+    // paso sin depender de Places.
+    await tester.tap(find.text('OTRO GYM / SIN GYM'));
     await tester.pumpAndSettle();
+    await _next(tester, 'SIGUIENTE');
 
     // ── Step 4: experience + gender ──────────────────────────────────────────
-    // TODO(finder): tap one experience-level chip and one gender chip so
-    // `canGoNext` turns true before advancing.
-    await tester.tap(find.text('SIGUIENTE'));
+    await tester.tap(find.text('PRINCIPIANTE'));
+    await tester.tap(find.text('OTRO'));
     await tester.pumpAndSettle();
+    await _next(tester, 'SIGUIENTE');
 
     // ── Step 5: weight + height → submit ("EMPEZAR") ─────────────────────────
-    // TODO(finder): enter weight + height in the two numeric fields; the last
-    // step's primary button is labelled "EMPEZAR" and calls notifier.submit().
-    await tester.tap(find.text('EMPEZAR'));
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+    final metrics = find.byType(TextFormField);
+    await tester.enterText(metrics.at(0), '75');
+    await tester.enterText(metrics.at(1), '175');
+    await tester.pumpAndSettle();
+    // Si el perfil todavía no tiene `termsAcceptedAt`, este paso vuelve a
+    // pedir los términos y EMPEZAR no envía sin ellos.
+    final terms = find.byType(Checkbox);
+    if (terms.evaluate().isNotEmpty &&
+        tester.widget<Checkbox>(terms.first).value != true) {
+      await tester.tap(terms.first);
+      await tester.pumpAndSettle();
+    }
+    await _next(tester, 'EMPEZAR');
 
-    // Submit persisted displayName → onboarding-complete gate → /home, y de
-    // ahí el gate del mail confirmado con código (`VerifyMailScreen`): una
-    // cuenta nueva todavía no lo confirmó. El código llega por mail y este test
-    // no puede leerlo —el backend guarda solo el hash—, así que el recorrido
-    // termina en esa pantalla.
-    //
-    // Ojo al tocar esto: el submit persiste displayName Y bornAt en la MISMA
-    // escritura, y de eso depende que no haya loop. Si alguna vez se separan,
-    // el gate de edad del router manda a /birth-date en lugar de seguir.
-    expect(
+    // ── Gate del mail ────────────────────────────────────────────────────────
+    // Submit persisted displayName + bornAt in ONE write → el gate del mail
+    // (prendido arriba) manda a /verificar-mail. Ojo al tocar esto: si
+    // displayName y bornAt alguna vez se separan, el gate de edad del router
+    // manda a /birth-date en lugar de seguir.
+    await pumpUntilFound(
+      tester,
       find.byType(VerifyMailScreen),
-      findsOneWidget,
       reason: 'una cuenta nueva confirma el mail antes de usar la app',
+    );
+
+    // La pantalla pide el código sola al montarse.
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final sw = Stopwatch()..start();
+    final codigo = await _codigoDeVerificacion(uid);
+    // ignore: avoid_print
+    print('[e2e] código de verificación: ${sw.elapsed.inMilliseconds} ms');
+    await tester.enterText(
+      find.byKey(const Key('verify_mail_code_field')),
+      codigo,
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('verify_mail_confirm')));
+
+    // La pantalla no navega: el router la saca cuando el perfil trae
+    // `emailVerification`, que escribe la callable.
+    await pumpUntilFound(
+      tester,
+      find.byType(HomeScreen),
+      reason: 'con el código confirmado el router saca al usuario a /home',
+    );
+    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await dismissOnboardingTourIfPresent(tester);
+
+    expect(
+      find.byType(HomeScreen),
+      findsOneWidget,
+      reason: 'el registro termina en Inicio',
     );
   });
 }

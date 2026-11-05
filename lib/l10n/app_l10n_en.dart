@@ -1019,7 +1019,8 @@ class AppL10nEn extends AppL10n {
   String get agendaCobrarMontoInvalido => 'Enter a valid amount.';
 
   @override
-  String get agendaCobrarSuccess => 'Session charged.';
+  String get agendaCobrarSuccess =>
+      'Charge recorded: it stays pending until you mark it paid.';
 
   @override
   String get agendaCobrarError =>
@@ -2597,7 +2598,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorSlotMenuHint =>
-      'The ⋮ on each exercise has replace, copy sets and move.';
+      'Each exercise\'s menu: replace it, copy sets or move it.';
 
   @override
   String get routineEditorRestLabel => 'Rest';

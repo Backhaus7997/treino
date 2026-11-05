@@ -370,8 +370,8 @@ describe("runCreatePreapproval — el cliente no elige nada que cueste plata", (
     // Es el nombre que MP muestra en su checkout, en la lista de suscripciones
     // y en el mail de cada cobro. Con el código crudo decía «plan1».
     const casos = [
-      { tier: "plan1", cycle: "monthly", nombre: "TREINO — Plan 1 (mensual)" },
-      { tier: "plan3", cycle: "annual", nombre: "TREINO — Plan 3 (anual)" },
+      { tier: "plan1", cycle: "monthly", nombre: "TREINO — Plus (mensual)" },
+      { tier: "plan3", cycle: "annual", nombre: "TREINO — Max (anual)" },
     ];
     for (const c of casos) {
       const { app } = fakeApp(PF);

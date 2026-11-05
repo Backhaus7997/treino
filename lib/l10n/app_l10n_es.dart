@@ -1035,7 +1035,8 @@ class AppL10nEs extends AppL10n {
   String get agendaCobrarMontoInvalido => 'Ingresa un monto válido.';
 
   @override
-  String get agendaCobrarSuccess => 'Turno cobrado.';
+  String get agendaCobrarSuccess =>
+      'Cobro registrado: queda pendiente hasta que lo marques pagado.';
 
   @override
   String get agendaCobrarError =>
@@ -2656,7 +2657,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorSlotMenuHint =>
-      'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.';
+      'Menú de cada ejercicio: cambiarlo, copiar sets o moverlo.';
 
   @override
   String get routineEditorRestLabel => 'Descanso';
@@ -7342,7 +7343,8 @@ class AppL10nEsAr extends AppL10nEs {
   String get agendaCobrarMontoInvalido => 'Ingresá un monto válido.';
 
   @override
-  String get agendaCobrarSuccess => 'Turno cobrado.';
+  String get agendaCobrarSuccess =>
+      'Cobro registrado: queda pendiente hasta que lo marques pagado.';
 
   @override
   String get agendaCobrarError =>
@@ -8963,7 +8965,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorSlotMenuHint =>
-      'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.';
+      'Menú de cada ejercicio: cambiarlo, copiar sets o moverlo.';
 
   @override
   String get routineEditorRestLabel => 'Descanso';

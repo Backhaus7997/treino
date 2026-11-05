@@ -284,9 +284,9 @@ tener en tu biblioteca y cuántas plantillas podés tener activas.
 | Plan | Límite de carga | Ejercicios propios | Plantillas | Precio mensual | Precio anual |
 |---|---|---|---|---|---|
 | Gratuito | 2 | 20 | 3 | — | — |
-| Plan 1 | 7 | 60 | Sin límite | $12.000 | $120.000 |
-| Plan 2 | 15 | 120 | Sin límite | $22.000 | $220.000 |
-| Plan 3 | Sin límite | Sin límite | Sin límite | $39.000 | $390.000 |
+| Plus | 7 | 60 | Sin límite | $12.000 | $120.000 |
+| Pro | 15 | 120 | Sin límite | $22.000 | $220.000 |
+| Max | Sin límite | Sin límite | Sin límite | $39.000 | $390.000 |
 
 Precios en pesos argentinos. El plan anual equivale a diez meses.
 
@@ -302,7 +302,7 @@ tengas claro, porque determina cuándo no vas a poder aceptar a alguien.
 | Terminado | 0 |
 | Bloqueado por falta de pago de tu suscripción | 0 |
 
-Un alumno pausado **sigue ocupando media plaza**. Con Plan 1, siete alumnos
+Un alumno pausado **sigue ocupando media plaza**. Con el plan Plus, siete alumnos
 activos te dejan sin lugar; seis activos y dos pausados también. El sistema
 bloquea el alta cuando el nuevo vínculo superaría el límite del plan.
 

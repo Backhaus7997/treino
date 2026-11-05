@@ -6,15 +6,15 @@ Reglas de producto: naming, tab bar, roles, scope. Cosas que no son técnicas pe
 
 - **TREINO** = nombre de la marca/app. Aparece en logo, splash, App Store, Play Store.
 - **Coach** = nombre del módulo y de la pestaña que gestiona Personal Trainers. **No** decirle "TREINO" al tab.
-- **Entreno IA** = feature de IA generadora de rutinas. **NO usar** el nombre antiguo "Coach IA". La pantalla en Flutter es `WorkoutAIView`, ruta `/workout/ai`.
+- **Entreno IA** = feature de IA generadora de rutinas. **NO usar** el nombre antiguo "Coach IA". **Hoy NO está implementada**: en `lib/` no existe `WorkoutAIView` ni la ruta `/workout/ai` (`rg -l 'WorkoutAIView|workout/ai' lib` no da hits), y la tab Entrenar no tiene ninguna entrada de IA. Si se construye, ese es el nombre (y el nombre de pantalla/ruta previsto). La IA generativa que sí existe es otra cosa: el parseo de PDFs de rutina con Gemini en `functions/src/pdf-import/`.
 - Las clases de dominio del PF mantienen el prefijo `Trainer*` (`TrainerProfile`, `TrainerStudentLink`, etc.) porque describen al actor-persona, no al feature.
 
 ## Tab bar (5 tabs, Inicio al medio)
 
 | # | Tab | Ícono | Ruta | Contiene |
 |---|---|---|---|---|
-| 1 | Entrenar | `TreinoIcon.tabWorkout` | `/workout` | Rutinas, Workout Player, Explore programas, Historial, Entreno IA |
-| 2 | Feed | `TreinoIcon.tabFeed` | `/feed` | Amigos · Comunidad · Público (3 segmentos), perfiles, friend requests. Sin PFs. 2da página swipeable: Rankings (`/feed?tab=rankings`), sólo para el rol atleta. |
+| 1 | Entrenar | `TreinoIcon.tabWorkout` | `/workout` | Atleta: 2 páginas swipeables, TU ENTRENO (rutinas + historial) y EXPLORAR (plantillas; deep link `?tab=plantillas`). Más el Workout Player. Sin Entreno IA (no implementada). |
+| 2 | Feed | `TreinoIcon.tabFeed` | `/feed` | Seguidores · Mi gym · Público (3 segmentos), perfiles, friend requests. Sin PFs. 2da página swipeable: Rankings (`/feed?tab=rankings`), sólo para el rol atleta. |
 | 3 | **Inicio** | `TreinoIcon.tabHome` | `/home` | Mockup Mobile Home (streak, stats, card HOY con CTA, amigos entrenando) |
 | 4 | Coach | `TreinoIcon.tabCoach` | `/coach` | Discovery cercana, mis coaches, chat, agenda, planes asignados. Vista distinta según rol. |
 | 5 | Perfil | `TreinoIcon.tabProfile` | `/profile` | Datos, gym, apariencia (toggle paleta), ajustes, logout |
@@ -44,7 +44,7 @@ Reglas de producto: naming, tab bar, roles, scope. Cosas que no son técnicas pe
 ### Vistas según rol en la tab Coach
 
 - **`role == "athlete"`**: header con filtros + carrusel "En tu gym" + sección "Cerca tuyo" + sección "Mis coaches".
-- **`role == "trainer"`**: pestañas DASHBOARD · ALUMNOS · AGENDA · COMUNIDADES.
+- **`role == "trainer"`**: pestañas ALUMNOS · AGENDA en la app (`TrainerCoachView`). El dashboard vive en el Coach Hub web; no hay pestaña COMUNIDADES en el código.
 
 No hay toggle interno entre vistas — el rol es uno solo y se elige al crear la cuenta.
 

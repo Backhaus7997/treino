@@ -100,12 +100,12 @@ const String kAssignedRoutineId = ${dartString(ROUTINES.asignadaAMartin.id)};
 /// Plantilla del sistema, sin \`assignedTo\`.
 const String kSystemTemplateRoutineId = ${dartString(ROUTINES.plantillaSistema.id)};
 
-// ⚠️  NO hay constante de "rutina propia del alumno" porque el seed no siembra
-// ninguna: las dos rutinas con contenido son \`trainer-assigned\` y la tercera es
-// una plantilla \`system\`. \`my_routine_edit_test.dart\` necesita una rutina de la
-// que el alumno sea DUEÑO, y poner acá el id de una asignada haría que esa suite
-// abriera el editor sobre algo que el alumno no puede editar — fallaría hablando
-// de permisos, que es el peor lugar posible para descubrir que falta un fixture.
+/// Rutina \`${ROUTINES.propiaDeMartin.source}\` de la que Martín es DUEÑO
+/// (\`createdBy\`): la que abre \`my_routine_edit_test.dart\` en el editor.
+const String kOwnRoutineId = ${dartString(ROUTINES.propiaDeMartin.id)};
+
+/// Nombre con el que se siembra el primer día de [kOwnRoutineId].
+const String kOwnRoutineFirstDayName = ${dartString(ROUTINES.propiaDeMartin.firstDayName)};
 `;
 }
 

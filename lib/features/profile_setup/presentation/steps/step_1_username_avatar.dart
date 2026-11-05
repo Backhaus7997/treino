@@ -111,6 +111,8 @@ class _Step1UsernameAvatarState extends ConsumerState<Step1UsernameAvatar> {
             hint: '@julieta',
             leadingIcon: TreinoIcon.atSign,
             keyboardType: TextInputType.text,
+            autocorrect: false,
+            enableSuggestions: false,
             textInputAction: TextInputAction.done,
             validator: ProfileSetupValidators.validateUsername,
             onFieldSubmitted: (_) {},

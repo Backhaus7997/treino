@@ -18,7 +18,16 @@ import 'widgets/chat_list_pane.dart';
 /// conversaciones), refactorizamos a query params + `addPostFrameCallback`.
 /// Por ahora el sidebar persistente del Coach Hub no se beneficia de URLs
 /// dentro de `/chat` — la fricción extra del routing no aporta.
-final selectedChatIdProvider = StateProvider<String?>((ref) => null);
+///
+/// Mira [currentUidProvider] para volver a `null` cuando cambia la cuenta.
+/// Sin eso sobrevivía al logout: en la misma pestaña, el PF que entraba
+/// después encontraba abierto el chat del anterior, con sus mensajes (E2E de
+/// 1.3.0). Un uid igual no lo resetea, así que un refresh de token no cierra
+/// la conversación.
+final selectedChatIdProvider = StateProvider<String?>((ref) {
+  ref.watch(currentUidProvider);
+  return null;
+});
 
 /// Pantalla principal del Chat web — split-pane WhatsApp Web style.
 ///

@@ -3354,11 +3354,15 @@ class _RoutineEditorWebScreenState
                   // texto y taparía la única información que el botón tenía.
                   TreinoButton(
                     key: const Key('routine_editor_submit_button'),
+                    // Una plantilla no tiene alumno: «Asignar» prometía algo
+                    // que este botón no hace (E2E 1.3.0).
                     label: _submitting
                         ? 'Guardando…'
                         : _isEditing
                             ? 'Guardar cambios'
-                            : 'Asignar rutina', // i18n
+                            : widget.isTemplate
+                                ? 'Guardar plantilla'
+                                : 'Asignar rutina', // i18n
                     onPressed: _submitting ? null : _submit,
                   ),
                 ],

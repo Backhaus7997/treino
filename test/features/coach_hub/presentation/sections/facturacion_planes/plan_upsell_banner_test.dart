@@ -91,8 +91,7 @@ void main() {
       expect(find.byKey(const Key('plan_upsell_banner')), findsOneWidget);
       expect(find.text('TU PLAN · FREE'), findsOneWidget);
       expect(
-        find.text(
-            'Estás en Free, hasta 2 alumnos. Con Plan 1, hasta 7 alumnos.'),
+        find.text('Estás en Free, hasta 2 alumnos. Con Plus, hasta 7 alumnos.'),
         findsOneWidget,
       );
     });
@@ -101,12 +100,12 @@ void main() {
         (tester) async {
       await _pump(tester, tier: SubscriptionTier.plan2);
 
-      expect(find.text('TU PLAN · PLAN 2'), findsOneWidget);
+      expect(find.text('TU PLAN · PRO'), findsOneWidget);
       // `weightLimit` null de plan3 es SIN LÍMITE, no una ausencia: si se
       // colapsara con un `?? 0`, el plan más caro se leería como el más chico.
       expect(
         find.text(
-          'Estás en Plan 2, hasta 15 alumnos. Con Plan 3, alumnos sin límite.',
+          'Estás en Pro, hasta 15 alumnos. Con Max, alumnos sin límite.',
         ),
         findsOneWidget,
       );
@@ -157,10 +156,10 @@ void main() {
         // «hasta 2»: el tope del tier que rige, no el del Plan 1 del doc.
         expect(
           find.text(
-              'Estás en Free, hasta 2 alumnos. Con Plan 1, hasta 7 alumnos.'),
+              'Estás en Free, hasta 2 alumnos. Con Plus, hasta 7 alumnos.'),
           findsOneWidget,
         );
-        expect(find.text('TU PLAN · PLAN 1'), findsNothing);
+        expect(find.text('TU PLAN · PLUS'), findsNothing);
       });
 
       // Control del de arriba: misma baja, mismo reloj, sólo cambia la fecha.
@@ -175,10 +174,10 @@ void main() {
           fin: conDiasPagos,
         );
 
-        expect(find.text('TU PLAN · PLAN 1'), findsOneWidget);
+        expect(find.text('TU PLAN · PLUS'), findsOneWidget);
         expect(
           find.text(
-              'Estás en Plan 1, hasta 7 alumnos. Con Plan 2, hasta 15 alumnos.'),
+              'Estás en Plus, hasta 7 alumnos. Con Pro, hasta 15 alumnos.'),
           findsOneWidget,
         );
       });
@@ -191,7 +190,7 @@ void main() {
           (tester) async {
         await _pump(tester, tier: SubscriptionTier.plan1, fin: vencida);
 
-        expect(find.text('TU PLAN · PLAN 1'), findsOneWidget);
+        expect(find.text('TU PLAN · PLUS'), findsOneWidget);
       });
 
       // Un Plan 3 vigente no tiene banner (no hay tier superior que vender).
@@ -209,7 +208,7 @@ void main() {
         expect(find.text('TU PLAN · FREE'), findsOneWidget);
         expect(
           find.text(
-              'Estás en Free, hasta 2 alumnos. Con Plan 1, hasta 7 alumnos.'),
+              'Estás en Free, hasta 2 alumnos. Con Plus, hasta 7 alumnos.'),
           findsOneWidget,
         );
       });
@@ -243,7 +242,7 @@ void main() {
           status: SubscriptionStatus.cancelled,
           fin: fin,
         );
-        expect(find.text('TU PLAN · PLAN 1'), findsOneWidget);
+        expect(find.text('TU PLAN · PLUS'), findsOneWidget);
 
         // Sólo pasa la hora: el reloj cruza el fin y nada más cambia.
         AppClock.freeze(fin.add(const Duration(minutes: 1)).toLocal());
@@ -253,7 +252,7 @@ void main() {
         expect(find.text('TU PLAN · FREE'), findsOneWidget);
         expect(
           find.text(
-              'Estás en Free, hasta 2 alumnos. Con Plan 1, hasta 7 alumnos.'),
+              'Estás en Free, hasta 2 alumnos. Con Plus, hasta 7 alumnos.'),
           findsOneWidget,
         );
       });

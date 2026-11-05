@@ -108,3 +108,24 @@ test('los uids no llevan guión bajo', () => {
     );
   }
 });
+
+test('la rutina propia es de Martín y la lista de "mis rutinas" la encuentra', () => {
+  // `RoutineRepository.listUserCreated` consulta `createdBy == uid` +
+  // `source == 'user-created'`. Con cualquiera de los dos errado la rutina
+  // existe en Firestore pero el alumno no la ve, y `my_routine_edit_test.dart`
+  // abre el editor sobre algo que no es suyo — fallaría por permisos, no por
+  // el fixture.
+  const propia = contrato.ROUTINES.propiaDeMartin;
+  assert.strictEqual(propia.source, 'user-created');
+  assert.strictEqual(propia.createdBy, contrato.USERS.martin.uid);
+  const ids = Object.values(contrato.ROUTINES).map((r) => r.id);
+  assert.strictEqual(new Set(ids).size, ids.length, 'dos rutinas del contrato comparten id');
+});
+
+test('el seed siembra la rutina propia con el dueño del contrato', () => {
+  // El contrato promete un documento; esto mira que el seed lo construya desde
+  // ahí y no con un id escrito a mano que pueda divergir.
+  const seed = readFileSync(require.resolve('../seed_emulator_full'), 'utf8');
+  assert.match(seed, /id: E2E\.ROUTINES\.propiaDeMartin\.id/);
+  assert.match(seed, /createdBy: E2E\.ROUTINES\.propiaDeMartin\.createdBy/);
+});

@@ -362,7 +362,7 @@ void main() {
       );
       // La caja de upsell al siguiente tier, mismo estilo que el paywall de
       // alumnos — sin "PASATE A" en el móvil: sólo el nombre del plan.
-      expect(find.text('PLAN 1'), findsOneWidget);
+      expect(find.text('PLUS'), findsOneWidget);
       expect(find.textContaining('PASATE A'), findsNothing);
       expect(find.text('12.000'), findsOneWidget);
       expect(find.text('Hasta 60 ejercicios propios'), findsOneWidget);
@@ -384,7 +384,7 @@ void main() {
         form: TrainerLimitNoticeForm.sheet,
       );
 
-      expect(find.text('PLAN 3'), findsOneWidget);
+      expect(find.text('MAX'), findsOneWidget);
       expect(find.textContaining('PASATE A'), findsNothing);
       expect(find.text('Ejercicios propios sin límite'), findsOneWidget);
       expect(find.textContaining('null'), findsNothing);
@@ -411,13 +411,13 @@ void main() {
       );
 
       expect(
-        find.text('Tu suscripción a Plan 1 no está activa. Mientras tanto, '
+        find.text('Tu suscripción a Plus no está activa. Mientras tanto, '
             'tu plan Free incluye 20 ejercicios propios.'),
         findsOneWidget,
       );
-      expect(find.textContaining('Plan 1 incluye'), findsNothing);
+      expect(find.textContaining('Plus incluye'), findsNothing);
       expect(find.textContaining('PASATE A'), findsNothing);
-      expect(find.text('PLAN 2'), findsNothing);
+      expect(find.text('PRO'), findsNothing);
       expect(find.text('VER PLANES'), findsOneWidget);
     });
 
@@ -440,14 +440,14 @@ void main() {
       );
 
       expect(
-        find.text('Tu plan Plan 1 incluye 60 ejercicios propios. Podés '
+        find.text('Tu plan Plus incluye 60 ejercicios propios. Podés '
             'editar o borrar los que ya tenés.'),
         findsOneWidget,
       );
       expect(find.textContaining('no está activa'), findsNothing);
       expect(find.textContaining('Free incluye'), findsNothing);
       // Aviso normal ⇒ caja de upsell al SIGUIENTE de su plan (Plan 2).
-      expect(find.text('PLAN 2'), findsOneWidget);
+      expect(find.text('PRO'), findsOneWidget);
       expect(find.text('Hasta 120 ejercicios propios'), findsOneWidget);
     });
 
@@ -474,9 +474,9 @@ void main() {
             'borrar los que ya tenés.'),
         findsOneWidget,
       );
-      expect(find.textContaining('Plan 1 incluye'), findsNothing);
+      expect(find.textContaining('Plus incluye'), findsNothing);
       expect(find.textContaining('Free incluye'), findsNothing);
-      expect(find.text('PLAN 2'), findsNothing);
+      expect(find.text('PRO'), findsNothing);
       expect(find.text('VER PLANES'), findsOneWidget);
     });
 
@@ -494,11 +494,11 @@ void main() {
       );
 
       expect(
-        find.text('Tu plan Plan 2 incluye 120 ejercicios propios. Podés '
+        find.text('Tu plan Pro incluye 120 ejercicios propios. Podés '
             'editar o borrar los que ya tenés.'),
         findsOneWidget,
       );
-      expect(find.text('PLAN 3'), findsOneWidget);
+      expect(find.text('MAX'), findsOneWidget);
       expect(find.text('Ejercicios propios sin límite'), findsOneWidget);
     });
 
@@ -521,9 +521,9 @@ void main() {
       expect(find.textContaining('Free incluye'), findsNothing);
       // Sin caja de upsell: no hay un tier de referencia desde el cual
       // calcular "el siguiente" sin adivinar.
-      expect(find.text('PLAN 1'), findsNothing);
-      expect(find.text('PLAN 2'), findsNothing);
-      expect(find.text('PLAN 3'), findsNothing);
+      expect(find.text('PLUS'), findsNothing);
+      expect(find.text('PRO'), findsNothing);
+      expect(find.text('MAX'), findsNothing);
       expect(find.text('PLAN A MEDIDA'), findsNothing);
       expect(find.text('VER PLANES'), findsOneWidget);
     });
@@ -646,7 +646,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+      expect(find.text('PASATE A PLUS'), findsOneWidget);
       expect(find.text('VER PLANES'), findsOneWidget);
     });
 
@@ -840,7 +840,7 @@ void main() {
             'archivar las que ya tenés.'),
         findsOneWidget,
       );
-      expect(find.text('PLAN 1'), findsOneWidget);
+      expect(find.text('PLUS'), findsOneWidget);
       expect(find.textContaining('PASATE A'), findsNothing);
       // Free → Plan 1 ya es plantillas sin límite (sólo Free tiene tope).
       expect(find.text('Plantillas sin límite'), findsOneWidget);
@@ -1058,7 +1058,7 @@ void main() {
         findsOneWidget,
       );
       // La tarjeta del siguiente plan: nombre, precio, sufijo y beneficio.
-      expect(find.text('PLAN 1'), findsOneWidget);
+      expect(find.text('PLUS'), findsOneWidget);
       expect(find.text('12.000'), findsOneWidget);
       expect(find.text('/month'), findsOneWidget);
       expect(find.text('/mes'), findsNothing);
@@ -1079,7 +1079,7 @@ void main() {
         count: 120,
       );
 
-      expect(find.text('PLAN 3'), findsOneWidget);
+      expect(find.text('MAX'), findsOneWidget);
       expect(find.text('Unlimited custom exercises'), findsOneWidget);
       expect(find.textContaining('null'), findsNothing);
     });
@@ -1119,12 +1119,12 @@ void main() {
       expect(find.text('CUSTOM EXERCISE LIMIT'), findsOneWidget);
       expect(
         find.text(
-          "Your Plan 1 subscription isn't active. Meanwhile, your Free "
+          "Your Plus subscription isn't active. Meanwhile, your Free "
           'plan includes 20 custom exercises.',
         ),
         findsOneWidget,
       );
-      expect(find.text('PLAN 2'), findsNothing);
+      expect(find.text('PRO'), findsNothing);
     });
 
     testWidgets(
@@ -1141,13 +1141,13 @@ void main() {
 
       expect(
         find.text(
-          'Your Plan 1 plan includes 60 custom exercises. You can edit or '
+          'Your Plus plan includes 60 custom exercises. You can edit or '
           'delete the ones you already have.',
         ),
         findsOneWidget,
       );
       expect(find.textContaining("isn't active"), findsNothing);
-      expect(find.text('PLAN 2'), findsOneWidget);
+      expect(find.text('PRO'), findsOneWidget);
     });
 
     testWidgets(
@@ -1241,7 +1241,7 @@ void main() {
       expect(find.text('TEMPLATE LIMIT'), findsOneWidget);
       expect(
         find.text(
-          "Your Plan 1 subscription isn't active. Meanwhile, your Free "
+          "Your Plus subscription isn't active. Meanwhile, your Free "
           'plan includes 3 templates.',
         ),
         findsOneWidget,
