@@ -40,6 +40,8 @@ SetLog _log(
   int setNumber = 1,
   int reps = 5,
   double weightKg = 60,
+  int? durationSeconds,
+  double? distanceMeters,
 }) =>
     SetLog(
       id: '$exerciseId-$setNumber-$reps-$weightKg',
@@ -49,6 +51,8 @@ SetLog _log(
       reps: reps,
       weightKg: weightKg,
       completedAt: DateTime.utc(2026, 5, 18, 10, 5),
+      durationSeconds: durationSeconds,
+      distanceMeters: distanceMeters,
     );
 
 final _now = DateTime.utc(2026, 5, 18, 13);
@@ -313,6 +317,81 @@ void main() {
       expect(e2.bestWeightKg, 0);
       expect(e2.bestSetReps, 12);
       expect(e2.sessionVolumeKg, 0);
+      // Sin métrica de tiempo/distancia en las series por reps (#1701).
+      expect(e2.bestDurationSeconds, isNull);
+      expect(e2.bestDistanceMeters, isNull);
+      expect(e1.bestDurationSeconds, isNull);
+      expect(e1.bestDistanceMeters, isNull);
+    });
+
+    test('#1701: la mejor serie de un ejercicio por TIEMPO es el mayor tiempo',
+        () {
+      final session = _session();
+
+      final result = aggregateSessionHighlights(
+        session: session,
+        sessionLogs: [
+          _log('plank',
+              setNumber: 1, reps: 0, weightKg: 0, durationSeconds: 30),
+          _log('plank',
+              setNumber: 2, reps: 0, weightKg: 0, durationSeconds: 60),
+          _log('plank',
+              setNumber: 3, reps: 0, weightKg: 0, durationSeconds: 45),
+        ],
+        sessionsDesc: [session],
+        priorLogsBySession: const {},
+        now: _now,
+      );
+
+      final plank = result.exercises.single;
+      expect(plank.setCount, 3);
+      expect(plank.bestDurationSeconds, 60);
+      expect(plank.bestDistanceMeters, isNull);
+      // Sin carga: no hay volumen ni récords inventados.
+      expect(plank.sessionVolumeKg, 0);
+      expect(plank.records, isEmpty);
+    });
+
+    test(
+        '#1701: la mejor serie de un ejercicio por DISTANCIA son los mayores '
+        'metros', () {
+      final session = _session();
+
+      final result = aggregateSessionHighlights(
+        session: session,
+        sessionLogs: [
+          _log('sled', setNumber: 1, reps: 0, weightKg: 0, distanceMeters: 20),
+          _log('sled', setNumber: 2, reps: 0, weightKg: 0, distanceMeters: 40),
+        ],
+        sessionsDesc: [session],
+        priorLogsBySession: const {},
+        now: _now,
+      );
+
+      final sled = result.exercises.single;
+      expect(sled.bestDistanceMeters, 40);
+      expect(sled.bestDurationSeconds, isNull);
+      expect(sled.sessionVolumeKg, 0);
+    });
+
+    test('#1701: una serie vieja sin métrica no inventa tiempo ni metros', () {
+      final session = _session();
+
+      final result = aggregateSessionHighlights(
+        session: session,
+        sessionLogs: [
+          _log('plank', setNumber: 1, reps: 0, weightKg: 0),
+          _log('plank',
+              setNumber: 2, reps: 0, weightKg: 0, durationSeconds: 45),
+        ],
+        sessionsDesc: [session],
+        priorLogsBySession: const {},
+        now: _now,
+      );
+
+      // La serie vieja no resta ni suma: manda la que sí trae dato.
+      expect(result.exercises.single.bestDurationSeconds, 45);
+      expect(result.exercises.single.bestSetReps, 0);
     });
   });
 

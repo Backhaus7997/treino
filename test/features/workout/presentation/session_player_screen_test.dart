@@ -1271,6 +1271,180 @@ void main() {
       expect(find.text('1/1'), findsOneWidget,
           reason: 'el bloque colapsa a completo');
     });
+
+    // ── #1701: la serie por distancia guarda sus metros ──────────────────
+    //
+    // La fila es un check sin valor editable: la distancia hecha es la
+    // prescripta. Antes la serie quedaba en `reps: 0, weightKg: 0` y los
+    // metros —que el atleta tenía en pantalla— se perdían.
+
+    testWidgets('marcar la serie guarda los metros del spec, y no tiempo',
+        (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'sled',
+        exerciseName: 'Trineo',
+        muscleGroup: 'legs',
+        targetSets: 1,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 60,
+        exerciseMode: ExerciseMode.distance,
+        sets: [SetSpec(distanceMeters: 40)],
+      );
+      final notifier = _LoggingNotifier(SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: const [slot]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      ));
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      final log = notifier.loggedSets.single;
+      expect(log.distanceMeters, 40);
+      expect(log.durationSeconds, isNull);
+      expect(log.reps, 0);
+      expect(log.weightKg, 0);
+    });
+
+    testWidgets(
+        'cada serie guarda SUS metros: con metros distintos por serie no se '
+        'copian los de la primera', (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'sled',
+        exerciseName: 'Trineo',
+        muscleGroup: 'legs',
+        targetSets: 2,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 0,
+        exerciseMode: ExerciseMode.distance,
+        sets: [SetSpec(distanceMeters: 40), SetSpec(distanceMeters: 25.5)],
+      );
+      final notifier = _LoggingNotifier(SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: const [slot]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      ));
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(
+        notifier.loggedSets.map((l) => (l.setNumber, l.distanceMeters)),
+        [(1, 40.0), (2, 25.5)],
+      );
+    });
+
+    testWidgets(
+        'periodizado: los metros salen de la semana de la sesión, no de la '
+        'primera', (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'sled',
+        exerciseName: 'Trineo',
+        muscleGroup: 'legs',
+        targetSets: 1,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 60,
+        exerciseMode: ExerciseMode.distance,
+        weeklySets: [
+          [SetSpec(distanceMeters: 20)],
+          [SetSpec(distanceMeters: 60)],
+        ],
+      );
+      final notifier = _LoggingNotifier(SessionState(
+        session: makeSession(weekNumber: 1),
+        day: makeDay(dayNumber: 1, slots: const [slot]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      ));
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+
+      expect(find.text('60 m'), findsOneWidget,
+          reason: 'la fila dibuja la semana 2');
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets.single.distanceMeters, 60);
+    });
+
+    testWidgets(
+        'slot con exerciseMode reps + metros en sets (modo inferido): también '
+        'guarda los metros', (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'sprint-3',
+        exerciseName: 'Sprint',
+        muscleGroup: 'legs',
+        targetSets: 1,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 60,
+        sets: [SetSpec(distanceMeters: 6)],
+      );
+      final notifier = _LoggingNotifier(SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: const [slot]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      ));
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets.single.distanceMeters, 6);
+    });
+
+    testWidgets(
+        'una serie por REPS no lleva ni tiempo ni metros, y su documento no '
+        'escribe esas claves', (tester) async {
+      final notifier = _LoggingNotifier(_defaultState());
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      final log = notifier.loggedSets.single;
+      expect(log.reps, greaterThan(0));
+      expect(log.durationSeconds, isNull);
+      expect(log.distanceMeters, isNull);
+      final json = log.toJson();
+      expect(json.containsKey('durationSeconds'), isFalse);
+      expect(json.containsKey('distanceMeters'), isFalse);
+    });
   });
 
   // #1510: el descanso configurado en la rutina sólo corría en el reloj. Al

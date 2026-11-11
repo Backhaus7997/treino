@@ -6374,6 +6374,18 @@ abstract class AppL10n {
   /// **'Esta sesión no tiene sets registrados.'**
   String get sessionDetailNoSets;
 
+  /// Distancia de una serie por DISTANCIA ya hecha (#1701): fila del historial/detalle de sesión y mejor serie del resumen post-entreno. {meters} ya viene formateado con el separador del locale (ej. 40 o 1.500).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{meters} m'**
+  String workoutSetDistanceValue(String meters);
+
+  /// Valor de una serie vieja por tiempo o distancia que se guardó como 0 reps / 0 kg, sin tiempo ni metros (#1701). Un guion en vez de afirmar «0 reps 0 kg», que es falso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'—'**
+  String get workoutSetNoMetric;
+
   /// Snackbar al salir del player porque el reloj cerro el entreno. El reloj escribe en la misma sesion, asi que terminar alla termina aca.
   ///
   /// In es_AR, this message translates to:

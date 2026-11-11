@@ -16,6 +16,8 @@ _$SetLogImpl _$$SetLogImplFromJson(Map<String, dynamic> json) => _$SetLogImpl(
       rpe: (json['rpe'] as num?)?.toInt(),
       completedAt:
           const TimestampConverter().fromJson(json['completedAt'] as Timestamp),
+      durationSeconds: (json['durationSeconds'] as num?)?.toInt(),
+      distanceMeters: (json['distanceMeters'] as num?)?.toDouble(),
     );
 
 Map<String, dynamic> _$$SetLogImplToJson(_$SetLogImpl instance) =>
@@ -28,4 +30,6 @@ Map<String, dynamic> _$$SetLogImplToJson(_$SetLogImpl instance) =>
       'weightKg': instance.weightKg,
       'rpe': instance.rpe,
       'completedAt': const TimestampConverter().toJson(instance.completedAt),
+      if (instance.durationSeconds case final value?) 'durationSeconds': value,
+      if (instance.distanceMeters case final value?) 'distanceMeters': value,
     };

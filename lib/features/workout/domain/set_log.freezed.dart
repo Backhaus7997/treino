@@ -30,6 +30,23 @@ mixin _$SetLog {
   @TimestampConverter()
   DateTime get completedAt => throw _privateConstructorUsedError;
 
+  /// Segundos que duró una serie por TIEMPO (una plancha). `null` en las
+  /// series por reps/peso y en las guardadas antes de que existiera el
+  /// campo (#1701): ahí la métrica era `reps: 0, weightKg: 0` y no había
+  /// dónde guardar el tiempo.
+  ///
+  /// `includeIfNull: false` para que una serie por reps no escriba la clave
+  /// y su documento quede idéntico al de antes. `rpe` conserva su
+  /// serialización (`rpe: null`) a propósito: cambiarla es otra decisión.
+  @JsonKey(includeIfNull: false)
+  int? get durationSeconds => throw _privateConstructorUsedError;
+
+  /// Metros de una serie por DISTANCIA (un trineo, un farmer carry). `null`
+  /// en las series por reps/peso y en las anteriores al campo (#1701). Mismo
+  /// criterio de serialización que [durationSeconds].
+  @JsonKey(includeIfNull: false)
+  double? get distanceMeters => throw _privateConstructorUsedError;
+
   /// Serializes this SetLog to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -52,7 +69,9 @@ abstract class $SetLogCopyWith<$Res> {
       int reps,
       double weightKg,
       int? rpe,
-      @TimestampConverter() DateTime completedAt});
+      @TimestampConverter() DateTime completedAt,
+      @JsonKey(includeIfNull: false) int? durationSeconds,
+      @JsonKey(includeIfNull: false) double? distanceMeters});
 }
 
 /// @nodoc
@@ -78,6 +97,8 @@ class _$SetLogCopyWithImpl<$Res, $Val extends SetLog>
     Object? weightKg = null,
     Object? rpe = freezed,
     Object? completedAt = null,
+    Object? durationSeconds = freezed,
+    Object? distanceMeters = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -112,6 +133,14 @@ class _$SetLogCopyWithImpl<$Res, $Val extends SetLog>
           ? _value.completedAt
           : completedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      durationSeconds: freezed == durationSeconds
+          ? _value.durationSeconds
+          : durationSeconds // ignore: cast_nullable_to_non_nullable
+              as int?,
+      distanceMeters: freezed == distanceMeters
+          ? _value.distanceMeters
+          : distanceMeters // ignore: cast_nullable_to_non_nullable
+              as double?,
     ) as $Val);
   }
 }
@@ -131,7 +160,9 @@ abstract class _$$SetLogImplCopyWith<$Res> implements $SetLogCopyWith<$Res> {
       int reps,
       double weightKg,
       int? rpe,
-      @TimestampConverter() DateTime completedAt});
+      @TimestampConverter() DateTime completedAt,
+      @JsonKey(includeIfNull: false) int? durationSeconds,
+      @JsonKey(includeIfNull: false) double? distanceMeters});
 }
 
 /// @nodoc
@@ -155,6 +186,8 @@ class __$$SetLogImplCopyWithImpl<$Res>
     Object? weightKg = null,
     Object? rpe = freezed,
     Object? completedAt = null,
+    Object? durationSeconds = freezed,
+    Object? distanceMeters = freezed,
   }) {
     return _then(_$SetLogImpl(
       id: null == id
@@ -189,6 +222,14 @@ class __$$SetLogImplCopyWithImpl<$Res>
           ? _value.completedAt
           : completedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      durationSeconds: freezed == durationSeconds
+          ? _value.durationSeconds
+          : durationSeconds // ignore: cast_nullable_to_non_nullable
+              as int?,
+      distanceMeters: freezed == distanceMeters
+          ? _value.distanceMeters
+          : distanceMeters // ignore: cast_nullable_to_non_nullable
+              as double?,
     ));
   }
 }
@@ -204,7 +245,9 @@ class _$SetLogImpl implements _SetLog {
       required this.reps,
       required this.weightKg,
       this.rpe,
-      @TimestampConverter() required this.completedAt});
+      @TimestampConverter() required this.completedAt,
+      @JsonKey(includeIfNull: false) this.durationSeconds,
+      @JsonKey(includeIfNull: false) this.distanceMeters});
 
   factory _$SetLogImpl.fromJson(Map<String, dynamic> json) =>
       _$$SetLogImplFromJson(json);
@@ -227,9 +270,28 @@ class _$SetLogImpl implements _SetLog {
   @TimestampConverter()
   final DateTime completedAt;
 
+  /// Segundos que duró una serie por TIEMPO (una plancha). `null` en las
+  /// series por reps/peso y en las guardadas antes de que existiera el
+  /// campo (#1701): ahí la métrica era `reps: 0, weightKg: 0` y no había
+  /// dónde guardar el tiempo.
+  ///
+  /// `includeIfNull: false` para que una serie por reps no escriba la clave
+  /// y su documento quede idéntico al de antes. `rpe` conserva su
+  /// serialización (`rpe: null`) a propósito: cambiarla es otra decisión.
+  @override
+  @JsonKey(includeIfNull: false)
+  final int? durationSeconds;
+
+  /// Metros de una serie por DISTANCIA (un trineo, un farmer carry). `null`
+  /// en las series por reps/peso y en las anteriores al campo (#1701). Mismo
+  /// criterio de serialización que [durationSeconds].
+  @override
+  @JsonKey(includeIfNull: false)
+  final double? distanceMeters;
+
   @override
   String toString() {
-    return 'SetLog(id: $id, exerciseId: $exerciseId, exerciseName: $exerciseName, setNumber: $setNumber, reps: $reps, weightKg: $weightKg, rpe: $rpe, completedAt: $completedAt)';
+    return 'SetLog(id: $id, exerciseId: $exerciseId, exerciseName: $exerciseName, setNumber: $setNumber, reps: $reps, weightKg: $weightKg, rpe: $rpe, completedAt: $completedAt, durationSeconds: $durationSeconds, distanceMeters: $distanceMeters)';
   }
 
   @override
@@ -249,13 +311,27 @@ class _$SetLogImpl implements _SetLog {
                 other.weightKg == weightKg) &&
             (identical(other.rpe, rpe) || other.rpe == rpe) &&
             (identical(other.completedAt, completedAt) ||
-                other.completedAt == completedAt));
+                other.completedAt == completedAt) &&
+            (identical(other.durationSeconds, durationSeconds) ||
+                other.durationSeconds == durationSeconds) &&
+            (identical(other.distanceMeters, distanceMeters) ||
+                other.distanceMeters == distanceMeters));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, exerciseId, exerciseName,
-      setNumber, reps, weightKg, rpe, completedAt);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      exerciseId,
+      exerciseName,
+      setNumber,
+      reps,
+      weightKg,
+      rpe,
+      completedAt,
+      durationSeconds,
+      distanceMeters);
 
   /// Create a copy of SetLog
   /// with the given fields replaced by the non-null parameter values.
@@ -282,7 +358,9 @@ abstract class _SetLog implements SetLog {
           required final int reps,
           required final double weightKg,
           final int? rpe,
-          @TimestampConverter() required final DateTime completedAt}) =
+          @TimestampConverter() required final DateTime completedAt,
+          @JsonKey(includeIfNull: false) final int? durationSeconds,
+          @JsonKey(includeIfNull: false) final double? distanceMeters}) =
       _$SetLogImpl;
 
   factory _SetLog.fromJson(Map<String, dynamic> json) = _$SetLogImpl.fromJson;
@@ -304,6 +382,25 @@ abstract class _SetLog implements SetLog {
   @override
   @TimestampConverter()
   DateTime get completedAt;
+
+  /// Segundos que duró una serie por TIEMPO (una plancha). `null` en las
+  /// series por reps/peso y en las guardadas antes de que existiera el
+  /// campo (#1701): ahí la métrica era `reps: 0, weightKg: 0` y no había
+  /// dónde guardar el tiempo.
+  ///
+  /// `includeIfNull: false` para que una serie por reps no escriba la clave
+  /// y su documento quede idéntico al de antes. `rpe` conserva su
+  /// serialización (`rpe: null`) a propósito: cambiarla es otra decisión.
+  @override
+  @JsonKey(includeIfNull: false)
+  int? get durationSeconds;
+
+  /// Metros de una serie por DISTANCIA (un trineo, un farmer carry). `null`
+  /// en las series por reps/peso y en las anteriores al campo (#1701). Mismo
+  /// criterio de serialización que [durationSeconds].
+  @override
+  @JsonKey(includeIfNull: false)
+  double? get distanceMeters;
 
   /// Create a copy of SetLog
   /// with the given fields replaced by the non-null parameter values.

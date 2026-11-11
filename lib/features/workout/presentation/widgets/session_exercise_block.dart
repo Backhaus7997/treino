@@ -12,6 +12,7 @@ import '../../../../core/utils/kg_format.dart';
 import '../../domain/exercise_feedback.dart';
 import '../../domain/set_log.dart';
 import 'exercise_feedback_note.dart';
+import 'mmss.dart';
 
 /// Displays one exercise group: name heading followed by a row per [SetLog].
 /// API matches the old private `_ExerciseBlock` in session_detail_screen.dart.
@@ -177,9 +178,37 @@ class _SetRow extends StatelessWidget {
   /// Lo que el alumno reportó sobre ESTA serie (#628).
   final List<ExerciseFeedback> feedback;
 
+  /// Lo que se lee de la serie (#1701). Una serie por TIEMPO o por DISTANCIA
+  /// se guarda con `reps: 0, weightKg: 0`, y «0 reps · 0 kg» es falso: lo que
+  /// hizo el atleta es su tiempo o sus metros.
+  ///
+  /// - con [SetLog.durationSeconds] → el tiempo («01:30»);
+  /// - con [SetLog.distanceMeters] → los metros («40 m»);
+  /// - serie vieja por tiempo/distancia, sin ninguno (`reps == 0` y
+  ///   `weightKg == 0`) → un guion: no hay dato que mostrar, y escribir un 0
+  ///   afirmaría uno;
+  /// - el resto (reps con o sin peso, incluido el peso corporal) → «N reps»
+  ///   y «N kg», sin cambios.
+  String _primaryText(AppL10n l10n) {
+    final seconds = log.durationSeconds;
+    if (seconds != null) return formatMMSS(seconds);
+    final meters = log.distanceMeters;
+    if (meters != null) {
+      return l10n.workoutSetDistanceValue(
+        formatNumberDisplay(meters, l10n.localeName),
+      );
+    }
+    if (log.reps == 0 && log.weightKg == 0) return l10n.workoutSetNoMetric;
+    return '${log.reps} reps';
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final isMetricSet = log.durationSeconds != null ||
+        log.distanceMeters != null ||
+        (log.reps == 0 && log.weightKg == 0);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
@@ -197,14 +226,17 @@ class _SetRow extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${log.reps} reps',
+                  _primaryText(l10n),
                   style: TextStyle(color: palette.textPrimary),
                 ),
               ),
-              Text(
-                '${formatWeightDisplay(log.weightKg, AppL10n.of(context).localeName)} kg',
-                style: TextStyle(color: palette.textPrimary),
-              ),
+              // Una serie por tiempo/distancia no tiene carga que mostrar. Si
+              // alguna vez trae peso (un acarreo con carga), sí se muestra.
+              if (!isMetricSet || log.weightKg > 0)
+                Text(
+                  '${formatWeightDisplay(log.weightKg, l10n.localeName)} kg',
+                  style: TextStyle(color: palette.textPrimary),
+                ),
               // QA-WKT-007: no PR badge until real personal-record detection
               // exists. The Etapa-5 stub rendered on every set, showing false
               // PRs to the athlete and — via the coach-hub reuse — to the

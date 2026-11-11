@@ -29,7 +29,9 @@ import 'package:treino/features/workout/application/workout_clock.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/duration_timer.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/features/workout/domain/set_spec.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -257,6 +259,92 @@ void main() {
       await tester.pump();
 
       expect(notifier.loggedSets, hasLength(1));
+    });
+  });
+
+  // ── #1701 ───────────────────────────────────────────────────────────────────
+  group('#1701: la serie por tiempo guarda su tiempo', () {
+    // El bug: la serie se guardaba con `reps: 0, weightKg: 0` y NADA más, así
+    // que el historial decía «0 reps · 0 kg» y el resumen «0 kg». El tiempo
+    // existía —`cuenta.totalSeconds`— y se tiraba.
+    setUp(() => _ahora = DateTime.utc(2027, 1, 15, 10));
+
+    testWidgets('al llegar a cero, el SetLog lleva los segundos de la cuenta',
+        (tester) async {
+      final notifier = _DurationLoggingNotifier(_durationOnlyState());
+      await tester.pumpWidget(_wrap(() => notifier));
+      await tester.pump();
+
+      await tester.tap(find.text('Iniciar'));
+      await tester.pump();
+      _ahora = _ahora.add(const Duration(seconds: 5));
+      await tester.pump(DurationTimerRules.tickInterval);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      final log = notifier.loggedSets.single;
+      // `_durationOnlyState` prescribe 3 s.
+      expect(log.durationSeconds, 3);
+      // Y no es una serie por distancia ni por reps.
+      expect(log.distanceMeters, isNull);
+      expect(log.reps, 0);
+      expect(log.weightKg, 0);
+    });
+
+    testWidgets(
+        'cada serie guarda SU tiempo: con tiempos distintos por serie no se '
+        'copia el de la primera', (tester) async {
+      final notifier = _DurationLoggingNotifier(
+        SessionState(
+          session: makeSession(),
+          day: makeDay(
+            dayNumber: 1,
+            slots: const [
+              RoutineSlot(
+                exerciseId: 'edur',
+                exerciseName: 'Plancha',
+                muscleGroup: 'Core',
+                targetSets: 2,
+                targetRepsMin: 0,
+                targetRepsMax: 0,
+                restSeconds: 0,
+                exerciseMode: ExerciseMode.duration,
+                sets: [
+                  SetSpec(durationSeconds: 3),
+                  SetSpec(durationSeconds: 7),
+                ],
+              ),
+            ],
+          ),
+          setLogs: const [],
+          currentExerciseIndex: 0,
+          elapsedSeconds: 0,
+        ),
+      );
+      await tester.pumpWidget(_wrap(() => notifier));
+      await tester.pump();
+
+      // Hay un «Iniciar» por serie pendiente, pero sólo el de la serie actual
+      // está habilitado, y es el primero del árbol.
+      //
+      // Serie 1: 3 s.
+      await tester.tap(find.text('Iniciar').first);
+      await tester.pump();
+      _ahora = _ahora.add(const Duration(seconds: 10));
+      await tester.pump(DurationTimerRules.tickInterval);
+      await tester.pump();
+
+      // Serie 2: 7 s.
+      await tester.tap(find.text('Iniciar').first);
+      await tester.pump();
+      _ahora = _ahora.add(const Duration(seconds: 10));
+      await tester.pump(DurationTimerRules.tickInterval);
+      await tester.pump();
+
+      expect(
+        notifier.loggedSets.map((l) => (l.setNumber, l.durationSeconds)),
+        [(1, 3), (2, 7)],
+      );
     });
   });
 

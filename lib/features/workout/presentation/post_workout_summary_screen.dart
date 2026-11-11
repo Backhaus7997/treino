@@ -202,16 +202,21 @@ class _LoadedBody extends StatelessWidget {
                 unit: 'min',
                 countUpValue: session.durationMin,
               ),
-              StatTile(
-                icon: TreinoIcon.dumbbell,
-                label: l10n.workoutStatVolume,
-                unit: 'kg',
-                value: formatVolumeKg(
-                    session.totalVolumeKg, AppL10n.of(context).localeName),
-                countUpValue: session.totalVolumeKg,
-                countUpFormatter: (v) => formatVolumeKg(
-                    v.toDouble(), AppL10n.of(context).localeName),
-              ),
+              // #1701: sin carga no hay volumen. Una sesión sólo de series por
+              // tiempo o por distancia cierra con `totalVolumeKg == 0`, y un
+              // «VOLUMEN 0 kg» afirma un dato que no existe. El tile no se
+              // dibuja y la tarjeta se reparte en 3 (ver SessionStatsCard).
+              if (session.totalVolumeKg > 0)
+                StatTile(
+                  icon: TreinoIcon.dumbbell,
+                  label: l10n.workoutStatVolume,
+                  unit: 'kg',
+                  value: formatVolumeKg(
+                      session.totalVolumeKg, AppL10n.of(context).localeName),
+                  countUpValue: session.totalVolumeKg,
+                  countUpFormatter: (v) => formatVolumeKg(
+                      v.toDouble(), AppL10n.of(context).localeName),
+                ),
               StatTile(
                 icon: TreinoIcon.statSets,
                 label: l10n.workoutStatSets,

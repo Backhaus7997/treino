@@ -34,12 +34,20 @@ typedef SessionExerciseRecord = ({
 /// [sessionVolumeKg] suma SOLO sets con peso (#368). [isFirstTime]: primera
 /// vez que el atleta registra este ejercicio (ver reglas en
 /// [aggregateSessionHighlights]).
+///
+/// [bestDurationSeconds]/[bestDistanceMeters] (#1701): la mejor serie de un
+/// ejercicio por TIEMPO o por DISTANCIA —el mayor tiempo / los mayores metros
+/// de la sesión—. Estas series se guardan con peso y reps en 0, así que
+/// [bestWeightKg]/[bestSetReps] no dicen nada de ellas. `null` cuando ninguna
+/// serie del ejercicio trae esa métrica (reps/peso, o series viejas sin dato).
 typedef SessionExerciseSummary = ({
   String exerciseId,
   String exerciseName,
   int setCount,
   double bestWeightKg,
   int bestSetReps,
+  int? bestDurationSeconds,
+  double? bestDistanceMeters,
   double sessionVolumeKg,
   bool isFirstTime,
   List<SessionExerciseRecord> records,
@@ -133,12 +141,22 @@ SessionHighlights aggregateSessionHighlights({
 
     SetLog? best;
     var volume = 0.0;
+    int? bestDuration;
+    double? bestDistance;
     for (final log in logs) {
       if (log.weightKg > 0) volume += log.reps * log.weightKg;
       if (best == null ||
           log.weightKg > best.weightKg ||
           (log.weightKg == best.weightKg && log.reps > best.reps)) {
         best = log;
+      }
+      final seconds = log.durationSeconds;
+      if (seconds != null && (bestDuration == null || seconds > bestDuration)) {
+        bestDuration = seconds;
+      }
+      final meters = log.distanceMeters;
+      if (meters != null && (bestDistance == null || meters > bestDistance)) {
+        bestDistance = meters;
       }
     }
 
@@ -228,6 +246,8 @@ SessionHighlights aggregateSessionHighlights({
       setCount: logs.length,
       bestWeightKg: best!.weightKg,
       bestSetReps: best.reps,
+      bestDurationSeconds: bestDuration,
+      bestDistanceMeters: bestDistance,
       sessionVolumeKg: volume,
       isFirstTime:
           counts && hasHistory && canDetectFirstTime && !hadExerciseBefore,

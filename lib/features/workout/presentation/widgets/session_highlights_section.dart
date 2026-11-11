@@ -12,6 +12,7 @@ import '../../application/exercise_progression_aggregator.dart'
 import '../../application/session_highlights.dart';
 import '../../application/session_recognition.dart';
 import '../../domain/exercise_progression.dart';
+import 'mmss.dart';
 
 // NOTA l10n: los ARB los está tocando otra rama en vuelo, así que los strings
 // NUEVOS de este archivo van como literales es-AR con TODO(l10n) — mismo
@@ -403,18 +404,38 @@ class _SessionExerciseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     // Mejor set: "80 kg × 5", o "12 reps" para bodyweight (#368: peso 0).
     // TODO(l10n): "sets"/"reps" literales — mismo pendiente que tenían las
     // barras de distribución que este cambio reemplazó.
-    final bestSet = exercise.bestWeightKg > 0
-        ? '${_formatRecordValue(exercise.bestWeightKg, isOneRepMax: false, localeName: AppL10n.of(context).localeName)} kg '
+    //
+    // #1701: un ejercicio por TIEMPO o por DISTANCIA guarda peso 0 y reps 0, y
+    // «0 reps · peso corporal» es falso: su mejor serie es el tiempo o los
+    // metros. Con el peso por delante (una serie con carga es siempre «kg ×
+    // reps»), el orden es tiempo → metros → reps de peso corporal. Una serie
+    // vieja por tiempo/distancia, sin métrica ni reps, no tiene mejor serie que
+    // mostrar: queda sólo la cantidad de sets, en vez de un «0 reps».
+    final bestDuration = exercise.bestDurationSeconds;
+    final bestDistance = exercise.bestDistanceMeters;
+    final String? bestSet = exercise.bestWeightKg > 0
+        ? '${_formatRecordValue(exercise.bestWeightKg, isOneRepMax: false, localeName: l10n.localeName)} kg '
             '× ${exercise.bestSetReps}'
-        // #1513: «12 reps» a secas, al lado de filas con kg, se leía como un
-        // peso que faltaba. Dice que es peso corporal (y no «0 kg», que se lee
-        // como un error de carga).
-        : '${exercise.bestSetReps} reps · peso corporal';
-    final stats = '${exercise.setCount} sets · $bestSet';
+        : bestDuration != null
+            ? formatMMSS(bestDuration)
+            : bestDistance != null
+                ? l10n.workoutSetDistanceValue(
+                    formatNumberDisplay(bestDistance, l10n.localeName),
+                  )
+                : exercise.bestSetReps > 0
+                    // #1513: «12 reps» a secas, al lado de filas con kg, se
+                    // leía como un peso que faltaba. Dice que es peso corporal
+                    // (y no «0 kg», que se lee como un error de carga).
+                    ? '${exercise.bestSetReps} reps · peso corporal'
+                    : null;
+    final stats = bestSet == null
+        ? '${exercise.setCount} sets'
+        : '${exercise.setCount} sets · $bestSet';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

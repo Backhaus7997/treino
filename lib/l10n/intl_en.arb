@@ -1301,6 +1301,8 @@
   "coachDailyHeatmapSectionTitle": "MUSCLES OF THE DAY",
   "profileLoadError": "We couldn't load your profile. Please try again.",
   "sessionDetailNoSets": "This session has no logged sets.",
+  "workoutSetDistanceValue": "{meters} m",
+  "workoutSetNoMetric": "—",
   "sessionLogSetError": "We couldn't save the set. Please try again.",
   "sessionFinishedOnWatch": "You finished this workout on your watch.",
   "sessionFinishError": "We couldn't finish the session. Please try again.",
