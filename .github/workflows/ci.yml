@@ -528,8 +528,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up Swift
-        uses: swift-actions/setup-swift@v2
+      # Swift viene preinstalado en la imagen ubuntu de los runners. Antes se
+      # instalaba con `swift-actions/setup-swift@v2`, que verifica la firma
+      # bajando claves de keyserver.ubuntu.com: el 2026-11-11 ese servidor no
+      # respondía y estos dos jobs fallaban sin correr un solo test. El Swift de
+      # la imagen no depende de un servidor de terceros en cada corrida. Si una
+      # imagen futura dejara de traerlo, este paso falla acá y lo dice.
+      - name: Swift del runner
+        run: swift --version
 
       - name: Run Swift conformance
         run: bash conformance/run_swift.sh
@@ -553,8 +559,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up Swift
-        uses: swift-actions/setup-swift@v2
+      # Mismo Swift preinstalado que conformance-swift, y por la misma razón.
+      - name: Swift del runner
+        run: swift --version
 
       # Que el entitlement de HealthKit, su enganche a las TRES configuraciones
       # del target y los textos de permiso sigan en su lugar.
