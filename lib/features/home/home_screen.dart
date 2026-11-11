@@ -530,9 +530,7 @@ void _maybeShowResumePrompt(
               if (next.isLoading) return;
               final vigente = next.valueOrNull?.session.id;
               if (vigente == session.id) return;
-              if (dialogCtx.mounted) {
-                Navigator.of(dialogCtx, rootNavigator: true).pop();
-              }
+              _cerrarDialogo(dialogCtx);
             },
           );
           return _resumeModal(context, ref, dialogCtx, session, record);
@@ -540,6 +538,24 @@ void _maybeShowResumePrompt(
       ),
     );
   });
+}
+
+/// Cierra el diálogo de «Entrenamiento en curso» una sola vez.
+///
+/// ⚠️ Lo cierran dos caminos que se pisan: el `listen` de arriba, cuando la
+/// sesión deja de estar activa, y los botones del modal. DESCARTAR dispara los
+/// dos: `finish()` hace re-emitir el provider, el `listen` cierra, y después el
+/// botón vuelve a cerrar.
+///
+/// `dialogCtx.mounted` no alcanza como guard: el diálogo sigue montado durante
+/// su transición de salida. Y `pop()` saca la ruta de arriba, no "este
+/// diálogo", así que el segundo `pop` se llevaba la página de abajo y dejaba la
+/// pantalla vacía (#1693). `isCurrent` pasa a false en cuanto se pide el `pop`.
+void _cerrarDialogo(BuildContext dialogCtx) {
+  if (!dialogCtx.mounted) return;
+  final route = ModalRoute.of(dialogCtx);
+  if (route == null || !route.isCurrent) return;
+  Navigator.of(dialogCtx, rootNavigator: true).pop();
 }
 
 /// El modal en sí, extraído para que el `Consumer` de arriba quede legible.
@@ -553,7 +569,7 @@ Widget _resumeModal(
   return ResumeSessionModal(
     session: session,
     onContinue: () {
-      Navigator.of(dialogCtx, rootNavigator: true).pop();
+      _cerrarDialogo(dialogCtx);
       context.push('/workout/session/resume/${session.id}');
     },
     onDiscard: () async {
@@ -566,9 +582,9 @@ Widget _resumeModal(
             (_) => null,
           );
       if (vigente == null || vigente.id != session.id) {
-        if (dialogCtx.mounted) {
-          Navigator.of(dialogCtx, rootNavigator: true).pop();
-        }
+        // `_cerrarDialogo` chequea `mounted` y `isCurrent` ella misma.
+        // ignore: use_build_context_synchronously
+        _cerrarDialogo(dialogCtx);
         return;
       }
       // QA-WKT-011: clamp the discarded session's duration with the same
@@ -598,9 +614,9 @@ Widget _resumeModal(
         // QA-WKT-011: the write can throw or (offline) stall indefinitely.
         // Don't leave the barrierDismissible:false dialog stuck with an
         // unhandled exception — close it and surface a retryable error.
-        if (dialogCtx.mounted) {
-          Navigator.of(dialogCtx, rootNavigator: true).pop();
-        }
+        // `_cerrarDialogo` chequea `mounted` y `isCurrent` ella misma.
+        // ignore: use_build_context_synchronously
+        _cerrarDialogo(dialogCtx);
         if (context.mounted) {
           showTreinoToast(
             context,
@@ -614,9 +630,7 @@ Widget _resumeModal(
       // (user navigated away). Invalidating through a torn-down ref throws,
       // so guard on the host context before touching ref again.
       if (!context.mounted) return;
-      if (dialogCtx.mounted) {
-        Navigator.of(dialogCtx, rootNavigator: true).pop();
-      }
+      _cerrarDialogo(dialogCtx);
       ref.invalidate(activeSessionForUidProvider);
       // El reloj no tiene listeners: sin este aviso descartar acá cerraba
       // la sesión en Firestore y en el teléfono, pero la muñeca se quedaba
