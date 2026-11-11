@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +27,7 @@ import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/user_routines_providers.dart';
+import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
@@ -414,6 +416,64 @@ void main() {
 
       expect(find.text('Entrenamiento en curso'), findsNothing);
       expect(find.byType(HomeHeader), findsOneWidget);
+    });
+
+    // ── #1693: DESCARTAR cerraba el diálogo DOS veces ────────────────────────
+
+    testWidgets('#1693: DESCARTAR no deja la pantalla vacía (doble pop)',
+        (tester) async {
+      // Repositorio REAL sobre Firestore falso, y el `activeSessionForUidProvider`
+      // REAL —sin override—: el bug es que dos cierres se pisan, y uno sale de
+      // que `finish()` hace re-emitir ESE provider (cambia la colección, se
+      // mueve `sessionsRevisionProvider`, getActive ya no la devuelve). Con un
+      // override a mano la re-emisión sería la que escribe el test, no la de
+      // la app. Tampoco se reusa `_firstRunOverrides`: fija la sesión activa en
+      // null y acá justo es lo que tiene que cambiar solo.
+      final repo = SessionRepository(firestore: FakeFirebaseFirestore());
+      // `startedAt` de ahora: `getActive` cierra las colgadas de más de 8 hs
+      // (`maxWorkoutDuration`) y devolvería null, o sea que DESCARTAR saldría
+      // por el return temprano.
+      await repo.create(
+        uid: _uid,
+        routineId: 'r1',
+        routineName: 'Push',
+        startedAt: DateTime.now().toUtc(),
+      );
+
+      await tester.pumpWidget(
+        _wrapWithRouter(_firstRunRouter(), [
+          userProfileProvider
+              .overrideWith((ref) => Stream.value(makeProfile())),
+          currentUidProvider.overrideWithValue(_uid),
+          sessionRepositoryProvider.overrideWithValue(repo),
+          userCreatedRoutinesProvider(_uid).overrideWith(
+            (ref) => Stream.value(const <Routine>[]),
+          ),
+          assignedRoutinesProvider(_uid)
+              .overrideWith((ref) async => const <Routine>[]),
+          todaysRoutineProvider.overrideWith((ref) async => null),
+          weeklyInsightsProvider.overrideWith((ref) async => null),
+          currentAthleteLinkProvider.overrideWith(
+            (ref) => Stream<TrainerLink?>.value(null),
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Entrenamiento en curso'), findsOneWidget);
+
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+
+      // Con el doble pop, el segundo sacaba la página de Home de abajo: go_router
+      // tira su assert de "match list vacía" en debug, y en release la pantalla
+      // queda en blanco.
+      expect(tester.takeException(), isNull);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.text('Entrenamiento en curso'), findsNothing);
+      // Y el descarte pasó de verdad: si no, el test habría salido por el
+      // return temprano y no probaría nada.
+      final sesiones = await repo.listByUid(_uid);
+      expect(sesiones.single.status, SessionStatus.finished);
     });
   });
 
