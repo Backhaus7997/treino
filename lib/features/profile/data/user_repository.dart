@@ -579,7 +579,9 @@ class UserRepository {
   ///   - `userPublicProfiles/{uid}` — written when partial contains any of
   ///     `displayName`, `avatarUrl`, `gymId`. REQ-UPP-011, REQ-UPP-012.
   ///   - `trainerPublicProfiles/{uid}` — written when partial contains any
-  ///     trainer-specific field (see [_trainerPublicFields]).
+  ///     trainer-specific field (see [_trainerPublicFields]). Sin campo de PF,
+  ///     un `displayName` / `avatarUrl` se espeja sólo si el usuario es PF y su
+  ///     tarjeta ya existe (ver [_trainerIdentityOnlySubset], #1336 / #1694).
   ///     REQ-COACH-DISC-DUAL-001.
   ///
   /// All three writes are in a single batch.commit() — no partial state.
@@ -797,8 +799,9 @@ class UserRepository {
     return filaPref[canal] != false;
   }
 
-  /// #1336 — espejo del nombre cuando el partial lleva `displayName` pero
-  /// ningún campo de PF (Coach Hub, Ajustes → Cuenta).
+  /// #1336 / #1694 — espejo de la IDENTIDAD (nombre y foto) cuando el partial
+  /// lleva `displayName` y/o `avatarUrl` pero ningún campo de PF (Coach Hub,
+  /// Ajustes → Cuenta; la pantalla «Datos personales» del mobile).
   ///
   /// [_trainerPublicSubsetFromPartial] se apaga sin campo de PF a propósito
   /// (regresión #58: el alta de un alumno mandaba `displayName` y la rule
@@ -808,29 +811,43 @@ class UserRepository {
   /// entra, así que #58 sigue cerrado.
   ///
   /// SÓLO ACTUALIZA: si `trainerPublicProfiles/{uid}` no existe no lo crea. Un
-  /// partial de nombre solo no es una tarjeta completa, y `listAll()` no filtra
-  /// por completitud: crearla acá metería una tarjeta pelada al descubrimiento
-  /// (el paso `cuenta` del onboarding corre antes que `pf`, que es quien la
-  /// crea). Tampoco espeja un nombre vacío: anularía `displayNameLowercase` y
-  /// la tarjeta saldría del `orderBy`.
+  /// partial de identidad solo no es una tarjeta completa, y `listAll()` no
+  /// filtra por completitud: crearla acá metería una tarjeta pelada al
+  /// descubrimiento (el paso `cuenta` del onboarding corre antes que `pf`, que
+  /// es quien la crea). Tampoco espeja un nombre vacío: anularía
+  /// `displayNameLowercase` y la tarjeta saldría del `orderBy`.
   ///
-  /// Cuesta dos lecturas, sólo cuando el partial trae `displayName` y no hay
+  /// El `avatarUrl` SÍ se espeja en `null`: «Quitar foto» es un valor legítimo,
+  /// y sin espejarlo Discovery seguiría mostrando una imagen que ya se borró de
+  /// Storage. Hasta #1694 este helper sólo miraba `displayName`: cambiar la
+  /// foto actualizaba `users/` y `userPublicProfiles/` pero dejaba la tarjeta
+  /// de Discovery con la foto vieja.
+  ///
+  /// Cuesta dos lecturas, sólo cuando el partial trae algo espejable y no hay
   /// otro disparador.
-  Future<Map<String, Object?>?> _trainerNameOnlySubset(
+  Future<Map<String, Object?>?> _trainerIdentityOnlySubset(
     String uid,
     Map<String, Object?> partial,
   ) async {
-    if (!partial.containsKey('displayName')) return null;
+    final trimmed = partial.containsKey('displayName')
+        ? (partial['displayName'] as String?)?.trim()
+        : null;
+    // Null = no hay nombre espejable (ausente, null o en blanco).
+    final name = trimmed != null && trimmed.isNotEmpty ? trimmed : null;
+    final mirrorAvatar = partial.containsKey('avatarUrl');
+    if (name == null && !mirrorAvatar) return null;
+
     final snap = await _users.doc(uid).get();
     if (snap.data()?['role'] != UserRole.trainer.name) return null;
-    final name = (partial['displayName'] as String?)?.trim();
-    if (name == null || name.isEmpty) return null;
     final card = await _trainerPublicProfiles.doc(uid).get();
     if (!card.exists) return null;
     return {
       'uid': uid,
-      'displayName': partial['displayName'],
-      'displayNameLowercase': name.toLowerCase(),
+      if (name != null) ...{
+        'displayName': partial['displayName'],
+        'displayNameLowercase': name.toLowerCase(),
+      },
+      if (mirrorAvatar) 'avatarUrl': partial['avatarUrl'],
     };
   }
 
@@ -947,7 +964,7 @@ class UserRepository {
     );
     final trainerPublicSubset = trainerSubsetDelPartial != null
         ? await _conNombreDeLaCuenta(uid, trainerSubsetDelPartial)
-        : await _trainerNameOnlySubset(uid, efectivo);
+        : await _trainerIdentityOnlySubset(uid, efectivo);
 
     if (publicSubset == null && trainerPublicSubset == null) {
       // No public-relevant fields — single write to users only.
