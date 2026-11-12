@@ -214,15 +214,22 @@ class PostCard extends ConsumerWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                Text(
-                  '${formatVolumeKg(post.workoutStats!.volumeKg, AppL10n.of(context).localeName)} kg',
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 12,
-                    color: palette.textMuted,
+                // #1701: sin carga no hay volumen. Un entreno sólo de series por
+                // tiempo o por distancia comparte `volumeKg == 0`, y «0 kg»
+                // afirma un dato que no existe. Vale también para los posts ya
+                // publicados. El separador va adentro del `if`: afuera quedaría
+                // un hueco de 18px antes de la duración.
+                if (post.workoutStats!.volumeKg > 0) ...[
+                  Text(
+                    '${formatVolumeKg(post.workoutStats!.volumeKg, AppL10n.of(context).localeName)} kg',
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      color: palette.textMuted,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 18),
+                  const SizedBox(width: 18),
+                ],
                 Text(
                   '${post.workoutStats!.durationMin} min',
                   style: GoogleFonts.barlow(

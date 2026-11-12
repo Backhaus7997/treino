@@ -1643,6 +1643,29 @@ void main() {
       expect(find.text('INCOMPLETA'), findsOneWidget);
     });
 
+    // #1701: una sesión sólo de series por tiempo o por distancia tiene
+    // `totalVolumeKg == 0`. En una tabla la columna no puede faltar en una sola
+    // fila: va «—» y no «0 kg». El caso con carga es el test de «7840 kg».
+    testWidgets('Sesiones: una sesión sin carga muestra «—» y no «0 kg»',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [_session(routineName: 'Plancha', totalVolumeKg: 0)],
+      );
+
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
+
+      expect(find.text('Plancha'), findsOneWidget);
+      expect(find.text('0 kg'), findsNothing);
+      expect(find.text('—'), findsOneWidget);
+    });
+
     testWidgets('Sesiones usa startedAt cuando finishedAt falta',
         (tester) async {
       await _pump(

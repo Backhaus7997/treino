@@ -99,6 +99,11 @@ List<Override> _baseOverrides() => [
           const UserPublicProfile(uid: _kAthlete, displayName: 'Lucía'),
         ),
       ),
+      userPublicProfileProvider('a2').overrideWith(
+        (_) => Stream.value(
+          const UserPublicProfile(uid: 'a2', displayName: 'Mati'),
+        ),
+      ),
     ];
 
 void main() {
@@ -184,5 +189,55 @@ void main() {
     expect(find.text('ficha:$_kAthlete'), findsNothing,
         reason: 'la SEGUNDA de las dos secciones. Tenía el mismo onTap copiado '
             'y arreglar sólo la otra se ve igual desde afuera');
+  });
+
+  // #1701: una sesión sólo de series por tiempo o por distancia tiene
+  // `totalVolumeKg == 0`, y «0 kg» afirma un dato que no existe. Mismo corte en
+  // las dos secciones —el trailing está copiado en cada fila—, así que van las
+  // dos. Cada test mezcla un alumno con carga y otro sin: con carga conserva su
+  // kg, y el único «kg» de la lista tiene que ser el suyo.
+  final conCarga = _session().copyWith(totalVolumeKg: 4200);
+  final sinCarga = _session().copyWith(id: 's-a2', uid: 'a2');
+
+  testWidgets('ENTRENARON HOY: la sesión sin carga no muestra «0 kg»',
+      (tester) async {
+    await tester.pumpWidget(_wrap(
+      const EntrenaronHoyListTestHarness(),
+      overrides: [
+        ..._baseOverrides(),
+        trainedTodayProvider.overrideWithValue(
+          AsyncValue.data([
+            TrainedTodayEntry(athleteId: _kAthlete, session: conCarga),
+            TrainedTodayEntry(athleteId: 'a2', session: sinCarga),
+          ]),
+        ),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mati'), findsOneWidget);
+    expect(find.text('4.200 kg'), findsOneWidget);
+    expect(find.textContaining('kg'), findsOneWidget);
+  });
+
+  testWidgets('ACTIVIDAD RECIENTE: la sesión sin carga no muestra «0 kg»',
+      (tester) async {
+    await tester.pumpWidget(_wrap(
+      const ActividadRecienteListTestHarness(),
+      overrides: [
+        ..._baseOverrides(),
+        recentActivityProvider.overrideWithValue(
+          AsyncValue.data([
+            RecentActivityEntry(athleteId: _kAthlete, session: conCarga),
+            RecentActivityEntry(athleteId: 'a2', session: sinCarga),
+          ]),
+        ),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mati'), findsOneWidget);
+    expect(find.text('4.200 kg'), findsOneWidget);
+    expect(find.textContaining('kg'), findsOneWidget);
   });
 }

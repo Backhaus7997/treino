@@ -156,7 +156,12 @@ class _AxisBarRow extends StatelessWidget {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
                 child: Text(
-                  '$sets sets · ${formatVolumeKg(volumeKg, AppL10n.of(context).localeName)} kg',
+                  // #1701: un eje sin carga (series por tiempo o por distancia,
+                  // o un snapshot viejo sin `volumeKgByAxis`) llega con 0, y
+                  // «0 kg» afirma un dato que no existe: queda sólo el conteo.
+                  volumeKg > 0
+                      ? '$sets sets · ${formatVolumeKg(volumeKg, AppL10n.of(context).localeName)} kg'
+                      : '$sets sets',
                   maxLines: 1,
                   style: GoogleFonts.barlow(
                     fontSize: 12,

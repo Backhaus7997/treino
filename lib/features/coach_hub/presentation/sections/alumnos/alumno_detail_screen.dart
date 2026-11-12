@@ -3216,10 +3216,17 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
                   ),
                   Expanded(
                     flex: 2,
-                    child:
-                        Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
-                            style: c,
-                            textAlign: TextAlign.right),
+                    // #1701: sin carga no hay volumen. Una sesión sólo de series
+                    // por tiempo o por distancia tiene `totalVolumeKg == 0`, y
+                    // «0 kg» afirma un dato que no existe. En una tabla la
+                    // columna no puede faltar en una sola fila: va el mismo
+                    // «—» de la fecha cuando no hay dato.
+                    child: Text(
+                        s.totalVolumeKg > 0
+                            ? '${s.totalVolumeKg.round()} kg' // i18n: Fase W2
+                            : '—',
+                        style: c,
+                        textAlign: TextAlign.right),
                   ),
                   SizedBox(
                     width: 24,
