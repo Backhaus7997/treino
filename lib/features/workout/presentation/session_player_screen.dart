@@ -492,7 +492,16 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
 
     final slot = _slotDe(cuenta.exerciseId);
     if (slot == null) return;
-    _logSet(slot, cuenta.setNumber, 0, 0.0);
+    // El tiempo de la serie es lo que corrió la cuenta (#1701). No hay pausa ni
+    // «terminar antes» —sólo Iniciar y Cancelar—, así que lo hecho es siempre
+    // lo prescripto, y `totalSeconds` es la única fuente que lo tiene.
+    _logSet(
+      slot,
+      cuenta.setNumber,
+      0,
+      0.0,
+      durationSeconds: cuenta.totalSeconds,
+    );
   }
 
   /// Saca de la sesión la anotación del cronómetro que acaba de terminar.
@@ -729,10 +738,30 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// ejercicio por tiempo jamás puede terminarse. Idem DISTANCIA
   /// (`_DistanceSetRow` llama `onSetCheck(n, 0, 0)`): `effectiveExerciseMode`
   /// la infiere de los metros aunque el doc diga `exerciseMode: reps`.
-  void _logSet(RoutineSlot slot, int setNumber, int reps, double weightKg) {
+  ///
+  /// #1701: una serie por tiempo o por distancia guarda `reps: 0, weightKg: 0`,
+  /// y sin más datos el historial no sabe qué hizo el atleta. Por eso la serie
+  /// lleva además su métrica propia:
+  /// - [durationSeconds]: lo pasa quien marca una serie por TIEMPO, que es el
+  ///   único que lo sabe (`_revisarCronometro`, con lo que corrió la cuenta).
+  /// - los metros NO se pasan: la fila de distancia es un check sin valor
+  ///   editable, así que lo hecho es lo prescripto y se lee del spec de ESTA
+  ///   serie ([_metrosPrescriptos]). Resolverlo acá evita cambiar los cuatro
+  ///   typedefs de `onSetCheck` que atraviesan los bloques.
+  ///
+  /// Un valor nulo o `<= 0` se guarda como `null`: un «0 s» o «0 m» afirmaría
+  /// una medición que no ocurrió. Las series por reps no llevan ninguno.
+  void _logSet(
+    RoutineSlot slot,
+    int setNumber,
+    int reps,
+    double weightKg, {
+    int? durationSeconds,
+  }) {
     if (slot.effectiveExerciseMode == ExerciseMode.reps && reps <= 0) {
       return;
     }
+    final meters = _metrosPrescriptos(slot, setNumber);
     // #1510: el descanso configurado en la rutina arranca solo al marcar la
     // serie. Una serie nueva reinicia la cuenta (no se apilan).
     //
@@ -751,8 +780,32 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             reps: reps,
             weightKg: weightKg,
             completedAt: DateTime.now(),
+            durationSeconds: durationSeconds != null && durationSeconds > 0
+                ? durationSeconds
+                : null,
+            distanceMeters: meters != null && meters > 0 ? meters : null,
           ),
         );
+  }
+
+  /// Los metros que prescribe el spec de la serie [setNumber] (1-based) de un
+  /// slot por DISTANCIA, o `null` si no es de distancia o no hay spec.
+  ///
+  /// Lee el MISMO spec que dibuja la fila (`effectiveSetsForWeek` con la semana
+  /// de la sesión), así lo que se guarda es lo que el atleta vio en pantalla.
+  /// Una fila agregada más allá del plan no tiene spec (AD-4) y da `null`.
+  double? _metrosPrescriptos(RoutineSlot slot, int setNumber) {
+    if (slot.effectiveExerciseMode != ExerciseMode.distance) return null;
+    final week = ref
+            .read(sessionNotifierProvider(widget.init))
+            .value
+            ?.session
+            .weekNumber ??
+        0;
+    final specs = slot.effectiveSetsForWeek(week);
+    final idx = setNumber - 1;
+    if (idx < 0 || idx >= specs.length) return null;
+    return specs[idx].distanceMeters;
   }
 
   /// Actualiza un set ya logueado con nuevos valores de reps y/o peso.

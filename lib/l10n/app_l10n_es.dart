@@ -3622,6 +3622,14 @@ class AppL10nEs extends AppL10n {
   String get sessionDetailNoSets => 'Esta sesión no tiene sets registrados.';
 
   @override
+  String workoutSetDistanceValue(String meters) {
+    return '$meters m';
+  }
+
+  @override
+  String get workoutSetNoMetric => '—';
+
+  @override
   String get sessionFinishedOnWatch =>
       'Finalizaste este entrenamiento desde el reloj.';
 
@@ -9928,6 +9936,14 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get sessionDetailNoSets => 'Esta sesión no tiene sets registrados.';
+
+  @override
+  String workoutSetDistanceValue(String meters) {
+    return '$meters m';
+  }
+
+  @override
+  String get workoutSetNoMetric => '—';
 
   @override
   String get sessionFinishedOnWatch =>

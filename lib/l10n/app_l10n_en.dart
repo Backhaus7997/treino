@@ -3561,6 +3561,14 @@ class AppL10nEn extends AppL10n {
   String get sessionDetailNoSets => 'This session has no logged sets.';
 
   @override
+  String workoutSetDistanceValue(String meters) {
+    return '$meters m';
+  }
+
+  @override
+  String get workoutSetNoMetric => '—';
+
+  @override
   String get sessionFinishedOnWatch =>
       'You finished this workout on your watch.';
 

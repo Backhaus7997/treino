@@ -30,6 +30,7 @@ import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/post_workout_summary_screen.dart';
 import 'package:treino/features/workout/presentation/widgets/session_stats_card.dart';
+import 'package:treino/features/workout/presentation/widgets/stat_tile.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -73,6 +74,8 @@ SessionExerciseSummary _exercise({
   int setCount = 4,
   double bestWeightKg = 80,
   int bestSetReps = 5,
+  int? bestDurationSeconds,
+  double? bestDistanceMeters,
   double sessionVolumeKg = 1200,
   bool isFirstTime = false,
   List<SessionExerciseRecord> records = const [],
@@ -83,6 +86,8 @@ SessionExerciseSummary _exercise({
       setCount: setCount,
       bestWeightKg: bestWeightKg,
       bestSetReps: bestSetReps,
+      bestDurationSeconds: bestDurationSeconds,
+      bestDistanceMeters: bestDistanceMeters,
       sessionVolumeKg: sessionVolumeKg,
       isFirstTime: isFirstTime,
       records: records,
@@ -302,6 +307,97 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('5'), findsOneWidget);
+  });
+
+  // ── #1701: sesión sin carga (series por tiempo / distancia) ──────────────
+
+  testWidgets(
+      '#1701: sin volumen (totalVolumeKg 0) no hay tile VOLUMEN ni "0 kg"; '
+      'quedan los otros 3', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (
+        session: _makeSession(durationMin: 18, totalVolumeKg: 0),
+        setLogs: List.generate(3, (_) => _makeSetLog()),
+      ),
+      highlights: _highlights(recordCount: 0),
+    ));
+    await tester.pumpAndSettle();
+
+    final card = find.byType(SessionStatsCard);
+    expect(find.descendant(of: card, matching: find.byType(StatTile)),
+        findsNWidgets(3));
+    expect(find.text('VOLUMEN'), findsNothing);
+    expect(find.text('kg'), findsNothing);
+    expect(find.text('0 kg'), findsNothing);
+    // Los demás siguen, con sus valores.
+    expect(find.text('DURACIÓN'), findsOneWidget);
+    expect(find.text('18'), findsOneWidget);
+    expect(find.text('SETS'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('PRS HOY'), findsOneWidget);
+  });
+
+  testWidgets(
+      '#1701: con volumen, el tile VOLUMEN sigue y la tarjeta tiene 4 tiles',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (
+        session: _makeSession(totalVolumeKg: 1200),
+        setLogs: [_makeSetLog()],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(SessionStatsCard),
+        matching: find.byType(StatTile),
+      ),
+      findsNWidgets(4),
+    );
+    expect(find.text('VOLUMEN'), findsOneWidget);
+    expect(find.text('kg'), findsOneWidget);
+  });
+
+  testWidgets(
+      '#1701: la tarjeta de 3 tiles no desborda ni con 390px de ancho y '
+      'font scale 3x', (tester) async {
+    tester.view.physicalSize = const Size(390, 3000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final horizontalOverflows = <FlutterErrorDetails>[];
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final message = details.exceptionAsString();
+      if (message.contains('overflowed')) {
+        if (message.contains('on the right')) {
+          horizontalOverflows.add(details);
+        }
+        return; // los overflows verticales del grid a este ancho no aplican
+      }
+      originalOnError?.call(details);
+    };
+    try {
+      await tester.pumpWidget(_buildWithRouter(
+        textScale: 3.0,
+        reduceMotion: true,
+        summaryOverride: () => (
+          session: _makeSession(totalVolumeKg: 0),
+          setLogs: [_makeSetLog()],
+        ),
+        highlights: _highlights(recordCount: 0),
+      ));
+      await tester.pumpAndSettle();
+    } finally {
+      FlutterError.onError = originalOnError;
+    }
+
+    expect(
+      horizontalOverflows.map((d) => d.exceptionAsString()).toList(),
+      isEmpty,
+    );
+    expect(find.text('VOLUMEN'), findsNothing);
   });
 
   testWidgets('stat card owns tile stagger and mood follows its four slots',
@@ -650,6 +746,116 @@ void main() {
     expect(find.text('1ª VEZ'), findsOneWidget);
     // Destacado: e1 tiene el mayor volumen → una sola estrella.
     expect(find.byIcon(TreinoIcon.starFill), findsOneWidget);
+  });
+
+  testWidgets(
+      '#1701 EJERCICIOS: un ejercicio por tiempo muestra su mejor serie en '
+      'mm:ss, no «0 reps · peso corporal»', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        exercises: [
+          _exercise(
+            id: 'plank',
+            name: 'Plancha',
+            setCount: 3,
+            bestWeightKg: 0,
+            bestSetReps: 0,
+            bestDurationSeconds: 45,
+            sessionVolumeKg: 0,
+          ),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 sets · 00:45'), findsOneWidget);
+    expect(find.textContaining('peso corporal'), findsNothing);
+    expect(find.textContaining('0 reps'), findsNothing);
+  });
+
+  testWidgets(
+      '#1701 EJERCICIOS: un ejercicio por distancia muestra los metros, con '
+      'el separador de miles del locale', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        exercises: [
+          _exercise(
+            id: 'sled',
+            name: 'Trineo',
+            setCount: 4,
+            bestWeightKg: 0,
+            bestSetReps: 0,
+            bestDistanceMeters: 40,
+            sessionVolumeKg: 0,
+          ),
+          _exercise(
+            id: 'run',
+            name: 'Remo largo',
+            setCount: 2,
+            bestWeightKg: 0,
+            bestSetReps: 0,
+            bestDistanceMeters: 1500,
+            sessionVolumeKg: 0,
+          ),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('4 sets · 40 m'), findsOneWidget);
+    expect(find.text('2 sets · 1.500 m'), findsOneWidget);
+    expect(find.textContaining('peso corporal'), findsNothing);
+  });
+
+  testWidgets(
+      '#1701 EJERCICIOS: una serie vieja por tiempo/distancia (0 reps, sin '
+      'métrica) muestra sólo los sets, sin «0 reps»', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        exercises: [
+          _exercise(
+            id: 'plank',
+            name: 'Plancha',
+            setCount: 3,
+            bestWeightKg: 0,
+            bestSetReps: 0,
+            sessionVolumeKg: 0,
+          ),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 sets'), findsOneWidget);
+    expect(find.textContaining('reps'), findsNothing);
+  });
+
+  testWidgets(
+      '#1701 EJERCICIOS: con carga manda «kg × reps» (aunque traiga metros) y '
+      'el peso corporal por reps no cambia', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        exercises: [
+          _exercise(bestDistanceMeters: 30), // 4 sets · 80 kg × 5
+          _exercise(
+            id: 'pullup',
+            name: 'Dominadas',
+            setCount: 3,
+            bestWeightKg: 0,
+            bestSetReps: 12,
+            sessionVolumeKg: 0,
+          ),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('4 sets · 80 kg × 5'), findsOneWidget);
+    expect(find.text('3 sets · 12 reps · peso corporal'), findsOneWidget);
   });
 
   // ── Reduced motion ───────────────────────────────────────────────────────
