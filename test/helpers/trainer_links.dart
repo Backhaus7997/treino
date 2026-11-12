@@ -1,6 +1,7 @@
 // Vínculos PF↔alumno para los tests que sólo necesitan su ESTADO (#1695).
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:flutter_test/flutter_test.dart' show Fake;
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -27,4 +28,18 @@ Future<TrainerLinkRepository> repoConVinculos(List<TrainerLink> links) async {
     await firestore.collection('trainer_links').doc(l.id).set(l.toJson());
   }
   return TrainerLinkRepository(firestore: firestore);
+}
+
+/// Doble SINCRÓNICO para los harness que no hablan del vínculo: el servidor
+/// tiene vivos a [vivos]. Lo que prueba la verificación de verdad es
+/// [repoConVinculos], no esto.
+TrainerLinkRepository repoConVivos(Iterable<String> vivos) =>
+    _RepoConVivos(vivos.toSet());
+
+class _RepoConVivos extends Fake implements TrainerLinkRepository {
+  _RepoConVivos(this._vivos);
+  final Set<String> _vivos;
+
+  @override
+  Future<Set<String>> alumnosConVinculoVivo(String trainerId) async => _vivos;
 }

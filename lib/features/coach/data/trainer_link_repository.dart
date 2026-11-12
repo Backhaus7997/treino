@@ -187,12 +187,19 @@ class TrainerLinkRepository {
     required String trainerId,
     required String athleteId,
   }) async {
-    if (trainerId.isEmpty || athleteId.isEmpty) return false;
+    if (athleteId.isEmpty) return false;
+    return (await alumnosConVinculoVivo(trainerId)).contains(athleteId);
+  }
+
+  /// Los alumnos con vínculo vivo AHORA, en UNA lectura: asignarle un plan a N
+  /// alumnos a la vez no tiene que pedir la misma lista N veces.
+  Future<Set<String>> alumnosConVinculoVivo(String trainerId) async {
+    if (trainerId.isEmpty) return const {};
     final links = await listForTrainer(
       trainerId,
       statuses: kEstadosDeVinculoVivo,
     );
-    return links.any((l) => l.athleteId == athleteId);
+    return {for (final l in links) l.athleteId};
   }
 
   // ─── setSharedWithTrainer ───────────────────────────────────────────────

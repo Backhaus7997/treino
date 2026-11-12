@@ -34,6 +34,7 @@ import 'package:treino/features/coach_hub/domain/periodized_plan.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
 import '../data/periodized_test_helpers.dart';
+import '../../../helpers/trainer_links.dart';
 
 /// Borrador del import armado con el parser REAL a partir de renglones de la
 /// hoja `Programa` (después del encabezado del DÍA 1 con [weeks] semanas).
@@ -184,6 +185,9 @@ List<Override> previewOverrides(RoutineRepository repo) => [
       userProfileProvider.overrideWith((ref) => Stream.value(trainerProfile())),
       currentUidProvider.overrideWithValue(kTrainerUid),
       routineRepositoryProvider.overrideWithValue(repo),
+      // La verificación previa a escribir (#1695) los encuentra vivos.
+      trainerLinkRepositoryProvider
+          .overrideWithValue(repoConVivos([kAthleteId, 'ath-2'])),
       trainerLinksStreamProvider.overrideWith(
         (ref) => Stream.value([
           TrainerLink(

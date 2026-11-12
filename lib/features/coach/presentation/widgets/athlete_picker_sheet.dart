@@ -8,6 +8,7 @@ import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/trainer_link_providers.dart';
+import '../../domain/trainer_link.dart';
 import '../../domain/trainer_link_status.dart';
 
 /// Shows a modal bottom sheet listing the trainer's currently active
@@ -25,6 +26,11 @@ Future<String?> showAthletePickerSheet(BuildContext context) {
     builder: (_) => const _AthletePickerSheetContent(),
   );
 }
+
+/// Con vínculo VIVO (activo o pausado), el criterio de toda asignación (#1695).
+/// Antes sólo `active`: el pausado seguía siendo del PF y el Hub sí lo ofrecía.
+List<TrainerLink> _vivos(List<TrainerLink> links) =>
+    links.where((l) => kEstadosDeVinculoVivo.contains(l.status)).toList();
 
 class _AthletePickerSheetContent extends ConsumerWidget {
   const _AthletePickerSheetContent();
@@ -76,11 +82,7 @@ class _AthletePickerSheetContent extends ConsumerWidget {
                   childKey: ValueKey(linksAsync.when(
                     loading: () => 'loading',
                     error: (_, __) => 'error',
-                    data: (links) => links
-                            .where((l) => l.status == TrainerLinkStatus.active)
-                            .isEmpty
-                        ? 'empty'
-                        : 'data',
+                    data: (links) => _vivos(links).isEmpty ? 'empty' : 'data',
                   )),
                   child: linksAsync.when(
                     loading: () => Center(
@@ -94,9 +96,7 @@ class _AthletePickerSheetContent extends ConsumerWidget {
                       ),
                     ),
                     data: (links) {
-                      final active = links
-                          .where((l) => l.status == TrainerLinkStatus.active)
-                          .toList();
+                      final active = _vivos(links);
                       if (active.isEmpty) {
                         return _EmptyState(palette: palette);
                       }

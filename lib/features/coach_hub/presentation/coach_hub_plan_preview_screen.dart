@@ -183,6 +183,15 @@ class _CoachHubPlanPreviewScreenState
                 'continuar.');
       case PlanAssignNoAthletes():
         setState(() => _error = 'Elegí al menos un atleta antes de asignar.');
+      case PlanAssignSinVinculo(:final athleteIds):
+        // Se sacan de la selección: reintentar con ellos adentro falla igual.
+        setState(() {
+          _selectedAthleteIds.removeAll(athleteIds);
+          _error = 'No se asignó nada: ya no tenés un vínculo vigente con '
+              '${athleteIds.length} de los atletas elegidos. Los sacamos de '
+              'la selección.'; // i18n
+          _saving = false;
+        });
       case PlanAssignModerationBlocked(:final campo):
         // El mismo plan para todos los atletas: si lo vetó para uno, lo vetó
         // para todos. «Probá de nuevo» sería consejo falso; la ubicación le
@@ -841,8 +850,10 @@ class _AthletePicker extends ConsumerWidget {
         style: TextStyle(color: palette.textMuted),
       ),
       data: (links) {
-        final active =
-            links.where((l) => l.status == TrainerLinkStatus.active).toList();
+        // Vivo = activo o pausado (#1695); `assign` lo re-confirma.
+        final active = links
+            .where((l) => kEstadosDeVinculoVivo.contains(l.status))
+            .toList();
         if (active.isEmpty) {
           return Container(
             padding: const EdgeInsets.all(14),

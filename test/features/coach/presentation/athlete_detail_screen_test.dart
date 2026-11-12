@@ -11,6 +11,10 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/athlete_detail_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -42,6 +46,8 @@ import 'package:treino/features/performance/domain/performance_test.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/log_measurement_screen.dart';
+
+import '../../../helpers/trainer_links.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {}
 
@@ -215,6 +221,9 @@ Future<void> _pumpScreen(
         // Sin plan nutricional por default: la sección (#1538) no es lo que
         // miran estos tests, y sin override le pegaría a Firestore real.
         nutritionPlanProvider.overrideWith((ref, key) => Stream.value(null)),
+        // CREAR PLAN exige vínculo vivo (#1695): por default, el alumno lo es.
+        trainerLinksStreamProvider
+            .overrideWith((ref) => Stream.value([linkDe(athleteId)])),
         ...overrides,
       ],
       child: MaterialApp.router(
@@ -358,6 +367,60 @@ void main() {
     });
   });
 
+  // #1695: CREAR PLAN (y IMPORTAR DE PDF) crean un plan para el alumno, y a esta
+  // ficha se llega también desde un turno pasado, o sea de un ex-alumno. Las
+  // rules validan el rol y no el vínculo, así que el gate es de la UI.
+  group('AthleteDetailScreen — CREAR PLAN exige vínculo vivo (#1695)', () {
+    Future<void> pumpCon(
+      WidgetTester tester,
+      Stream<List<TrainerLink>> roster,
+    ) async {
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          trainerLinksStreamProvider.overrideWith((ref) => roster),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+          ),
+          assignedRoutinesByTrainerProvider
+              .overrideWith((ref, key) async => const []),
+        ],
+      );
+      await tester.pumpAndSettle();
+    }
+
+    for (final (status, ofrece) in [
+      (TrainerLinkStatus.active, true),
+      (TrainerLinkStatus.paused, true), // hold, no corte
+      (TrainerLinkStatus.terminated, false),
+      (null, false), // sin vínculo con este uid
+    ]) {
+      testWidgets(
+          'vínculo ${status?.name ?? 'inexistente'}: '
+          '${ofrece ? 'ofrece' : 'NO ofrece'} crear un plan', (tester) async {
+        await pumpCon(
+          tester,
+          Stream.value(
+              [if (status != null) linkDe('athlete-1', status: status)]),
+        );
+
+        expect(find.text('CREAR PLAN'), ofrece ? findsOneWidget : findsNothing);
+        expect(find.byKey(const Key('athlete_detail_sin_vinculo')),
+            ofrece ? findsNothing : findsOneWidget);
+      });
+    }
+
+    testWidgets('sin saber todavía el roster, no dice «sin vínculo»',
+        (tester) async {
+      await pumpCon(tester, const Stream.empty());
+
+      expect(find.text('CREAR PLAN'), findsNothing);
+      expect(find.byKey(const Key('athlete_detail_sin_vinculo')), findsNothing);
+    });
+  });
+
   // #1484: «Medición guardada» vuelve a esta pantalla y el SnackBar tapaba
   // CREAR PLAN: los botones estaban al pie del body. Ahora van en el
   // `bottomNavigationBar` del Scaffold de la pantalla, que dibuja los SnackBar
@@ -367,6 +430,8 @@ void main() {
     await tester.pumpWidget(ProviderScope(
       overrides: [
         currentUidProvider.overrideWithValue('trainer-1'),
+        trainerLinksStreamProvider
+            .overrideWith((ref) => Stream.value([linkDe('athlete-1')])),
         userPublicProfileProvider('athlete-1').overrideWith(
           (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
         ),
