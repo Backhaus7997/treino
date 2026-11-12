@@ -2817,6 +2817,10 @@ service cloud.firestore {
     //   - create: caller en members, members.size()==2, members ordenados
     //     ascendentemente, y chatId == members.join('_').
     //   - update: caller en members. members/createdAt inmutables.
+    //     linkId/kind/closedAt pineados (closedAt: sólo la Cloud Function).
+    //   - messages/create y el preview del padre: denegados si el chat tiene
+    //     `closedAt` (vínculo terminado, #1697). Leer, lastRead, archivar y
+    //     eliminar siguen permitidos.
     //   - delete: denied.
     match /chats/{chatId} {
       // QA-CHAT-004: a chat may only be opened between two users who have a real
@@ -2978,19 +2982,22 @@ service cloud.firestore {
 
       // Mismo permiso que `senderMayPost`, pero sobre un chat que YA existe, así
       // que sale de `resource.data` y NO paga el `get()` del chat: miembro (lo
-      // chequea el `allow update`) y sin bloqueo. Desde el cambio de producto
-      // del 2026-10-21 escribir en un chat existente no pide follow en ninguna
-      // dirección, así que tampoco el preview. Costo: 2 llamadas.
+      // chequea el `allow update`), chat no cerrado (`closedAt`, #1697) y sin
+      // bloqueo. Desde el cambio de producto del 2026-10-21 escribir en un chat
+      // existente no pide follow en ninguna dirección, así que tampoco el
+      // preview. Costo: 2 llamadas (0 en un chat cerrado: `&&` corta antes).
       //
       // Sin este gate el bloqueado no lograba escribir el mensaje —ese gate sí
       // tiene `notBlocked`— pero sí `lastMessageText` en el doc padre, que es el
       // texto que la otra persona ve en su lista de chats, con badge de
-      // no-leído.
+      // no-leído. Con `closedAt` pasa lo mismo: sin el check acá, el ex-PF no
+      // escribiría el mensaje pero sí el preview.
       function chatWriterOk(uid) {
         let other = resource.data.members[0] == uid
           ? resource.data.members[1]
           : resource.data.members[0];
-        return notBlocked(uid, other);
+        return resource.data.get('closedAt', null) == null
+            && notBlocked(uid, other);
       }
 
       // ── Archivar y eliminar, POR MIEMBRO ─────────────────────────────────
@@ -3057,6 +3064,10 @@ service cloud.firestore {
                     && request.auth.uid in request.resource.data.members
                     && request.resource.data.members[0] < request.resource.data.members[1]
                     && chatId == request.resource.data.members[0] + '_' + request.resource.data.members[1]
+                    // `closedAt` es de la Cloud Function (#1697): un chat no
+                    // nace cerrado desde el cliente. `get(..., null)` tolera
+                    // un `closedAt: null` explícito en el payload.
+                    && request.resource.data.get('closedAt', null) == null
                     && chatCreateOk(
                         request.resource.data.members, request.resource.data);
 
@@ -3092,6 +3103,16 @@ service cloud.firestore {
                     // `linkId`: a un chat existente no se le puede agregar.
                     && request.resource.data.get('kind', null)
                        == resource.data.get('kind', null)
+                    // ⚠ `closedAt` PINEADO (#1697): lo escribe SOLO la Cloud
+                    // Function que cierra/reabre el chat al terminar/retomar el
+                    // vínculo (Admin SDK, no pasa por estas reglas). Esta regla
+                    // no tiene allowlist de claves, así que sin el pin un
+                    // miembro podría BORRARLO (el ex-PF reabriría el chat que
+                    // el vínculo cerró) o PONÉRSELO al otro para enmudecerlo.
+                    // `get(..., null)`: ausente en los dos lados matchea, así
+                    // que los chats que nunca se cerraron no se ven afectados.
+                    && request.resource.data.get('closedAt', null)
+                       == resource.data.get('closedAt', null)
                     && (
                          !request.resource.data.keys().hasAny(['lastRead'])
                          || request.resource.data.get('lastRead', {})
@@ -3132,21 +3153,42 @@ service cloud.firestore {
       // Messages sub-collection. Mensajes inmutables en MVP — sin edit/delete.
       // read/create gated por members del chat parent.
       match /messages/{messageId} {
-        // Postear en un chat existente: miembro y sin bloqueo. Nada más.
+        // Postear en un chat existente: miembro, chat no cerrado y sin bloqueo.
         //
         // Hasta el 2026-10-21 (REQ-FOLLOW-012) acá se exigía que el OTRO
         // siguiera al que escribe, por mensaje, para que dejar de seguir le
         // cortara la escritura a esa persona. Producto lo reemplazó: el que
         // recibe un chat responde aunque no siga al que lo abrió, y el control
-        // de quién puede INICIAR vive en `chatCreateOk`. Lo que corta una
-        // conversación ya abierta es el bloqueo.
+        // de quién puede INICIAR vive en `chatCreateOk`.
+        //
+        // Dos cosas cortan una conversación ya abierta:
+        //
+        //   · el BLOQUEO (`notBlocked`), en cualquier dirección;
+        //   · el CIERRE POR FIN DE VÍNCULO (#1697): `chats/{id}.closedAt`. Lo
+        //     escribe SOLO una Cloud Function (Admin SDK; el pin del `update`
+        //     de arriba impide que un miembro lo toque) cuando el par se queda
+        //     sin vínculo vivo, y lo borra cuando vuelven a vincularse. Si el
+        //     campo no está, el chat está abierto: así los docs anteriores y
+        //     los builds viejos siguen funcionando sin migración.
+        //
+        // Esta regla NO lee `trainer_links` a propósito (ni por `chat.linkId`:
+        // `backfillChatLinkId` conserva el linkId viejo al revincular, así que
+        // un par revinculado seguiría trabado, y cada mensaje pagaría un get
+        // más). El estado del vínculo se proyecta una vez al chat y acá se
+        // mira un campo del mismo doc que ya se leyó.
+        //
+        // El historial sigue legible (`read` no mira `closedAt`) y el
+        // `lastRead`/archivar/eliminar siguen permitidos: ver el `update`.
         //
         // Absorbe el check de membresía: reusa el mismo `get(chats/{chatId})`
-        // para sacar `members`. Costo: 3 llamadas (1 get + 2 de `notBlocked`).
+        // para sacar `members` y `closedAt`. Costo: 3 llamadas (1 get + 2 de
+        // `notBlocked`); en un chat cerrado, 1, porque `&&` corta antes.
         function senderMayPost(uid) {
           let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
           let other = chat.members[0] == uid ? chat.members[1] : chat.members[0];
-          return uid in chat.members && notBlocked(uid, other);
+          return uid in chat.members
+              && chat.get('closedAt', null) == null
+              && notBlocked(uid, other);
         }
 
         // Lectura: membresía, SIN CAMBIOS. El lado bloqueado conserva la
