@@ -4767,6 +4767,10 @@ class AppL10nEs extends AppL10n {
   String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
 
   @override
+  String get chatClosedComposerNotice =>
+      'El vínculo terminó. Ya no se pueden enviar mensajes en este chat.';
+
+  @override
   String get followListTabFollowers => 'SEGUIDORES';
 
   @override
@@ -11078,6 +11082,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
+
+  @override
+  String get chatClosedComposerNotice =>
+      'El vínculo terminó. Ya no se pueden enviar mensajes en este chat.';
 
   @override
   String get followListTabFollowers => 'SEGUIDORES';

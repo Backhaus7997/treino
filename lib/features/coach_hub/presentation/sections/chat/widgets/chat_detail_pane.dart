@@ -293,6 +293,13 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
     final currentUid = ref.watch(currentUidProvider);
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
     final mediaSend = ref.watch(chatMediaSendControllerProvider(widget.chatId));
+    // Chat CERRADO (`Chat.closedAt`): el vínculo del par terminó y las rules
+    // rechazan cualquier mensaje nuevo. Sin el doc todavía se asume abierto:
+    // un falso cerrado le tapa el composer a quien sí puede escribir.
+    final isClosed = ref.watch(
+      chatByIdProvider(widget.chatId)
+          .select((chat) => chat.valueOrNull?.isClosed ?? false),
+    );
 
     return Container(
       color: palette.bg,
@@ -361,13 +368,19 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
               color: palette.accent,
               backgroundColor: palette.bgCard,
             ),
-          _Composer(
-            controller: _composerCtrl,
-            sending: _sending || mediaSend.uploading,
-            onSend: _send,
-            onAttach: _openAttachMenu,
-            palette: palette,
-          ),
+          // Cerrado el aviso REEMPLAZA al composer: no hay nada que el PF
+          // pueda hacer para destrabarlo, sólo un vínculo nuevo reabre el chat.
+          // El historial de arriba sigue intacto.
+          if (isClosed)
+            _ClosedNotice(palette: palette)
+          else
+            _Composer(
+              controller: _composerCtrl,
+              sending: _sending || mediaSend.uploading,
+              onSend: _send,
+              onAttach: _openAttachMenu,
+              palette: palette,
+            ),
         ],
       ),
     );
@@ -594,6 +607,42 @@ class _MessagesList extends StatelessWidget {
         '📷 Foto', // never reached in V3 (image renders inline)
       null => '📎 Adjunto', // i18n: Fase W2 — defensive
     };
+  }
+}
+
+/// Aviso persistente en lugar del composer cuando el chat está cerrado
+/// (`Chat.isClosed`). Sólo texto, sin controles: el copy vive en el ARB
+/// (`chatClosedComposerNotice`) para que sea el mismo que ve la app móvil.
+class _ClosedNotice extends StatelessWidget {
+  const _ClosedNotice({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('chat_closed_notice'),
+      color: palette.bgCard,
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(TreinoIcon.infoCircle, size: 18, color: palette.textMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              AppL10n.of(context).chatClosedComposerNotice,
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
+                color: palette.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

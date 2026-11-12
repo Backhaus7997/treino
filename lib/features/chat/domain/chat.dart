@@ -23,12 +23,13 @@ class Chat with _$Chat {
 
     /// Id del `trainer_links` que respalda este chat, si es un chat de Coach.
     ///
-    /// Se expone al cliente porque el gate de escritura del chat social
-    /// (REQ-FOLLOW-012) tiene que poder distinguir un chat de Coach: las rules
-    /// escapan por `'linkId' in chat` en `senderMayPost`, y si la UI no mira lo
-    /// mismo le bloquearía el composer al entrenador aunque el servidor se lo
-    /// permita. La validez del link la garantiza `chatCreateOk` al crear el doc
-    /// y el pin de inmutabilidad en `chats/update`; acá sólo se lee.
+    /// Es informativo: NO decide si se puede escribir. Hasta el 2026-10-21
+    /// (REQ-FOLLOW-012) `senderMayPost` escapaba por `'linkId' in chat` y la UI
+    /// tenía que espejarlo; ese cambio de producto sacó el requisito de follow
+    /// y con él el escape. Hoy en un chat existente escriben los dos miembros y
+    /// lo único que corta es un bloqueo o [closedAt] — tener `linkId` no abre
+    /// ni cierra nada. La validez del link la garantiza `chatCreateOk` al crear
+    /// el doc y el pin de inmutabilidad en `chats/update`; acá sólo se lee.
     String? linkId,
 
     /// Naturaleza del chat cuando NO lo respalda un vínculo formal.
@@ -37,11 +38,24 @@ class Chat with _$Chat {
     /// atleta abre desde el perfil público de un PF para preguntar antes de
     /// comprometerse. Un chat social no lleva el campo.
     ///
-    /// Espeja la tercera rama de `chatCreateOk`: las rules escapan por
-    /// `kind == 'inquiry'` en `senderMayPost`/`chatWriterOk` igual que por
-    /// `linkId`, y lo tienen pineado inmutable en `chats/update`. Acá sólo se
-    /// lee — la validez la garantiza el servidor al crear el doc.
+    /// Espeja la tercera rama de `chatCreateOk`, que es donde importa: decide
+    /// quién puede CREAR el chat. No habilita la escritura posterior — desde
+    /// el 2026-10-21 `senderMayPost`/`chatWriterOk` ya no escapan por
+    /// `kind == 'inquiry'` ni por `linkId`. Está pineado inmutable en
+    /// `chats/update`. Acá sólo se lee — la validez la garantiza el servidor al
+    /// crear el doc.
     String? kind,
+
+    /// Cuándo se CERRÓ el chat: el vínculo PF↔alumno del par terminó y no hay
+    /// otro vigente. `null` = abierto, que es también como se lee un doc
+    /// viejo que no trae el campo.
+    ///
+    /// Lo escribe sólo una Cloud Function (`syncChatOnTrainerLink`) y las rules
+    /// lo tienen pineado en `chats/update`, así que un cliente nunca lo setea.
+    /// Cerrado, `senderMayPost` rechaza todo mensaje nuevo y el historial sigue
+    /// legible. Si el par se vuelve a vincular, la función borra el campo y el
+    /// chat reabre ([isClosed]).
+    @TimestampConverter() DateTime? closedAt,
 
     /// Archivado POR MIEMBRO: `uid → cuándo lo archivó`. Esconde el chat de la
     /// lista principal de ese uid hasta que llega un mensaje posterior
@@ -60,6 +74,10 @@ class Chat with _$Chat {
 
   /// Chat de pre-consulta (#637): sin vínculo formal todavía.
   bool get isInquiry => kind == inquiryKind;
+
+  /// El vínculo del par terminó: se lee el historial pero no se puede mandar
+  /// nada nuevo (ver [closedAt]).
+  bool get isClosed => closedAt != null;
 
   /// Archivado por [uid] y sin mensajes desde entonces.
   bool isArchivedFor(String uid) => _stampCovers(archivedAt?[uid]);

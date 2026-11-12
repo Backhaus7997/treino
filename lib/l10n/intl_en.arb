@@ -1806,6 +1806,10 @@
   "@chatBlockedComposerHintA11y": {
     "description": "Semantics del composer deshabilitado por falta de permiso."
   },
+  "chatClosedComposerNotice": "This link has ended. Messages can no longer be sent in this chat.",
+  "@chatClosedComposerNotice": {
+    "description": "Aviso persistente que reemplaza al composer cuando el chat está cerrado: el vínculo PF↔alumno del par terminó (Chat.closedAt, #1697). El historial sigue legible y si el par se vuelve a vincular el chat reabre. Texto neutro a propósito: lo ve cualquiera de los dos lados, sin saber quién terminó el vínculo."
+  },
   "followListTabFollowers": "FOLLOWERS",
   "@followListTabFollowers": {
     "description": "Pill for the followers list on the followers/following screen."

@@ -494,4 +494,92 @@ void main() {
       },
     );
   });
+
+  // Chat CERRADO (#1697): el vínculo del par terminó (`Chat.closedAt`) y las
+  // rules rechazan el mensaje. El aviso reemplaza al composer; el historial
+  // queda a la vista.
+  group('ChatDetailPane — chat cerrado', () {
+    const closedCopy =
+        'El vínculo terminó. Ya no se pueden enviar mensajes en este chat.';
+    final closedChat =
+        _stubChat().copyWith(closedAt: DateTime.utc(2026, 11, 12));
+
+    Future<void> pumpWithChat(WidgetTester tester, Stream<Chat?> chat) async {
+      final container = _buildContainer(overrides: [
+        chatByIdProvider(_chatId).overrideWith((ref) => chat),
+        messagesProvider(_chatId).overrideWith(
+          (ref) => Stream<List<Message>>.value([
+            Message(
+              id: 'm1',
+              senderId: _athleteUid,
+              text: 'mensaje previo',
+              createdAt: DateTime(2026, 7, 1),
+            ),
+          ]),
+        ),
+        userPublicProfileProvider(_athleteUid).overrideWith(
+          (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+        ),
+      ]);
+      addTearDown(container.dispose);
+      await _pumpPane(
+        tester,
+        container,
+        const ChatDetailPane(chatId: _chatId, peerUid: _athleteUid),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    final composerKeys = [
+      const Key('chat_composer_field'),
+      const Key('chat_send_button'),
+      const Key('chat_composer_attach_button'),
+    ];
+
+    testWidgets(
+        'cerrado → aviso SIN campo, enviar ni adjuntar; historial a la '
+        'vista', (tester) async {
+      await pumpWithChat(tester, Stream.value(closedChat));
+
+      expect(find.byKey(const Key('chat_closed_notice')), findsOneWidget);
+      expect(find.text(closedCopy), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+      for (final key in composerKeys) {
+        expect(find.byKey(key), findsNothing);
+      }
+      expect(find.text('mensaje previo'), findsOneWidget);
+    });
+
+    testWidgets('abierto → composer completo y sin aviso', (tester) async {
+      await pumpWithChat(tester, Stream.value(_stubChat()));
+
+      expect(find.byKey(const Key('chat_closed_notice')), findsNothing);
+      expect(find.text(closedCopy), findsNothing);
+      for (final key in composerKeys) {
+        expect(find.byKey(key), findsOneWidget);
+      }
+    });
+
+    testWidgets(
+        'sin doc todavía → abierto; llega closedAt → cierra; se borra '
+        '(re-vínculo) → reabre', (tester) async {
+      final chat = StreamController<Chat?>();
+      // Sin await: si nadie escucha, `close()` nunca completa y el tearDown
+      // colgaba el test 10 minutos en vez de fallar la aserción.
+      addTearDown(() => unawaited(chat.close()));
+      await pumpWithChat(tester, chat.stream);
+      expect(find.byKey(const Key('chat_closed_notice')), findsNothing);
+      expect(find.byKey(const Key('chat_composer_field')), findsOneWidget);
+
+      chat.add(closedChat);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat_closed_notice')), findsOneWidget);
+      expect(find.byKey(const Key('chat_composer_field')), findsNothing);
+
+      chat.add(_stubChat());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat_closed_notice')), findsNothing);
+      expect(find.byKey(const Key('chat_composer_field')), findsOneWidget);
+    });
+  });
 }

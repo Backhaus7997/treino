@@ -124,4 +124,65 @@ void main() {
       expect(copied.lastRead, equals(chat.lastRead));
     });
   });
+
+  // `closedAt` lo escribe una Cloud Function cuando termina el vínculo del par
+  // (#1697). Ausente = abierto: es como se lee todo doc anterior al campo.
+  group('Chat.closedAt / isClosed', () {
+    final t0 = DateTime.utc(2026, 6, 1, 10, 0);
+    final t1 = DateTime.utc(2026, 11, 12, 9, 30);
+
+    test('Timestamp de Firestore → closedAt parseado e isClosed true', () {
+      final decoded = Chat.fromJson(<String, Object?>{
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+        'createdAt': Timestamp.fromDate(t0),
+        'closedAt': Timestamp.fromDate(t1),
+      });
+      expect(decoded.closedAt, t1);
+      expect(decoded.isClosed, isTrue);
+    });
+
+    test('doc sin la clave (legacy) → closedAt null e isClosed false', () {
+      final decoded = Chat.fromJson(<String, Object?>{
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+        'createdAt': Timestamp.fromDate(t0),
+      });
+      expect(decoded.closedAt, isNull);
+      expect(decoded.isClosed, isFalse);
+    });
+
+    test('closedAt: null explícito también es abierto', () {
+      final decoded = Chat.fromJson(<String, Object?>{
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+        'createdAt': Timestamp.fromDate(t0),
+        'closedAt': null,
+      });
+      expect(decoded.isClosed, isFalse);
+    });
+
+    test('round-trip por JSON conserva closedAt', () {
+      final chat = Chat(
+        chatId: 'aaa_bbb',
+        members: const ['aaa', 'bbb'],
+        createdAt: t0,
+        closedAt: t1,
+      );
+      final decoded = Chat.fromJson(chat.toJson());
+      expect(decoded.closedAt, t1);
+      expect(decoded.isClosed, isTrue);
+      expect(decoded, equals(chat));
+    });
+
+    test('copyWith(closedAt: null) reabre el chat (re-vínculo)', () {
+      final closed = Chat(
+        chatId: 'aaa_bbb',
+        members: const ['aaa', 'bbb'],
+        createdAt: t0,
+        closedAt: t1,
+      );
+      expect(closed.copyWith(closedAt: null).isClosed, isFalse);
+    });
+  });
 }
