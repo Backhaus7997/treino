@@ -60,6 +60,14 @@ Future<void> main() async {
       GoogleFonts.barlow(fontWeight: FontWeight.w700),
     ]);
 
+    if (kUsaEmuladores) {
+      // ANTES de `initializeApp` (#1692). Sólo hace algo en web, y este entry
+      // no es el del web target —ver más abajo—, pero si alguien lo corre ahí
+      // con `USE_EMULATOR` el plugin de Auth restaura la sesión por red y deja
+      // a Auth en PRODUCCIÓN. Ver `limpiarSesionDeAuthParaEmulador`.
+      await limpiarSesionDeAuthParaEmulador();
+    }
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -171,11 +179,7 @@ Future<void> main() async {
     // Android), so no explicit args are needed here.
     await GoogleSignIn.instance.initialize();
 
-    const useEmulator = bool.fromEnvironment(
-      'USE_EMULATOR',
-      defaultValue: false,
-    );
-    if (useEmulator) {
+    if (kUsaEmuladores) {
       // Firestore, Auth, Functions y Storage, en una sola función que comparte
       // con el Coach Hub — ver su dartdoc. Requiere `./scripts/emulator.sh`
       // (fija --project treino-dev; el default de .firebaserc es

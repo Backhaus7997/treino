@@ -49,6 +49,14 @@ Future<void> main() async {
   // Datos de formato de fecha en español (etiquetas del calendario, meses).
   await initializeDateFormatting('es');
 
+  if (kUsaEmuladores) {
+    // ANTES de `initializeApp`, no después: ahí adentro el plugin de Auth
+    // restaura la sesión persistida por red y, hecho ese request, el emulador
+    // ya no se puede conectar y Auth se queda en PRODUCCIÓN (#1692). Costo: en
+    // modo emulador una recarga cierra la sesión. Ver el dartdoc.
+    await limpiarSesionDeAuthParaEmulador();
+  }
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -59,11 +67,7 @@ Future<void> main() async {
   // nunca ocurre, se cuelga. El sign-out de `/not-allowed` va directo a
   // `FirebaseAuth` (ver `coach_hub_not_allowed_screen.dart`).
 
-  const useEmulator = bool.fromEnvironment(
-    'USE_EMULATOR',
-    defaultValue: false,
-  );
-  if (useEmulator) {
+  if (kUsaEmuladores) {
     // La misma función que la app. Antes este bloque conectaba sólo Firestore
     // y Auth a mano, y los callables del Hub (`acceptTrainerLink`,
     // `createPreapproval`, …) pegaban a PRODUCCIÓN en modo emulador.
