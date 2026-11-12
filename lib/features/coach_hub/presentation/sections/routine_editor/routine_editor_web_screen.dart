@@ -35,6 +35,8 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../../core/widgets/treino_select.dart';
 import '../../../../coach/application/blocked_athletes_providers.dart';
+import '../../../../coach/application/trainer_link_providers.dart'
+    show alumnoConVinculoVivoProvider, trainerLinkRepositoryProvider;
 import '../../../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../../../../coach/presentation/template_limit_gate.dart';
 import '../facturacion_planes/blocked_students_screen.dart'
@@ -2256,6 +2258,7 @@ class _RoutineEditorWebScreenState
     }).toList();
 
     final repo = ref.read(routineRepositoryProvider);
+    final linkRepo = ref.read(trainerLinkRepositoryProvider);
     // Captured before the write's async gap: the post-save cache invalidation
     // must land even if this screen is disposed mid-save, and a WidgetRef
     // touched after dispose throws. See [invalidateRoutineById].
@@ -2368,6 +2371,26 @@ class _RoutineEditorWebScreenState
           weeksCount: _numWeeks,
         );
       } else {
+        // Última barrera antes de crear el plan (#1695). El gate de arriba mira
+        // el stream del roster y el vínculo pudo cortarse con el editor abierto
+        // —el alumno lo termina desde su teléfono— y las rules no lo van a
+        // frenar: validan el rol, no el vínculo. Esto sí lo pregunta al
+        // servidor, a un paso de escribir.
+        final vigente = await linkRepo.tieneVinculoVivo(
+          trainerId: trainerUid,
+          athleteId: widget.athleteId!,
+        );
+        if (!vigente) {
+          if (mounted) {
+            setState(() {
+              _submitting = false;
+              _errorMessage = 'No se asignó nada: este alumno ya no tiene un '
+                  'vínculo vigente con vos.'; // i18n
+              _errorIsDenial = false;
+            });
+          }
+          return;
+        }
         final routine = Routine(
           id: '',
           name: _nameCtrl.text.trim(),
@@ -2710,6 +2733,28 @@ class _RoutineEditorWebScreenState
     // barrido (que corren con los mismos valores) reconstruyan este árbol.
     if (!widget.isTemplate) ref.watch(blockedAthletesProvider);
 
+    // CREAR un plan para un alumno exige vínculo VIVO con él (activo o pausado,
+    // #1695). La ruta
+    // `/routine-editor/:athleteId` la escribe cualquiera, así que el gate vive
+    // acá y no en quien navega: un uid sin vínculo, de un ex-alumno o que ni
+    // existe cae en el mismo estado fatal que «no encontramos la rutina», con
+    // su «Volver» — no en un formulario que termina en una rutina huérfana.
+    //
+    // EDITAR no pasa por acá: un plan que ya existe es del PF aunque el vínculo
+    // haya terminado, y sacarlo (archivarlo) es justamente cómo se limpia.
+    final vinculo = (!widget.isTemplate && !_isEditing)
+        ? ref.watch(alumnoConVinculoVivoProvider(widget.athleteId!))
+        : const AsyncData(true);
+    final cargando = _loading || vinculo.isLoading;
+    final fatal = _fatalMessage ??
+        (vinculo.hasError
+            ? 'No pudimos verificar tu vínculo con $athleteName. '
+                'Probá de nuevo.' // i18n
+            : vinculo.valueOrNull == false
+                ? '$athleteName no tiene un vínculo vigente con vos, así que no '
+                    'podés asignarle una rutina.' // i18n
+                : null);
+
     final arbol = PopScope(
       canPop: !_isDirty,
       onPopInvokedWithResult: (didPop, _) {
@@ -2762,14 +2807,13 @@ class _RoutineEditorWebScreenState
           // ── Body: loading spinner / blocked notice / the form ───────────
           Expanded(
             child: TreinoStateSwitcher(
-              childKey: ValueKey(_loading
-                  ? 'loading'
-                  : (_fatalMessage != null ? 'fatal' : 'form')),
-              child: _loading
+              childKey: ValueKey(
+                  cargando ? 'loading' : (fatal != null ? 'fatal' : 'form')),
+              child: cargando
                   ? const Center(child: CircularProgressIndicator())
-                  : _fatalMessage != null
+                  : fatal != null
                       ? _FatalMessage(
-                          message: _fatalMessage!,
+                          message: fatal,
                           palette: palette,
                           onBack: _onBackTap,
                         )
@@ -3334,7 +3378,7 @@ class _RoutineEditorWebScreenState
             ),
           ),
           // ── Footer (hidden while loading or when blocked) ───────────────
-          if (!_loading && _fatalMessage == null)
+          if (!cargando && fatal == null)
             Container(
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
               decoration: BoxDecoration(

@@ -1508,6 +1508,44 @@ void main() {
       );
     });
 
+    // #1695: «Asignar rutina» exige vínculo VIVO (activo o pausado). Sobre un
+    // ex-alumno creaba una rutina que él veía como «DE TU COACH · ACTIVA» y no
+    // podía borrar. Son DOS puertas (el aviso del Resumen y el botón de la
+    // sub-vista Rutina).
+    for (final (status, ofrece) in [
+      (TrainerLinkStatus.active, true),
+      (TrainerLinkStatus.paused, true), // hold, no corte
+      (TrainerLinkStatus.terminated, false),
+      (TrainerLinkStatus.pending, false),
+    ]) {
+      testWidgets(
+          'con el vínculo ${status.name} '
+          '${ofrece ? 'ofrece' : 'NO ofrece'} asignar rutina', (tester) async {
+        await _pump(tester, profile: _prof(), link: _link(status));
+
+        // Puerta 1: el aviso de «Sin rutina asignada» del Resumen. El aviso
+        // en sí se queda: explica por qué faltan las métricas.
+        expect(find.text('Sin rutina asignada'), findsOneWidget);
+        expect(find.text('Asignar rutina'),
+            ofrece ? findsOneWidget : findsNothing);
+
+        // Puerta 2: el botón de la sub-vista Rutina.
+        await navigateAlumnoDetail(tester, group: 'Entrenamiento');
+        expect(find.text('RUTINA ACTIVA'), findsOneWidget);
+        expect(find.text('Asignar rutina'),
+            ofrece ? findsOneWidget : findsNothing);
+      });
+    }
+
+    testWidgets('SIN vínculo con el alumno (uid cualquiera) tampoco asigna',
+        (tester) async {
+      await _pump(tester, profile: _prof()); // roster vacío
+
+      expect(find.text('Asignar rutina'), findsNothing);
+      await navigateAlumnoDetail(tester, group: 'Entrenamiento');
+      expect(find.text('Asignar rutina'), findsNothing);
+    });
+
     testWidgets(
         'tab Entrenamientos: rutina activa + historial con datos (W2 PR3)',
         (tester) async {

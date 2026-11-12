@@ -20,6 +20,18 @@ enum TrainerLinkStatus {
   terminated,
 }
 
+/// Estados de un vínculo VIVO: el PF y el alumno siguen siendo PF y alumno.
+///
+/// `paused` cuenta: pausar es un hold temporal, no un corte (el chat sigue
+/// abierto, ver `chatEnablingLinkStatuses`). Sólo `pending` (nunca se aceptó) y
+/// `terminated` (ex-alumno) quedan afuera, y también el alumno SIN vínculo.
+/// Es el criterio de las acciones que le dan algo al alumno, como asignarle una
+/// rutina (#1695).
+const kEstadosDeVinculoVivo = {
+  TrainerLinkStatus.active,
+  TrainerLinkStatus.paused,
+};
+
 extension TrainerLinkStatusX on TrainerLinkStatus {
   String toJson() => switch (this) {
         TrainerLinkStatus.pending => 'pending',

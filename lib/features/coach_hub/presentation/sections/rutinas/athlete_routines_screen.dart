@@ -11,6 +11,8 @@ import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show alumnoConVinculoVivoProvider;
 // NO se importa routine_web_editability: a725b026 lo eliminó de main junto con
 // el guard — el editor web abre cualquier rutina sin perder datos.
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/routine_actions_provider.dart';
@@ -66,6 +68,12 @@ class AthleteRoutinesScreen extends ConsumerWidget {
     final archived =
         allRoutines.where((r) => r.status == RoutineStatus.archived).toList();
     final visible = statusFilter == RoutineStatus.active ? active : archived;
+    // «Nueva rutina» sólo con vínculo VIVO (activo o pausado) confirmado
+    // (#1695). Mientras no se
+    // sabe, tampoco se ofrece: una acción que aparece y desaparece es peor que
+    // una que tarda un instante. Ver [alumnoConVinculoVivoProvider].
+    final vinculo = ref.watch(alumnoConVinculoVivoProvider(athleteId));
+    final sinVinculo = vinculo.valueOrNull == false;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
@@ -99,18 +107,36 @@ class AthleteRoutinesScreen extends ConsumerWidget {
                     title: 'Rutinas de $name', // i18n
                     count: routinesAsync.hasValue ? visible.length : null,
                     actions: [
-                      CoachHubHeroAction(
-                        label: 'Nueva rutina', // i18n
-                        icon: TreinoIcon.plus,
-                        onTap: () => context.push('/routine-editor/$athleteId'),
-                        primary: true,
-                      ),
+                      if (vinculo.valueOrNull == true)
+                        CoachHubHeroAction(
+                          label: 'Nueva rutina', // i18n
+                          icon: TreinoIcon.plus,
+                          onTap: () =>
+                              context.push('/routine-editor/$athleteId'),
+                          primary: true,
+                        ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
+          // Las rutinas que ya tenía se siguen VIENDO (y archivando, que es
+          // cómo se limpia lo que se asignó mal); lo que no hay es forma de
+          // darle una nueva. Sin esta línea el botón simplemente desaparecía.
+          if (sinVinculo) ...[
+            const SizedBox(height: AppSpacing.s12),
+            Text(
+              '$name no tiene un vínculo vigente con vos. Podés ver sus '
+              'rutinas, pero no asignarle nuevas.', // i18n
+              key: const Key('athlete_routines_sin_vinculo'),
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontSize: AppTextSize.caption,
+                color: palette.textMuted,
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.s18),
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(1),
