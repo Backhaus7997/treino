@@ -679,6 +679,69 @@ void main() {
     expect(find.text('Estadísticas avanzadas'), findsNothing);
   });
 
+  // #1696: la cuenta nueva sólo veía «Empezá a entrenar…» y no tenía cómo
+  // llegar a Medidas — o sea, no podía cargar su primera medición. Medidas no
+  // depende de haber entrenado, así que sale en el empty state. Los demás
+  // tiles del hub NO: abrirían pantallas vacías.
+  testWidgets(
+      'SCENARIO-EMPTY-MEDIDAS-01: cuenta nueva → el empty state ofrece '
+      'Medidas (y sólo Medidas del hub) y navega a su ruta', (tester) async {
+    final repo = MockSessionRepository();
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => const []);
+
+    final overrides = <Override>[
+      currentUidProvider.overrideWithValue('u1'),
+      sessionRepositoryProvider.overrideWithValue(repo),
+      exercisesProvider.overrideWith((ref) async => const []),
+    ];
+
+    final router = GoRouter(
+      initialLocation: '/home/insights',
+      routes: [
+        GoRoute(
+          path: '/home/insights',
+          builder: (_, __) => const InsightsScreen(),
+        ),
+        GoRoute(
+          path: '/home/insights/measurements',
+          builder: (_, __) => const Scaffold(
+            body: Text('measurements-route'),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: overrides,
+        child: MaterialApp.router(
+          theme: AppTheme.dark(),
+          routerConfig: router,
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Sigue siendo el empty state…
+    expect(
+        find.text('Empezá a entrenar para ver tus insights.'), findsOneWidget);
+    expect(find.text('Estadísticas avanzadas'), findsNothing);
+    // …con Medidas a la vista y ningún otro tile del hub.
+    expect(find.text('Medidas'), findsOneWidget);
+    expect(find.text('Peso y medidas corporales en el tiempo'), findsOneWidget);
+    expect(find.text('Distribución muscular'), findsNothing);
+    expect(find.text('Ejercicios frecuentes'), findsNothing);
+    expect(find.text('Volumen por grupo'), findsNothing);
+
+    await tester.tap(find.text('Medidas'));
+    await tester.pumpAndSettle();
+    expect(find.text('measurements-route'), findsOneWidget);
+  });
+
   testWidgets(
       'SCENARIO-HUB-TILES-02: tapping each tile pushes its dedicated route',
       (tester) async {
