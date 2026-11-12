@@ -4,9 +4,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
+import 'auth_emulador_stub.dart'
+    if (dart.library.js_interop) 'auth_emulador_web.dart' as auth_web;
+
 /// Si esta compilación corre contra los emuladores
 /// (`--dart-define=USE_EMULATOR=true`).
 const kUsaEmuladores = bool.fromEnvironment('USE_EMULATOR');
+
+/// Puerto del emulador de Auth. Lo comparten [conectarEmuladores] y la
+/// verificación posterior: si cambia en uno, cambia en el otro.
+const kPuertoEmuladorAuth = 9099;
 
 /// Puerto del emulador de Storage. Lo comparten [conectarEmuladores] y
 /// [esUrlDeDescargaDelEmuladorDeStorage]: si cambia en uno, cambia en el otro.
@@ -94,12 +101,49 @@ const kFunctionsRegion = 'southamerica-east1';
 ///
 /// Si un emulador no está levantado, ese servicio FALLA en local en vez de
 /// salir a producción. Es lo que tiene que pasar.
+///
+/// Auth, en web, además se VERIFICA y la app se frena si no quedó en el
+/// emulador (#1692): ahí `useAuthEmulator` puede fallar sin avisar. Ver
+/// [exigirAuthEnElEmulador]. La prevención va ANTES de `Firebase.initializeApp`
+/// ([limpiarSesionDeAuthParaEmulador]); esto es la red de seguridad.
 Future<void> conectarEmuladores() async {
   FirebaseFirestore.instance
       .useFirestoreEmulator('localhost', kPuertoEmuladorFirestore);
-  await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
+  await FirebaseAuth.instance.useAuthEmulator('localhost', kPuertoEmuladorAuth);
+  auth_web.verificarAuthEnElEmulador('localhost', kPuertoEmuladorAuth);
   FirebaseFunctions.instanceFor(region: kFunctionsRegion)
       .useFunctionsEmulator('localhost', 5001);
   await FirebaseStorage.instance
       .useStorageEmulator('localhost', kPuertoEmuladorStorage);
+}
+
+/// En web, borra la sesión de Auth persistida en el navegador para que
+/// `Firebase.initializeApp` no tenga nada que restaurar contra PRODUCCIÓN
+/// (#1692). Los dos entry points la llaman justo ANTES de
+/// `Firebase.initializeApp`, dentro de `if (kUsaEmuladores)`.
+///
+/// El orden es todo. `firebase_auth_web` 5.15.3 restaura la sesión por red
+/// dentro de `initializeApp` (`ensurePluginInitialized` espera
+/// `onWaitInitState`), antes de que [conectarEmuladores] pueda llamar a
+/// `useAuthEmulator`. Ese restore le pega a `identitytoolkit.googleapis.com` y
+/// `securetoken.googleapis.com`, y desde ese request el SDK de JS ya no deja
+/// conectar el emulador (`auth/emulator-config-failed`, que el plugin traga).
+/// Auth queda en producción para toda la vida de la página, y el próximo login
+/// manda la contraseña ahí. `treino-dev` ES producción (AGENTS.md → Entornos).
+///
+/// ⚠️ COSTO: en modo emulador una recarga cierra la sesión. Es aceptable para
+/// dev y QA local, y es lo que evita el restore. En un build normal esto no
+/// existe: `kUsaEmuladores` es const, así que el `if` de los entry points se
+/// elimina al compilar y esta función y su implementación web se podan.
+///
+/// Fuera de web no hace nada (`auth_emulador_stub.dart`).
+///
+/// Aunque se la llame sin `USE_EMULATOR` no borra nada: se corta sola por
+/// [kUsaEmuladores]. [borrar] existe para que un test vea si se invocó.
+Future<void> limpiarSesionDeAuthParaEmulador({
+  @visibleForTesting
+  Future<void> Function() borrar = auth_web.borrarSesionPersistidaDeAuth,
+}) async {
+  if (!(debugUsaEmuladoresOverride ?? kUsaEmuladores)) return;
+  await borrar();
 }
