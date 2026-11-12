@@ -1895,6 +1895,110 @@ void main() {
       expect(find.textContaining('600 kg vol.'), findsOneWidget);
       expect(find.textContaining('600.0'), findsNothing);
     });
+
+    // ── #1701: «0 kg vol.» en una sesión que no puede juntar carga ─────────
+    //
+    // Se esconde sólo cuando TODOS los slots son por tiempo o por distancia.
+    // Con `totalVolumeKg == 0` a secas, toda sesión por reps arrancaría sin el
+    // dato y lo vería aparecer recién al marcar la primera serie.
+
+    const distanceSlot = RoutineSlot(
+      exerciseId: 'sled',
+      exerciseName: 'Trineo',
+      muscleGroup: 'legs',
+      targetSets: 1,
+      targetRepsMin: 0,
+      targetRepsMax: 0,
+      restSeconds: 60,
+      exerciseMode: ExerciseMode.distance,
+      sets: [SetSpec(distanceMeters: 40)],
+    );
+    const durationSlot = RoutineSlot(
+      exerciseId: 'plank',
+      exerciseName: 'Plancha',
+      muscleGroup: 'core',
+      targetSets: 1,
+      targetRepsMin: 0,
+      targetRepsMax: 0,
+      restSeconds: 60,
+      exerciseMode: ExerciseMode.duration,
+      sets: [SetSpec(durationSeconds: 30)],
+    );
+
+    SessionState stateOf(List<RoutineSlot> slots, {List<SetLog>? setLogs}) =>
+        SessionState(
+          session: makeSession(),
+          day: makeDay(dayNumber: 1, slots: slots),
+          setLogs: setLogs ?? const [],
+          currentExerciseIndex: 0,
+          elapsedSeconds: 0,
+        );
+
+    testWidgets(
+        '#1701: sesión por reps en 0 sigue mostrando "0 kg vol." (no aparece '
+        'de golpe con la primera serie)', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(_defaultState()),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+          find.textContaining('0 / 2 ejercicios · 0 kg vol.'), findsOneWidget);
+    });
+
+    testWidgets(
+        '#1701: todos los slots por tiempo o distancia → sin "kg vol.", queda '
+        'el conteo de ejercicios', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(stateOf(const [distanceSlot, durationSlot])),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('0 / 2 ejercicios'), findsOneWidget);
+      expect(find.textContaining('kg vol.'), findsNothing);
+    });
+
+    testWidgets(
+        '#1701: un slot por reps entre los de tiempo/distancia alcanza para '
+        'mantener "kg vol."', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(
+            stateOf([makeSlot(exerciseId: 'e1'), distanceSlot]),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+          find.textContaining('0 / 2 ejercicios · 0 kg vol.'), findsOneWidget);
+    });
+
+    testWidgets(
+        '#1701: si una sesión sin slots por reps ya tiene volumen, se muestra',
+        (tester) async {
+      // No debería pasar —las series por tiempo/distancia guardan 0×0—, pero
+      // esconder un número real sería peor que mostrar un 0.
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(stateOf(
+            const [distanceSlot],
+            setLogs: [makeSetLog(exerciseId: 'sled', reps: 10, weightKg: 60.0)],
+          )),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('600 kg vol.'), findsOneWidget);
+    });
   });
 
   // ── SCENARIO-WPRES-025: numWeeks==1 player is unchanged (REQ-WPRES-015/030) ─
