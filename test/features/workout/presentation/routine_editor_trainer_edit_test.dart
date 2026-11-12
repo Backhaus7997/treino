@@ -21,6 +21,11 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinkRepositoryProvider, trainerLinksStreamProvider;
+import 'package:treino/features/coach/data/trainer_link_repository.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart'
     show assignedRoutinesByTrainerProvider;
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
@@ -41,6 +46,7 @@ import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../helpers/trainer_links.dart';
 import '../../../fixtures/exercises.dart';
 import '../../../fixtures/routine_editor_ui.dart';
 
@@ -54,6 +60,8 @@ Future<void> _pumpEditor(
   WidgetTester tester, {
   required RoutineEditorMode mode,
   required List<Override> overrides,
+  // Los tests de #1695 prueban la puerta del vínculo de verdad.
+  bool vinculoReal = false,
 }) async {
   final router = GoRouter(
     initialLocation: '/workout/editor',
@@ -81,7 +89,7 @@ Future<void> _pumpEditor(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: overrides,
+      overrides: [if (!vinculoReal) ...alumnosVivosOverrides(), ...overrides],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
@@ -646,6 +654,147 @@ void main() {
       // Pasado el resguardo, el botón vuelve a andar.
       await tester.pump(const Duration(milliseconds: 600));
       expect(tester.widget<ElevatedButton>(asignar).onPressed, isNotNull);
+    });
+  });
+
+  // ── #1695: CREAR un plan exige vínculo VIVO ──────────────────────────────
+  //
+  // La ruta `/workout/routine-editor/:athleteId` la escribe cualquiera, y las
+  // rules validan el rol, no el vínculo. Acá se prueba la puerta REAL: el
+  // roster en memoria al abrir, y el servidor un paso antes de escribir.
+
+  group('#1695 — CREAR un plan exige vínculo vivo', () {
+    const sinVinculo = 'Este alumno no tiene un vínculo vigente con vos, así '
+        'que no podés asignarle una rutina.';
+    const sinVerificar =
+        'No pudimos verificar tu vínculo con este alumno. Probá de nuevo.';
+    const nameField = Key('editor_name_field');
+    final terminado = linkDe('ath-1', status: TrainerLinkStatus.terminated);
+
+    Future<void> pump(
+      WidgetTester tester, {
+      required Stream<List<TrainerLink>> roster,
+      TrainerLinkRepository? server,
+      RoutineRepository? repo,
+      RoutineEditorMode mode = const TrainerAssigning(athleteId: 'ath-1'),
+    }) =>
+        _pumpEditor(
+          tester,
+          mode: mode,
+          vinculoReal: true,
+          overrides: [
+            ..._overrides(repo: repo),
+            trainerLinksStreamProvider.overrideWith((ref) => roster),
+            if (server != null)
+              trainerLinkRepositoryProvider.overrideWithValue(server),
+          ],
+        );
+
+    /// Llena un plan válido y toca ASIGNAR PLAN (como EDIT-008).
+    Future<void> asignar(WidgetTester tester) async {
+      await tester.enterText(find.byKey(nameField), 'Plan');
+      await tester.enterText(
+          find.byKey(const Key('editor_split_field')), 'PPL');
+      await tester.pumpAndSettle();
+      await desplazarHastaAgregarEjercicio(tester);
+      await tester.tap(find.text('Agregar ejercicio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Press de Banca').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar 1 ejercicio'));
+      await tester.pumpAndSettle();
+      await expandirEjercicios(tester);
+      final vacio = find.byType(TextField).evaluate().where((e) {
+        final c = (e.widget as TextField).controller;
+        return c != null && c.text.isEmpty;
+      }).last;
+      await tester.enterText(find.byWidget(vacio.widget), '8');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    for (final estado in [TrainerLinkStatus.active, TrainerLinkStatus.paused]) {
+      testWidgets('vínculo ${estado.name}: abre y escribe', (tester) async {
+        final vivo = linkDe('ath-1', status: estado);
+        final repo = _MockRoutineRepository();
+        when(() => repo.createAssigned(any())).thenAnswer((inv) async =>
+            (inv.positionalArguments.first as Routine).copyWith(id: 'nuevo'));
+        await pump(tester,
+            roster: Stream.value([vivo]),
+            server: await repoConVinculos([vivo]),
+            repo: repo);
+        expect(find.byKey(nameField), findsOneWidget);
+
+        await asignar(tester);
+
+        verify(() => repo.createAssigned(any())).called(1);
+      });
+    }
+
+    for (final (caso, roster) in [
+      ('terminado', [terminado]),
+      ('pendiente', [linkDe('ath-1', status: TrainerLinkStatus.pending)]),
+      ('de OTRO alumno', [linkDe('ath-2')]),
+      ('sin vínculo', <TrainerLink>[]),
+    ]) {
+      testWidgets('$caso: no abre el formulario', (tester) async {
+        await pump(tester, roster: Stream.value(roster));
+
+        expect(find.text(sinVinculo), findsOneWidget);
+        expect(find.byKey(nameField), findsNothing);
+      });
+    }
+
+    testWidgets('roster que falla: «no pudimos verificar», no «sin vínculo»',
+        (tester) async {
+      await pump(tester, roster: Stream.error(Exception('boom')));
+
+      expect(find.text(sinVerificar), findsOneWidget);
+      expect(find.text(sinVinculo), findsNothing);
+      expect(find.byKey(nameField), findsNothing);
+    });
+
+    testWidgets('EDITAR un plan que ya existe no pide vínculo', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('plan-id-1'))
+          .thenAnswer((_) async => _existingPlan);
+      await pump(tester,
+          roster: Stream.value([terminado]),
+          repo: repo,
+          mode: const TrainerAssigning(
+              athleteId: 'ath-1', existingPlanId: 'plan-id-1'));
+
+      expect(find.byKey(nameField), findsOneWidget);
+    });
+
+    testWidgets('el vínculo terminó con el editor abierto: no escribe',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      await pump(tester,
+          roster: Stream.value([linkDe('ath-1')]), // el roster, viejo
+          server: await repoConVinculos([terminado]),
+          repo: repo);
+
+      await asignar(tester);
+
+      verifyNever(() => repo.createAssigned(any()));
+      expect(find.text(sinVinculo), findsOneWidget);
+    });
+
+    testWidgets('el servidor no responde: no escribe y avisa', (tester) async {
+      final repo = _MockRoutineRepository();
+      await pump(tester,
+          roster: Stream.value([linkDe('ath-1')]),
+          server: repoQueNoResponde(),
+          repo: repo);
+
+      await asignar(tester);
+
+      verifyNever(() => repo.createAssigned(any()));
+      expect(find.text('No pudimos crear el plan. Intentá de nuevo.'),
+          findsOneWidget);
     });
   });
 }

@@ -1,7 +1,11 @@
 // Vínculos PF↔alumno para los tests que sólo necesitan su ESTADO (#1695).
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show AsyncData, Override;
 import 'package:flutter_test/flutter_test.dart' show Fake;
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show alumnoConVinculoVivoProvider, trainerLinkRepositoryProvider;
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -42,4 +46,36 @@ class _RepoConVivos extends Fake implements TrainerLinkRepository {
 
   @override
   Future<Set<String>> alumnosConVinculoVivo(String trainerId) async => _vivos;
+}
+
+/// Para los harness que montan una pantalla que CREA un plan para un alumno
+/// pero no hablan del vínculo (#1695): cualquier alumno está vivo, tanto en el
+/// roster (la puerta de `build`) como en el servidor (la verificación previa a
+/// escribir). Va ANTES de los overrides del test, para que éstos le ganen.
+List<Override> alumnosVivosOverrides() => [
+      alumnoConVinculoVivoProvider
+          .overrideWith((ref, athleteId) => const AsyncData(true)),
+      trainerLinkRepositoryProvider.overrideWithValue(_RepoTodosVivos()),
+    ];
+
+/// El servidor no responde (sin red, permiso): verificar el vínculo TIRA, y
+/// quien escribe tiene que tratarlo como «no se sabe», nunca como «vivo».
+TrainerLinkRepository repoQueNoResponde() => _RepoQueNoResponde();
+
+class _RepoQueNoResponde extends Fake implements TrainerLinkRepository {
+  @override
+  Future<bool> tieneVinculoVivo({
+    required String trainerId,
+    required String athleteId,
+  }) async =>
+      throw Exception('offline');
+}
+
+class _RepoTodosVivos extends Fake implements TrainerLinkRepository {
+  @override
+  Future<bool> tieneVinculoVivo({
+    required String trainerId,
+    required String athleteId,
+  }) async =>
+      true;
 }

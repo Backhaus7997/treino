@@ -11,6 +11,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/plan_pdf_import_upload_screen.dart';
 import 'package:treino/features/coach_hub/application/pdf_import_quota_provider.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
@@ -18,8 +22,11 @@ import 'package:treino/features/coach_hub/application/plan_pdf_import_providers.
 import 'package:treino/features/coach_hub/data/periodized_import_draft.dart';
 import 'package:treino/features/coach_hub/data/plan_pdf_import_service.dart';
 import 'package:treino/features/coach_hub/domain/periodized_plan.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../../helpers/trainer_links.dart';
 import '../../coach_hub/presentation/periodized_draft_fixtures.dart'
     show FakeFilePicker;
 
@@ -84,6 +91,9 @@ Future<ProviderContainer> _pump(
   _FakeService service, {
   PdfImportRemaining? remaining,
   _Cleaner? cleaner,
+  // Los tests de #1695 prueban la puerta del vínculo de verdad; sin roster,
+  // el alumno está vivo.
+  Stream<List<TrainerLink>>? roster,
 }) async {
   final router = GoRouter(
     initialLocation: '/home',
@@ -107,6 +117,12 @@ Future<ProviderContainer> _pump(
     ],
   );
   final container = ProviderContainer(overrides: [
+    if (roster == null)
+      ...alumnosVivosOverrides()
+    else ...[
+      currentUidProvider.overrideWithValue('trainer-1'),
+      trainerLinksStreamProvider.overrideWith((ref) => roster),
+    ],
     planPdfImportServiceProvider.overrideWithValue(service),
     pdfImportRemainingProvider.overrideWithValue(remaining),
     pdfPickerCacheCleanerProvider
@@ -484,6 +500,52 @@ void main() {
       expect(cleaner.calls, greaterThanOrEqualTo(1));
       expect(container.read(periodizedImportProvider), isNotNull);
       expect(find.text('preview:ath-1'), findsOneWidget);
+    });
+  });
+
+  // ── #1695: importar CREA un plan y gasta cupo del PF ─────────────────────
+  //
+  // `/workout/import-pdf/:athleteId` la escribe cualquiera: el vínculo se
+  // exige ANTES de aceptar el archivo.
+
+  group('#1695 — la subida exige vínculo vivo', () {
+    const sinVinculo = Key('pdf_import_sin_vinculo');
+    const textoSinVinculo = 'Este alumno no tiene un vínculo vigente con vos, '
+        'así que no podés asignarle una rutina.';
+
+    for (final estado in [TrainerLinkStatus.active, TrainerLinkStatus.paused]) {
+      testWidgets('vínculo ${estado.name}: se puede elegir el PDF',
+          (tester) async {
+        await _pump(tester, _FakeService(),
+            roster: Stream.value([linkDe('ath-1', status: estado)]));
+
+        expect(find.text('Elegir PDF'), findsOneWidget);
+        expect(find.byKey(sinVinculo), findsNothing);
+      });
+    }
+
+    for (final (caso, roster) in [
+      ('terminado', [linkDe('ath-1', status: TrainerLinkStatus.terminated)]),
+      ('pendiente', [linkDe('ath-1', status: TrainerLinkStatus.pending)]),
+      ('de OTRO alumno', [linkDe('ath-2')]),
+      ('sin vínculo', <TrainerLink>[]),
+    ]) {
+      testWidgets('$caso: no acepta el archivo', (tester) async {
+        await _pump(tester, _FakeService(), roster: Stream.value(roster));
+
+        expect(find.text(textoSinVinculo), findsOneWidget);
+        expect(find.text('Elegir PDF'), findsNothing);
+      });
+    }
+
+    testWidgets('roster que falla: «no pudimos verificar», no «sin vínculo»',
+        (tester) async {
+      await _pump(tester, _FakeService(),
+          roster: Stream.error(Exception('boom')));
+
+      expect(find.byKey(sinVinculo), findsOneWidget);
+      expect(find.text(textoSinVinculo), findsNothing);
+      expect(find.text('Elegir PDF'), findsNothing);
     });
   });
 }

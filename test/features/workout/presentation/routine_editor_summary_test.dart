@@ -41,6 +41,7 @@ import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../fixtures/exercises.dart';
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../helpers/trainer_links.dart';
 import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ Future<void> _pumpEditor(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        ...alumnosVivosOverrides(),
         currentUidProvider.overrideWithValue('trainer-1'),
         routineRepositoryProvider.overrideWithValue(mockRepo),
         exercisesProvider.overrideWith((ref) async => kExerciseSeed),

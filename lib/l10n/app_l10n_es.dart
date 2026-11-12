@@ -6326,6 +6326,10 @@ class AppL10nEs extends AppL10n {
   @override
   String get coachAssignNoLink =>
       'Este alumno no tiene un vínculo vigente contigo, así que no puedes asignarle una rutina.';
+
+  @override
+  String get coachAssignLinkUnverified =>
+      'No pudimos verificar tu vínculo con este alumno. Prueba de nuevo.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -12647,4 +12651,8 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachAssignNoLink =>
       'Este alumno no tiene un vínculo vigente con vos, así que no podés asignarle una rutina.';
+
+  @override
+  String get coachAssignLinkUnverified =>
+      'No pudimos verificar tu vínculo con este alumno. Probá de nuevo.';
 }

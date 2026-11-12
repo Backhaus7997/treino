@@ -20,6 +20,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 import '../helpers/mail_test_helpers.dart';
+import '../helpers/trainer_links.dart';
 
 class _MockUser extends Mock implements User {}
 
@@ -46,6 +47,7 @@ UserProfile _profile() => UserProfile(
 
 Future<void> _go(WidgetTester tester, String location) async {
   final container = ProviderContainer(overrides: [
+    ...alumnosVivosOverrides(),
     authNotifierProvider.overrideWith(_StubAuthNotifier.new),
     userProfileProvider.overrideWith((ref) => Stream.value(_profile())),
     authStateChangesProvider.overrideWith((_) => Stream.value(null)),
