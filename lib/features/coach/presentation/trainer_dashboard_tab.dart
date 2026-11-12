@@ -1579,15 +1579,21 @@ class _EntrenaronHoyRow extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)} kg',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: palette.textMuted,
+            // #1701: sin carga no hay volumen. Una sesión sólo de series por
+            // tiempo o por distancia tiene `totalVolumeKg == 0`, y «0 kg»
+            // afirma un dato que no existe. El separador va adentro del `if`:
+            // afuera quedaría un hueco de 8px a la derecha del nombre.
+            if (session.totalVolumeKg > 0) ...[
+              const SizedBox(width: 8),
+              Text(
+                '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)} kg',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: palette.textMuted,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -1865,15 +1871,21 @@ class _ActividadRecienteRow extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)} kg',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: palette.textMuted,
+            // #1701: sin carga no hay volumen. Una sesión sólo de series por
+            // tiempo o por distancia tiene `totalVolumeKg == 0`, y «0 kg»
+            // afirma un dato que no existe. El separador va adentro del `if`:
+            // afuera quedaría un hueco de 8px a la derecha del nombre.
+            if (session.totalVolumeKg > 0) ...[
+              const SizedBox(width: 8),
+              Text(
+                '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)} kg',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: palette.textMuted,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
