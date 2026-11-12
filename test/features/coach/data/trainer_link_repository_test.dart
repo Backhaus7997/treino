@@ -180,6 +180,45 @@ void main() {
     });
   });
 
+  // ─── tieneVinculoVivo (#1695) ───────────────────────────────────────────
+
+  group('tieneVinculoVivo', () {
+    Future<bool> tiene(String athlete) =>
+        repo.tieneVinculoVivo(trainerId: trainerId, athleteId: athlete);
+
+    test('sólo un vínculo VIVO (activo o pausado) con ESE alumno cuenta',
+        () async {
+      final activo = await repo.request(trainerId: trainerId, athleteId: 'a1');
+      await activateLink(activo.id);
+      await repo.request(trainerId: trainerId, athleteId: 'a2'); // pending
+      final pausado = await repo.request(trainerId: trainerId, athleteId: 'a3');
+      await activateLink(pausado.id);
+      await repo.pause(pausado.id);
+      final terminado =
+          await repo.request(trainerId: trainerId, athleteId: 'a4');
+      await activateLink(terminado.id);
+      await repo.terminate(terminado.id);
+      // Activo, pero con OTRO PF: el vínculo es del par, no del alumno.
+      final ajeno = await repo.request(trainerId: 'pf-2', athleteId: 'a5');
+      await activateLink(ajeno.id);
+
+      expect(await tiene('a1'), isTrue);
+      expect(await tiene('a2'), isFalse); // pending
+      expect(await tiene('a3'), isTrue); // paused: un hold, no un corte
+      expect(await tiene('a4'), isFalse); // terminated: el ex-alumno
+      expect(await tiene('a5'), isFalse); // de otro PF
+      expect(await tiene('no-existe'), isFalse); // un uid cualquiera
+    });
+
+    test('con un id vacío no pregunta y contesta que no', () async {
+      expect(await tiene(''), isFalse);
+      expect(
+        await repo.tieneVinculoVivo(trainerId: '', athleteId: 'a1'),
+        isFalse,
+      );
+    });
+  });
+
   // ─── listForAthlete ───────────────────────────────────────────────────────
 
   group('listForAthlete', () {

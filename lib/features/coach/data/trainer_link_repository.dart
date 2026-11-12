@@ -172,6 +172,29 @@ class TrainerLinkRepository {
     return links.where((l) => statuses.contains(l.status)).toList();
   }
 
+  // ─── tieneVinculoVivo ───────────────────────────────────────────────────
+  //
+  // ¿Hay AHORA un vínculo vivo (`active` o `paused`, ver
+  // [kEstadosDeVinculoVivo]) entre este PF y este alumno? Es la pregunta
+  // que las rules no pueden hacer (`trainer_links` tiene ids autogenerados), así
+  // que la contesta el cliente justo antes de asignarle algo (#1695).
+  //
+  // Reusa `listForTrainer` —un `.get()` que va al servidor y sólo cae a la caché
+  // si no hay red— en vez de estrenar una query: es lectura de un solo uso, y el
+  // stream del roster podría estar viejo justo cuando el alumno corta el vínculo.
+
+  Future<bool> tieneVinculoVivo({
+    required String trainerId,
+    required String athleteId,
+  }) async {
+    if (trainerId.isEmpty || athleteId.isEmpty) return false;
+    final links = await listForTrainer(
+      trainerId,
+      statuses: kEstadosDeVinculoVivo,
+    );
+    return links.any((l) => l.athleteId == athleteId);
+  }
+
   // ─── setSharedWithTrainer ───────────────────────────────────────────────
   //
   // Privacy gate. Solo el atleta puede flippear este flag (validado por

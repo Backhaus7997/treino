@@ -182,6 +182,46 @@ final trainerLinksStreamProvider =
   return ref.read(trainerLinkRepositoryProvider).watchForTrainer(uid);
 });
 
+/// ¿El PF actual tiene un vínculo VIVO con [athleteId]? — el gate de toda
+/// superficie que ofrece ASIGNARLE o CREARLE una rutina (#1695).
+///
+/// Las rules sólo validan el ROL de quien escribe, no el vínculo (`trainer_links`
+/// tiene ids autogenerados y una regla no puede buscarlo). Sin este gate la UI
+/// convertía ese residuo en un flujo: un ex-alumno recibía la rutina como «DE TU
+/// COACH · ACTIVA» y no podía borrarla.
+///
+/// Vivo = [kEstadosDeVinculoVivo]: `active` Y `paused` (pausar es un hold, el
+/// alumno sigue siendo tuyo). `pending`, `terminated` y la ausencia de vínculo
+/// bloquean.
+///
+/// Devuelve un [AsyncValue] y NO un `bool` a propósito. «Todavía no sé» no es
+/// «no tiene vínculo»: `currentUidProvider` sale de un stream y arranca en
+/// null, y el roster arranca en loading. Contestar `false` ahí le mostraría
+/// «este alumno ya no es tuyo» a un PF con el vínculo vivo — el mismo fallo de
+/// `assignedRoutinesByTrainerProvider`. Quien lo consume decide qué dibujar
+/// mientras no hay respuesta; ninguno debería ofrecer la acción.
+///
+/// Si el stream ya tuvo datos y después falla, se conserva el último valor: un
+/// error transitorio no tiene que apagar la acción en medio de una edición.
+final alumnoConVinculoVivoProvider =
+    Provider.autoDispose.family<AsyncValue<bool>, String>((ref, athleteId) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null || uid.isEmpty) return const AsyncLoading();
+  final links = ref.watch(trainerLinksStreamProvider);
+  final data = links.valueOrNull;
+  if (data == null) {
+    return links.hasError
+        ? AsyncError(links.error!, links.stackTrace ?? StackTrace.empty)
+        : const AsyncLoading();
+  }
+  return AsyncData(
+    data.any(
+      (l) =>
+          l.athleteId == athleteId && kEstadosDeVinculoVivo.contains(l.status),
+    ),
+  );
+});
+
 /// Privacy-grant repository — wraps the `session_shares/{athleteId}` doc.
 /// Used by the athlete's "Compartir con mi PF" toggle to keep the Firestore
 /// security grant in sync with `trainer_links.sharedWithTrainer`.
