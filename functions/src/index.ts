@@ -181,6 +181,8 @@ export { resumeTrainerLink } from "./subscriptions/resume-trainer-link";
 // MÁS. El Admin SDK no pasa por rules, así que valida los mismos tres hechos
 // que `chatCreateOk` y estampa — sin relajar el pin del cliente.
 export { promoteChatToInquiry } from "./chat/promote-chat-to-inquiry";
+// #1697: cierra el chat del par al terminar el vínculo y lo reabre al re-vincular.
+export { syncChatOnTrainerLink } from "./chat/sync-chat-on-trainer-link";
 // Paywall Fase 7 (downgrade): reconcilian `entitlement` cuando el PF queda
 // por encima de su limite. Hacen falta LOS DOS — el trigger ve los cambios de
 // suscripcion al instante, y el barrido ve lo que ningun trigger puede ver:

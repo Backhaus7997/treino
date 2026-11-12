@@ -183,11 +183,13 @@ async function enqueueLinkMail(
 /**
  * Estampa `linkId` en el chat que ya existía entre el PF y el alumno.
  *
- * POR QUE HACE FALTA. `senderMayPost` (firestore.rules) deja postear si el DOC
- * DEL CHAT tiene `linkId`. El cliente lo escribe SÓLO al crear el chat, vía
+ * POR QUE HACE FALTA. `linkId` es la marca de "chat de Coach" (`Chat.linkId`),
+ * NO un permiso de escritura: `senderMayPost` dejó de mirarlo el 2026-10-21
+ * (REQ-FOLLOW-012) y hoy sólo pide membresía y ausencia de bloqueo. La
+ * escritura la corta `closedAt` (`syncChatOnTrainerLink`, #1697). El cliente
+ * escribe `linkId` SÓLO al crear el chat, vía
  * `ChatRepository._activeLinkIdBetween`. Un par que se escribió primero como
- * chat social y se vinculó DESPUES nunca lo recibe, y el alumno vinculado a su
- * PF queda leyendo "Para escribirle, esta persona tiene que seguirte". El
+ * chat social y se vinculó DESPUES nunca lo recibe. El
  * cliente tampoco lo puede completar después: `chats/update` tiene `linkId`
  * PINEADO INMUTABLE. Por eso vive acá, donde el Admin SDK saltea las reglas.
  *
@@ -195,9 +197,8 @@ async function enqueueLinkMail(
  * `paused`. Esa no es una preferencia: es la invariante que `chatCreateOk`
  * exige de todo chat que lleve `linkId` (el link existe, su status está en
  * ['active','paused'], y los dos miembros son trainerId y athleteId), y que el
- * cliente espeja en `_activeLinkIdBetween`. Estamparlo en `pending` le daría
- * escritura al alumno ANTES de que el PF acepte — o sea, desarmaría el gate
- * que el vínculo representa.
+ * cliente espeja en `_activeLinkIdBetween`. Estamparlo en `pending` marcaría
+ * como chat de Coach uno cuyo PF todavía no aceptó, y la marca es inmutable.
  *
  * EL DOC ES UNO SOLO Y SU ID ES DETERMINISTICO: `sortedUids.join('_')`, igual
  * que `ChatRepository.chatIdFor`. La unicidad por par es estructural (la
@@ -517,17 +518,19 @@ export async function notifyOnLinkChangeHandler(
   // borra. Ver purge-rejected-link.ts para el discriminador.
   //
   // POR QUE VIVE ACA Y NO EN UN TRIGGER PROPIO. El orden contra la notificacion
-  // es el punto entero. Como SEXTO trigger sobre `trainer_links/{linkId}`,
+  // es el punto entero. Como un trigger MAS sobre `trainer_links/{linkId}`,
   // "primero se notifica y despues se borra" quedaria a merced de como Eventarc
   // planifique dos invocaciones independientes — que es otra manera de decir
   // que no seria un orden. Al final de este handler, el orden es una propiedad
   // del codigo: sendFcm y enqueueLinkMail ya resolvieron.
   //
-  // Hoy hay CINCO (notifyOnLinkChange, linkAggregate, syncSessionShareOnTrainerLink,
-  // cleanupAssignedPlansOnUnlink, linkLoadReconcile). El comando, porque una
-  // afirmacion de conteo sin el al lado no cuenta (AGENTS.md §11.1):
+  // Hoy hay SIETE (notifyOnLinkChange, linkAggregate, syncSessionShareOnTrainerLink,
+  // cleanupAssignedPlansOnUnlink, linkLoadReconcile, syncAthletePaywallOnTrainerLink,
+  // syncChatOnTrainerLink). El comando, porque una afirmacion de conteo sin el
+  // al lado no cuenta (AGENTS.md §11.1; el 2do `rg` saca la linea de este
+  // comentario, que tambien matchea):
   //
-  //   rg -n 'document: "trainer_links' functions/src --type ts -g '!__tests__'
+  //   rg -n 'document: "trainer_links' functions/src --type ts -g '!__tests__' | rg -v '^\S+:\d+:\s*//'
   //
   // (Una version anterior de este comentario decia "septimo". Estaba mal, y de
   // ese numero colgaba el razonamiento de fan-out.)
