@@ -526,6 +526,7 @@ void main() {
       String? linkId,
       bool inquiry = false,
       bool iBlockedThem = false,
+      bool closed = false,
     }) async {
       final fake = FakeFirebaseFirestore();
       await fake.collection('chats').doc('aaa_bbb').set({
@@ -534,6 +535,7 @@ void main() {
         'createdAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20)),
         if (linkId != null) 'linkId': linkId,
         if (inquiry) 'kind': 'inquiry',
+        if (closed) 'closedAt': Timestamp.fromDate(DateTime.utc(2026, 11, 12)),
       });
       if (iBlockedThem) {
         await fake.collection('blocks').doc('aaa_bbb').set({
@@ -607,6 +609,58 @@ void main() {
         (tester) async {
       await pump(tester, await seed(inquiry: true));
       expect(composerEnabled(tester), isTrue);
+    });
+
+    // Chat CERRADO (#1697): el vínculo del par terminó, `chats/{id}.closedAt`
+    // está seteado y las rules rechazan el mensaje. Acá el aviso REEMPLAZA al
+    // composer —a diferencia del bloqueo, que lo deja apagado— porque no hay
+    // nada que el usuario pueda hacer para destrabarlo.
+    const closedCopy =
+        'El vínculo terminó. Ya no se pueden enviar mensajes en este chat.';
+
+    testWidgets('cerrado → aviso y SIN campo de texto ni botón de enviar',
+        (tester) async {
+      await pump(tester, await seed(closed: true));
+
+      expect(find.text(closedCopy), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+      expect(find.byTooltip('Enviar'), findsNothing);
+      expect(find.byTooltip('Adjuntar'), findsNothing);
+    });
+
+    testWidgets('cerrado → el historial se sigue viendo', (tester) async {
+      await pump(tester, await seed(closed: true));
+
+      expect(find.text('mensaje previo'), findsOneWidget);
+    });
+
+    testWidgets('cerrado en un chat de Coach (linkId) → también cerrado',
+        (tester) async {
+      // `linkId` no abre nada: ni el servidor ni la UI lo miran para escribir.
+      await pump(tester, await seed(linkId: 'link-1', closed: true));
+
+      expect(find.text(closedCopy), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+    });
+
+    testWidgets('cerrado Y bloqueado → sólo el aviso de cerrado',
+        (tester) async {
+      // "Desbloqueala para escribirle" sería falso: desbloquear no reabre.
+      await pump(tester, await seed(closed: true, iBlockedThem: true));
+
+      expect(find.text(closedCopy), findsOneWidget);
+      expect(find.textContaining('Bloqueaste'), findsNothing);
+      expect(find.byType(TextField), findsNothing);
+    });
+
+    testWidgets('abierto → composer habilitado y sin aviso de cerrado',
+        (tester) async {
+      await pump(tester, await seed());
+
+      expect(find.text(closedCopy), findsNothing);
+      expect(find.byType(TextField), findsOneWidget);
+      expect(composerEnabled(tester), isTrue);
+      expect(find.byTooltip('Enviar'), findsOneWidget);
     });
 
     // El frame de carga: con los bloqueos todavía sin llegar, no saber no

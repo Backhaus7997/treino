@@ -4681,6 +4681,10 @@ class AppL10nEn extends AppL10n {
   String get chatBlockedComposerHintA11y => 'You can\'t write in this chat';
 
   @override
+  String get chatClosedComposerNotice =>
+      'This link has ended. Messages can no longer be sent in this chat.';
+
+  @override
   String get followListTabFollowers => 'FOLLOWERS';
 
   @override

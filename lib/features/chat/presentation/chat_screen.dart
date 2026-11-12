@@ -321,7 +321,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // Espejo de `senderMayPost` en las rules: en un chat existente escriben
     // los dos miembros SIN requisito de follow (cambio de producto del
     // 2026-10-21, que reemplazó a REQ-FOLLOW-012). Lo único que corta la
-    // escritura es un bloqueo.
+    // escritura es un bloqueo o que el chat esté cerrado (más abajo).
     //
     // Del bloqueo sólo se ve una mitad: los que bloqueé YO. Si el otro me
     // bloqueó, las rules no me dejan leerlo; el envío rebota con un
@@ -334,6 +334,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         (ref.watch(blockedUidsProvider(currentUid)).valueOrNull ?? const [])
             .contains(widget.otherUid);
     final canWrite = !iBlockedThem;
+    // Chat CERRADO: el vínculo PF↔alumno del par terminó y no hay otro vigente
+    // (`Chat.closedAt`, lo escribe una Cloud Function; las rules rechazan el
+    // mensaje). A diferencia del bloqueo, ES simétrico —lo ven los dos— y no
+    // hay nada que el usuario pueda hacer para destrabarlo: sólo un vínculo
+    // nuevo reabre el chat. Mismo criterio de carga que el bloqueo: sin el doc
+    // todavía se asume abierto, porque un falso cerrado le tapa el composer a
+    // quien sí puede escribir en cada apertura.
+    final isClosed = ref.watch(
+      chatByIdProvider(widget.chatId)
+          .select((chat) => chat.valueOrNull?.isClosed ?? false),
+    );
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
     final mediaSend = ref.watch(chatMediaSendControllerProvider(widget.chatId));
 
@@ -461,19 +472,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 color: palette.accent,
                 backgroundColor: palette.bgCard,
               ),
-            // El aviso va ARRIBA del composer, no en su lugar: dejar el campo
-            // visible pero apagado explica POR QUÉ no se puede escribir. Si el
-            // composer desapareciera, la pantalla se vería rota sin motivo.
-            if (!canWrite) _BlockedComposerNotice(palette: palette),
-            _Composer(
-              controller: _textController,
-              sending: _sending || mediaSend.uploading,
-              uploading: mediaSend.uploading,
-              canWrite: canWrite,
-              onSend: _onSend,
-              onAttach: _onAttach,
-              palette: palette,
-            ),
+            if (isClosed)
+              // Cerrado el aviso REEMPLAZA al composer: no hay un campo que
+              // "se pueda destrabar", y uno apagado prometería lo contrario.
+              // Gana sobre el aviso de bloqueo: "desbloqueala para escribirle"
+              // sería falso, desbloquear no reabre un chat cerrado.
+              _ComposerNotice(
+                palette: palette,
+                message: l10n.chatClosedComposerNotice,
+              )
+            else ...[
+              // El aviso de bloqueo va ARRIBA del composer, no en su lugar:
+              // dejar el campo visible pero apagado explica POR QUÉ no se puede
+              // escribir. Si el composer desapareciera, la pantalla se vería
+              // rota sin motivo.
+              if (!canWrite)
+                _ComposerNotice(
+                  palette: palette,
+                  message: l10n.chatBlockedComposerNotice,
+                ),
+              _Composer(
+                controller: _textController,
+                sending: _sending || mediaSend.uploading,
+                uploading: mediaSend.uploading,
+                canWrite: canWrite,
+                onSend: _onSend,
+                onAttach: _onAttach,
+                palette: palette,
+              ),
+            ],
           ],
         ),
       ),
@@ -804,20 +831,21 @@ class _Composer extends StatelessWidget {
   }
 }
 
-/// Aviso PERSISTENTE que reemplaza al composer cuando no se puede escribir.
+/// Aviso PERSISTENTE sobre el composer cuando no se puede escribir (bloqueo o
+/// chat cerrado; el [message] lo elige quien lo usa).
 ///
-/// Persistente y no un snackbar a propósito: el estado dura hasta que la otra
-/// persona vuelva a seguirte, así que un aviso que se desvanece dejaría la
-/// pantalla mostrando un composer inexistente sin explicación.
+/// Persistente y no un snackbar a propósito: el estado dura hasta que cambie la
+/// relación (desbloquear, o un vínculo nuevo), así que un aviso que se
+/// desvanece dejaría la pantalla sin explicación de por qué no hay dónde
+/// escribir.
 ///
-/// Copy confirmado por el dueño en 4.7. Se eligió el que EXPLICA de qué depende
-/// —"esta persona tiene que seguirte"— por sobre las alternativas neutras: es
-/// el único que le dice al usuario qué destrabaría la situación. No expone nada
-/// que no se vea ya en el perfil de la otra persona.
-class _BlockedComposerNotice extends StatelessWidget {
-  const _BlockedComposerNotice({required this.palette});
+/// Es sólo texto: no expone nada que no se vea ya en el perfil de la otra
+/// persona ni dice quién terminó el vínculo.
+class _ComposerNotice extends StatelessWidget {
+  const _ComposerNotice({required this.palette, required this.message});
 
   final AppPalette palette;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -835,7 +863,7 @@ class _BlockedComposerNotice extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              AppL10n.of(context).chatBlockedComposerNotice,
+              message,
               style: GoogleFonts.barlow(
                 fontSize: 14,
                 color: palette.textMuted,

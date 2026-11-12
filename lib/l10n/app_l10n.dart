@@ -8211,6 +8211,12 @@ abstract class AppL10n {
   /// **'No podés escribir en este chat'**
   String get chatBlockedComposerHintA11y;
 
+  /// Aviso persistente que reemplaza al composer cuando el chat está cerrado: el vínculo PF↔alumno del par terminó (Chat.closedAt, #1697). El historial sigue legible y si el par se vuelve a vincular el chat reabre. Texto neutro a propósito: lo ve cualquiera de los dos lados, sin saber quién terminó el vínculo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El vínculo terminó. Ya no se pueden enviar mensajes en este chat.'**
+  String get chatClosedComposerNotice;
+
   /// Pill de la lista de seguidores en la pantalla de seguidores/seguidos.
   ///
   /// In es_AR, this message translates to:
