@@ -15,6 +15,11 @@ import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/coach/application/blocked_athletes_providers.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinkRepositoryProvider, trainerLinksStreamProvider;
+import 'package:treino/features/coach/data/trainer_link_repository.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/blocked_students_screen.dart'
     show kBlockedStudentsRoutePath;
@@ -43,12 +48,16 @@ import 'package:treino/features/workout/domain/set_spec.dart';
 import '../../../../../fixtures/routine_editor_ui.dart';
 import '../../../../../fixtures/exercises.dart';
 import '../../../../../helpers/fake_analytics_service.dart';
+import '../../../../../helpers/trainer_links.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
+
+class _MockTrainerLinkRepository extends Mock
+    implements TrainerLinkRepository {}
 
 const _trainerId = 'trainer-1';
 const _athleteId = 'athlete-1';
@@ -61,8 +70,22 @@ List<Override> _overrides({
   BlockedAthletes? blocked,
 }) {
   final mockRepo = repo ?? _MockRoutineRepository();
+  // Crear un plan exige vínculo VIVO (activo o pausado) con el alumno (#1695):
+  // por defecto lo tiene, tanto en el roster que mira la pantalla como en la
+  // verificación que hace antes de escribir. Los tests del gate lo pisan con `extraOverrides`.
+  final links = _MockTrainerLinkRepository();
+  when(
+    () => links.tieneVinculoVivo(
+      trainerId: any(named: 'trainerId'),
+      athleteId: any(named: 'athleteId'),
+    ),
+  ).thenAnswer((_) async => true);
   return [
     currentUidProvider.overrideWithValue(_trainerId),
+    trainerLinksStreamProvider.overrideWith(
+      (ref) => Stream.value([linkDe(_athleteId)]),
+    ),
+    trainerLinkRepositoryProvider.overrideWithValue(links),
     routineRepositoryProvider.overrideWithValue(mockRepo),
     // Sin override el provider real queda en AsyncError (no hay app de
     // Firebase en `flutter test`), que es lo que quieren los tests que no
@@ -1636,6 +1659,121 @@ void main() {
         findsOneWidget,
       );
     });
+  });
+
+  // -- Vínculo vivo (#1695) ----------------------------------------------
+  //
+  // Las rules validan el ROL de quien escribe, no el vínculo. Sin este gate el
+  // editor le creaba una rutina a un ex-alumno (que la veía como «DE TU COACH ·
+  // ACTIVA» y no podía borrarla) o a cualquier uid pegado en la URL.
+  group('RoutineEditorWebScreen — crear exige vínculo VIVO', () {
+    Override roster(List<TrainerLink> links) =>
+        trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links));
+
+    void expectBloqueado(WidgetTester tester) {
+      expect(find.byKey(const Key('routine_editor_form')), findsNothing);
+      expect(
+          find.byKey(const Key('routine_editor_submit_button')), findsNothing);
+      expect(
+        find.textContaining('no tiene un vínculo vigente con vos'),
+        findsOneWidget,
+      );
+    }
+
+    // Vivo = activo O pausado: pausar es un hold, el alumno sigue siendo tuyo.
+    for (final status in [TrainerLinkStatus.active, TrainerLinkStatus.paused]) {
+      testWidgets('vínculo ${status.name}: abre el formulario', (tester) async {
+        await _pumpEditor(tester, extraOverrides: [
+          roster([linkDe(_athleteId, status: status)]),
+        ]);
+
+        expect(find.byKey(const Key('routine_editor_form')), findsOneWidget);
+        expect(find.byKey(const Key('routine_editor_submit_button')),
+            findsOneWidget);
+      });
+    }
+
+    testWidgets('vínculo TERMINADO (ex-alumno): estado fatal, sin formulario',
+        (tester) async {
+      await _pumpEditor(tester, extraOverrides: [
+        roster([linkDe(_athleteId, status: TrainerLinkStatus.terminated)]),
+      ]);
+
+      expectBloqueado(tester);
+    });
+
+    testWidgets('uid SIN vínculo (o que no existe) por URL: mismo estado',
+        (tester) async {
+      await _pumpEditor(tester, extraOverrides: [
+        roster([linkDe('otro')])
+      ]);
+
+      expectBloqueado(tester);
+    });
+
+    testWidgets('EDITAR un plan existente no pasa por el gate', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r1')).thenAnswer((_) async => _simpleRoutine());
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        routineId: 'r1',
+        extraOverrides: [
+          roster([linkDe(_athleteId, status: TrainerLinkStatus.terminated)]),
+        ],
+      );
+
+      expect(find.byKey(const Key('routine_editor_form')), findsOneWidget);
+    });
+
+    testWidgets(
+        'el vínculo se corta con el editor ABIERTO: la verificación previa '
+        'a escribir frena el createAssigned', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any()))
+          .thenAnswer((i) async => i.positionalArguments.first as Routine);
+      // El roster en memoria todavía dice «activo» (el stream no llegó), pero
+      // el servidor ya lo tiene terminado.
+      final enElServidor = await repoConVinculos([
+        linkDe(_athleteId, status: TrainerLinkStatus.terminated),
+      ]);
+      await _pumpEditor(tester, repo: repo, extraOverrides: [
+        trainerLinkRepositoryProvider.overrideWithValue(enElServidor),
+      ]);
+      await _fillMinimalValidForm(tester);
+
+      await _tapGuardar(tester);
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repo.createAssigned(any()));
+      expect(
+        find.text('No se asignó nada: este alumno ya no tiene un vínculo '
+            'vigente con vos.'),
+        findsOneWidget,
+      );
+      // Y el botón vuelve a quedar usable: no se quedó «Guardando…».
+      expect(find.text('Guardando…'), findsNothing);
+    });
+
+    for (final status in [TrainerLinkStatus.active, TrainerLinkStatus.paused]) {
+      testWidgets('con el vínculo ${status.name} en el servidor, escribe',
+          (tester) async {
+        final repo = _MockRoutineRepository();
+        when(() => repo.createAssigned(any()))
+            .thenAnswer((i) async => i.positionalArguments.first as Routine);
+        final enElServidor =
+            await repoConVinculos([linkDe(_athleteId, status: status)]);
+        await _pumpEditor(tester, repo: repo, extraOverrides: [
+          trainerLinkRepositoryProvider.overrideWithValue(enElServidor),
+        ]);
+        await _fillMinimalValidForm(tester);
+
+        await _tapGuardar(tester);
+        await tester.pumpAndSettle();
+
+        verify(() => repo.createAssigned(any())).called(1);
+      });
+    }
   });
 
   // -- Paywall: escritura denegada -----------------------------------------

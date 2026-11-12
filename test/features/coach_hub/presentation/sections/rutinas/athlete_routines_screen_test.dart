@@ -10,6 +10,10 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/athlete_routines_screen.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -17,6 +21,8 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
@@ -25,6 +31,8 @@ import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
+
+import '../../../../../helpers/trainer_links.dart';
 
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
@@ -70,7 +78,13 @@ Routine _routine({
       ],
     );
 
-Future<void> _pump(WidgetTester tester, List<Routine> routines) async {
+/// [links] es el roster del PF: por defecto el alumno tiene vínculo ACTIVO, y
+/// con uno vivo (activo o pausado) se habilita «Nueva rutina» (#1695).
+Future<void> _pump(
+  WidgetTester tester,
+  List<Routine> routines, {
+  List<TrainerLink>? links,
+}) async {
   tester.view.physicalSize = const Size(1400, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
@@ -103,6 +117,10 @@ Future<void> _pump(WidgetTester tester, List<Routine> routines) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        currentUidProvider.overrideWithValue('trainer-1'),
+        trainerLinksStreamProvider.overrideWith(
+          (ref) => Stream.value(links ?? [linkDe(_athleteId)]),
+        ),
         assignedRoutinesByTrainerProvider
             .overrideWith((ref, key) async => routines),
         userPublicProfileProvider(_athleteId).overrideWith(
@@ -264,6 +282,93 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('CREATE $_athleteId'), findsOneWidget);
+    });
+
+    // #1695: «Nueva rutina» exige vínculo VIVO. Un ex-alumno recibía la
+    // rutina como «DE TU COACH · ACTIVA» y no podía borrarla.
+    group('«Nueva rutina» según el vínculo', () {
+      Future<void> pumpSinAccion(
+        WidgetTester tester,
+        List<TrainerLink> links,
+      ) async {
+        await _pump(tester, [_routine(id: 'r1', name: 'Vieja')], links: links);
+        expect(find.text('Nueva rutina'), findsNothing);
+        expect(
+          find.byKey(const Key('athlete_routines_sin_vinculo')),
+          findsOneWidget,
+        );
+        // Lo que ya tenía se sigue viendo, y archivar (la limpieza) también.
+        expect(find.text('Vieja'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('routine_row_archive_button_r1')),
+          findsOneWidget,
+        );
+      }
+
+      // Vivo = activo O pausado: pausar es un hold, el alumno sigue siendo tuyo.
+      for (final status in [
+        TrainerLinkStatus.active,
+        TrainerLinkStatus.paused,
+      ]) {
+        testWidgets('vínculo ${status.name}: ofrece la acción y no avisa nada',
+            (tester) async {
+          await _pump(tester, const [],
+              links: [linkDe(_athleteId, status: status)]);
+
+          expect(find.text('Nueva rutina'), findsOneWidget);
+          expect(
+            find.byKey(const Key('athlete_routines_sin_vinculo')),
+            findsNothing,
+          );
+        });
+      }
+
+      for (final status in [
+        TrainerLinkStatus.terminated, // el ex-alumno
+        TrainerLinkStatus.pending, // solicitud que nunca se aceptó
+      ]) {
+        testWidgets('vínculo ${status.name}: sin acción', (tester) async {
+          await pumpSinAccion(tester, [linkDe(_athleteId, status: status)]);
+        });
+      }
+
+      testWidgets('uid SIN vínculo con este PF (o que no existe): sin acción',
+          (tester) async {
+        await pumpSinAccion(tester, [linkDe('otro-alumno')]);
+      });
+
+      testWidgets('mientras el roster no llegó no se ofrece ni se avisa',
+          (tester) async {
+        // `await _pump` asienta el árbol; acá el roster nunca emite.
+        tester.view.physicalSize = const Size(1400, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              currentUidProvider.overrideWithValue('trainer-1'),
+              trainerLinksStreamProvider
+                  .overrideWith((ref) => const Stream.empty()),
+              assignedRoutinesByTrainerProvider
+                  .overrideWith((ref, key) async => const []),
+            ],
+            child: MaterialApp(
+              theme: AppTheme.dark(),
+              home: const Scaffold(
+                body: AthleteRoutinesScreen(athleteId: _athleteId),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('Nueva rutina'), findsNothing);
+        expect(
+          find.byKey(const Key('athlete_routines_sin_vinculo')),
+          findsNothing,
+        );
+      });
     });
 
     testWidgets(
