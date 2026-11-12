@@ -804,9 +804,13 @@ void main() {
       expect(scaleOf(), equals(1.0));
     });
 
+    // #1696: este test decía `findsNothing` y blindaba el bug — una cuenta sin
+    // sesiones esta semana no tenía cómo llegar a Insights ni a Medidas. Lo
+    // correcto es que la semana en 0 conserve SU CTA principal Y el acceso a
+    // Insights.
     testWidgets(
-        'the zero-week state shows its own routines CTA, not the insights one',
-        (tester) async {
+        '#1696: el zero-week state conserva su CTA de rutinas Y muestra '
+        'VER INSIGHTS', (tester) async {
       await tester.pumpWidget(
         _wrapCard(
           overrides: [
@@ -819,8 +823,144 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('VER INSIGHTS  →'), findsNothing);
+      expect(find.text('VER INSIGHTS  →'), findsOneWidget);
       expect(find.textContaining('EXPLORAR RUTINAS'), findsOneWidget);
+    });
+  });
+
+  // ── #1696: Insights alcanzable SIN sesiones en la semana ────────────────────
+  //
+  // QA 2026-11-06: con la semana en 0 la card no ofrecía VER INSIGHTS y Perfil
+  // tampoco, así que una cuenta nueva no podía cargar su primera medición y una
+  // con historial no veía sus reportes hasta volver a entrenar. Las dos
+  // variantes de `_ZeroWeekState` tienen que mostrarlo y navegar.
+  group('EstaSemanaCard — #1696 insights sin sesiones en la semana', () {
+    // (etiqueta, pill, CTA principal, override del provider)
+    final variants = <(String, String, String, WeeklyInsights?)>[
+      (
+        'cuenta nueva (PRIMER PASO)',
+        'PRIMER PASO',
+        'EXPLORAR RUTINAS  →',
+        null
+      ),
+      (
+        'con historial (A RETOMAR)',
+        'A RETOMAR',
+        'VOLVER A ENTRENAR  →',
+        _makeInsights(
+          sessionsCount: 0,
+          streak: 0,
+          monthSessionsCount: 0,
+          hasEverCompletedAnyWorkout: true,
+        ),
+      ),
+    ];
+
+    for (final (label, pill, primaryCta, insights) in variants) {
+      testWidgets('$label: muestra VER INSIGHTS y navega a /home/insights', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          _wrapCard(
+            overrides: [
+              weeklyInsightsProvider.overrideWith((_) async => insights),
+            ],
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        // Es el estado de semana en 0 que se esperaba, no la rama con datos.
+        expect(find.text(pill), findsOneWidget);
+        expect(find.text('RACHA ACTUAL'), findsNothing);
+
+        expect(find.text('VER INSIGHTS  →'), findsOneWidget);
+        // …y NO desplazó al CTA principal de la variante.
+        expect(find.text(primaryCta), findsOneWidget);
+
+        await tester.ensureVisible(find.text('VER INSIGHTS  →'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('VER INSIGHTS  →'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Insights'), findsOneWidget);
+      });
+
+      testWidgets(
+        '$label: el CTA principal sigue siendo el primario — Insights va '
+        'debajo, sin relleno y de ancho completo',
+        (tester) async {
+          await tester.pumpWidget(
+            _wrapCard(
+              overrides: [
+                weeklyInsightsProvider.overrideWith((_) async => insights),
+              ],
+            ),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 50));
+
+          // Un solo OutlinedButton (el principal): Insights no es otro botón
+          // outlined compitiendo con él.
+          expect(find.byType(OutlinedButton), findsOneWidget);
+
+          final insightsBox = find.ancestor(
+            of: find.text('VER INSIGHTS  →'),
+            matching: find.byType(AnimatedContainer),
+          );
+          final decoration = tester
+              .widget<AnimatedContainer>(insightsBox)
+              .decoration! as ShapeDecoration;
+          // Sin relleno: la píldora rellena en acento le ganaría la jerarquía
+          // al CTA principal (outlined).
+          expect(decoration.color, isNot(AppPalette.mintMagenta.accent));
+          expect(decoration.color!.a, 0.0);
+
+          // Debajo del principal, mismo ancho, y con target táctil de 44.
+          final primary = find.byType(OutlinedButton);
+          expect(
+            tester.getTopLeft(insightsBox).dy,
+            greaterThanOrEqualTo(tester.getBottomLeft(primary).dy),
+          );
+          expect(
+            tester.getSize(insightsBox).width,
+            tester.getSize(primary).width,
+          );
+          expect(tester.getSize(insightsBox).height, 44);
+        },
+      );
+    }
+
+    // Guardia de regresión: la rama CON sesiones no cambió — sigue teniendo su
+    // píldora RELLENA en acento (la sin caja es sólo del estado de semana en 0)
+    // y sigue habiendo UN solo CTA de Insights.
+    testWidgets('la rama con sesiones sigue mostrando la píldora rellena', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapCard(
+          overrides: [
+            weeklyInsightsProvider.overrideWith(
+              (_) async => _makeInsights(sessionsCount: 2),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('VER INSIGHTS  →'), findsOneWidget);
+      final decoration = tester
+          .widget<AnimatedContainer>(
+            find.ancestor(
+              of: find.text('VER INSIGHTS  →'),
+              matching: find.byType(AnimatedContainer),
+            ),
+          )
+          .decoration! as ShapeDecoration;
+      expect(decoration.color, AppPalette.mintMagenta.accent);
+      // Y no se coló el CTA de rutinas de la semana en 0.
+      expect(find.byType(OutlinedButton), findsNothing);
     });
   });
 }

@@ -312,11 +312,21 @@ class _Loaded extends StatelessWidget {
 // gives the action real button semantics, which the card-level GestureDetector
 // (a bare GestureDetector) never had.
 //
-// Compact — NOT full-width like _ZeroWeekState's CTA — because it lives inline
-// beside the streak number rather than as a block at the foot of the card.
+// Dos presentaciones, misma ruta y mismo semantics:
+// - Default (rama con sesiones): compacta y RELLENA, porque vive inline junto al
+//   número de racha y no como bloque al pie de la card.
+// - [secondary] (semana en 0, #1696): de ancho completo y SIN caja, para el pie
+//   de [_ZeroWeekState]. Ahí el CTA principal es EXPLORAR RUTINAS / VOLVER A
+//   ENTRENAR (outlined en acento); la píldora rellena le habría ganado la
+//   jerarquía a la acción que la card quiere empujar. Es la variante
+//   `ghostAccent` del kit de botones: «la terciaria en acento: sin caja, texto
+//   que invita».
 
 class _InsightsCta extends StatefulWidget {
-  const _InsightsCta();
+  const _InsightsCta({this.secondary = false});
+
+  /// `true` → versión sin caja de ancho completo para el estado de semana en 0.
+  final bool secondary;
 
   @override
   State<_InsightsCta> createState() => _InsightsCtaState();
@@ -334,6 +344,12 @@ class _InsightsCtaState extends State<_InsightsCta> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+    final secondary = widget.secondary;
+    // Colores de la versión sin caja: salen del token del kit (`accentText`,
+    // AA en las dos paletas), no de `palette.accent` — el mint sobre una card
+    // blanca da 1,64:1 (#1056).
+    final ghost =
+        TreinoButtonTokens.of(context, TreinoButtonVariant.ghostAccent);
 
     // Same construction as [HomeCTAButton] (Motion PR3), compact instead of
     // full-width: Semantics + TreinoTappable + Container. NOT an
@@ -364,13 +380,19 @@ class _InsightsCtaState extends State<_InsightsCta> {
             duration: AppMotion.resolve(context, AppMotion.micro),
             curve: AppMotion.standard,
             height: 44,
+            // Ancho completo sólo en la versión secundaria (queda como bloque
+            // al pie de la card, debajo del CTA principal).
+            width: secondary ? double.infinity : null,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: ShapeDecoration(
-              color: _hovered
-                  ? Color.lerp(palette.accent, Colors.white, 0.18)!
-                  : palette.accent,
+              color: secondary
+                  ? (_hovered ? ghost.hoverBackground : ghost.background)
+                  : _hovered
+                      ? Color.lerp(palette.accent, Colors.white, 0.18)!
+                      : palette.accent,
               shape: const StadiumBorder(),
-              shadows: _hovered
+              // Sin glow en la versión sin caja: no tiene fondo del que brillar.
+              shadows: _hovered && !secondary
                   ? [
                       BoxShadow(
                         color: palette.accent.withValues(alpha: 0.45),
@@ -402,7 +424,9 @@ class _InsightsCtaState extends State<_InsightsCta> {
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                   letterSpacing: 0.8,
-                  color: TreinoButtonTokens.foreground(context),
+                  color: secondary
+                      ? ghost.foreground
+                      : TreinoButtonTokens.foreground(context),
                 ),
               ),
             ),
@@ -419,6 +443,7 @@ class _InsightsCtaState extends State<_InsightsCta> {
 // motivador: titular grande + ícono de llama (TreinoIcon.streak) + copy
 // invitante + CTA explícito que lleva a la tab Entrenar. Diseño 2026-05-22:
 // no mostramos "0 días / 0 entrenos" porque desmotiva al primer login.
+// Debajo del CTA principal, el acceso secundario a Insights (#1696).
 //
 // #551: dos variantes del mismo layout según [hasHistory]:
 // - `false` → cuenta nueva (0 sesiones TOTALES): copy de onboarding
@@ -500,6 +525,13 @@ class _ZeroWeekState extends StatelessWidget {
               ),
             ),
           ),
+          // #1696: la semana en 0 NO le saca el acceso a Insights (y desde ahí
+          // a Medidas). Cuenta nueva: es el único camino a cargar la primera
+          // medición. Con historial: ver sus reportes no depende de haber
+          // entrenado esta semana. Va DEBAJO del CTA principal y sin caja para
+          // no competirle.
+          const SizedBox(height: 8),
+          const _InsightsCta(secondary: true),
         ],
       ),
     );

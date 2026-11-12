@@ -243,6 +243,11 @@ void _safePopOrHome(BuildContext context) {
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
+/// Cuenta nueva (nunca completó un entrenamiento): no hay nada que reportar de
+/// entrenos, pero MEDIDAS sí es alcanzable (#1696) — es la única puerta para
+/// que una cuenta nueva cargue su primera medición. Los demás tiles del hub
+/// (distribución muscular, ejercicios, volumen…) quedan afuera a propósito:
+/// abrirían pantallas vacías.
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
 
@@ -250,10 +255,12 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Center(
-      child: Padding(
+      // Scroll por si el texto escala (accesibilidad) o la pantalla es baja:
+      // ahora la columna tiene un tile más que el ícono + el mensaje de antes.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               TreinoIcon.chartBar,
@@ -270,6 +277,8 @@ class _EmptyState extends StatelessWidget {
                 color: palette.textMuted,
               ),
             ),
+            const SizedBox(height: 20),
+            const SizedBox(width: double.infinity, child: _MeasurementsTile()),
           ],
         ),
       ),
@@ -817,17 +826,7 @@ class _StatsHubTileList extends StatelessWidget {
           onTap: () => context.push('/home/insights/volume-by-group'),
         ),
         const SizedBox(height: 12),
-        // MEDIDAS: el PF carga peso y circunferencias de su alumno y era el
-        // ÚNICO que las veía. El alumno no tenía dónde mirarlas. (Rendimiento
-        // NO se surfacea al alumno: son evaluaciones profesionales —CMJ,
-        // sprints, VO2máx— que toma el coach con equipo específico; siguen
-        // viviendo sólo en el detalle de alumno del PF.)
-        _StatTile(
-          icon: TreinoIcon.ruler,
-          title: l10n.insightsTileMeasurementsTitle,
-          subtitle: l10n.insightsTileMeasurementsSubtitle,
-          onTap: () => context.push('/home/insights/measurements'),
-        ),
+        const _MeasurementsTile(),
         const SizedBox(height: 12),
         // Séptima entrada del hub, y la única que no mide kilos ni volumen.
         // Va al final a propósito: suma una dimensión al hub, no reordena la
@@ -839,6 +838,31 @@ class _StatsHubTileList extends StatelessWidget {
           onTap: () => context.push('/home/insights/wellbeing'),
         ),
       ],
+    );
+  }
+}
+
+/// MEDIDAS: el PF carga peso y circunferencias de su alumno y era el ÚNICO que
+/// las veía. El alumno no tenía dónde mirarlas. (Rendimiento NO se surfacea al
+/// alumno: son evaluaciones profesionales —CMJ, sprints, VO2máx— que toma el
+/// coach con equipo específico; siguen viviendo sólo en el detalle de alumno
+/// del PF.)
+///
+/// Su propio widget porque vive en DOS lugares: la lista del hub y el
+/// [_EmptyState] de la cuenta nueva (#1696). Las medidas no dependen de haber
+/// entrenado — el alumno las carga desde la pantalla de destino ("+") —, así
+/// que no tienen por qué quedar detrás del «Empezá a entrenar».
+class _MeasurementsTile extends StatelessWidget {
+  const _MeasurementsTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return _StatTile(
+      icon: TreinoIcon.ruler,
+      title: l10n.insightsTileMeasurementsTitle,
+      subtitle: l10n.insightsTileMeasurementsSubtitle,
+      onTap: () => context.push('/home/insights/measurements'),
     );
   }
 }
