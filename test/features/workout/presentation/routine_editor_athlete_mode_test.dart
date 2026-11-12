@@ -32,6 +32,7 @@ import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../helpers/trainer_links.dart';
 import '../../../fixtures/exercises.dart';
 import 'package:treino/features/workout/presentation/widgets/day_tab_bar.dart';
 import 'package:treino/features/workout/presentation/widgets/routine_action_buttons.dart';
@@ -77,7 +78,7 @@ Future<void> _pumpEditor(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: overrides,
+      overrides: [...alumnosVivosOverrides(), ...overrides],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,

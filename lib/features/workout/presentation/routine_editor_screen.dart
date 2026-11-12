@@ -21,6 +21,8 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../core/widgets/treino_select.dart';
 import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../coach/application/trainer_link_providers.dart'
+    show alumnoConVinculoVivoProvider, trainerLinkRepositoryProvider;
 import '../../coach/presentation/template_limit_gate.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
 import '../../onboarding/domain/onboarding_surface.dart';
@@ -2936,6 +2938,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           context.pop();
 
         case TrainerAssigning(:final athleteId, existingPlanId: null):
+          // Última barrera antes de crear el plan (#1695). El gate de `build`
+          // mira el roster EN MEMORIA y el alumno pudo cortar el vínculo con el
+          // editor abierto; las rules no lo frenan (validan el rol, no el
+          // vínculo). Esto se lo pregunta al servidor, a un paso de escribir.
+          // Si no se puede preguntar, tira y cae al aviso de error de abajo.
+          final vigente =
+              await ref.read(trainerLinkRepositoryProvider).tieneVinculoVivo(
+                    trainerId: uid,
+                    athleteId: athleteId,
+                  );
+          if (!vigente) {
+            if (!mounted) return;
+            showTreinoToast(context, l10n.coachAssignNoLink,
+                type: TreinoToastType.error);
+            // No se guardó nada: se re-arma el guard de cambios sin guardar.
+            _isDirty = true;
+            setState(() => _submitting = false);
+            return;
+          }
           // Create new trainer-assigned plan.
           final routine = Routine(
             id: '',
@@ -3408,8 +3429,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }
     }
 
+    // CREAR un plan para un alumno exige vínculo VIVO con él (activo o pausado,
+    // #1695). La ruta `/workout/routine-editor/:athleteId` la escribe cualquiera
+    // —y la ficha de un ex-alumno la ofrecía—, así que el gate vive acá. EDITAR
+    // un plan que ya existe no pasa por acá: sigue siendo del PF.
+    //
+    // «Todavía no sé» (uid o roster sin resolver) es carga, nunca «sin vínculo».
+    final vinculo = switch (widget.mode) {
+      TrainerAssigning(:final athleteId, existingPlanId: null) =>
+        ref.watch(alumnoConVinculoVivoProvider(athleteId)),
+      _ => const AsyncData(true),
+    };
+    final sinVinculo = vinculo.hasError
+        ? l10n.coachAssignLinkUnverified
+        : vinculo.valueOrNull == false
+            ? l10n.coachAssignNoLink
+            : null;
+
     // Loading state: hydrating from Firestore.
-    if (_loading) {
+    if (_loading || vinculo.isLoading) {
       return _shell(
         bodyKey: const ValueKey('loading'),
         body: Center(
@@ -3430,9 +3468,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // parecía más simple, pero el esqueleto tiene shimmer: la pantalla se queda
     // animando para siempre y `pumpAndSettle` de los tests no asienta nunca. Un
     // cuelgue en un test suele ser un cuelgue en la UI.
-    if (_loadNotFound || _paywallBlocked) {
+    if (_loadNotFound || _paywallBlocked || sinVinculo != null) {
       return _shell(
-        bodyKey: ValueKey(_paywallBlocked ? 'paywall-blocked' : 'notfound'),
+        bodyKey: ValueKey(_paywallBlocked
+            ? 'paywall-blocked'
+            : sinVinculo != null
+                ? 'sin-vinculo'
+                : 'notfound'),
         body: SafeArea(
           child: Column(
             children: [
@@ -3457,7 +3499,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         ? l10n.paywallFreePlanLimitCustomizeTemplateBody(
                             kFreeMaxRoutineDays,
                           )
-                        : l10n.workoutSelfEditorNotFound,
+                        : sinVinculo ?? l10n.workoutSelfEditorNotFound,
                     textAlign: TextAlign.center,
                     style: TextStyle(color: palette.textMuted),
                   ),

@@ -6218,4 +6218,8 @@ class AppL10nEn extends AppL10n {
   @override
   String get coachAssignNoLink =>
       'This student has no active link with you, so you can\'t assign them a routine.';
+
+  @override
+  String get coachAssignLinkUnverified =>
+      'We couldn\'t verify your link with this student. Try again.';
 }

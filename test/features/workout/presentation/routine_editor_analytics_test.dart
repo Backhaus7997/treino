@@ -39,6 +39,7 @@ import 'package:treino/l10n/app_l10n.dart';
 import '../../../fixtures/exercises.dart';
 import '../../../fixtures/routine_editor_ui.dart';
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../helpers/trainer_links.dart';
 
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
@@ -75,7 +76,7 @@ Future<void> _pumpEditor(
   );
   await tester.pumpWidget(
     ProviderScope(
-      overrides: overrides,
+      overrides: [...alumnosVivosOverrides(), ...overrides],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,

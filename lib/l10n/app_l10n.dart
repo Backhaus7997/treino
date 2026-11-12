@@ -10477,11 +10477,17 @@ abstract class AppL10n {
   /// **'VER DETALLE'**
   String get coachHubPdfFailedAction;
 
-  /// PF mobile: el alumno no tiene vínculo vivo (activo o pausado) y se frena crear o asignar una rutina (#1695). Lo usan la ficha del alumno y el aviso de «No se asignó nada» de la importación de PDF.
+  /// PF mobile: el alumno no tiene vínculo vivo (activo o pausado) y se frena crear o asignar una rutina (#1695). Lo usan la ficha, el editor, la importación de PDF y el aviso de «No se asignó nada».
   ///
   /// In es_AR, this message translates to:
   /// **'Este alumno no tiene un vínculo vigente con vos, así que no podés asignarle una rutina.'**
   String get coachAssignNoLink;
+
+  /// PF mobile: no se pudo leer el roster, causa DISTINTA de no tener vínculo (#1695). No afirma que el vínculo terminó.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos verificar tu vínculo con este alumno. Probá de nuevo.'**
+  String get coachAssignLinkUnverified;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

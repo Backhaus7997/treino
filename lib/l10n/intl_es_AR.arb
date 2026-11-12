@@ -5636,5 +5636,7 @@
   "coachHubPdfFailedAction": "VER DETALLE",
   "@coachHubPdfFailedAction": {"description": "Acción del aviso «No pudimos leer tu plan.»: vuelve a «Importar plan», que muestra el error tipado."},
   "coachAssignNoLink": "Este alumno no tiene un vínculo vigente con vos, así que no podés asignarle una rutina.",
-  "@coachAssignNoLink": {"description": "PF mobile: el alumno no tiene vínculo vivo (activo o pausado) y se frena crear o asignar una rutina (#1695). Lo usan la ficha del alumno y el aviso de «No se asignó nada» de la importación de PDF."}
+  "@coachAssignNoLink": {"description": "PF mobile: el alumno no tiene vínculo vivo (activo o pausado) y se frena crear o asignar una rutina (#1695). Lo usan la ficha, el editor, la importación de PDF y el aviso de «No se asignó nada»."},
+  "coachAssignLinkUnverified": "No pudimos verificar tu vínculo con este alumno. Probá de nuevo.",
+  "@coachAssignLinkUnverified": {"description": "PF mobile: no se pudo leer el roster, causa DISTINTA de no tener vínculo (#1695). No afirma que el vínculo terminó."}
 }
