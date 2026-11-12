@@ -10470,6 +10470,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VER DETALLE'**
   String get coachHubPdfFailedAction;
+
+  /// PF mobile: el alumno no tiene vínculo vivo (activo o pausado) y se frena crear o asignar una rutina (#1695). Lo usan la ficha del alumno y el aviso de «No se asignó nada» de la importación de PDF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este alumno no tiene un vínculo vigente con vos, así que no podés asignarle una rutina.'**
+  String get coachAssignNoLink;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

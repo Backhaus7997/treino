@@ -6210,4 +6210,8 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachHubPdfFailedAction => 'SEE DETAILS';
+
+  @override
+  String get coachAssignNoLink =>
+      'This student has no active link with you, so you can\'t assign them a routine.';
 }

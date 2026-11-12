@@ -2545,5 +2545,6 @@
   "coachHubPdfReadyToast": "Your plan is ready",
   "coachHubPdfReadyAction": "SEE PREVIEW",
   "coachHubPdfFailedToast": "We couldn’t read your plan.",
-  "coachHubPdfFailedAction": "SEE DETAILS"
+  "coachHubPdfFailedAction": "SEE DETAILS",
+  "coachAssignNoLink": "This student has no active link with you, so you can't assign them a routine."
 }

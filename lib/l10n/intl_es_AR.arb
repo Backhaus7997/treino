@@ -5630,5 +5630,7 @@
   "coachHubPdfFailedToast": "No pudimos leer tu plan.",
   "@coachHubPdfFailedToast": {"description": "Coach Hub: aviso del shell cuando la lectura del PDF terminó mal mientras el PF estaba en otra sección. El detalle y su acción están en «Importar plan»."},
   "coachHubPdfFailedAction": "VER DETALLE",
-  "@coachHubPdfFailedAction": {"description": "Acción del aviso «No pudimos leer tu plan.»: vuelve a «Importar plan», que muestra el error tipado."}
+  "@coachHubPdfFailedAction": {"description": "Acción del aviso «No pudimos leer tu plan.»: vuelve a «Importar plan», que muestra el error tipado."},
+  "coachAssignNoLink": "Este alumno no tiene un vínculo vigente con vos, así que no podés asignarle una rutina.",
+  "@coachAssignNoLink": {"description": "PF mobile: el alumno no tiene vínculo vivo (activo o pausado) y se frena crear o asignar una rutina (#1695). Lo usan la ficha del alumno y el aviso de «No se asignó nada» de la importación de PDF."}
 }
