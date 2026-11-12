@@ -81,6 +81,7 @@ const {
 const SCRIPTS = [
   { script: 'backfill_gym_ids.js', argv: ['--dry-run'] },
   { script: 'backfill_gym_names.js', argv: ['--dry-run'] },
+  { script: 'backfill_chat_closed_unlinked.js', argv: ['--dry-run'] }, // #1697
   { script: 'seed_trainer_profiles.js', argv: [] },
   { script: 'promote_user_to_trainer.js', argv: ['uid-de-prueba'] },
   { script: 'seed_workout_catalog.js', argv: ['--exercises'] },

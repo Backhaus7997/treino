@@ -155,7 +155,7 @@ test('todo script que habla con Firebase importa la frontera', () => {
   );
 });
 
-test('los 55 scripts que inicializan Firebase pasan por la frontera', () => {
+test('los 56 scripts que inicializan Firebase pasan por la frontera', () => {
   // 45 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
   // emulator-only y entra igual para que no quede NINGÚN `initializeApp` suelto.
   //
@@ -228,13 +228,18 @@ test('los 55 scripts que inicializan Firebase pasan por la frontera', () => {
   // sólo con `--apply`) y, contra un proyecto real, aborta si las reglas
   // DESPLEGADAS todavía no conocen el campo.
   //
+  // El 56 es `backfill_chat_closed_unlinked.js` (#1697): cierra el chat de los
+  // pares cuyo vínculo terminó antes de la CF que lo cierra sola. Entra por
+  // `lib/admin`, imprime el banner ANTES de inicializar y es DRY-RUN POR DEFECTO
+  // (escribe sólo con `--write`; `--write --dry-run` NO).
+  //
   // El número está clavado a propósito: si alguien agrega un script que entra
   // por `lib/`, este test lo cuenta y hay que subirlo — leyendo el diff. Es el
   // recordatorio de que la lista se mira, no se asume.
   const cableados = ARCHIVOS.filter(({ codigo }) => IMPORTA_LA_FRONTERA.test(codigo));
   assert.strictEqual(
     cableados.length,
-    55,
+    56,
     `cableados: ${cableados.length}. Si agregaste o sacaste un script, actualizá ` +
       'este número Y confirmá que el nuevo entra por lib/:\n  ' +
       cableados.map((a) => a.nombre).join('\n  '),
