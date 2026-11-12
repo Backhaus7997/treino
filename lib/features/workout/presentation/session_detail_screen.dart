@@ -222,7 +222,7 @@ class _DetailLoaded extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // 4 stats agrupadas en una tarjeta 2×2.
+          // 4 stats agrupadas en una tarjeta 2×2 (3 si la sesión no tuvo carga).
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(1),
             child: SessionStatsCard(
@@ -238,13 +238,18 @@ class _DetailLoaded extends StatelessWidget {
                   label: l10n.workoutDetailStatSets,
                   value: setLogs.length.toString(),
                 ),
-                StatTile(
-                  icon: TreinoIcon.dumbbell,
-                  label: l10n.workoutDetailStatVolume,
-                  unit: 'kg',
-                  value: formatVolumeKg(
-                      session.totalVolumeKg, AppL10n.of(context).localeName),
-                ),
+                // #1701: sin carga no hay volumen. Una sesión sólo de series por
+                // tiempo o por distancia tiene `totalVolumeKg == 0`, y un
+                // «VOLUMEN 0 kg» afirma un dato que no existe (mismo criterio
+                // que el resumen post-entreno).
+                if (session.totalVolumeKg > 0)
+                  StatTile(
+                    icon: TreinoIcon.dumbbell,
+                    label: l10n.workoutDetailStatVolume,
+                    unit: 'kg',
+                    value: formatVolumeKg(
+                        session.totalVolumeKg, AppL10n.of(context).localeName),
+                  ),
                 StatTile(
                   icon: TreinoIcon.statPr,
                   label: l10n.workoutDetailStatPrsToday,

@@ -1389,6 +1389,15 @@ class _SessionStatsCard extends StatelessWidget {
     // hasta cerrar el ejercicio entero. El texto sigue contando ejercicios.
     final setsTotal = state.totalPlannedSets;
     final progress = setsTotal > 0 ? state.completedSetCount / setsTotal : 0.0;
+    // #1701: «0 kg vol.» sólo se esconde cuando la sesión NO puede juntar carga:
+    // todos los slots del día son por tiempo o por distancia (sus series se
+    // guardan con `reps: 0, weightKg: 0`). NO alcanza con `totalVolumeKg == 0`:
+    // toda sesión por reps arranca en 0, y el dato aparecería de golpe recién
+    // al marcar la primera serie. Si por algún camino ya hay volumen, se muestra.
+    final slots = state.day.slots;
+    final sinCarga = slots.isNotEmpty &&
+        slots.every((s) => s.effectiveExerciseMode != ExerciseMode.reps);
+    final mostrarVolumen = !sinCarga || state.totalVolumeKg > 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -1413,8 +1422,10 @@ class _SessionStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '$completed / $total ejercicios · '
-                  '${formatVolumeKg(state.totalVolumeKg, AppL10n.of(context).localeName)} kg vol.',
+                  mostrarVolumen
+                      ? '$completed / $total ejercicios · '
+                          '${formatVolumeKg(state.totalVolumeKg, AppL10n.of(context).localeName)} kg vol.'
+                      : '$completed / $total ejercicios',
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
