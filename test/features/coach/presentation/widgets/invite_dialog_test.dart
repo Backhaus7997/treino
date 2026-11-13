@@ -16,20 +16,26 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
+import '../../../../helpers/trainer_links.dart' show repoConVinculos;
+
 class _MockRepo extends Mock implements TrainerLinkRepository {}
 
-TrainerLink _link(String trainerId) => TrainerLink(
+TrainerLink _link(
+  String trainerId, {
+  TrainerLinkStatus status = TrainerLinkStatus.active,
+}) =>
+    TrainerLink(
       id: 'link-viejo',
       trainerId: trainerId,
       athleteId: 'atleta',
-      status: TrainerLinkStatus.active,
+      status: status,
       requestedAt: DateTime(2026),
     );
 
 Future<void> _pump(
   WidgetTester tester,
   InviteOutcome outcome, {
-  required _MockRepo repo,
+  required TrainerLinkRepository repo,
   bool pfTomaAlumnos = true,
   // Pausa por lectura: la 1.ª es la del build, las siguientes las de
   // `_vincular`. Si no se pasa, todas devuelven [pfTomaAlumnos].
@@ -252,6 +258,124 @@ void main() {
 
       // Cambiar de entrenador no se decide con un toque distraído.
       expect(find.text('YA TENÉS ENTRENADOR'), findsOneWidget);
+    });
+  });
+
+  // #1727: una invitación de OTRO PF con una solicitud `pending` caía en el
+  // mismo diálogo del caso E y terminaba en `Bad state`, porque `terminate`
+  // sólo acepta `active|paused`. Sobre una solicitud la transición es `cancel`.
+  group('caso E — solicitud PENDIENTE con OTRO PF', () {
+    final pendiente = InviteRequiereDesvincular(
+      nuevoTrainerId: 'pf-nuevo',
+      vinculoActual: _link('pf-viejo', status: TrainerLinkStatus.pending),
+    );
+
+    testWidgets('habla de una solicitud, no de un vínculo', (tester) async {
+      final repo = _MockRepo();
+      await _pump(tester, pendiente, repo: repo);
+
+      expect(find.text('YA PEDISTE VINCULARTE'), findsOneWidget);
+      expect(find.text('Cancelar solicitud y continuar'), findsOneWidget);
+      expect(find.text('Desvincular y continuar'), findsNothing);
+    });
+
+    testWidgets('CANCELA la solicitud PRIMERO, pide después, y no termina nada',
+        (tester) async {
+      final repo = _MockRepo();
+      when(() => repo.cancel(any())).thenAnswer((_) async {});
+      when(() => repo.request(
+            trainerId: any(named: 'trainerId'),
+            athleteId: any(named: 'athleteId'),
+          )).thenAnswer((_) async => _link('pf-nuevo'));
+
+      await _pump(tester, pendiente, repo: repo);
+      await tester.tap(find.byKey(const Key('invite_dialog_confirm')));
+      await tester.pumpAndSettle();
+
+      verifyInOrder([
+        () => repo.cancel('link-viejo'),
+        () => repo.request(trainerId: 'pf-nuevo', athleteId: 'atleta'),
+      ]);
+      verifyNever(() => repo.terminate(any(), reason: any(named: 'reason')));
+      expect(find.byKey(const Key('invite_dialog_error')), findsNothing);
+    });
+
+    testWidgets('con el repositorio REAL: cancela la vieja y crea la nueva',
+        (tester) async {
+      // Sin mock: es el `StateError` de `terminate` sobre un `pending` lo que
+      // reportó la QA, y un mock que contesta lo que el test quiere no lo ve.
+      final repo = await repoConVinculos([
+        _link('pf-viejo', status: TrainerLinkStatus.pending),
+      ]);
+
+      await _pump(tester, pendiente, repo: repo);
+      await tester.tap(find.byKey(const Key('invite_dialog_confirm')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('invite_dialog_error')), findsNothing);
+      expect(find.text('YA PEDISTE VINCULARTE'), findsNothing,
+          reason: 'cierra');
+      final links = await repo.listForAthlete('atleta');
+      expect(links, hasLength(2));
+      final vieja = links.singleWhere((l) => l.trainerId == 'pf-viejo');
+      expect(vieja.status, TrainerLinkStatus.terminated);
+      final nueva = links.singleWhere((l) => l.trainerId == 'pf-nuevo');
+      expect(nueva.status, TrainerLinkStatus.pending);
+    });
+
+    testWidgets('«Ahora no» no toca ninguna asociación', (tester) async {
+      final repo = _MockRepo();
+      await _pump(tester, pendiente, repo: repo);
+
+      await tester.tap(find.byKey(const Key('invite_dialog_cancel')));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repo.cancel(any()));
+      verifyNever(() => repo.terminate(any(), reason: any(named: 'reason')));
+      verifyNever(() => repo.request(
+            trainerId: any(named: 'trainerId'),
+            athleteId: any(named: 'athleteId'),
+          ));
+    });
+
+    testWidgets('PF nuevo pausado: avisa y NO cancela la solicitud vigente',
+        (tester) async {
+      final repo = _MockRepo();
+      await _pump(tester, pendiente, repo: repo, pfTomaAlumnos: false);
+
+      expect(find.text('NO ESTÁ TOMANDO ALUMNOS'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('invite_dialog_confirm')));
+      await tester.pumpAndSettle();
+      verifyNever(() => repo.cancel(any()));
+    });
+  });
+
+  group('caso E — vínculo PAUSADO con OTRO PF', () {
+    testWidgets('sigue siendo `terminate` (cancel sólo vale sobre pending)',
+        (tester) async {
+      final repo = _MockRepo();
+      when(() => repo.terminate(any(), reason: any(named: 'reason')))
+          .thenAnswer((_) async {});
+      when(() => repo.request(
+            trainerId: any(named: 'trainerId'),
+            athleteId: any(named: 'athleteId'),
+          )).thenAnswer((_) async => _link('pf-nuevo'));
+
+      await _pump(
+        tester,
+        InviteRequiereDesvincular(
+          nuevoTrainerId: 'pf-nuevo',
+          vinculoActual: _link('pf-viejo', status: TrainerLinkStatus.paused),
+        ),
+        repo: repo,
+      );
+      expect(find.text('YA TENÉS ENTRENADOR'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('invite_dialog_confirm')));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.terminate('link-viejo', reason: 'switched_trainer'))
+          .called(1);
+      verifyNever(() => repo.cancel(any()));
     });
   });
 

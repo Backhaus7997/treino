@@ -11,6 +11,8 @@ import '../../application/trainer_discovery_providers.dart'
     show trainerByIdProvider;
 import '../../application/trainer_link_providers.dart';
 import '../../domain/invite_outcome.dart';
+import '../../domain/trainer_link.dart';
+import '../../domain/trainer_link_status.dart';
 
 /// Muestra el resultado de una invitación y, si corresponde, la aplica.
 Future<void> showInviteDialog(BuildContext context, InviteOutcome outcome) =>
@@ -47,7 +49,7 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
           null,
       };
 
-  Future<void> _vincular({String? terminarPrimero}) async {
+  Future<void> _vincular({TrainerLink? liberarPrimero}) async {
     if (_trabajando) return;
     final athleteId = ref.read(currentUidProvider);
     if (athleteId == null) return;
@@ -59,7 +61,7 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
     try {
       // Se vuelve a mirar la pausa ACÁ, y no sólo en el build: el provider
       // puede no haber resuelto cuando se tocó el botón, y con
-      // `terminarPrimero` equivocarse cuesta el vínculo actual del alumno.
+      // `liberarPrimero` equivocarse cuesta el vínculo actual del alumno.
       // Un PF sin perfil público no tiene cómo decirlo (las rules lo leen de
       // `users`, que el alumno no puede leer); ahí decide el rechazo del
       // servidor, después del terminate.
@@ -79,8 +81,16 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
       // El orden importa y no es intercambiable: primero se libera el cupo,
       // después se pide el nuevo. Al revés, el `request` chocaría con el
       // vínculo que todavía está vivo.
-      if (terminarPrimero != null) {
-        await repo.terminate(terminarPrimero, reason: 'switched_trainer');
+      if (liberarPrimero != null) {
+        // La transición depende del estado, no es intercambiable: `terminate`
+        // sólo acepta `active|paused` y sobre una solicitud `pending` tira
+        // `Bad state` (#1727). Una solicitud sin aceptar se CANCELA, igual que
+        // el botón «Cancelar solicitud» de la tab Coach.
+        if (liberarPrimero.status == TrainerLinkStatus.pending) {
+          await repo.cancel(liberarPrimero.id);
+        } else {
+          await repo.terminate(liberarPrimero.id, reason: 'switched_trainer');
+        }
       }
       await repo.request(trainerId: _trainerId!, athleteId: athleteId);
       ref.invalidate(currentAthleteLinkProvider);
@@ -156,6 +166,24 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
           'Ya entrenás con $quien. No hace falta que hagas nada.', // i18n
           [_primario('Entendido', _cerrar)], // i18n
         ),
+      // Solicitud enviada a OTRO PF y sin aceptar: no hay nada que "desvincular",
+      // y decirlo así sería hablar de un vínculo que nunca existió. Se cancela
+      // la solicitud (#1727).
+      InviteRequiereDesvincular(:final vinculoActual)
+          when vinculoActual.status == TrainerLinkStatus.pending =>
+        (
+          'YA PEDISTE VINCULARTE', // i18n
+          'Tenés una solicitud pendiente con otro entrenador. Para '
+              'vincularte con $quien primero tenés que cancelarla. Podés '
+              'volver a pedírsela cuando quieras.', // i18n
+          [
+            _secundario('Ahora no'), // i18n
+            _primario(
+              'Cancelar solicitud y continuar', // i18n
+              () => _vincular(liberarPrimero: vinculoActual),
+            ),
+          ],
+        ),
       InviteRequiereDesvincular(:final vinculoActual) => (
           'YA TENÉS ENTRENADOR', // i18n
           'Para vincularte con $quien primero tenés que desvincularte del '
@@ -165,7 +193,7 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
             _secundario('Cancelar'), // i18n
             _primario(
               'Desvincular y continuar', // i18n
-              () => _vincular(terminarPrimero: vinculoActual.id),
+              () => _vincular(liberarPrimero: vinculoActual),
             ),
           ],
         ),
