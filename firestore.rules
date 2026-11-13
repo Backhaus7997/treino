@@ -2179,6 +2179,11 @@ service cloud.firestore {
                     // Admin SDK). Un create no puede ocultarse solo: ausente
                     // o `false`, igual que en trainerPublicProfiles.
                     && request.resource.data.get('hiddenFromDiscovery', false) == false
+                    // Contadores de follow (#1835): los escribe SÓLO la CF
+                    // `maintainFollowCounters`. Un create no los siembra:
+                    // ausentes, null (el toJson del modelo) o 0.
+                    && request.resource.data.get('followersCount', 0) in [null, 0]
+                    && request.resource.data.get('followingCount', 0) in [null, 0]
                     // Sello de frescura de `rachaSemanas`, siempre derivado
                     // por UserPublicProfileRepository.updateCounters (server
                     // timestamp): ausente, o el `request.time`. Un create no
@@ -2254,6 +2259,14 @@ service cloud.firestore {
                     // Tiene que estar en el hasOnly de arriba: si no, una
                     // cuenta oculta no podría actualizar más su perfil.
                     && unchanged(request.resource.data, resource.data, 'hiddenFromDiscovery')
+                    // followersCount / followingCount (#1835): los mantiene
+                    // SÓLO `maintainFollowCounters` (Admin SDK) desde #315, y
+                    // ningún camino del cliente los escribe. Hasta acá estaban
+                    // en el hasOnly sin validar valor: el dueño se ponía
+                    // 999999 seguidores. Mismo trato que los rangos: sólo
+                    // re-presentar lo guardado, que es lo que trae el merge.
+                    && unchanged(request.resource.data, resource.data, 'followersCount')
+                    && unchanged(request.resource.data, resource.data, 'followingCount')
                     // Sello de frescura de `rachaSemanas` — el que ya estaba o el
                     // del servidor (`request.time`), nunca uno elegido por el
                     // dueño, y tampoco se puede sacar (#1698). El disyunto
@@ -3066,9 +3079,13 @@ service cloud.firestore {
       //   decorativo, que es exactamente lo que este bloque prohíbe.
       //
       // MARCA INMUTABLE: `kind` queda pineado en el `update` de abajo, igual
-      // que `linkId`. Sin eso, (a) un chat social se convertiría en consulta
-      // con un update de una línea, saltándose el gate de follow, y (b) una
-      // consulta podría escalar a chat de Coach agregándose un `linkId`.
+      // que `linkId`. Ya NO cuida un permiso de escritura: desde el
+      // 2026-10-21 (REQ-FOLLOW-012) `senderMayPost` no mira el follow, ni
+      // `kind`, ni `linkId` (en un chat existente escriben los dos miembros;
+      // sólo cortan un bloqueo o `closedAt`), y `kind` lo lee únicamente esta
+      // rama, al CREAR. Lo que cuida es que la marca diga la verdad: un chat
+      // social no se rotula consulta con un update de una línea, y una
+      // consulta no escala a chat de Coach (eso lo corta el pin de `linkId`).
       //
       // PRESUPUESTO DE LLAMADAS: la rama nueva cuesta 3 (1 exists + 2 get) y
       // sólo se evalúa ella, así que el peor caso de `chats/create` sigue
