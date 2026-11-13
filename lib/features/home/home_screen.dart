@@ -27,12 +27,14 @@ import '../workout/application/session_duration.dart';
 import '../workout/application/session_providers.dart';
 import '../workout/application/weekly_streak_providers.dart';
 import '../workout/application/user_routines_providers.dart';
+import '../workout/domain/routine.dart';
 import '../workout/domain/session.dart';
 import '../watch/application/watch_credential_providers.dart'
     show watchNudgeServiceProvider;
 import '../watch/data/watch_nudge_service.dart';
 import '../workout/domain/set_log.dart';
 import '../workout/presentation/widgets/resume_session_modal.dart';
+import 'application/followed_template_provider.dart';
 import 'widgets/daily_check_in_card.dart';
 import 'widgets/empezar_entrenamiento_card.dart';
 import 'widgets/esta_semana_card.dart';
@@ -158,11 +160,21 @@ class _AthleteHome extends ConsumerWidget {
     // their trainer-assigned plans have resolved to empty. While either is
     // loading or errors, fall back to the existing card (no spinner flash,
     // and we never hide a real workout behind a transient empty read).
+    //
+    // Una plantilla del catálogo que el atleta SIGUE sin copiarla también es
+    // una rutina: no crea ningún doc suyo, así que las dos listas vienen
+    // vacías y sin esta tercera condición Home le daba la bienvenida de «no
+    // tenés rutina» a quien ya la estaba siguiendo (#1698). Se mira DESPUÉS de
+    // las otras dos y sólo si ambas resolvieron vacías: el `&&` corta antes, y
+    // quien tiene rutina propia o plan de un PF no paga la lectura del
+    // catálogo. Como las otras, sólo cuenta cuando CONFIRMÓ que no sigue
+    // ninguna — `_isEmptyData` no aplica porque acá el dato es un `Routine?`.
     final uid = ref.watch(currentUidProvider) ?? '';
     final hasNoRoutine = uid.isEmpty
         ? false
         : _isEmptyData(ref.watch(userCreatedRoutinesProvider(uid))) &&
-            _isEmptyData(ref.watch(assignedRoutinesProvider(uid)));
+            _isEmptyData(ref.watch(assignedRoutinesProvider(uid))) &&
+            _confirmedNoFollowedTemplate(ref.watch(followedTemplateProvider));
 
     // El tercer camino ("Buscar entrenador") sólo se ofrece cuando el servidor
     // CONFIRMÓ que el atleta no tiene PF activo — mismo criterio que
@@ -250,6 +262,18 @@ class _AthleteHome extends ConsumerWidget {
 /// instead of a premature first-run empty state (finding 5).
 bool _isEmptyData(AsyncValue<List<Object?>> async) =>
     async.valueOrNull?.isEmpty ?? false;
+
+/// True only when [async] confirmed the athlete follows NO catalog template.
+/// Loading and error return false, same reason as [_isEmptyData]. `hasValue`
+/// y no `valueOrNull == null`: un `null` de dato es justamente la respuesta
+/// «no sigue ninguna», y es indistinguible del «todavía no sé» si se mira sólo
+/// el valor. Y `hasError` primero, porque Riverpod retiene el último valor al
+/// entrar en error (mismo cuidado que `_estadoDelVinculo`).
+bool _confirmedNoFollowedTemplate(AsyncValue<Routine?> async) =>
+    !async.isLoading &&
+    !async.hasError &&
+    async.hasValue &&
+    async.value == null;
 
 /// Lo que la card de primer arranque sabe sobre el vínculo del atleta con un
 /// PF. Son TRES estados y no dos, y la diferencia no es teórica.
