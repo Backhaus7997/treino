@@ -5109,6 +5109,22 @@
   "@moderationUnblockError": {
     "description": "Error snackbar when unblocking fails."
   },
+  "blockedUsersTitle": "Usuarios bloqueados",
+  "@blockedUsersTitle": {
+    "description": "Titulo de la pantalla de usuarios bloqueados y de la fila de Privacidad que la abre."
+  },
+  "blockedUsersExplainer": "Las personas que bloqueaste no pueden escribirte, seguirte ni reaccionar a tus posts. Desbloquear no restaura los seguimientos: si se seguían, tienen que volver a seguirse.",
+  "@blockedUsersExplainer": {
+    "description": "Parrafo sobre la lista. La 1a frase repite moderationBlockConfirmBody. La 2a es cierta porque el trigger removeFollowEdgesOnBlock corre solo al CREAR el bloqueo (ver el comentario del delete en las rules de blocks)."
+  },
+  "blockedUsersEmpty": "No bloqueaste a nadie.",
+  "@blockedUsersEmpty": {
+    "description": "Estado vacio de la lista de usuarios bloqueados."
+  },
+  "blockedUsersLoadError": "No pudimos cargar tu lista. Probá de nuevo.",
+  "@blockedUsersLoadError": {
+    "description": "Error de carga de la lista de usuarios bloqueados. Va con coachRetryLabel."
+  },
   "moderationBlockedMessage": "Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revisalo y volvé a intentar.",
   "@moderationBlockedMessage": {
     "description": "Error mostrado cuando el filtro de terminos vetados rechaza un texto. NO nombra el termino que lo disparo a proposito: decirlo convierte al filtro en un oraculo para encontrarle el borde."

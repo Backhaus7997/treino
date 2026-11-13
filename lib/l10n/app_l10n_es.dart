@@ -5583,6 +5583,20 @@ class AppL10nEs extends AppL10n {
       'No pudimos desbloquear. Inténtalo de nuevo.';
 
   @override
+  String get blockedUsersTitle => 'Usuarios bloqueados';
+
+  @override
+  String get blockedUsersExplainer =>
+      'Las personas que has bloqueado no pueden escribirte, seguirte ni reaccionar a tus posts. Desbloquear no restaura los seguimientos: si se seguían, tienen que volver a seguirse.';
+
+  @override
+  String get blockedUsersEmpty => 'No has bloqueado a nadie.';
+
+  @override
+  String get blockedUsersLoadError =>
+      'No pudimos cargar tu lista. Inténtalo de nuevo.';
+
+  @override
   String get moderationBlockedMessage =>
       'Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revísalo e inténtalo de nuevo.';
 
@@ -11957,6 +11971,20 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get moderationUnblockError =>
       'No pudimos desbloquear. Probá de nuevo.';
+
+  @override
+  String get blockedUsersTitle => 'Usuarios bloqueados';
+
+  @override
+  String get blockedUsersExplainer =>
+      'Las personas que bloqueaste no pueden escribirte, seguirte ni reaccionar a tus posts. Desbloquear no restaura los seguimientos: si se seguían, tienen que volver a seguirse.';
+
+  @override
+  String get blockedUsersEmpty => 'No bloqueaste a nadie.';
+
+  @override
+  String get blockedUsersLoadError =>
+      'No pudimos cargar tu lista. Probá de nuevo.';
 
   @override
   String get moderationBlockedMessage =>

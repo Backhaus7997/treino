@@ -5479,6 +5479,19 @@ class AppL10nEn extends AppL10n {
   String get moderationUnblockError => 'We couldn\'t unblock them. Try again.';
 
   @override
+  String get blockedUsersTitle => 'Blocked users';
+
+  @override
+  String get blockedUsersExplainer =>
+      'People you\'ve blocked can\'t message you, follow you, or react to your posts. Unblocking doesn\'t restore follows: if you followed each other, you\'ll need to follow again.';
+
+  @override
+  String get blockedUsersEmpty => 'You haven\'t blocked anyone.';
+
+  @override
+  String get blockedUsersLoadError => 'We couldn\'t load your list. Try again.';
+
+  @override
   String get moderationBlockedMessage =>
       'That text can\'t be posted because it breaks the Community Guidelines. Please review it and try again.';
 

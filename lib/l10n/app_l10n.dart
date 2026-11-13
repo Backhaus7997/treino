@@ -9555,6 +9555,30 @@ abstract class AppL10n {
   /// **'No pudimos desbloquear. Probá de nuevo.'**
   String get moderationUnblockError;
 
+  /// Titulo de la pantalla de usuarios bloqueados y de la fila de Privacidad que la abre.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usuarios bloqueados'**
+  String get blockedUsersTitle;
+
+  /// Parrafo sobre la lista. La 1a frase repite moderationBlockConfirmBody. La 2a es cierta porque el trigger removeFollowEdgesOnBlock corre solo al CREAR el bloqueo (ver el comentario del delete en las rules de blocks).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Las personas que bloqueaste no pueden escribirte, seguirte ni reaccionar a tus posts. Desbloquear no restaura los seguimientos: si se seguían, tienen que volver a seguirse.'**
+  String get blockedUsersExplainer;
+
+  /// Estado vacio de la lista de usuarios bloqueados.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No bloqueaste a nadie.'**
+  String get blockedUsersEmpty;
+
+  /// Error de carga de la lista de usuarios bloqueados. Va con coachRetryLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu lista. Probá de nuevo.'**
+  String get blockedUsersLoadError;
+
   /// Error mostrado cuando el filtro de terminos vetados rechaza un texto. NO nombra el termino que lo disparo a proposito: decirlo convierte al filtro en un oraculo para encontrarle el borde.
   ///
   /// In es_AR, this message translates to:
