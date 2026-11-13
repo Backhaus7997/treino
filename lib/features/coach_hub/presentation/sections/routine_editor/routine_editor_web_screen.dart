@@ -4553,8 +4553,11 @@ class _SlotCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  // 88 y no 60: el tema le pone 18 px de padding a cada lado y con
+                  // 60 quedaban 16 px de texto, que no alcanzan para «180» —se
+                  // veía «80»—. Con 88 entran los 3 dígitos del tope con holgura.
                   SizedBox(
-                    width: 60,
+                    width: 88,
                     child: TextFormField(
                       key: const Key('routine_editor_rest_field'),
                       initialValue: slot.restSeconds.toString(),
