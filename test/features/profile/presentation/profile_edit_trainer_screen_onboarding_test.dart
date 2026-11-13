@@ -416,4 +416,24 @@ void main() {
       verify(() => auth.signOut()).called(1);
     });
   });
+
+  // #1738: en el onboarding el gate del router devuelve al PF a esta pantalla
+  // ante cualquier otra ruta, así que «Datos personales» todavía no se puede
+  // abrir: el aviso tiene que decir que es para después y no mandarlo ahí ya.
+  group('#1738: aviso de nombre y avatar', () {
+    testWidgets('en el onboarding dice que se cambian después, desde Perfil',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen());
+      await tester.pumpAndSettle();
+
+      final aviso = tester.widget<Text>(
+        find.byKey(const Key('profile_edit_trainer_identity_notice')),
+      );
+      expect(
+        aviso.data,
+        'Tu nombre y tu avatar los cambiás después, desde '
+        'Perfil > "Datos personales".',
+      );
+    });
+  });
 }

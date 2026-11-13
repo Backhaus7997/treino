@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -318,6 +319,61 @@ void main() {
       expect(captured[0], equals('uid-test'));
       final partial = captured[1] as Map<String, Object?>;
       expect(partial['displayName'], equals('Carlos R.'));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // #1738: el PF llega a esta pantalla desde la fila «Datos personales» de su
+  // pestaña Perfil. Guardar el nombre desde acá tiene que seguir llegando a la
+  // tarjeta de Discovery (`trainerPublicProfiles`, #1336 / #1706). Va con el
+  // repositorio REAL sobre un Firestore falso: con un mock no se vería si el
+  // espejo se rompe.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('#1738: un PF cambia su nombre desde Datos personales', () {
+    testWidgets('el nombre nuevo queda en users/ Y en la tarjeta pública',
+        (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      final pf = _profile(displayName: 'Viejo Nombre')
+          .copyWith(role: UserRole.trainer);
+      await firestore.collection('users').doc('uid-test').set(pf.toJson());
+      await firestore.collection('trainerPublicProfiles').doc('uid-test').set({
+        'uid': 'uid-test',
+        'displayName': 'Viejo Nombre',
+        'displayNameLowercase': 'viejo nombre',
+        'trainerBio': 'Bio original',
+      });
+
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: pf,
+          userRepository: UserRepository(firestore: firestore),
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('edit_personal_display_name')),
+        'Ana Coach',
+      );
+      await tester.pump();
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+
+      final user = await firestore.collection('users').doc('uid-test').get();
+      expect(user.data()!['displayName'], 'Ana Coach');
+
+      final card = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('uid-test')
+          .get();
+      expect(card.data()!['displayName'], 'Ana Coach');
+      expect(card.data()!['displayNameLowercase'], 'ana coach');
+      // El resto de la tarjeta no se toca.
+      expect(card.data()!['trainerBio'], 'Bio original');
     });
   });
 

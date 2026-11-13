@@ -679,6 +679,25 @@ void main() {
       expect(find.text('PROFILE'), findsOneWidget);
     });
   });
+
+  // #1738: el aviso mandaba a «Datos personales», una sección a la que el PF
+  // no llegaba. Ahora la fila existe en su pestaña Perfil, y el aviso dice
+  // dónde está.
+  group('#1738: aviso de nombre y avatar', () {
+    testWidgets('en edición indica Perfil > "Datos personales"',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen(mode: ProfileEditTrainerMode.edit));
+      await tester.pumpAndSettle();
+
+      final aviso = tester.widget<Text>(
+        find.byKey(const Key('profile_edit_trainer_identity_notice')),
+      );
+      expect(
+        aviso.data,
+        'Tu nombre y tu avatar se cambian desde Perfil > "Datos personales".',
+      );
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
