@@ -61,16 +61,24 @@ const _kSessionId = 'session-1';
 
 final DateTime _kDate = DateTime.utc(2026, 1, 1);
 
+// Es una ruta EXCLUSIVA del PF (#1743): `authRedirect` saca de ahí a cualquier
+// cuenta que no sea `trainer`, así que el perfil del fixture es el de un PF con
+// el perfil comercial completo (si no, el gate de onboarding lo desvía).
 UserProfile _profile() => UserProfile(
       uid: _kCoachUid,
       email: 'coach@example.com',
       displayName: 'coach',
       bornAt: _adultBornAt,
       emailVerification:
-          mailConfirmadoPara(UserRole.athlete, 'coach@example.com'),
-      role: UserRole.athlete,
+          mailConfirmadoPara(UserRole.trainer, 'coach@example.com'),
+      role: UserRole.trainer,
       createdAt: _kDate,
       updatedAt: _kDate,
+      trainerBio: 'Powerlifting coach',
+      trainerSpecialty: 'Fuerza',
+      trainerMonthlyRate: 50000,
+      trainerLocations: const [],
+      trainerOffersOnline: true,
     );
 
 /// La sesión que devuelve el override, con el uid del dueño adentro para que

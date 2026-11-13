@@ -33,16 +33,24 @@ class _StubAuthNotifier extends AuthNotifier {
   }
 }
 
+// Es una ruta EXCLUSIVA del PF (#1743): `authRedirect` saca de ahí a cualquier
+// cuenta que no sea `trainer`, así que el perfil del fixture es el de un PF con
+// el perfil comercial completo (si no, el gate de onboarding lo desvía).
 UserProfile _profile() => UserProfile(
       uid: 'u1',
       email: 'athlete@example.com',
       displayName: 'sporty',
       bornAt: DateTime.utc(1990, 5, 20),
       emailVerification:
-          mailConfirmadoPara(UserRole.athlete, 'athlete@example.com'),
-      role: UserRole.athlete,
+          mailConfirmadoPara(UserRole.trainer, 'athlete@example.com'),
+      role: UserRole.trainer,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
+      trainerBio: 'Powerlifting coach',
+      trainerSpecialty: 'Fuerza',
+      trainerMonthlyRate: 50000,
+      trainerLocations: const [],
+      trainerOffersOnline: true,
     );
 
 Future<void> _go(WidgetTester tester, String location) async {
