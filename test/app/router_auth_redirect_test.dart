@@ -822,6 +822,19 @@ void main() {
       });
     }
 
+    test('/profile/edit-personal abre para el PF Y para el alumno (#1817)',
+        () async {
+      // Cuelga de `/profile`, que tiene pantallas de PF en `_rutasSoloPF`, y
+      // sumarla ahí «por ser de perfil» sería un error fácil. El PF llega por la
+      // fila «Datos personales» de su Perfil (#1738), el único lugar desde el
+      // que cambia su nombre y su avatar; el alumno, por la de CUENTA.
+      final alumno = await listo(_athleteProfile());
+      final pf = await listo(_trainerComplete());
+
+      expect(callRedirect(alumno, '/profile/edit-personal'), isNull);
+      expect(callRedirect(pf, '/profile/edit-personal'), isNull);
+    });
+
     test('un prefijo parecido no cuenta: el match es por segmento', () async {
       final c = await listo(_athleteProfile());
       expect(callRedirect(c, '/coach/athletes'), isNull);
