@@ -124,7 +124,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 child: CircularProgressIndicator(color: palette.accent),
               ),
               error: (_, __) => _ErrorState(
-                onRetry: () => _retryWeek(ref, uid, _shownWeekStart),
+                onRetry: () => retryWeekInsights(ref, uid, _shownWeekStart),
               ),
               data: (insights) {
                 // Bug fix (abandoned-session-streak-reports): el CTA de
@@ -288,20 +288,10 @@ class _EmptyState extends StatelessWidget {
 
 // ── Retry ─────────────────────────────────────────────────────────────────────
 
-/// QA-498: `ref.invalidate` NO cascada a las dependencias, y [exercisesProvider]
-/// NO es autoDispose — cachea su `AsyncError` para toda la vida del container.
-/// Invalidar solo el provider de la card lo rebuildeaba, re-leía el MISMO error
-/// cacheado del catálogo y re-renderizaba el mismo estado de error: un botón de
-/// reintentar que no podía recuperar nunca, justo en el caso que trae al usuario
-/// acá (offline / fallo al cargar el catálogo en frío). Mismo criterio que el
-/// `_retry` de MuscleDistributionScreen y FrequentExercisesScreen (#376).
-void _retryWeek(WidgetRef ref, String uid, DateTime weekStart) {
-  ref.invalidate(exercisesProvider);
-  ref.invalidate(athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)));
-}
-
-/// Ver [_retryWeek] — [athleteDayInsightsProvider] también lee
-/// `exercisesProvider.future`.
+/// La semana se reintenta con [retryWeekInsights] (compartido con la card «Esta
+/// semana» de Inicio; ahí está el porqué de invalidar también el catálogo).
+/// [athleteDayInsightsProvider] también lee `exercisesProvider.future`, así que
+/// el día invalida igual los dos.
 void _retryDay(WidgetRef ref, String uid, DateTime day) {
   ref.invalidate(exercisesProvider);
   ref.invalidate(athleteDayInsightsProvider((uid: uid, day: day)));
