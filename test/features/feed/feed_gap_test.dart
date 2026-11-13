@@ -10,7 +10,7 @@
 //   feed-69 — feedForFriends chunks the whereIn query in ≤10 batches and
 //             re-sorts the merged result globally newest-first.
 //   feed-72 — PostRepository.create denormalizes authorGymId from the user doc
-//             when null, and preserves an explicit authorGymId.
+//             and the user doc wins over an explicit authorGymId (#1698).
 //   feed-40 — FriendshipRepository.accept increments followingCount from 0 when
 //             the public profile doc is absent (the `?? 0` branch).
 //   feed-41 — FriendshipRepository.delete clamps the followingCount decrement at
@@ -188,9 +188,10 @@ void main() {
       expect(snap.data()!['authorGymId'], equals('smart-fit-palermo'));
     });
 
-    test('preserves an explicit authorGymId instead of overwriting it',
-        () async {
-      // User doc carries a DIFFERENT gym; the explicit input value must win.
+    test('the user doc wins over an explicit authorGymId (#1698)', () async {
+      // Antes el valor explícito del input ganaba. Desde #1698 las reglas
+      // exigen authorGymId == users/{uid}.gymId (un gym ajeno es la inyección
+      // en el feed de otro gym), así que el doc del autor es la fuente.
       await firestore.collection('users').doc('u1').set({
         'gymId': 'sportclub-belgrano',
       });
@@ -203,9 +204,8 @@ void main() {
 
       final persisted = await repo.create(input);
 
-      expect(persisted.authorGymId, equals('megatlon-recoleta'),
-          reason:
-              'explicit authorGymId must not be overwritten by the user doc');
+      expect(persisted.authorGymId, equals('sportclub-belgrano'),
+          reason: 'the author\'s own users/{uid}.gymId is the source of truth');
     });
 
     test('leaves authorGymId null when input is null and user doc has no gymId',

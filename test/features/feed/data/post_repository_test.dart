@@ -81,6 +81,91 @@ void main() {
       expect(data['text'], equals('Hello'));
       expect(data['privacy'], equals('public'));
     });
+
+    // [#1698] Las reglas exigen que gym, nombre y avatar del post coincidan
+    // con `users/{uid}`. El perfil en memoria que arma el `input` puede ir un
+    // paso atrás del doc, así que cuando el doc existe manda él.
+    group('autoría denormalizada (#1698)', () {
+      Future<Map<String, Object?>> leerPost(String id) async =>
+          (await firestore.collection('posts').doc(id).get()).data()!;
+
+      test('el doc del usuario pisa un perfil en memoria desactualizado',
+          () async {
+        await firestore.collection('users').doc('u1').set({
+          'displayName': 'Ana María',
+          'avatarUrl': 'https://cdn.test/nueva.jpg',
+          'gymId': 'gym-real',
+        });
+
+        await repo.create(
+          _makePost(
+            id: 'p1',
+            authorUid: 'u1',
+            authorDisplayName: 'Ana',
+            authorAvatarUrl: 'https://cdn.test/vieja.jpg',
+            authorGymId: 'gym-viejo',
+          ),
+        );
+
+        final data = await leerPost('p1');
+        expect(data['authorDisplayName'], 'Ana María');
+        expect(data['authorAvatarUrl'], 'https://cdn.test/nueva.jpg');
+        expect(data['authorGymId'], 'gym-real');
+      });
+
+      test('el sentinel "sin gym" del doc no viaja al post', () async {
+        await firestore
+            .collection('users')
+            .doc('u1')
+            .set({'displayName': 'Ana', 'gymId': 'no-gym'});
+
+        await repo.create(
+          _makePost(
+              id: 'p1',
+              authorUid: 'u1',
+              authorDisplayName: 'Ana',
+              authorGymId: 'no-gym'),
+        );
+
+        expect((await leerPost('p1'))['authorGymId'], isNull);
+      });
+
+      test('un usuario sin nombre ni avatar conserva los fallbacks del input',
+          () async {
+        await firestore.collection('users').doc('u1').set({'gymId': 'g1'});
+
+        await repo.create(
+          _makePost(
+            id: 'p1',
+            authorUid: 'u1',
+            authorDisplayName: 'Anónimo',
+            authorAvatarUrl: 'https://cdn.test/vieja.jpg',
+          ),
+        );
+
+        final data = await leerPost('p1');
+        expect(data['authorDisplayName'], 'Anónimo');
+        expect(data['authorAvatarUrl'], isNull,
+            reason: 'el doc existe y no tiene avatar: el post tampoco');
+        expect(data['authorGymId'], 'g1');
+      });
+
+      test('sin doc de usuario queda lo que trae el input (las reglas deciden)',
+          () async {
+        await repo.create(
+          _makePost(
+            id: 'p1',
+            authorUid: 'u1',
+            authorDisplayName: 'Ana',
+            authorGymId: 'g1',
+          ),
+        );
+
+        final data = await leerPost('p1');
+        expect(data['authorDisplayName'], 'Ana');
+        expect(data['authorGymId'], 'g1');
+      });
+    });
   });
 
   group('PostRepository.delete', () {
