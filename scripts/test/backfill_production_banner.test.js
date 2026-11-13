@@ -3,7 +3,8 @@
  *
  * Los tests del CABLEADO: que los backfills que escriben sobre `users/` y
  * `userPublicProfiles/` (la lista `BACKFILLS`; el tercero, el de
- * `searchPrefixes`, es del #1478; el cuarto, `chats/`, del #1697) efectivamente
+ * `searchPrefixes`, es del #1478; el cuarto, `chats/`, del #1697; el quinto,
+ * `routines/`, del #1723) efectivamente
  * IMPRIMAN el cartel de producción, y que lo impriman antes de leer un solo dato.
  *
  *   node --test scripts/test/
@@ -38,6 +39,7 @@ const BACKFILLS = [
   'backfill_gym_names.js',
   'backfill_user_search_prefixes.js',
   'backfill_chat_closed_unlinked.js', // #1697: escribe sobre `chats/`
+  'backfill_archive_orphan_assigned_routines.js', // #1723: escribe sobre `routines/`
 ];
 
 /**
