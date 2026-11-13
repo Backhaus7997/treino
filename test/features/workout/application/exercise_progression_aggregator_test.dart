@@ -42,6 +42,8 @@ SetLog _log({
   required int reps,
   required double weightKg,
   int setNumber = 1,
+  int? durationSeconds,
+  double? distanceMeters,
 }) =>
     SetLog(
       id: '${sessionId}_${exerciseId}_$setNumber',
@@ -50,6 +52,8 @@ SetLog _log({
       setNumber: setNumber,
       reps: reps,
       weightKg: weightKg,
+      durationSeconds: durationSeconds,
+      distanceMeters: distanceMeters,
       completedAt: DateTime(2025, 1, 1),
     );
 
@@ -1104,6 +1108,75 @@ void main() {
       expect(history[1].bestSetReps, 12);
       expect(history[1].sessionVolume, 0);
       expect(history[1].setCount, 2);
+    });
+
+    test(
+        '#1716: a timed or distance exercise yields the longest time / the '
+        'most meters of the session; reps and weight work leaves both null',
+        () {
+      final timed = _session('timed', DateTime.utc(2026, 7, 20, 12));
+      final distance = _session('distance', DateTime.utc(2026, 7, 21, 12));
+      final legacy = _session('legacy', DateTime.utc(2026, 7, 22, 12));
+      final weighted = _session('weighted', DateTime.utc(2026, 7, 23, 12));
+      SetLog plank(
+        String sessionId, {
+        int setNumber = 1,
+        int reps = 0,
+        double weightKg = 0,
+        int? durationSeconds,
+        double? distanceMeters,
+      }) =>
+          _log(
+            sessionId: sessionId,
+            exerciseId: 'plank',
+            exerciseName: 'Plancha',
+            reps: reps,
+            weightKg: weightKg,
+            setNumber: setNumber,
+            durationSeconds: durationSeconds,
+            distanceMeters: distanceMeters,
+          );
+      final logs = <String, List<SetLog>>{
+        // Peso y reps en 0, la métrica es el tiempo (#1702). La mejor serie es
+        // la MÁS LARGA, no la primera ni la última.
+        'timed': [
+          plank('timed', setNumber: 1, durationSeconds: 45),
+          plank('timed', setNumber: 2, durationSeconds: 60),
+          plank('timed', setNumber: 3, durationSeconds: 50),
+        ],
+        'distance': [
+          plank('distance', setNumber: 1, distanceMeters: 40),
+          plank('distance', setNumber: 2, distanceMeters: 100.5),
+        ],
+        // Serie vieja, de antes de #1702: ni métrica ni reps.
+        'legacy': [plank('legacy')],
+        'weighted': [plank('weighted', reps: 10, weightKg: 20)],
+      };
+
+      final history = deriveExerciseSessionHistory(
+        exerciseId: 'plank',
+        sessionsDesc: [weighted, legacy, distance, timed],
+        logsBySession: logs,
+      );
+
+      expect(history, hasLength(4));
+      // weighted: trabajo de peso y reps, sin métrica.
+      expect(history[0].bestDurationSeconds, isNull);
+      expect(history[0].bestDistanceMeters, isNull);
+      // legacy: sin dato, y distinguible de «0 segundos».
+      expect(history[1].bestDurationSeconds, isNull);
+      expect(history[1].bestDistanceMeters, isNull);
+      expect(history[1].bestSetReps, 0);
+      expect(history[1].setCount, 1);
+      // distance
+      expect(history[2].bestDistanceMeters, 100.5);
+      expect(history[2].bestDurationSeconds, isNull);
+      expect(history[2].setCount, 2);
+      // timed
+      expect(history[3].bestDurationSeconds, 60);
+      expect(history[3].bestDistanceMeters, isNull);
+      expect(history[3].setCount, 3);
+      expect(history[3].sessionVolume, 0);
     });
 
     test('maxEntries caps the rows; empty exerciseId short-circuits', () {

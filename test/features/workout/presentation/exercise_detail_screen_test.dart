@@ -366,6 +366,8 @@ void main() {
         setCount: 4,
         bestWeightKg: 80.0,
         bestSetReps: 8,
+        bestDurationSeconds: null,
+        bestDistanceMeters: null,
         sessionVolume: 2400.0,
       ),
       (
@@ -373,9 +375,29 @@ void main() {
         setCount: 1,
         bestWeightKg: 0.0,
         bestSetReps: 12,
+        bestDurationSeconds: null,
+        bestDistanceMeters: null,
         sessionVolume: 0.0,
       ),
     ];
+
+    // #1716: una fila de HISTORIAL de un ejercicio por tiempo o por distancia.
+    // Con los dos nulos es una serie vieja (de antes de #1702), sin métrica ni
+    // reps.
+    ExerciseSessionHistoryEntry timedOrDistanceRow({
+      required int setCount,
+      int? bestDurationSeconds,
+      double? bestDistanceMeters,
+    }) =>
+        (
+          date: DateTime.utc(2026, 7, 22, 12),
+          setCount: setCount,
+          bestWeightKg: 0.0,
+          bestSetReps: 0,
+          bestDurationSeconds: bestDurationSeconds,
+          bestDistanceMeters: bestDistanceMeters,
+          sessionVolume: 0.0,
+        );
 
     List<Override> statsOverrides({
       required ExerciseProgression progression,
@@ -496,6 +518,79 @@ void main() {
       expect(find.text('1 serie'), findsOneWidget);
       // Real rows replace the HISTORIAL empty state.
       expect(find.text('Aún no entrenaste este ejercicio'), findsNothing);
+    });
+
+    testWidgets('#1716: a timed exercise shows its best time, not «0 reps»',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        statsOverrides(
+          progression: makeProgression(),
+          history: [timedOrDistanceRow(setCount: 3, bestDurationSeconds: 60)],
+        ),
+        uid: 'user-1',
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.scrollUntilVisible(
+        find.text('01:00'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('01:00'), findsOneWidget);
+      expect(find.text('3 series'), findsOneWidget);
+      expect(find.textContaining('0 reps'), findsNothing);
+    });
+
+    testWidgets(
+        '#1716: a distance exercise shows its best distance in meters, not '
+        '«0 reps»', (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        statsOverrides(
+          progression: makeProgression(),
+          history: [timedOrDistanceRow(setCount: 2, bestDistanceMeters: 40)],
+        ),
+        uid: 'user-1',
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.scrollUntilVisible(
+        find.text('40 m'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('40 m'), findsOneWidget);
+      expect(find.text('2 series'), findsOneWidget);
+      expect(find.textContaining('0 reps'), findsNothing);
+    });
+
+    testWidgets(
+        '#1716: an old timed/distance set with no metric has no best set — '
+        'the row keeps only the set count and no «0 reps»', (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        statsOverrides(
+          progression: makeProgression(),
+          history: [timedOrDistanceRow(setCount: 2)],
+        ),
+        uid: 'user-1',
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.scrollUntilVisible(
+        find.text('2 series'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('2 series'), findsOneWidget);
+      expect(find.textContaining('reps'), findsNothing);
     });
 
     testWidgets(
