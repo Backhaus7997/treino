@@ -475,8 +475,9 @@ void main() {
 
   // ── unreadFromCoachProvider / unreadFromFriendsProvider ─────────────────
   //
-  // Both providers derive from `chatsForCurrentUserProvider` and
-  // `currentAthleteLinkProvider`. They partition unread chats by "the OTHER
+  // Both providers derive from `chatsForCurrentUserProvider` and the athlete's
+  // LIVE link (`active|paused`, via `currentAthleteLinkAnyStatusProvider`).
+  // They partition unread chats by "the OTHER
   // member is my coach" vs "is anyone else". Together their sum equals
   // `totalUnreadCountProvider` (when the athlete has a coach) so consumers
   // can trust each badge counts what its surface says.
@@ -507,16 +508,21 @@ void main() {
       required List<Chat> chats,
       String? uid,
       String? coachUid,
+      TrainerLinkStatus status = TrainerLinkStatus.active,
     }) {
       final container = ProviderContainer(overrides: [
         currentUidProvider.overrideWith((ref) => uid),
         chatsForCurrentUserProvider.overrideWith(
           (ref) => Stream.value(chats),
         ),
-        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(
+        currentAthleteLinkAnyStatusProvider.overrideWith((ref) => Stream.value(
               coachUid == null
                   ? null
-                  : makeLink(trainerId: coachUid, athleteId: uid ?? 'me'),
+                  : makeLink(
+                      trainerId: coachUid,
+                      athleteId: uid ?? 'me',
+                      status: status,
+                    ),
             )),
       ]);
       addTearDown(container.dispose);
@@ -539,7 +545,7 @@ void main() {
       final subA = container.listen(unreadFromCoachProvider, (_, __) {});
       final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
       await container.read(chatsForCurrentUserProvider.future);
-      await container.read(currentAthleteLinkProvider.future);
+      await container.read(currentAthleteLinkAnyStatusProvider.future);
 
       expect(container.read(unreadFromCoachProvider), 1);
       expect(container.read(unreadFromFriendsProvider), 1);
@@ -559,7 +565,7 @@ void main() {
       final subA = container.listen(unreadFromCoachProvider, (_, __) {});
       final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
       await container.read(chatsForCurrentUserProvider.future);
-      await container.read(currentAthleteLinkProvider.future);
+      await container.read(currentAthleteLinkAnyStatusProvider.future);
 
       expect(container.read(unreadFromCoachProvider), 0);
       expect(container.read(unreadFromFriendsProvider), 2);
@@ -578,7 +584,7 @@ void main() {
       final subA = container.listen(unreadFromCoachProvider, (_, __) {});
       final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
       await container.read(chatsForCurrentUserProvider.future);
-      await container.read(currentAthleteLinkProvider.future);
+      await container.read(currentAthleteLinkAnyStatusProvider.future);
 
       expect(container.read(unreadFromCoachProvider), 1);
       expect(container.read(unreadFromFriendsProvider), 0);
@@ -602,7 +608,82 @@ void main() {
       final subA = container.listen(unreadFromCoachProvider, (_, __) {});
       final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
       await container.read(chatsForCurrentUserProvider.future);
-      await container.read(currentAthleteLinkProvider.future);
+      await container.read(currentAthleteLinkAnyStatusProvider.future);
+
+      expect(container.read(unreadFromCoachProvider), 0);
+      expect(container.read(unreadFromFriendsProvider), 1);
+      subA.close();
+      subB.close();
+    });
+
+    // #1845: pausar es un hold, el chat con el PF sigue abierto. Con el vínculo
+    // active-only, el mensaje del PF de un alumno pausado no contaba en Coach y
+    // se colaba en el badge del Feed.
+    group('vínculo PAUSADO (#1845)', () {
+      test('el mensaje del PF cuenta en Coach y NO en el Feed', () async {
+        const me = 'me';
+        const coach = 'coach';
+        final container = makeSplitContainer(
+          chats: [unreadChatWith(coach, me, 'c1')],
+          uid: me,
+          coachUid: coach,
+          status: TrainerLinkStatus.paused,
+        );
+
+        final subA = container.listen(unreadFromCoachProvider, (_, __) {});
+        final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
+        await container.read(chatsForCurrentUserProvider.future);
+        await container.read(currentAthleteLinkAnyStatusProvider.future);
+
+        expect(container.read(unreadFromCoachProvider), 1);
+        expect(container.read(unreadFromFriendsProvider), 0,
+            reason: 'el chat del PF no es social: no va al badge del Feed');
+        subA.close();
+        subB.close();
+      });
+
+      test('PF y amigo sin leer → una en cada badge', () async {
+        const me = 'me';
+        const coach = 'coach';
+        final container = makeSplitContainer(
+          chats: [
+            unreadChatWith(coach, me, 'c1'),
+            unreadChatWith('friend', me, 'c2'),
+          ],
+          uid: me,
+          coachUid: coach,
+          status: TrainerLinkStatus.paused,
+        );
+
+        final subA = container.listen(unreadFromCoachProvider, (_, __) {});
+        final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
+        await container.read(chatsForCurrentUserProvider.future);
+        await container.read(currentAthleteLinkAnyStatusProvider.future);
+
+        expect(container.read(unreadFromCoachProvider), 1);
+        expect(container.read(unreadFromFriendsProvider), 1);
+        subA.close();
+        subB.close();
+      });
+    });
+
+    // Una solicitud que nadie aceptó no es un PF: lo que ya hacía el
+    // active-only, y lo que sigue haciendo.
+    test('vínculo PENDING → sin PF: coach 0, el chat cuenta como social',
+        () async {
+      const me = 'me';
+      const trainer = 'trainer';
+      final container = makeSplitContainer(
+        chats: [unreadChatWith(trainer, me, 'c1')],
+        uid: me,
+        coachUid: trainer,
+        status: TrainerLinkStatus.pending,
+      );
+
+      final subA = container.listen(unreadFromCoachProvider, (_, __) {});
+      final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      await container.read(currentAthleteLinkAnyStatusProvider.future);
 
       expect(container.read(unreadFromCoachProvider), 0);
       expect(container.read(unreadFromFriendsProvider), 1);
