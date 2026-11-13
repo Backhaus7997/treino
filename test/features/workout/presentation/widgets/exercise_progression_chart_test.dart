@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart' as intl;
@@ -16,6 +17,7 @@ ExerciseProgressionChartLabels _labels({
   String bestSessionVolumeLabel = 'Volumen',
   String volumeUnit = 'kg·reps',
   String weightUnit = 'kg',
+  String distanceUnit = 'm',
   String Function(int)? frequencyLabel,
   String singlePointHint =
       'Necesitás al menos 2 sesiones para ver la evolución.',
@@ -26,8 +28,11 @@ ExerciseProgressionChartLabels _labels({
       oneRepMaxLabel: oneRepMaxLabel,
       bestSetVolumeLabel: bestSetVolumeLabel,
       bestSessionVolumeLabel: bestSessionVolumeLabel,
+      longestDurationLabel: 'Tiempo máximo',
+      longestDistanceLabel: 'Distancia máxima',
       volumeUnit: volumeUnit,
       weightUnit: weightUnit,
+      distanceUnit: distanceUnit,
       frequencyLabel: frequencyLabel ?? (n) => '$n sesiones en este período',
       singlePointHint: singlePointHint,
       emptyHint: emptyHint,
@@ -53,6 +58,8 @@ ExerciseProgression _progression({
   List<ProgressionPoint> oneRepMaxSeries = const [],
   List<ProgressionPoint> bestSetVolumeSeries = const [],
   List<ProgressionPoint> bestSessionVolumeSeries = const [],
+  List<ProgressionPoint> bestDurationSeries = const [],
+  List<ProgressionPoint> bestDistanceSeries = const [],
   int frequencySessionCount = 0,
 }) =>
     ExerciseProgression(
@@ -62,6 +69,8 @@ ExerciseProgression _progression({
       oneRepMaxSeries: oneRepMaxSeries,
       bestSetVolumeSeries: bestSetVolumeSeries,
       bestSessionVolumeSeries: bestSessionVolumeSeries,
+      bestDurationSeries: bestDurationSeries,
+      bestDistanceSeries: bestDistanceSeries,
       personalRecords: const [],
       frequencySessionCount: frequencySessionCount,
     );
@@ -376,6 +385,85 @@ void main() {
         expect(find.text(label(i)), findsOneWidget,
             reason: 'axis label for point $i must appear exactly once');
       }
+    });
+
+    // #1715: una plancha o un carry no tienen carga. Sus 4 chips de peso sólo
+    // dirían «sin datos»: el gráfico ofrece la métrica que el ejercicio tiene.
+    group('#1715 tiempo y distancia', () {
+      Future<void> pump(WidgetTester tester, ExerciseProgression p) async {
+        await tester.pumpWidget(_wrap(ExerciseProgressionChart(
+          progression: p,
+          labels: _labels(),
+          localeName: 'es_AR',
+        )));
+        await tester.pump();
+      }
+
+      testWidgets('plancha: sólo el chip de tiempo, y el valor se lee mm:ss',
+          (tester) async {
+        await pump(tester, _progression(bestDurationSeries: [_pt(5, 90)]));
+
+        expect(find.text('Tiempo máximo'), findsOneWidget);
+        expect(find.text('Peso máximo'), findsNothing);
+        expect(find.text('1RM'), findsNothing);
+        expect(find.text('01:30'), findsOneWidget);
+        expect(find.text('Sin datos para este ejercicio.'), findsNothing);
+      });
+
+      testWidgets('plancha con 2+ sesiones: dibuja la línea con ejes mm:ss',
+          (tester) async {
+        await pump(tester,
+            _progression(bestDurationSeries: [_pt(5, 60), _pt(10, 75)]));
+
+        expect(find.byType(LineChart), findsOneWidget);
+        expect(
+          find.byWidgetPredicate((w) =>
+              w is Text && RegExp(r'^\d{2}:\d{2}$').hasMatch(w.data ?? '')),
+          findsWidgets,
+        );
+      });
+
+      testWidgets('carry: el chip de distancia y los metros con su unidad',
+          (tester) async {
+        await pump(tester, _progression(bestDistanceSeries: [_pt(5, 40)]));
+
+        expect(find.text('Distancia máxima'), findsOneWidget);
+        expect(find.text('Peso máximo'), findsNothing);
+        expect(find.text('40'), findsOneWidget);
+        expect(find.text('m'), findsOneWidget);
+      });
+
+      testWidgets('un ejercicio de peso conserva sus 4 chips sin el de tiempo',
+          (tester) async {
+        await pump(
+            tester,
+            _progression(
+              heaviestWeightSeries: [_pt(5, 80)],
+              oneRepMaxSeries: [_pt(5, 93)],
+            ));
+
+        expect(find.text('Peso máximo'), findsOneWidget);
+        expect(find.text('Volumen'), findsOneWidget);
+        expect(find.text('Tiempo máximo'), findsNothing);
+      });
+
+      testWidgets(
+          'si el período cambia a un ejercicio sin carga, la selección vieja '
+          'cae al primer chip en vez de quedar vacía', (tester) async {
+        await pump(
+            tester,
+            _progression(
+              heaviestWeightSeries: [_pt(5, 80)],
+              bestSetVolumeSeries: [_pt(5, 400)],
+            ));
+        await tester.tap(find.text('Mejor serie'));
+        await tester.pump();
+
+        await pump(tester, _progression(bestDurationSeries: [_pt(5, 90)]));
+
+        expect(find.text('01:30'), findsOneWidget);
+        expect(find.text('Sin datos para este ejercicio.'), findsNothing);
+      });
     });
   });
 }
