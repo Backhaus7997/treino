@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart'
-    show currentAthleteLinkProvider;
+    show currentAthleteLinkAnyStatusProvider;
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/payments/application/billing_providers.dart'
@@ -62,7 +62,8 @@ ProviderContainer _container({
 }) {
   final container = ProviderContainer(
     overrides: [
-      currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
+      currentAthleteLinkAnyStatusProvider
+          .overrideWith((ref) => Stream.value(link)),
       athletePaymentsProvider.overrideWith((ref) => Stream.value(payments)),
       // miCuotaProvider no longer reads either of these — they're overridden
       // here purely to prove the tests below are unaffected by them.
@@ -78,7 +79,7 @@ ProviderContainer _container({
 /// Reads [miCuotaProvider] after letting every upstream async dependency
 /// resolve, so the synchronous folding inside the provider sees `data`.
 Future<MiCuotaState?> _readSettled(ProviderContainer container) async {
-  await container.read(currentAthleteLinkProvider.future);
+  await container.read(currentAthleteLinkAnyStatusProvider.future);
   await container.read(athletePaymentsProvider.future);
   return container.read(miCuotaProvider).valueOrNull;
 }
