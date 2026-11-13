@@ -67,6 +67,36 @@ afterEach(async () => {
 });
 
 /**
+ * El doc privado del autor, del que las reglas sacan su identidad (#1698):
+ * gym, nombre y avatar del post tienen que coincidir con él. El default es el
+ * perfil que `validPost()` declara (Ana, sin avatar, sin gym).
+ */
+async function seedAuthorUser(
+  overrides: Record<string, unknown> = {},
+  uid = AUTHOR
+): Promise<void> {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection("users")
+      .doc(uid)
+      .set({
+        uid,
+        role: "athlete",
+        email: `${uid}@example.test`,
+        displayName: "Ana",
+        avatarUrl: null,
+        gymId: null,
+        ...overrides,
+      });
+  });
+}
+
+beforeEach(async () => {
+  await seedAuthorUser();
+});
+
+/**
  * Full new-client wire shape: post.toJson() emits every key it CAN emit,
  * optional ones as explicit null (no includeIfNull:false on these models).
  *
@@ -127,12 +157,16 @@ function snapshotWith(count: number) {
   };
 }
 
-function createPost(uid: string, data: Record<string, unknown>) {
+function createPost(
+  uid: string,
+  data: Record<string, unknown>,
+  postId = "p1"
+) {
   return testEnv
     .authenticatedContext(uid)
     .firestore()
     .collection("posts")
-    .doc("p1")
+    .doc(postId)
     .set(data);
 }
 
@@ -330,5 +364,128 @@ describe("posts/{postId} update — same shape bounds as create", () => {
 
   it("DENIES rewriting createdAt on edit", async () => {
     await assertFails(updatePost(AUTHOR, { createdAt: new Date() }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Autoría denormalizada en el create (#1698).
+//
+// El `update` ya pineaba authorGymId/authorDisplayName/authorAvatarUrl como
+// inmutables; el create no miraba ninguno, así que un post `privacy: 'gym'`
+// con el authorGymId de OTRO gym y un nombre ajeno entraba al feed de ese gym.
+// Ahora los tres tienen que coincidir con `users/{uid}` del autor.
+// ---------------------------------------------------------------------------
+describe("posts/{postId} create — autoría denormalizada (#1698)", () => {
+  const GYM_A = "ChIJgymA";
+  const GYM_B = "ChIJgymB";
+
+  describe("DENY", () => {
+    it("un post de gym con el authorGymId de OTRO gym (la inyección)", async () => {
+      await seedAuthorUser({ gymId: GYM_A });
+      await assertFails(
+        createPost(AUTHOR, validPost({ privacy: "gym", authorGymId: GYM_B }))
+      );
+    });
+
+    it("un authorGymId cuando el autor no tiene gym", async () => {
+      await seedAuthorUser({ gymId: null });
+      await assertFails(
+        createPost(AUTHOR, validPost({ privacy: "gym", authorGymId: GYM_B }))
+      );
+    });
+
+    it("un nombre suplantado", async () => {
+      await assertFails(
+        createPost(AUTHOR, validPost({ authorDisplayName: "Entrenador Oficial" }))
+      );
+    });
+
+    it("un nombre vacío cuando el usuario SÍ tiene nombre", async () => {
+      await assertFails(createPost(AUTHOR, validPost({ authorDisplayName: "" })));
+    });
+
+    it("un nombre inventado cuando el usuario no tiene ninguno", async () => {
+      await seedAuthorUser({ displayName: null });
+      await assertFails(
+        createPost(AUTHOR, validPost({ authorDisplayName: "Entrenador Oficial" }))
+      );
+    });
+
+    it("un avatar que no es el del autor", async () => {
+      await seedAuthorUser({ avatarUrl: "https://cdn.test/ana.jpg" });
+      await assertFails(
+        createPost(
+          AUTHOR,
+          validPost({ authorAvatarUrl: "https://cdn.test/otra.jpg" })
+        )
+      );
+    });
+
+    it("un autor sin doc de usuario: no hay identidad que probar (falla cerrado)", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().collection("users").doc(AUTHOR).delete();
+      });
+      await assertFails(createPost(AUTHOR, validPost()));
+    });
+  });
+
+  describe("ALLOW — lo que el cliente real escribe", () => {
+    it("un post de gym en el gym propio", async () => {
+      await seedAuthorUser({ gymId: GYM_A });
+      await assertSucceeds(
+        createPost(AUTHOR, validPost({ privacy: "gym", authorGymId: GYM_A }))
+      );
+    });
+
+    it("un post sin gym aunque el autor tenga uno (compartir entreno sin gym real)", async () => {
+      await seedAuthorUser({ gymId: GYM_A });
+      await assertSucceeds(createPost(AUTHOR, validPost({ authorGymId: null })));
+    });
+
+    it("el sentinel 'no-gym' tal como lo guarda el usuario (composer), o como null", async () => {
+      await seedAuthorUser({ gymId: "no-gym" });
+      await assertSucceeds(
+        createPost(AUTHOR, validPost({ authorGymId: "no-gym" }), "p1")
+      );
+      await assertSucceeds(
+        createPost(AUTHOR, validPost({ authorGymId: null }), "p2")
+      );
+    });
+
+    it("nombre y avatar iguales a los del autor", async () => {
+      await seedAuthorUser({
+        displayName: "Ana María",
+        avatarUrl: "https://cdn.test/ana.jpg",
+      });
+      await assertSucceeds(
+        createPost(
+          AUTHOR,
+          validPost({
+            authorDisplayName: "Ana María",
+            authorAvatarUrl: "https://cdn.test/ana.jpg",
+          })
+        )
+      );
+    });
+
+    it("un usuario sin nombre: los dos fallbacks del cliente ('Anónimo' y '')", async () => {
+      await seedAuthorUser({ displayName: null });
+      await assertSucceeds(
+        createPost(AUTHOR, validPost({ authorDisplayName: "Anónimo" }), "p1")
+      );
+      await assertSucceeds(
+        createPost(AUTHOR, validPost({ authorDisplayName: "" }), "p2")
+      );
+    });
+
+    it("renombrarse cambia lo que se puede publicar: el nombre nuevo pasa, el viejo no", async () => {
+      await seedAuthorUser({ displayName: "Ana María" });
+      await assertSucceeds(
+        createPost(AUTHOR, validPost({ authorDisplayName: "Ana María" }), "p1")
+      );
+      await assertFails(
+        createPost(AUTHOR, validPost({ authorDisplayName: "Ana" }), "p2")
+      );
+    });
   });
 });

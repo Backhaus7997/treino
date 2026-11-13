@@ -1814,6 +1814,48 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gymId == authorGymId;
       }
 
+      // ── Autoría denormalizada del post (#1698) ────────────────────────────
+      //
+      // Un post lleva el gym, el nombre y el avatar de su autor, y el feed del
+      // gym se arma por `authorGymId`. El create sólo pedía `authorUid ==
+      // auth.uid`, así que cualquiera plantaba un post `privacy: 'gym'` con el
+      // `authorGymId` de OTRO gym y un nombre ajeno, y aparecía en el feed de
+      // ese gym con esa identidad. El `update` ya pineaba estos campos como
+      // inmutables; el create era la mitad que faltaba.
+      //
+      // Se pinean contra `users/{uid}` del propio autor, que es de donde el
+      // cliente los saca (`userProfileProvider`) y donde `PostRepository.create`
+      // los relee antes de escribir. Fallan CERRADO: sin doc de usuario no hay
+      // identidad que probar.
+      //
+      //  · gym: ninguno, o el que el autor tiene guardado (el sentinel
+      //    'no-gym' también, si es lo que guarda: `postSameGym` no lo matchea).
+      //  · nombre: el guardado; si el usuario no tiene nombre, los dos
+      //    fallbacks que manda el cliente ('Anónimo' del composer, '' de
+      //    compartir un entreno).
+      //  · avatar: el guardado (null y ausente son lo mismo, como en todo el
+      //    archivo).
+      //
+      // ⚠️ ALCANCE, dicho derecho: `users/{uid}.gymId` lo declara el propio
+      // usuario —en el sistema no existe autoridad de pertenencia a un gym
+      // (ver `userPublicProfiles`, AD-4)—. Esto cierra "postear en un gym que
+      // NO es el tuyo", no "postear en un gym al que no vas": quien se declara
+      // en el gym B antes de postear sigue entrando a su feed.
+      function postNombreOk(nombre, real) {
+        return (real is string && real != '')
+            ? nombre == real
+            : (nombre == '' || nombre == 'Anónimo');
+      }
+
+      function postAutorOk(d) {
+        let u = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        return u != null
+            && (d.get('authorGymId', null) == null
+                || d.authorGymId == u.data.get('gymId', null))
+            && postNombreOk(d.get('authorDisplayName', ''), u.data.get('displayName', null))
+            && d.get('authorAvatarUrl', null) == u.data.get('avatarUrl', null);
+      }
+
       allow read: if request.auth != null
                   && (
                     resource == null
@@ -1858,7 +1900,9 @@ service cloud.firestore {
                     && (request.resource.data.get('workoutSnapshot', null) == null
                         || (request.resource.data.workoutSnapshot is map
                             && request.resource.data.workoutSnapshot.get('exercises', null) is list
-                            && request.resource.data.workoutSnapshot.exercises.size() <= 30));
+                            && request.resource.data.workoutSnapshot.exercises.size() <= 30))
+                    // Va ÚLTIMO: es la única cláusula que paga una lectura.
+                    && postAutorOk(request.resource.data);
 
       // Update: only the original author, mismos bounds de shape que create —
       // sin esto el hardening del create es cosmético (el dueño podría inflar
