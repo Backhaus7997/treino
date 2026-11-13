@@ -65,7 +65,12 @@ export { notifyOnReview } from "./notifications/notify-review";
 // #628: canal alumno → PF durante la sesión. Notifica SOLO cuando
 // kind === 'discomfort' — un comment no debe vibrarle el teléfono al PF.
 export { notifyOnExerciseFeedback } from "./notifications/notify-exercise-feedback";
-export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
+// #1723: el plan asignado DESPUÉS de terminar el vínculo (o sin vínculo) se
+// archiva al crearse; `cleanupAssignedPlansOnUnlink` sólo corre en la transición.
+export {
+  archiveOrphanAssignedPlanOnCreate,
+  cleanupAssignedPlansOnUnlink,
+} from "./cleanup-assigned-plans";
 export { propagateGymNameToProfiles } from "./gyms/propagate-gym-name";
 export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";
