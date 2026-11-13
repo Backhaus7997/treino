@@ -80,11 +80,20 @@ List<PersonalRecord> derivePersonalRecords(
 /// best set as reps-only in that case. [sessionVolume] sums ONLY weighted
 /// sets (same #368 rule as [aggregateExerciseProgression]'s volume series),
 /// so it is 0 for bodyweight-only sessions.
+///
+/// [bestDurationSeconds]/[bestDistanceMeters] (#1716): the best set of a TIMED
+/// or DISTANCE exercise — the longest time / the most meters of the session.
+/// Those sets are logged with weight and reps at 0 (#1702), so
+/// [bestWeightKg]/[bestSetReps] say nothing about them. `null` when no set of
+/// the exercise carries that metric (reps/weight work, or pre-#1702 sets with
+/// no data) — same convention as `SessionExerciseSummary`.
 typedef ExerciseSessionHistoryEntry = ({
   DateTime date,
   int setCount,
   double bestWeightKg,
   int bestSetReps,
+  int? bestDurationSeconds,
+  double? bestDistanceMeters,
   double sessionVolume,
 });
 
@@ -111,6 +120,9 @@ const int kExerciseHistoryMaxEntries = 20;
 ///   set with `bestWeightKg = 0`;
 /// - `setCount` is weight-agnostic (a bodyweight set still counts as a set,
 ///   matching the frecuencia stat's weight-agnostic spirit);
+/// - a timed / distance exercise (#1716) also yields the longest
+///   `durationSeconds` / the most `distanceMeters` of the session, the same
+///   max-of-the-session rule `aggregateSessionHighlights` applies (#1701);
 /// - dates are `startedAt.toLocal()` for display (#380).
 List<ExerciseSessionHistoryEntry> deriveExerciseSessionHistory({
   required String exerciseId,
@@ -130,6 +142,8 @@ List<ExerciseSessionHistoryEntry> deriveExerciseSessionHistory({
     SetLog? best;
     var volume = 0.0;
     var setCount = 0;
+    int? bestDuration;
+    double? bestDistance;
     for (final log in exerciseLogs) {
       setCount++;
       if (log.weightKg > 0) volume += log.reps * log.weightKg;
@@ -138,6 +152,14 @@ List<ExerciseSessionHistoryEntry> deriveExerciseSessionHistory({
           (log.weightKg == best.weightKg && log.reps > best.reps)) {
         best = log;
       }
+      final seconds = log.durationSeconds;
+      if (seconds != null && (bestDuration == null || seconds > bestDuration)) {
+        bestDuration = seconds;
+      }
+      final meters = log.distanceMeters;
+      if (meters != null && (bestDistance == null || meters > bestDistance)) {
+        bestDistance = meters;
+      }
     }
 
     entries.add((
@@ -145,6 +167,8 @@ List<ExerciseSessionHistoryEntry> deriveExerciseSessionHistory({
       setCount: setCount,
       bestWeightKg: best!.weightKg,
       bestSetReps: best.reps,
+      bestDurationSeconds: bestDuration,
+      bestDistanceMeters: bestDistance,
       sessionVolume: volume,
     ));
     if (entries.length >= maxEntries) break;

@@ -12,7 +12,7 @@ import '../../application/exercise_progression_aggregator.dart'
 import '../../application/session_highlights.dart';
 import '../../application/session_recognition.dart';
 import '../../domain/exercise_progression.dart';
-import 'mmss.dart';
+import 'best_set_label.dart';
 
 // NOTA l10n: los ARB los está tocando otra rama en vuelo, así que los strings
 // NUEVOS de este archivo van como literales es-AR con TODO(l10n) — mismo
@@ -412,27 +412,22 @@ class _SessionExerciseRow extends StatelessWidget {
     //
     // #1701: un ejercicio por TIEMPO o por DISTANCIA guarda peso 0 y reps 0, y
     // «0 reps · peso corporal» es falso: su mejor serie es el tiempo o los
-    // metros. Con el peso por delante (una serie con carga es siempre «kg ×
-    // reps»), el orden es tiempo → metros → reps de peso corporal. Una serie
-    // vieja por tiempo/distancia, sin métrica ni reps, no tiene mejor serie que
-    // mostrar: queda sólo la cantidad de sets, en vez de un «0 reps».
-    final bestDuration = exercise.bestDurationSeconds;
-    final bestDistance = exercise.bestDistanceMeters;
-    final String? bestSet = exercise.bestWeightKg > 0
-        ? '${_formatRecordValue(exercise.bestWeightKg, isOneRepMax: false, localeName: l10n.localeName)} kg '
-            '× ${exercise.bestSetReps}'
-        : bestDuration != null
-            ? formatMMSS(bestDuration)
-            : bestDistance != null
-                ? l10n.workoutSetDistanceValue(
-                    formatNumberDisplay(bestDistance, l10n.localeName),
-                  )
-                : exercise.bestSetReps > 0
-                    // #1513: «12 reps» a secas, al lado de filas con kg, se
-                    // leía como un peso que faltaba. Dice que es peso corporal
-                    // (y no «0 kg», que se lee como un error de carga).
-                    ? '${exercise.bestSetReps} reps · peso corporal'
-                    : null;
+    // metros. La regla (peso → tiempo → metros → reps de peso corporal → nada)
+    // vive en [bestSetLabel], compartida con el HISTORIAL del detalle de
+    // ejercicio (#1716). Una serie vieja por tiempo/distancia, sin métrica ni
+    // reps, no tiene mejor serie que mostrar: queda sólo la cantidad de sets,
+    // en vez de un «0 reps».
+    final String? bestSet = bestSetLabel(
+      l10n: l10n,
+      weightKg: exercise.bestWeightKg,
+      reps: exercise.bestSetReps,
+      durationSeconds: exercise.bestDurationSeconds,
+      distanceMeters: exercise.bestDistanceMeters,
+      // #1513: «12 reps» a secas, al lado de filas con kg, se leía como un peso
+      // que faltaba. Dice que es peso corporal (y no «0 kg», que se lee como un
+      // error de carga).
+      bodyweightSuffix: ' · peso corporal',
+    );
     final stats = bestSet == null
         ? '${exercise.setCount} sets'
         : '${exercise.setCount} sets · $bestSet';

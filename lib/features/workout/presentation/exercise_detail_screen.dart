@@ -24,6 +24,7 @@ import '../application/session_providers.dart' show currentUidProvider;
 import '../domain/exercise.dart';
 import '../domain/exercise_progression.dart';
 import '../domain/muscle_group.dart';
+import 'widgets/best_set_label.dart';
 import 'widgets/exercise_progression_chart.dart';
 import 'widgets/exercise_progression_section.dart'
     show ChartPeriodLabels, ChartPeriodSelector;
@@ -571,10 +572,17 @@ class _HistoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     // #368: bodyweight-only session → best set is reps-only, no volume line.
-    final isBodyweight = entry.bestWeightKg <= 0;
-    final bestSet = isBodyweight
-        ? '${entry.bestSetReps} reps'
-        : '${_formatStatValue(entry.bestWeightKg, AppL10n.of(context).localeName)} kg × ${entry.bestSetReps}';
+    // #1716: a timed / distance exercise shows its time or meters, and an old
+    // set with no metric and no reps has no best set to show — `null` hides
+    // the line instead of rendering «0 reps». Same rule as the post-workout
+    // summary ([bestSetLabel]).
+    final bestSet = bestSetLabel(
+      l10n: AppL10n.of(context),
+      weightKg: entry.bestWeightKg,
+      reps: entry.bestSetReps,
+      durationSeconds: entry.bestDurationSeconds,
+      distanceMeters: entry.bestDistanceMeters,
+    );
 
     return Row(
       children: [
@@ -604,14 +612,15 @@ class _HistoryRow extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              bestSet,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                color: palette.accent,
+            if (bestSet != null)
+              Text(
+                bestSet,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  color: palette.accent,
+                ),
               ),
-            ),
             if (entry.sessionVolume > 0) ...[
               const SizedBox(height: 2),
               Text(
