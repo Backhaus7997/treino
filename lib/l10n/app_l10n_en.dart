@@ -5429,6 +5429,17 @@ class AppL10nEn extends AppL10n {
   String get moderationBlockError => 'We couldn\'t block them. Try again.';
 
   @override
+  String get moderationUnblockAction => 'Unblock';
+
+  @override
+  String moderationUnblockSuccess(String name) {
+    return 'You unblocked $name.';
+  }
+
+  @override
+  String get moderationUnblockError => 'We couldn\'t unblock them. Try again.';
+
+  @override
   String get moderationBlockedMessage =>
       'That text can\'t be posted because it breaks the Community Guidelines. Please review it and try again.';
 

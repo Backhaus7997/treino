@@ -5042,6 +5042,23 @@
   "@moderationBlockError": {
     "description": "Error snackbar when blocking fails."
   },
+  "moderationUnblockAction": "Desbloquear",
+  "@moderationUnblockAction": {
+    "description": "Desbloquear a alguien que el usuario bloqueo. Label del item del menu de moderacion (reemplaza a Bloquear si ya esta bloqueado), del boton del aviso de bloqueo del chat y de la lista de bloqueados."
+  },
+  "moderationUnblockSuccess": "Desbloqueaste a {name}.",
+  "@moderationUnblockSuccess": {
+    "description": "Success snackbar after unblocking someone.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationUnblockError": "No pudimos desbloquear. Probá de nuevo.",
+  "@moderationUnblockError": {
+    "description": "Error snackbar when unblocking fails."
+  },
   "moderationBlockedMessage": "Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revisalo y volvé a intentar.",
   "@moderationBlockedMessage": {
     "description": "Error mostrado cuando el filtro de terminos vetados rechaza un texto. NO nombra el termino que lo disparo a proposito: decirlo convierte al filtro en un oraculo para encontrarle el borde."

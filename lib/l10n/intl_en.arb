@@ -2212,6 +2212,16 @@
     }
   },
   "moderationBlockError": "We couldn't block them. Try again.",
+  "moderationUnblockAction": "Unblock",
+  "moderationUnblockSuccess": "You unblocked {name}.",
+  "@moderationUnblockSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationUnblockError": "We couldn't unblock them. Try again.",
   "moderationBlockedMessage": "That text can't be posted because it breaks the Community Guidelines. Please review it and try again.",
   "@moderationBlockedMessage": {},
   "privacyTitle": "Privacy",

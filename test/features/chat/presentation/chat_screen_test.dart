@@ -591,6 +591,31 @@ void main() {
       expect(find.textContaining('Bloqueaste a esta persona'), findsOneWidget);
     });
 
+    // #1698: el aviso decía «Desbloqueala para escribirle» y no había cómo.
+    testWidgets('lo bloqueé → el aviso trae Desbloquear y habilita el composer',
+        (tester) async {
+      final fake = await seed(iBlockedThem: true);
+      await pump(tester, fake);
+
+      await tester
+          .tap(find.byKey(const ValueKey('chat-composer-notice-action')));
+      await tester.pumpAndSettle();
+
+      expect((await fake.collection('blocks').get()).docs, isEmpty);
+      expect(composerEnabled(tester), isTrue);
+      expect(find.textContaining('Bloqueaste a esta persona'), findsNothing);
+      expect(find.text('Desbloqueaste a Coach Joe.'), findsOneWidget);
+    });
+
+    testWidgets('sin bloqueo → no hay botón de Desbloquear', (tester) async {
+      await pump(tester, await seed());
+
+      expect(
+        find.byKey(const ValueKey('chat-composer-notice-action')),
+        findsNothing,
+      );
+    });
+
     testWidgets('el historial se sigue viendo con el composer apagado',
         (tester) async {
       await pump(tester, await seed(iBlockedThem: true));
@@ -650,6 +675,11 @@ void main() {
 
       expect(find.text(closedCopy), findsOneWidget);
       expect(find.textContaining('Bloqueaste'), findsNothing);
+      // Y tampoco su botón: desbloquear no reabre un chat cerrado.
+      expect(
+        find.byKey(const ValueKey('chat-composer-notice-action')),
+        findsNothing,
+      );
       expect(find.byType(TextField), findsNothing);
     });
 

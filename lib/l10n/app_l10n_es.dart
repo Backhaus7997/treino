@@ -5532,6 +5532,18 @@ class AppL10nEs extends AppL10n {
   String get moderationBlockError => 'No pudimos bloquear. Probá de nuevo.';
 
   @override
+  String get moderationUnblockAction => 'Desbloquear';
+
+  @override
+  String moderationUnblockSuccess(String name) {
+    return 'Desbloqueaste a $name.';
+  }
+
+  @override
+  String get moderationUnblockError =>
+      'No pudimos desbloquear. Inténtalo de nuevo.';
+
+  @override
   String get moderationBlockedMessage =>
       'Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revísalo e inténtalo de nuevo.';
 
@@ -11855,6 +11867,18 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get moderationBlockError => 'No pudimos bloquear. Probá de nuevo.';
+
+  @override
+  String get moderationUnblockAction => 'Desbloquear';
+
+  @override
+  String moderationUnblockSuccess(String name) {
+    return 'Desbloqueaste a $name.';
+  }
+
+  @override
+  String get moderationUnblockError =>
+      'No pudimos desbloquear. Probá de nuevo.';
 
   @override
   String get moderationBlockedMessage =>

@@ -33,6 +33,12 @@ import 'package:treino/core/widgets/treino_toast.dart';
 /// uid a bloquear. Vale para los cuatro targets de la taxonomía — el dueño
 /// del contenido reportado es siempre la persona a la que tendría sentido
 /// bloquear (autor del post/review, o el perfil mismo).
+///
+/// Si esa persona YA está bloqueada, el segundo ítem es «Desbloquear» (#1698:
+/// bloquear no tenía vuelta). Se resuelve con un `Consumer` dentro del sheet y
+/// no con un `ref.read` al abrirlo: [myBlockedUidsProvider] es `autoDispose` y,
+/// desde un call site que no lo observa (p. ej. `ReviewTile`), un `read` en
+/// frío daría `[]` y ofrecería «Bloquear» sobre alguien ya bloqueado.
 Future<void> showModerationMenu(
   BuildContext context,
   WidgetRef ref, {
@@ -76,23 +82,47 @@ Future<void> showModerationMenu(
               );
             },
           ),
-          ListTile(
-            leading: Icon(TreinoIcon.block, color: palette.dangerText),
-            title: Text(
-              l10n.moderationBlockAction,
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w400,
-                fontSize: AppTextSize.body,
-                color: palette.dangerText,
-              ),
-            ),
-            onTap: () {
-              Navigator.of(sheetContext).pop();
-              blockUser(
-                context,
-                ref,
-                targetUid: targetOwnerUid,
-                targetDisplayName: targetOwnerDisplayName,
+          Consumer(
+            builder: (_, sheetRef, __) {
+              final yaBloqueado = sheetRef
+                  .watch(myBlockedUidsProvider)
+                  .contains(targetOwnerUid);
+              // Deshacer no es destructivo: color de texto normal, no el rojo
+              // de «Bloquear».
+              return ListTile(
+                leading: Icon(
+                  TreinoIcon.block,
+                  color: yaBloqueado ? palette.textPrimary : palette.dangerText,
+                ),
+                title: Text(
+                  yaBloqueado
+                      ? l10n.moderationUnblockAction
+                      : l10n.moderationBlockAction,
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: AppTextSize.body,
+                    color:
+                        yaBloqueado ? palette.textPrimary : palette.dangerText,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  if (yaBloqueado) {
+                    unblockUser(
+                      context,
+                      ref,
+                      targetUid: targetOwnerUid,
+                      targetDisplayName: targetOwnerDisplayName,
+                    );
+                  } else {
+                    blockUser(
+                      context,
+                      ref,
+                      targetUid: targetOwnerUid,
+                      targetDisplayName: targetOwnerDisplayName,
+                    );
+                  }
+                },
               );
             },
           ),
@@ -197,4 +227,45 @@ Future<void> blockUser(
       },
     ),
   );
+}
+
+/// Desbloquea a [targetUid]. Sin confirmación, a propósito: es el camino de
+/// vuelta, no destruye nada y se re-bloquea en dos toques — al revés que
+/// [blockUser], que sí confirma porque borra los follows en las dos
+/// direcciones. **Desbloquear no los restaura**: cada uno vuelve a seguir al
+/// otro si quiere (el trigger `removeFollowEdgesOnBlock` corre sólo al crear).
+///
+/// Devuelve `true` si se escribió. Lo comparten el menú de moderación, el aviso
+/// del chat y la lista de bloqueados, así que el toast es uno solo.
+Future<bool> unblockUser(
+  BuildContext context,
+  WidgetRef ref, {
+  required String targetUid,
+  required String targetDisplayName,
+}) async {
+  final blockerUid = ref.read(currentUidProvider);
+  if (blockerUid == null) return false;
+
+  final l10n = AppL10n.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  // Antes del `await`: quien disparó esto puede irse de pantalla apenas el
+  // stream de bloqueados refleja el cambio, y con él su `ref`.
+  final repo = ref.read(blockRepositoryProvider);
+
+  try {
+    await repo.unblock(blockerUid, targetUid);
+    showTreinoToastOn(
+      messenger,
+      l10n.moderationUnblockSuccess(targetDisplayName),
+      type: TreinoToastType.success,
+    );
+    return true;
+  } catch (_) {
+    showTreinoToastOn(
+      messenger,
+      l10n.moderationUnblockError,
+      type: TreinoToastType.error,
+    );
+    return false;
+  }
 }
