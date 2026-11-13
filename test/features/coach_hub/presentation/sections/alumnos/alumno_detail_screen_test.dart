@@ -1994,6 +1994,35 @@ void main() {
     test('diciembre (tope del array de meses)', () {
       expect(fmtDayMonth(DateTime(2026, 12, 1)), '1 diciembre');
     });
+
+    // #1773 — `dueAt` se guarda como el FIN del día ART elegido, como instante
+    // UTC. Leerle `.day` en UTC lo muestra un día después. Estos casos son
+    // UTC explícito, así que dan lo mismo en un dispositivo en ART que en un
+    // CI en UTC.
+    group('instante UTC → día de calendario en ART (#1773)', () {
+      test('fin del día ART (23:59:59 ART = 02:59:59 UTC del día siguiente)',
+          () {
+        expect(
+            fmtDayMonth(DateTime.utc(2026, 11, 5, 2, 59, 59)), '4 noviembre');
+      });
+
+      test('21:00 ART (00:00 UTC): el día UTC ya cambió, el de ART no', () {
+        expect(fmtDayMonth(DateTime.utc(2026, 11, 5, 0, 0)), '4 noviembre');
+      });
+
+      test('00:00 ART (03:00 UTC): ya es el día siguiente en ART', () {
+        expect(fmtDayMonth(DateTime.utc(2026, 11, 5, 3, 0)), '5 noviembre');
+      });
+
+      test('cruza el mes: 1º de diciembre 01:00 UTC es 30 de noviembre en ART',
+          () {
+        expect(fmtDayMonth(DateTime.utc(2026, 12, 1, 1, 0)), '30 noviembre');
+      });
+
+      test('cruza el año: 1º de enero 02:00 UTC es 31 de diciembre en ART', () {
+        expect(fmtDayMonth(DateTime.utc(2027, 1, 1, 2, 0)), '31 diciembre');
+      });
+    });
   });
 
   // ── PR2: Entrenamientos tab — evolución por ejercicio (TASK-10) ──────────────
