@@ -403,6 +403,148 @@ void main() {
       expect(find.text('ELIMINAR'), findsOneWidget);
     });
 
+    // ── #1698: la activa es una plantilla del catálogo SEGUIDA ────────────────
+    //
+    // Seguir una plantilla sólo escribe `activeRoutineId`; no crea ninguna card.
+    // Con UNA rutina propia, esa card quedaba sin ACTIVA y —porque el toggle
+    // exigía 2+ entradas— sin forma de volver a ella.
+    group('la activa vive fuera de la lista (plantilla seguida)', () {
+      testWidgets(
+          '1 propia + plantilla seguida → la propia ofrece MARCAR COMO ACTIVA '
+          'y al tocarla escribe SU id', (tester) async {
+        final mocks = await _pumpSection(
+          tester,
+          own: [_makeUserRoutine(id: 'r-only')],
+          activeRoutineId: 'tpl-seguida',
+        );
+        await tester.pumpAndSettle();
+
+        // Ninguna card está activa: el marcador apunta a la plantilla.
+        expect(
+          find.byKey(const Key('routine_active_chip_r-only')),
+          findsNothing,
+        );
+
+        await tester.tap(find.byKey(const Key('routine_card_more_r-only')));
+        await tester.pumpAndSettle();
+        expect(find.text('MARCAR COMO ACTIVA'), findsOneWidget);
+        // Y sigue siendo propia: EDITAR/ELIMINAR no se pierden.
+        expect(find.text('EDITAR'), findsOneWidget);
+        expect(find.text('ELIMINAR'), findsOneWidget);
+
+        await tester.tap(find.text('MARCAR COMO ACTIVA'));
+        await tester.pumpAndSettle();
+
+        verify(
+          () => mocks.userRepo.update('athlete-1', {
+            'activeRoutineId': 'r-only',
+          }),
+        ).called(1);
+      });
+
+      testWidgets(
+          'un único plan de PF + plantilla seguida → el plan también ofrece '
+          'MARCAR COMO ACTIVA', (tester) async {
+        await _pumpSection(
+          tester,
+          assigned: [_makeCoachPlan(id: 'plan-1')],
+          activeRoutineId: 'tpl-seguida',
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('routine_card_more_plan-1')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('routine_card_toggle_active_plan-1')),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets(
+          'marcador OBSOLETO con una sola rutina → también se puede activar '
+          '(la adopción perezosa no repara un marcador no-null)',
+          (tester) async {
+        await _pumpSection(
+          tester,
+          own: [_makeUserRoutine(id: 'r-only')],
+          activeRoutineId: 'borrada',
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('routine_card_more_r-only')));
+        await tester.pumpAndSettle();
+        expect(find.text('MARCAR COMO ACTIVA'), findsOneWidget);
+      });
+
+      testWidgets(
+          'la rutina propia YA activa sigue sin toggle (el arreglo no abre el '
+          'menú de más)', (tester) async {
+        await _pumpSection(
+          tester,
+          own: [_makeUserRoutine(id: 'r-only')],
+          activeRoutineId: 'r-only',
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('routine_card_more_r-only')));
+        await tester.pumpAndSettle();
+        expect(find.text('MARCAR COMO ACTIVA'), findsNothing);
+      });
+
+      testWidgets(
+          'ida y vuelta: plantilla → propia (toggle) → plantilla (seguir) → '
+          'la propia vuelve a poder reactivarse', (tester) async {
+        // El perfil es un stream que el test empuja: así el marcador cambia
+        // como lo haría Firestore, y se prueban las DOS direcciones sobre la
+        // misma pantalla y no sólo la primera.
+        final perfil = StreamController<UserProfile?>();
+        addTearDown(perfil.close);
+
+        await _pumpSection(
+          tester,
+          own: [_makeUserRoutine(id: 'r-only')],
+          extraOverrides: [
+            userProfileProvider.overrideWith((ref) => perfil.stream),
+          ],
+        );
+        perfil.add(_profile(activeRoutineId: 'tpl-seguida'));
+        await tester.pumpAndSettle();
+
+        Future<void> abrirMenu() async {
+          await tester.tap(find.byKey(const Key('routine_card_more_r-only')));
+          await tester.pumpAndSettle();
+        }
+
+        // Sigue una plantilla → la propia se puede activar.
+        await abrirMenu();
+        expect(find.text('MARCAR COMO ACTIVA'), findsOneWidget);
+        await tester.tapAt(const Offset(10, 10));
+        await tester.pumpAndSettle();
+
+        // El atleta activa la propia (lo que escribiría el toggle).
+        perfil.add(_profile(activeRoutineId: 'r-only'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('routine_active_chip_r-only')),
+          findsOneWidget,
+        );
+        await abrirMenu();
+        expect(find.text('MARCAR COMO ACTIVA'), findsNothing);
+        await tester.tapAt(const Offset(10, 10));
+        await tester.pumpAndSettle();
+
+        // Vuelve a seguir la plantilla → ACTIVA se va y el toggle vuelve.
+        perfil.add(_profile(activeRoutineId: 'tpl-seguida'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('routine_active_chip_r-only')),
+          findsNothing,
+        );
+        await abrirMenu();
+        expect(find.text('MARCAR COMO ACTIVA'), findsOneWidget);
+      });
+    });
+
     testWidgets(
         '2+ routines → non-active cards offer MARCAR COMO ACTIVA; the active '
         'card offers no unmark (mark-only contract)', (tester) async {
