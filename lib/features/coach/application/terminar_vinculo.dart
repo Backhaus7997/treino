@@ -14,6 +14,7 @@
 // de 24h con las reglas actuales, eso necesita una Cloud Function.
 library;
 
+import '../../../l10n/app_l10n.dart';
 import '../data/appointment_repository.dart';
 import '../data/trainer_link_repository.dart';
 import '../domain/trainer_link.dart';
@@ -44,6 +45,16 @@ Future<int?> contarTurnosFuturos(
   } catch (_) {
     return null;
   }
+}
+
+/// La línea que el diálogo de «Terminar vínculo» suma sobre los turnos futuros,
+/// o `''` si no hay nada que avisar.
+String avisoDeTurnosAlTerminar(AppL10n l10n, int? turnosFuturos) {
+  if (turnosFuturos == null) {
+    return l10n.coachHubTerminateLinkAppointmentsWarningUnknown;
+  }
+  if (turnosFuturos == 0) return '';
+  return l10n.coachHubTerminateLinkAppointmentsWarning(turnosFuturos);
 }
 
 /// Cancela los turnos futuros del par y termina el vínculo, en ese orden.

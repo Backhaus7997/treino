@@ -223,6 +223,45 @@ service cloud.firestore {
       return u != null && u.data.get('acceptingAthletes', true) == true;
     }
 
+    // ¿El PF que escribe tiene un vínculo VIVO (active o paused) con este
+    // alumno? (#1806). Cierra el residuo de AD-1 opción b: con sólo el rol,
+    // un PF sin vínculo le cargaba pagos, mediciones o turnos al alumno de
+    // otro PF con sólo conocer su uid.
+    //
+    // `trainer_links` tiene ids autogenerados y las reglas no hacen queries,
+    // así que se lee `trainer_athlete_pairs/{pf}_{alumno}`: la conclusión de
+    // esa query, que escribe SÓLO la CF `syncTrainerAthletePair` releyendo
+    // todos los vínculos del par. `session_shares` no sirve: guarda un solo
+    // PF, se borra al pausar y lo escribe el propio alumno.
+    //
+    // KILL-SWITCH `app_config/trainer_pairs_gate.enabled`: AUSENTE ⇒ NO SE
+    // APLICA, el patrón de `paywallEnforcedFor`. Las reglas se pueden
+    // desplegar antes que el backfill sin cortarle nada a nadie; se prende
+    // con el flag cuando todos los pares vivos tienen su doc. Apagarlo vuelve
+    // al gate de sólo rol sin redeploy.
+    //
+    // Sólo se usa en los CREATE (y en recuperar un plan asignado): marcar
+    // pagado un cobro viejo, corregir una medición propia o cancelar un turno
+    // de un ex-alumno siguen siendo del PF que los escribió.
+    //
+    // Costo: con el flag apagado UNA lectura (el flag); prendido, dos. Va
+    // ÚLTIMO en cada cláusula, después de las guardas baratas. Los ids
+    // también se comparan contra el doc: un uid con `_` podría armar el id de
+    // otro par.
+    function pfConParVivo(athleteId) {
+      let gate = get(/databases/$(database)/documents/app_config/trainer_pairs_gate);
+      return gate == null
+             || gate.data.get('enabled', false) != true
+             || parVivo(request.auth.uid, athleteId);
+    }
+    function parVivo(trainerId, athleteId) {
+      let par = get(/databases/$(database)/documents/trainer_athlete_pairs/$(trainerId + '_' + athleteId));
+      return par != null
+             && par.data.get('live', false) == true
+             && par.data.get('trainerId', '') == trainerId
+             && par.data.get('athleteId', '') == athleteId;
+    }
+
     // Edad mínima de cuenta — ver `ProfileSetupValidators.kMinAgeYears` y
     // `docs/legal/terminos-y-condiciones.md`.
     //
@@ -1509,7 +1548,15 @@ service cloud.firestore {
                     && request.resource.data.status in ['active', 'archived']
                     && (resource.data.source != 'trainer-template'
                         || resource.data.get('status', 'active') != 'archived'
-                        || templateQuotaOk(request.auth.uid));
+                        || templateQuotaOk(request.auth.uid))
+                    // Recuperar un plan ASIGNADO exige el par vivo (#1723,
+                    // #1806): sin esto un ex-PF desarchivaba el plan de un
+                    // ex-alumno y le volvía a aparecer en Entrenar. La CF
+                    // `archiveOrphanAssignedPlanOnCreate` cubre sólo el create.
+                    // Archivar no pide nada: es la salida, no la entrada.
+                    && (resource.data.source != 'trainer-assigned'
+                        || resource.data.get('status', 'active') != 'archived'
+                        || pfConParVivo(resource.data.assignedTo));
 
       // DELETE (narrow): the owning trainer may delete their OWN
       // `trainer-template` docs (library cleanup) and `trainer-assigned`
@@ -2179,6 +2226,11 @@ service cloud.firestore {
                     // Admin SDK). Un create no puede ocultarse solo: ausente
                     // o `false`, igual que en trainerPublicProfiles.
                     && request.resource.data.get('hiddenFromDiscovery', false) == false
+                    // Contadores de follow (#1835): los escribe SÓLO la CF
+                    // `maintainFollowCounters`. Un create no los siembra:
+                    // ausentes, null (el toJson del modelo) o 0.
+                    && request.resource.data.get('followersCount', 0) in [null, 0]
+                    && request.resource.data.get('followingCount', 0) in [null, 0]
                     // Sello de frescura de `rachaSemanas`, siempre derivado
                     // por UserPublicProfileRepository.updateCounters (server
                     // timestamp): ausente, o el `request.time`. Un create no
@@ -2254,6 +2306,14 @@ service cloud.firestore {
                     // Tiene que estar en el hasOnly de arriba: si no, una
                     // cuenta oculta no podría actualizar más su perfil.
                     && unchanged(request.resource.data, resource.data, 'hiddenFromDiscovery')
+                    // followersCount / followingCount (#1835): los mantiene
+                    // SÓLO `maintainFollowCounters` (Admin SDK) desde #315, y
+                    // ningún camino del cliente los escribe. Hasta acá estaban
+                    // en el hasOnly sin validar valor: el dueño se ponía
+                    // 999999 seguidores. Mismo trato que los rangos: sólo
+                    // re-presentar lo guardado, que es lo que trae el merge.
+                    && unchanged(request.resource.data, resource.data, 'followersCount')
+                    && unchanged(request.resource.data, resource.data, 'followingCount')
                     // Sello de frescura de `rachaSemanas` — el que ya estaba o el
                     // del servidor (`request.time`), nunca uno elegido por el
                     // dueño, y tampoco se puede sacar (#1698). El disyunto
@@ -3066,9 +3126,13 @@ service cloud.firestore {
       //   decorativo, que es exactamente lo que este bloque prohíbe.
       //
       // MARCA INMUTABLE: `kind` queda pineado en el `update` de abajo, igual
-      // que `linkId`. Sin eso, (a) un chat social se convertiría en consulta
-      // con un update de una línea, saltándose el gate de follow, y (b) una
-      // consulta podría escalar a chat de Coach agregándose un `linkId`.
+      // que `linkId`. Ya NO cuida un permiso de escritura: desde el
+      // 2026-10-21 (REQ-FOLLOW-012) `senderMayPost` no mira el follow, ni
+      // `kind`, ni `linkId` (en un chat existente escriben los dos miembros;
+      // sólo cortan un bloqueo o `closedAt`), y `kind` lo lee únicamente esta
+      // rama, al CREAR. Lo que cuida es que la marca diga la verdad: un chat
+      // social no se rotula consulta con un update de una línea, y una
+      // consulta no escala a chat de Coach (eso lo corta el pin de `linkId`).
       //
       // PRESUPUESTO DE LLAMADAS: la rama nueva cuesta 3 (1 exists + 2 get) y
       // sólo se evalúa ella, así que el peor caso de `chats/create` sigue
@@ -4193,8 +4257,8 @@ service cloud.firestore {
       // an arbitrary victim athlete. The gate applies ONLY to the trainer
       // disjunct — the legacy athlete self-book disjunct (`athleteId ==
       // auth.uid`) is UNCHANGED, preserving that live path (regression-
-      // tested: SCENARIO-CC-08). Role-check only, NOT a trainer_links
-      // relationship check — see design.md AD-1 / engram obs #413.
+      // tested: SCENARIO-CC-08). Role-check only at the time (AD-1); since
+      // #1806 the trainer disjunct ALSO needs a live pair (`pfConParVivo`).
       //
       // QA-SEC-014 (#781) — el create no validaba NADA del documento: sin
       // `keys().hasOnly()`, sin cap en ningún campo de texto, sin rango en
@@ -4210,8 +4274,8 @@ service cloud.firestore {
       // <5000, `nutrition_plans` <200, `payments` <=200, `measurements`
       // <=2000). Era un olvido, no una decisión.
       //
-      // El auto-booking NO se toca (Slice C lo dejó explícitamente intacto) ni
-      // se exige `trainer_links`: eso es cambio de producto. Acá sólo se acota
+      // El auto-booking NO se toca (Slice C lo dejó explícitamente intacto); el
+      // vínculo del PF lo pide `pfConParVivo` (#1806). Acá sólo se acota
       // QUÉ se puede meter adentro del documento.
       //
       // ⚠️ `startsAt` es **wall-clock UTC**, no un instante real (ADR-7,
@@ -4238,7 +4302,8 @@ service cloud.firestore {
                     && appointmentShapeOk(request.resource.data)
                     && (request.resource.data.athleteId == request.auth.uid
                         || (request.resource.data.trainerId == request.auth.uid
-                            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'));
+                            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                            && pfConParVivo(request.resource.data.athleteId)));  // #1806
       // Update: DOS caminos válidos — cancelación por un miembro (Path 1) y
       // edición del PF sobre su propio turno (Path 2). Eran tres.
       //
@@ -4774,8 +4839,9 @@ service cloud.firestore {
                     && (
                          // Athlete-self branch: may log ONLY about themselves.
                          request.resource.data.athleteId == request.auth.uid
-                         // Trainer branch (unchanged from rules-hardening Slice C).
-                         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                         // Trainer branch: rol (Slice C) + par vivo (#1806).
+                         || (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                             && pfConParVivo(request.resource.data.athleteId))
                        );
       allow update: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid
@@ -4882,14 +4948,14 @@ service cloud.firestore {
       // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
       // Requires Trainer Role: closes the "any athlete-role user forges a
       // performance_test naming themselves recordedBy" vector. Role-check
-      // only, NOT a trainer_links relationship check — see design.md AD-1 /
-      // engram obs #413.
+      // only at the time (AD-1); since #1806 also a live pair (`pfConParVivo`).
       allow create: if request.auth != null
                     && request.resource.data.recordedBy == request.auth.uid
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.athleteId is string
                     && request.resource.data.athleteId.size() > 0
-                    && performanceTestShapeOk(request.resource.data, {});
+                    && performanceTestShapeOk(request.resource.data, {})
+                    && pfConParVivo(request.resource.data.athleteId);  // #1806
       allow update: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid
                     && request.resource.data.recordedBy == resource.data.recordedBy
@@ -4924,9 +4990,8 @@ service cloud.firestore {
       // COMBINED create+update rule block, so the role gate is scoped to
       // create-only via `resource == null` (create has no prior resource
       // doc) — legit trainer UPDATES to their existing billing config are
-      // unaffected (SCENARIO-CC-06e regression test). Role-check only, NOT
-      // a trainer_links relationship check — see design.md AD-1 / engram
-      // obs #413.
+      // unaffected (SCENARIO-CC-06e regression test). Role-check only at the
+      // time (AD-1); since #1806 the create also needs a live pair.
       // QA-PAY-007 (#447): the combined create+update block is split so each
       // side can validate the money fields at the right strictness.
       //
@@ -4946,7 +5011,8 @@ service cloud.firestore {
                   && request.resource.data.amountArs > 0
                   && request.resource.data.amountArs <= 100000000
                   && request.resource.data.cadence in ['mensual', 'semanal', 'por_sesion', 'suelto']
-                  && request.resource.data.updatedAt is timestamp;
+                  && request.resource.data.updatedAt is timestamp
+                  && pfConParVivo(request.resource.data.athleteId);  // #1806
       // UPDATE — diff-based instead of keys().hasOnly(): setConfig writes via
       // set(merge:true), so request.resource.data is the POST-merge doc. A
       // legacy doc carrying a zombie field (e.g. pre-model monthlyRate) would
@@ -5083,12 +5149,11 @@ service cloud.firestore {
                   // Archivos de la víctima (`sharedAthleteFilesProvider`) con
                   // el `fileName` y el `downloadUrl` que el atacante eligió.
                   //
-                  // Es el mismo alcance que AD-1: rol, NO rol + vínculo —un PF
-                  // real sin vínculo con la víctima sigue pudiendo, atribuible
-                  // por su `trainerId`—, porque `trainer_links` tiene ids
-                  // autogenerados y una regla no puede preguntar por el par.
-                  // Va ÚLTIMO: es la única cláusula que paga una lectura.
-                  && tieneRolDePF(request.auth.uid);
+                  // Y desde #1806, además del rol, el par vivo: un PF real sin
+                  // vínculo con la víctima ya no puede (`pfConParVivo`, detrás
+                  // de su kill-switch). Van ÚLTIMOS: son las que pagan lectura.
+                  && tieneRolDePF(request.auth.uid)
+                  && pfConParVivo(request.resource.data.athleteId);
       // ⚠️ ACOPLAMIENTO: este hasOnly debe coincidir exactamente con las keys
       // de AthleteFile.toJson(). Si el modelo suma un campo y esta lista no,
       // todos los updates del flag fallan con permission-denied.
@@ -5173,7 +5238,8 @@ service cloud.firestore {
                   && request.resource.data.title is string
                   && request.resource.data.title.size() < 200
                   && request.resource.data.meals is list
-                  && tieneRolDePF(request.auth.uid);
+                  && tieneRolDePF(request.auth.uid)
+                  && pfConParVivo(request.resource.data.athleteId);  // #1806
       allow update: if request.auth != null
                   && resource.data.trainerId == request.auth.uid
                   && request.resource.data.trainerId == resource.data.trainerId
@@ -5192,9 +5258,10 @@ service cloud.firestore {
                       || request.auth.uid == resource.data.athleteId);
       // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
       // Requires Trainer Role: closes the "any athlete-role user forges a
-      // payment debt naming themselves trainer" vector. Role-check only,
-      // NOT a trainer_links relationship check — see design.md AD-1 /
-      // engram obs #413.
+      // payment debt naming themselves trainer" vector. Role-check only at
+      // the time (AD-1); since #1806 the create also needs a live pair
+      // (`pfConParVivo`). The UPDATE does not: a PF marks an ex-student's
+      // old payment as paid.
       // QA-PAY-007 (#447): create now validates the money fields — before
       // this, a legit-role trainer with a modified client could write
       // amountArs negative/zero/decimal/string (poisoning the totals both
@@ -5234,7 +5301,8 @@ service cloud.firestore {
                       || request.resource.data.paidAt is timestamp)
                   && (request.resource.data.get('dueAt', null) == null
                       || request.resource.data.dueAt is timestamp)
-                  && request.resource.data.get('lastOverdueNotifiedAt', null) == null;
+                  && request.resource.data.get('lastOverdueNotifiedAt', null) == null
+                  && pfConParVivo(request.resource.data.athleteId);  // #1806
       // REQ-VENC-13: tightened update rule — field-level protection.
       // Follows the `reviews` rule pattern (keys().hasOnly + per-field equality).
       // Audited: markPaid/markManyPaid send only {status, paidAt} — still pass.
@@ -5326,8 +5394,9 @@ service cloud.firestore {
     //   create: athlete creates their own review (athleteId == auth.uid);
     //           doc-id must equal `${linkId}_${athleteId}`; the named
     //           trainer_links/{linkId} must exist with athleteId/trainerId
-    //           matching the review payload and status in [active, paused]
-    //           (a terminated link no longer proves a live relationship);
+    //           matching the review payload, and be either live (status in
+    //           [active, paused]) or a REAL relationship that ended
+    //           (terminated with acceptedAt != null, #1840);
     //           rating must be 1..5; comment ≤500 chars.
     //   update: owner only; may change only rating, comment, updatedAt —
     //           preventing id/linkId/athleteId/trainerId/createdAt tampering.
@@ -5340,7 +5409,17 @@ service cloud.firestore {
                     && reviewId == request.resource.data.linkId + '_' + request.resource.data.athleteId
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.athleteId == request.auth.uid
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.trainerId == request.resource.data.trainerId
-                    && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status in ['active', 'paused']
+                    // #1840: también un vínculo TERMINADO que fue real. Al
+                    // terminar, la app le ofrece la reseña al alumno, y ahí el
+                    // vínculo ya es `terminated`: exigir `active|paused`
+                    // la denegaba siempre. `acceptedAt` distingue un vínculo
+                    // que existió de un pedido rechazado o cancelado (el
+                    // criterio de `clasificar` en cleanup_rejected_links.js):
+                    // quien nunca entrenó con el PF sigue sin poder reseñarlo.
+                    // Una reseña por vínculo, como siempre: el id lo fija.
+                    && (get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status in ['active', 'paused']
+                        || (get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status == 'terminated'
+                            && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.get('acceptedAt', null) != null))
                     // notBlocked() (change `moderacion-reporte-y-bloqueo`).
                     && notBlocked(request.auth.uid, request.resource.data.trainerId)
                     && request.resource.data.rating >= 1
@@ -5499,6 +5578,24 @@ service cloud.firestore {
     // escribirlo es plantarse un código propio y marcarse verificado sin abrir
     // el mail. Cerrado entero: lo usa solo la Cloud Function.
     match /verificaciones_de_mail/{uid} {
+      allow read, write: if false;
+    }
+    // Par PF-alumno (#1806): `{trainerId, athleteId, live, status, updatedAt}`,
+    // id `{trainerId}_{athleteId}`. Lo escribe SÓLO la CF
+    // `syncTrainerAthletePair` (y el backfill), con el Admin SDK. Lo leen los
+    // dos miembros; nadie lo escribe desde un cliente, porque es lo que
+    // `pfConParVivo` usa para autorizar. `resource == null` deniega: no hay
+    // lectura de un par ajeno ni oráculo de existencia.
+    match /trainer_athlete_pairs/{pairId} {
+      allow get: if request.auth != null
+                 && resource != null
+                 && request.auth.uid in [resource.data.trainerId, resource.data.athleteId];
+      allow list, write: if false;
+    }
+    // Kill-switch de `pfConParVivo`: `app_config/trainer_pairs_gate.enabled`.
+    // Ausente ⇒ apagado. Lo prende un humano con el backfill verificado.
+    // Ningún cliente lo lee ni lo escribe: lo consultan las reglas.
+    match /app_config/trainer_pairs_gate {
       allow read, write: if false;
     }
     // El interruptor del gate del mail: `app_config/email_gate`, que prende o

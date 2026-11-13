@@ -5942,6 +5942,24 @@ abstract class AppL10n {
   /// **'No pudimos terminar el vínculo.'**
   String get coachHubDashboardTerminateLinkError;
 
+  /// Línea que se suma al diálogo de terminar un vínculo (Coach Hub y tab Coach del PF) cuando el PF tiene sesiones futuras con ese alumno: terminar el vínculo las cancela (#1792).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{También se cancela 1 sesión agendada con este alumno y se le avisa.} other{También se cancelan {count} sesiones agendadas con este alumno y se le avisa.}}'**
+  String coachHubTerminateLinkAppointmentsWarning(int count);
+
+  /// No description provided for @coachHubTerminateLinkAppointmentsWarningUnknown.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos revisar tus sesiones con este alumno. Las que tengas a futuro también se cancelan y se le avisa.'**
+  String get coachHubTerminateLinkAppointmentsWarningUnknown;
+
+  /// No description provided for @coachHubTerminateLinkAppointmentsError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cancelar las sesiones futuras con este alumno, así que el vínculo sigue activo. Probá de nuevo.'**
+  String get coachHubTerminateLinkAppointmentsError;
+
   /// Coach Hub web dashboard — snackbar when resume() fails.
   ///
   /// In es_AR, this message translates to:
@@ -6409,6 +6427,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'MÚSCULOS DEL DÍA'**
   String get insightsDayMusclesHeading;
+
+  /// Unidad que va después de la cantidad en cada fila de la tarjeta de músculos del día de InsightsScreen (p. ej. «6 SETS»). Va en mayúsculas porque se dibuja con la tipografía de etiquetas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SETS'**
+  String get insightsDaySetsUnit;
+
+  /// Botón del pie de InsightsScreen: vuelve a la pantalla anterior o a Inicio (_safePopOrHome).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLVER'**
+  String get insightsBackButton;
 
   /// Section header for the shared DailyHeatmapSection (per-day body heat-map + day-strip) in the coach's mobile athlete detail screen (charts-redesign PR2b, AD5).
   ///

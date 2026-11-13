@@ -42,6 +42,15 @@
  *     usable (owner decision). Archiving them would hide them from the athlete,
  *     whose list filters by status. Reads are allowed by `assignedTo ==
  *     auth.uid` with no link check.
+ *   - reason === 'duplicate-request' → skip (#1812). `acceptTrainerLink` cancela
+ *     las demás solicitudes pending del par al aceptar una: el par queda con un
+ *     vínculo vivo, y archivarle los planes sería quitárselos a un alumno activo.
+ *   - el par tiene OTRO vínculo vivo (`active` | `paused`) → skip (#1832). Las reglas
+ *     permiten varios vínculos por par (ids autogenerados): terminar uno —una
+ *     solicitud pending duplicada que el alumno cancela o el PF rechaza— no puede
+ *     quitarle los planes a un alumno que sigue siéndolo. Va por el ESTADO del par,
+ *     no por un marcador de la escritura: `duplicate-request` sólo cubre la
+ *     duplicada que cancela `acceptTrainerLink`.
  *   - before.status === after.status (no-op write) → skip.
  *   - after.status !== 'terminated' → skip.
  *
@@ -69,6 +78,7 @@ import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
+import { DUPLICATE_REQUEST_REASON } from "./subscriptions/cancel-duplicate-pending-links";
 import { TRAINER_ACCOUNT_DELETED_REASON } from "./cascade/trainer-data";
 import { LIVE_LINK_STATUSES } from "./chat/sync-chat-on-trainer-link";
 
@@ -135,6 +145,20 @@ export async function archiveAssignedPlansForPair(
 }
 
 /**
+ * ¿El par (trainerId, athleteId) tiene algún vínculo `active` o `paused`? Una query de
+ * igualdad doble —sin índice compuesto, como `archiveAssignedPlansForPair`— y el status
+ * se filtra en memoria: un par tiene pocos vínculos.
+ */
+async function pairHasLiveLink(app: App, trainerId: string, athleteId: string): Promise<boolean> {
+  const snap = await getFirestore(app)
+    .collection("trainer_links")
+    .where("trainerId", "==", trainerId)
+    .where("athleteId", "==", athleteId)
+    .get();
+  return snap.docs.some((d) => (LIVE_LINK_STATUSES as readonly string[]).includes(d.get("status")));
+}
+
+/**
  * Pure handler extracted for jest testability.
  *
  * @param app    - Admin SDK app.
@@ -172,6 +196,13 @@ export async function cleanupAssignedPlansOnUnlinkHandler(
     return { count: 0 };
   }
 
+  // Guard: una solicitud DUPLICADA que `acceptTrainerLink` cancela al aceptar otra
+  // del mismo par (#1812). El par tiene un vínculo VIVO: sus planes se quedan.
+  if (reason === DUPLICATE_REQUEST_REASON) {
+    logger.info(`cleanupAssignedPlans: skipping reason=${DUPLICATE_REQUEST_REASON}`);
+    return { count: 0 };
+  }
+
   // Guard: no-op write — status unchanged.
   if (beforeStatus !== undefined && beforeStatus === afterStatus) {
     return { count: 0 };
@@ -184,6 +215,16 @@ export async function cleanupAssignedPlansOnUnlinkHandler(
 
   if (!trainerId || !athleteId) {
     logger.warn("cleanupAssignedPlans: missing trainerId/athleteId", {
+      trainerId,
+      athleteId,
+    });
+    return { count: 0 };
+  }
+
+  // Guard: el par conserva OTRO vínculo vivo (#1832) → los planes se quedan. El doc que
+  // terminó ya está `terminated` en Firestore, así que no se cuenta a sí mismo.
+  if (await pairHasLiveLink(app, trainerId, athleteId)) {
+    logger.info("cleanupAssignedPlans: el par tiene otro vínculo vivo, los planes se quedan", {
       trainerId,
       athleteId,
     });

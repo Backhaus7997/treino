@@ -822,11 +822,37 @@ void main() {
       });
     }
 
+    test('/profile/edit-personal abre para el PF Y para el alumno (#1817)',
+        () async {
+      // Cuelga de `/profile`, que tiene pantallas de PF en `_rutasSoloPF`, y
+      // sumarla ahí «por ser de perfil» sería un error fácil. El PF llega por la
+      // fila «Datos personales» de su Perfil (#1738), el único lugar desde el
+      // que cambia su nombre y su avatar; el alumno, por la de CUENTA.
+      final alumno = await listo(_athleteProfile());
+      final pf = await listo(_trainerComplete());
+
+      expect(callRedirect(alumno, '/profile/edit-personal'), isNull);
+      expect(callRedirect(pf, '/profile/edit-personal'), isNull);
+    });
+
     test('un prefijo parecido no cuenta: el match es por segmento', () async {
       final c = await listo(_athleteProfile());
       expect(callRedirect(c, '/coach/athletes'), isNull);
       expect(callRedirect(c, '/profile/edit-trainer-x'), isNull);
       expect(callRedirect(c, '/workout/routine-editors'), isNull);
+    });
+
+    test(
+        '/profile/settings/bloqueados abre para el PF Y para el alumno (#1830)',
+        () async {
+      // «Usuarios bloqueados» cuelga de Privacidad, a la que llegan los dos
+      // roles (el PF desde `TrainerProfileView`). Si alguien la suma a
+      // `_rutasSoloPF` «por ser de configuración», el alumno rebota a /home.
+      final alumno = await listo(_athleteProfile());
+      final pf = await listo(_trainerComplete());
+
+      expect(callRedirect(alumno, '/profile/settings/bloqueados'), isNull);
+      expect(callRedirect(pf, '/profile/settings/bloqueados'), isNull);
     });
 
     test('mientras el perfil carga NO redirige (el router re-evalúa después)',

@@ -982,7 +982,20 @@ class SessionNotifier
   // ── Helpers privados ─────────────────────────────────────────────────────
 
   void _onTick(Timer _) {
-    final current = state.value;
+    // En error no hay nada que cronometrar, y tocar el estado lo BORRARÍA: un
+    // `state = AsyncError(...)` conserva el dato anterior (`hasValue` sigue en
+    // true), así que `state.value` no tira y devuelve la sesión vieja, y el
+    // `AsyncData` de abajo pisaba el aviso de «el servidor rechazó tu entreno»
+    // un segundo después de mostrarlo (#1805). Por eso el chequeo es
+    // `hasError` y no `valueOrNull`: éste devuelve el mismo dato viejo.
+    //
+    // Un reintento hace rebuild del provider, y `build` arma otro reloj.
+    if (state.hasError) {
+      _timer?.cancel();
+      _timer = null;
+      return;
+    }
+    final current = state.valueOrNull;
     if (current == null || _finalized) return;
     final elapsed = _elapsedSecondsNow();
     state = AsyncData(current.copyWith(elapsedSeconds: elapsed));

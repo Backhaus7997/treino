@@ -3313,6 +3313,27 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t end the link.';
 
   @override
+  String coachHubTerminateLinkAppointmentsWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count scheduled sessions with this student will also be cancelled, and they will be notified.',
+      one:
+          '1 scheduled session with this student will also be cancelled, and they will be notified.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get coachHubTerminateLinkAppointmentsWarningUnknown =>
+      'We couldn\'t check your sessions with this student. Any upcoming ones will also be cancelled, and they will be notified.';
+
+  @override
+  String get coachHubTerminateLinkAppointmentsError =>
+      'We couldn\'t cancel the upcoming sessions with this student, so the link is still active. Try again.';
+
+  @override
   String get coachHubDashboardResumeLinkError =>
       'We couldn\'t resume the link.';
 
@@ -3579,6 +3600,12 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get insightsDayMusclesHeading => 'MUSCLES OF THE DAY';
+
+  @override
+  String get insightsDaySetsUnit => 'SETS';
+
+  @override
+  String get insightsBackButton => 'BACK';
 
   @override
   String get coachDailyHeatmapSectionTitle => 'MUSCLES OF THE DAY';

@@ -1,6 +1,7 @@
 // #1792 — terminar un vínculo desde el lado del PF cancela los turnos futuros
 // del par ANTES de terminar el vínculo.
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/coach/application/terminar_vinculo.dart';
@@ -9,6 +10,7 @@ import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 class _MockLinks extends Mock implements TrainerLinkRepository {}
 
@@ -131,6 +133,23 @@ void main() {
           )).thenThrow(Exception('sin red'));
 
       expect(await contarTurnosFuturos(roto, _link), isNull);
+    });
+  });
+
+  group('avisoDeTurnosAlTerminar', () {
+    final l10n = lookupAppL10n(const Locale('es', 'AR'));
+
+    test('0 → nada que avisar; 1 → singular; N → plural, con la cuenta', () {
+      expect(avisoDeTurnosAlTerminar(l10n, 0), isEmpty);
+      expect(avisoDeTurnosAlTerminar(l10n, 1), contains('se cancela 1 sesión'));
+      expect(
+          avisoDeTurnosAlTerminar(l10n, 3), contains('se cancelan 3 sesiones'));
+    });
+
+    test('null → avisa que no pudo revisar, y que igual se cancelan', () {
+      final aviso = avisoDeTurnosAlTerminar(l10n, null);
+      expect(aviso, contains('No pudimos revisar'));
+      expect(aviso, contains('también se cancelan'));
     });
   });
 }

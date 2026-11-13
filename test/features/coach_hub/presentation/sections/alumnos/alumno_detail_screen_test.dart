@@ -8,6 +8,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +27,7 @@ import 'package:treino/features/chat/domain/message.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
@@ -1801,6 +1803,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            // «Terminar» cuenta los turnos futuros del alumno (#1792).
+            appointmentRepositoryProvider.overrideWithValue(
+                AppointmentRepository(firestore: FakeFirebaseFirestore())),
             trainerLinksStreamProvider.overrideWith(
                 (ref) => Stream.value([_link(TrainerLinkStatus.active)])),
             userPublicProfilesBatchProvider

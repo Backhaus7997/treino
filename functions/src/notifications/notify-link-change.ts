@@ -49,6 +49,7 @@ import {
   purgeRejectedLinkHandler,
   type CausaDeTerminacion,
 } from "../purge-rejected-link";
+import { DUPLICATE_REQUEST_REASON } from "../subscriptions/cancel-duplicate-pending-links";
 
 function ensureApp(): App {
   try {
@@ -288,6 +289,19 @@ export async function notifyOnLinkChangeHandler(
   // cascada. Eso se mantiene. Lo que no tenía por qué arrastrar era el borrado.
   if (reason === "account-deleted") {
     logger.info("notifyOnLinkChange: cascada account-deleted — sin push, con purga");
+    if (afterStatus === "terminated") {
+      await purgeRejectedLinkHandler(app, linkId, clasificarTerminacion(after));
+    }
+    return;
+  }
+
+  // Guard: solicitud DUPLICADA cancelada por `acceptTrainerLink` al aceptar otra del
+  // mismo par (#1812). NO se notifica y SÍ se purga, igual que arriba. Sin esto
+  // caería en la rama `cancelacion` y el PF recibiría «X canceló su solicitud»
+  // segundos después de aceptarla: un aviso que describe mal lo que pasó
+  // (AGENTS.md §11.1). Nadie cambió nada: el alumno ya es alumno de ese PF.
+  if (reason === DUPLICATE_REQUEST_REASON) {
+    logger.info("notifyOnLinkChange: solicitud duplicada cancelada — sin push, con purga");
     if (afterStatus === "terminated") {
       await purgeRejectedLinkHandler(app, linkId, clasificarTerminacion(after));
     }

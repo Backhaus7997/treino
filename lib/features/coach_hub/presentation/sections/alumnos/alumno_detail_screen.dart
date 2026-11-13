@@ -2911,8 +2911,11 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               oneRepMaxLabel: '1RM', // i18n: Fase W2
               bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
               bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
+              longestDurationLabel: 'Tiempo máximo', // i18n: Fase W2
+              longestDistanceLabel: 'Distancia máxima', // i18n: Fase W2
               volumeUnit: 'kg', // i18n: Fase W2
               weightUnit: 'kg', // i18n: Fase W2
+              distanceUnit: 'm', // i18n: Fase W2
               // #555: el count viene acotado al período activo del selector.
               frequencyLabel: (n) => n == 1
                   ? '1 sesión en este período' // i18n: Fase W2

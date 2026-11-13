@@ -1007,6 +1007,11 @@ void main() {
       expect(find.textContaining('SEMANA · '), findsNothing);
       expect(find.text('MUSCLES OF THE DAY'), findsOneWidget);
       expect(find.text('MÚSCULOS DEL DÍA'), findsNothing);
+      // #1823: el botón del pie y la unidad de las filas también salen del ARB.
+      // «SETS» se escribe igual en los dos idiomas: acá solo se fija que sigue.
+      expect(find.text('BACK'), findsOneWidget);
+      expect(find.text('VOLVER'), findsNothing);
+      expect(find.text('SETS'), findsWidgets);
     });
 
     testWidgets('en es-AR el rango y los tooltips siguen en español',
@@ -1047,6 +1052,9 @@ void main() {
       expect(find.byTooltip('Semana siguiente'), findsOneWidget);
       expect(find.textContaining('SEMANA · '), findsOneWidget);
       expect(find.text('MÚSCULOS DEL DÍA'), findsOneWidget);
+      expect(find.text('VOLVER'), findsOneWidget);
+      expect(find.text('BACK'), findsNothing);
+      expect(find.text('SETS'), findsWidgets);
     });
   });
 }

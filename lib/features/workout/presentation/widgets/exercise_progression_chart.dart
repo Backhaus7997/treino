@@ -11,8 +11,10 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/chart_point_index.dart';
+import '../../../../core/utils/kg_format.dart';
 import '../../application/exercise_progression_aggregator.dart';
 import '../../domain/exercise_progression.dart';
+import 'mmss.dart';
 
 // ── Short date helper ─────────────────────────────────────────────────────────
 
@@ -30,11 +32,29 @@ String _shortDate(DateTime dt, String localeName) =>
 /// rounded to the nearest 0.5 kg AT DISPLAY ONLY before formatting. The other
 /// 3 series (Heaviest Weight, Best Set Volume, Best Session Volume) are left
 /// untouched — they are already whole/half-kg-plate values by construction.
-String _formatMetricValue(double value, {required bool isOneRepMax}) {
-  final display = isOneRepMax ? roundToNearestHalfKg(value) : value;
-  return display % 1 == 0
-      ? display.toStringAsFixed(0)
-      : display.toStringAsFixed(1);
+///
+/// #1715: the duration series reads `01:30` ([formatMMSS]) and the distance
+/// series reads like every other distance in the app ([formatNumberDisplay]).
+String _formatMetricValue(
+  double value, {
+  required _Metric metric,
+  required String localeName,
+}) {
+  switch (metric) {
+    case _Metric.longestDuration:
+      return formatMMSS(value.round());
+    case _Metric.longestDistance:
+      return formatNumberDisplay(value, localeName);
+    case _Metric.heaviestWeight:
+    case _Metric.oneRepMax:
+    case _Metric.bestSetVolume:
+    case _Metric.bestSessionVolume:
+      final display =
+          metric == _Metric.oneRepMax ? roundToNearestHalfKg(value) : value;
+      return display % 1 == 0
+          ? display.toStringAsFixed(0)
+          : display.toStringAsFixed(1);
+  }
 }
 
 // ── Label bag ─────────────────────────────────────────────────────────────────
@@ -55,8 +75,11 @@ class ExerciseProgressionChartLabels {
     required this.oneRepMaxLabel,
     required this.bestSetVolumeLabel,
     required this.bestSessionVolumeLabel,
+    required this.longestDurationLabel,
+    required this.longestDistanceLabel,
     required this.volumeUnit,
     required this.weightUnit,
+    required this.distanceUnit,
     required this.frequencyLabel,
     required this.singlePointHint,
     required this.emptyHint,
@@ -74,12 +97,22 @@ class ExerciseProgressionChartLabels {
   /// E.g. 'Volumen' — Σ(reps×weightKg) per session (was 'Volumen'/PR-era).
   final String bestSessionVolumeLabel;
 
+  /// E.g. 'Tiempo máximo' — the longest timed set per session (#1715).
+  final String longestDurationLabel;
+
+  /// E.g. 'Distancia máxima' — the longest distance set per session (#1715).
+  final String longestDistanceLabel;
+
   /// E.g. 'kg·reps' — RD5: must NOT be plain 'kg'. Used by both volume
   /// metrics (Best Set Volume, Best Session Volume).
   final String volumeUnit;
 
   /// E.g. 'kg'. Used by both weight metrics (Heaviest Weight, 1RM).
   final String weightUnit;
+
+  /// E.g. 'm'. Used by the distance metric (#1715). The duration metric has no
+  /// unit: its values read as `01:30`.
+  final String distanceUnit;
 
   /// Converts a session count to a Frecuencia string. The count is scoped
   /// to the active chart period (#555), so the label must speak of that
@@ -95,8 +128,36 @@ class ExerciseProgressionChartLabels {
 
 // ── Metric enum ───────────────────────────────────────────────────────────────
 
-/// [AD3] The 4 client-computed metrics selectable via chip row.
-enum _Metric { heaviestWeight, oneRepMax, bestSetVolume, bestSessionVolume }
+/// [AD3] The client-computed metrics selectable via chip row (#1715 adds the
+/// timed / distance ones).
+enum _Metric {
+  heaviestWeight,
+  oneRepMax,
+  bestSetVolume,
+  bestSessionVolume,
+  longestDuration,
+  longestDistance,
+}
+
+const _weightMetrics = [
+  _Metric.heaviestWeight,
+  _Metric.oneRepMax,
+  _Metric.bestSetVolume,
+  _Metric.bestSessionVolume,
+];
+
+/// The chips to offer for [p]. A timed or distance exercise carries no weight
+/// (#1702), so its 4 weight chips would only ever say «sin datos»: it gets
+/// just the metrics it has. Anything else keeps the 4 weight chips, plus the
+/// timed / distance ones when it also has that data.
+List<_Metric> _metricsFor(ExerciseProgression p) {
+  final timed = [
+    if (p.bestDurationSeries.isNotEmpty) _Metric.longestDuration,
+    if (p.bestDistanceSeries.isNotEmpty) _Metric.longestDistance,
+  ];
+  if (timed.isNotEmpty && p.heaviestWeightSeries.isEmpty) return timed;
+  return [..._weightMetrics, ...timed];
+}
 
 // ── Public chart widget ───────────────────────────────────────────────────────
 
@@ -130,8 +191,8 @@ class ExerciseProgressionChart extends StatefulWidget {
 class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
   _Metric _selected = _Metric.heaviestWeight;
 
-  List<ProgressionPoint> get _activeSeries {
-    switch (_selected) {
+  List<ProgressionPoint> _seriesOf(_Metric metric) {
+    switch (metric) {
       case _Metric.heaviestWeight:
         return widget.progression.heaviestWeightSeries;
       case _Metric.oneRepMax:
@@ -140,17 +201,43 @@ class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
         return widget.progression.bestSetVolumeSeries;
       case _Metric.bestSessionVolume:
         return widget.progression.bestSessionVolumeSeries;
+      case _Metric.longestDuration:
+        return widget.progression.bestDurationSeries;
+      case _Metric.longestDistance:
+        return widget.progression.bestDistanceSeries;
     }
   }
 
-  String get _activeUnit {
-    switch (_selected) {
+  String _unitOf(_Metric metric) {
+    switch (metric) {
       case _Metric.heaviestWeight:
       case _Metric.oneRepMax:
         return widget.labels.weightUnit;
       case _Metric.bestSetVolume:
       case _Metric.bestSessionVolume:
         return widget.labels.volumeUnit;
+      case _Metric.longestDuration:
+        return '';
+      case _Metric.longestDistance:
+        return widget.labels.distanceUnit;
+    }
+  }
+
+  String _labelOf(_Metric metric) {
+    final labels = widget.labels;
+    switch (metric) {
+      case _Metric.heaviestWeight:
+        return labels.heaviestWeightLabel;
+      case _Metric.oneRepMax:
+        return labels.oneRepMaxLabel;
+      case _Metric.bestSetVolume:
+        return labels.bestSetVolumeLabel;
+      case _Metric.bestSessionVolume:
+        return labels.bestSessionVolumeLabel;
+      case _Metric.longestDuration:
+        return labels.longestDurationLabel;
+      case _Metric.longestDistance:
+        return labels.longestDistanceLabel;
     }
   }
 
@@ -158,7 +245,11 @@ class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final labels = widget.labels;
-    final series = _activeSeries;
+    // The period can swap a weight exercise's data for a timed one's: a
+    // selection that is no longer offered falls back to the first chip.
+    final metrics = _metricsFor(widget.progression);
+    final selected = metrics.contains(_selected) ? _selected : metrics.first;
+    final series = _seriesOf(selected);
 
     return Container(
       width: double.infinity,
@@ -183,11 +274,9 @@ class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
 
           // ── Metric chip row ───────────────────────────────────────────
           _MetricChipRow(
-            selected: _selected,
-            heaviestWeightLabel: labels.heaviestWeightLabel,
-            oneRepMaxLabel: labels.oneRepMaxLabel,
-            bestSetVolumeLabel: labels.bestSetVolumeLabel,
-            bestSessionVolumeLabel: labels.bestSessionVolumeLabel,
+            metrics: metrics,
+            selected: selected,
+            labelOf: _labelOf,
             palette: palette,
             onSelect: (m) => setState(() => _selected = m),
           ),
@@ -202,18 +291,19 @@ class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
           else if (series.length == 1)
             _SinglePointView(
               point: series.first,
-              unit: _activeUnit,
+              unit: _unitOf(selected),
               hint: labels.singlePointHint,
               palette: palette,
-              isOneRepMax: _selected == _Metric.oneRepMax,
+              metric: selected,
+              localeName: widget.localeName,
             )
           else
             _ProgressLineChart(
               points: series,
-              unit: _activeUnit,
+              unit: _unitOf(selected),
               localeName: widget.localeName,
               palette: palette,
-              isOneRepMax: _selected == _Metric.oneRepMax,
+              metric: selected,
             ),
         ],
       ),
@@ -225,20 +315,16 @@ class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
 
 class _MetricChipRow extends StatelessWidget {
   const _MetricChipRow({
+    required this.metrics,
     required this.selected,
-    required this.heaviestWeightLabel,
-    required this.oneRepMaxLabel,
-    required this.bestSetVolumeLabel,
-    required this.bestSessionVolumeLabel,
+    required this.labelOf,
     required this.palette,
     required this.onSelect,
   });
 
+  final List<_Metric> metrics;
   final _Metric selected;
-  final String heaviestWeightLabel;
-  final String oneRepMaxLabel;
-  final String bestSetVolumeLabel;
-  final String bestSessionVolumeLabel;
+  final String Function(_Metric) labelOf;
   final AppPalette palette;
   final void Function(_Metric) onSelect;
 
@@ -248,33 +334,15 @@ class _MetricChipRow extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          _Chip(
-            label: heaviestWeightLabel,
-            isSelected: selected == _Metric.heaviestWeight,
-            palette: palette,
-            onTap: () => onSelect(_Metric.heaviestWeight),
-          ),
-          const SizedBox(width: 6),
-          _Chip(
-            label: oneRepMaxLabel,
-            isSelected: selected == _Metric.oneRepMax,
-            palette: palette,
-            onTap: () => onSelect(_Metric.oneRepMax),
-          ),
-          const SizedBox(width: 6),
-          _Chip(
-            label: bestSetVolumeLabel,
-            isSelected: selected == _Metric.bestSetVolume,
-            palette: palette,
-            onTap: () => onSelect(_Metric.bestSetVolume),
-          ),
-          const SizedBox(width: 6),
-          _Chip(
-            label: bestSessionVolumeLabel,
-            isSelected: selected == _Metric.bestSessionVolume,
-            palette: palette,
-            onTap: () => onSelect(_Metric.bestSessionVolume),
-          ),
+          for (var i = 0; i < metrics.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            _Chip(
+              label: labelOf(metrics[i]),
+              isSelected: selected == metrics[i],
+              palette: palette,
+              onTap: () => onSelect(metrics[i]),
+            ),
+          ],
         ],
       ),
     );
@@ -330,7 +398,8 @@ class _SinglePointView extends StatelessWidget {
     required this.unit,
     required this.hint,
     required this.palette,
-    required this.isOneRepMax,
+    required this.metric,
+    required this.localeName,
   });
 
   final ProgressionPoint point;
@@ -338,13 +407,15 @@ class _SinglePointView extends StatelessWidget {
   final String hint;
   final AppPalette palette;
 
-  /// [AD2] Whether this point belongs to the 1RM series — the only series
-  /// requiring 0.5kg display rounding.
-  final bool isOneRepMax;
+  /// [AD2] Which series this point belongs to — the 1RM one is the only one
+  /// requiring 0.5kg display rounding, the timed one reads as `01:30`.
+  final _Metric metric;
+  final String localeName;
 
   @override
   Widget build(BuildContext context) {
-    final valStr = _formatMetricValue(point.value, isOneRepMax: isOneRepMax);
+    final valStr =
+        _formatMetricValue(point.value, metric: metric, localeName: localeName);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -361,15 +432,17 @@ class _SinglePointView extends StatelessWidget {
                 color: palette.accent,
               ),
             ),
-            const SizedBox(width: 4),
-            Text(
-              unit,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: palette.accent,
+            if (unit.isNotEmpty) ...[
+              const SizedBox(width: 4),
+              Text(
+                unit,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: palette.accent,
+                ),
               ),
-            ),
+            ],
           ],
         ),
         const SizedBox(height: 6),
@@ -390,7 +463,7 @@ class _ProgressLineChart extends StatelessWidget {
     required this.unit,
     required this.localeName,
     required this.palette,
-    required this.isOneRepMax,
+    required this.metric,
   });
 
   final List<ProgressionPoint> points;
@@ -398,9 +471,9 @@ class _ProgressLineChart extends StatelessWidget {
   final String localeName;
   final AppPalette palette;
 
-  /// [AD2] Whether [points] belongs to the 1RM series — the only series
-  /// requiring 0.5kg display rounding.
-  final bool isOneRepMax;
+  /// [AD2] Which series [points] belongs to — the 1RM one is the only one
+  /// requiring 0.5kg display rounding, the timed one reads as `01:30`.
+  final _Metric metric;
 
   @override
   Widget build(BuildContext context) {
@@ -492,8 +565,8 @@ class _ProgressLineChart extends StatelessWidget {
                   final isNear = yLabels
                       .any((y) => (y - value).abs() < (maxY - minY) * 0.05);
                   if (!isNear) return const SizedBox.shrink();
-                  final label =
-                      _formatMetricValue(value, isOneRepMax: isOneRepMax);
+                  final label = _formatMetricValue(value,
+                      metric: metric, localeName: localeName);
                   return SideTitleWidget(
                     meta: meta,
                     child: Text(label,
@@ -522,12 +595,12 @@ class _ProgressLineChart extends StatelessWidget {
                 final idx = spot.x.round();
                 final date =
                     (idx >= 0 && idx < points.length) ? points[idx].date : null;
-                final valStr =
-                    _formatMetricValue(spot.y, isOneRepMax: isOneRepMax);
+                final valStr = _formatMetricValue(spot.y,
+                    metric: metric, localeName: localeName);
                 final dateStr =
                     date != null ? '\n${_shortDate(date, localeName)}' : '';
                 return LineTooltipItem(
-                  '$valStr $unit$dateStr',
+                  '${unit.isEmpty ? valStr : '$valStr $unit'}$dateStr',
                   GoogleFonts.barlow(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
