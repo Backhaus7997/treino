@@ -3642,6 +3642,15 @@ class AppL10nEs extends AppL10n {
       'No pudimos finalizar la sesión. Inténtalo de nuevo.';
 
   @override
+  String get sessionLoadErrorTitle => 'No pudimos abrir el entrenamiento';
+
+  @override
+  String get sessionLoadErrorBody => 'Vuelve al inicio y prueba de nuevo.';
+
+  @override
+  String get sessionLoadErrorCta => 'Volver al inicio';
+
+  @override
   String get sessionFinishNeedOneSet =>
       'Haz al menos una serie para poder terminar. Si hoy no vas a entrenar, toca ABANDONAR.';
 
@@ -9967,6 +9976,15 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get sessionFinishError =>
       'No pudimos finalizar la sesión. Probá de nuevo.';
+
+  @override
+  String get sessionLoadErrorTitle => 'No pudimos abrir el entrenamiento';
+
+  @override
+  String get sessionLoadErrorBody => 'Volvé al inicio y probá de nuevo.';
+
+  @override
+  String get sessionLoadErrorCta => 'Volver al inicio';
 
   @override
   String get sessionFinishNeedOneSet =>

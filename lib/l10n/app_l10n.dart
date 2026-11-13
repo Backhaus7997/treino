@@ -6404,6 +6404,24 @@ abstract class AppL10n {
   /// **'No pudimos finalizar la sesión. Probá de nuevo.'**
   String get sessionFinishError;
 
+  /// Título del estado de error del player cuando no se pudo armar la sesión: retomar una sesión ajena, inexistente o ya cerrada, un timeout de lectura, una rutina borrada o un rechazo del servidor (#1728). No afirma cuál fue la causa, porque la pantalla no la distingue.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir el entrenamiento'**
+  String get sessionLoadErrorTitle;
+
+  /// Cuerpo del estado de error del player. Apunta al botón de abajo (sessionLoadErrorCta).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volvé al inicio y probá de nuevo.'**
+  String get sessionLoadErrorBody;
+
+  /// Botón del estado de error del player: va a Inicio con context.go('/home'). Es la única salida cuando el player es la única ruta del stack (recarga en web, deep link).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volver al inicio'**
+  String get sessionLoadErrorCta;
+
   /// Caption under the disabled TERMINAR SESIÓN button while the athlete has logged zero sets (#1511). Explains why it is disabled and where the other exit is.
   ///
   /// In es_AR, this message translates to:
