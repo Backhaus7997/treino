@@ -59,6 +59,71 @@ final _now = DateTime.utc(2026, 5, 18, 13);
 
 void main() {
   group('aggregateSessionHighlights — récords', () {
+    // #1715: lo guardado en una serie por tiempo / distancia es lo que el atleta
+    // completó, así que el récord sube cuando el plan sube.
+    group('#1715 tiempo y distancia', () {
+      final session = _session();
+      final prior =
+          _session(id: 'p1', startedAt: DateTime.utc(2026, 5, 11, 10));
+
+      SessionHighlights run(List<SetLog> today, List<SetLog> before) =>
+          aggregateSessionHighlights(
+            session: session,
+            sessionLogs: today,
+            sessionsDesc: [session, prior],
+            priorLogsBySession: {'p1': before},
+            now: _now,
+          );
+
+      SetLog plank(int seconds, {int setNumber = 1}) => _log('plank',
+          reps: 0, weightKg: 0, durationSeconds: seconds, setNumber: setNumber);
+      SetLog carry(double meters) =>
+          _log('carry', reps: 0, weightKg: 0, distanceMeters: meters);
+
+      test('un tiempo mayor al histórico es récord, con la marca anterior', () {
+        final result = run(
+          [plank(60), plank(75, setNumber: 2)],
+          [plank(60)],
+        );
+
+        expect(result.recordCount, 1);
+        final record = result.exercises.single.records.single;
+        expect(record.recordType, ProgressionRecordType.longestDuration);
+        expect(record.value, 75);
+        expect(record.previousBest, 60);
+        expect(result.recognition.kind, SessionRecognitionKind.records);
+      });
+
+      test('igualar el tiempo no es récord (la plancha prescripta no cambia)',
+          () {
+        final result = run([plank(60)], [plank(60)]);
+
+        expect(result.recordCount, 0);
+        expect(result.exercises.single.records, isEmpty);
+      });
+
+      test('más metros que el histórico es récord de distancia', () {
+        final result = run([carry(60)], [carry(40)]);
+
+        final record = result.exercises.single.records.single;
+        expect(record.recordType, ProgressionRecordType.longestDistance);
+        expect(record.value, 60);
+        expect(record.previousBest, 40);
+      });
+
+      test(
+          'sin marca previa de tiempo (series viejas, sin métrica) no hay '
+          'récord: la primera vez fija el punto de partida', () {
+        final result = run(
+          [plank(60)],
+          [_log('plank', reps: 0, weightKg: 0)],
+        );
+
+        expect(result.recordCount, 0);
+        expect(result.exercises.single.bestDurationSeconds, 60);
+      });
+    });
+
     test('subir el peso máximo bate los 3 tipos por-set (peso, 1RM, serie)',
         () {
       final session = _session();
