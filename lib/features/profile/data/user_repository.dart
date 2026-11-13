@@ -851,7 +851,8 @@ class UserRepository {
     };
   }
 
-  /// Completa el subset de PF con el nombre de la cuenta cuando no lo trae.
+  /// Completa el subset de PF con el nombre y la foto de la cuenta cuando no
+  /// los trae.
   ///
   /// El alta (ProfileSetup) manda `displayName` SIN campos de PF, así que el
   /// espejo no se dispara; después "Editar perfil de PF" guarda bio, tarifa y
@@ -859,26 +860,43 @@ class UserRepository {
   /// `displayNameLowercase`: en el directorio sale con "?" y `listAll()`
   /// (`orderBy('displayNameLowercase')`) la excluye. Nada la rellenaba.
   ///
-  /// Un `displayName` explícito en el partial gana (no se pisa). Si la cuenta
-  /// no tiene nombre, no se agrega nada: nunca se escribe un nombre vacío, que
-  /// anularía `displayNameLowercase`. El nombre de `users/` ya viene filtrado
+  /// Con la foto pasaba lo mismo (#1717): el alta del mobile —o un alumno
+  /// promovido a PF— deja `users/{uid}.avatarUrl` cargado ANTES de que exista
+  /// la tarjeta, y el guardado que la crea no la manda. Discovery mostraba la
+  /// card sin foto hasta que el PF la volviera a subir. Se completa igual que
+  /// el nombre, y de paso una tarjeta que ya existía sin foto se cura sola en
+  /// el siguiente guardado de PF.
+  ///
+  /// Un `displayName` / `avatarUrl` explícito en el partial gana (no se pisa).
+  /// Si la cuenta no tiene nombre, no se agrega nada: nunca se escribe un
+  /// nombre vacío, que anularía `displayNameLowercase`. Con la foto igual: una
+  /// cuenta sin foto (o con una en blanco) no agrega `avatarUrl`, así que acá
+  /// nunca se espeja un `null`; «Quitar foto» ya lo espeja
+  /// [_trainerIdentityOnlySubset]. El nombre de `users/` ya viene filtrado
   /// por el guard del cliente y por la cuarentena del servidor
   /// (`quarantineDisplayName` lo reemplaza por `usuario_xxxxxx`), así que
   /// copiarlo no re-publica un nombre vetado. Una lectura extra, sólo en
-  /// guardados de PF sin nombre; los de alumnos devuelven null antes y no
-  /// llegan acá.
-  Future<Map<String, Object?>> _conNombreDeLaCuenta(
+  /// guardados de PF a los que les falta el nombre o la foto; los de alumnos
+  /// devuelven null antes y no llegan acá.
+  Future<Map<String, Object?>> _conIdentidadDeLaCuenta(
     String uid,
     Map<String, Object?> subset,
   ) async {
-    if (subset.containsKey('displayName')) return subset;
-    final snap = await _users.doc(uid).get();
-    final name = (snap.data()?['displayName'] as String?)?.trim();
-    if (name == null || name.isEmpty) return subset;
+    final faltaNombre = !subset.containsKey('displayName');
+    final faltaFoto = !subset.containsKey('avatarUrl');
+    if (!faltaNombre && !faltaFoto) return subset;
+
+    final data = (await _users.doc(uid).get()).data();
+    final name = faltaNombre ? (data?['displayName'] as String?)?.trim() : null;
+    final avatarUrl =
+        faltaFoto ? (data?['avatarUrl'] as String?)?.trim() : null;
     return {
       ...subset,
-      'displayName': name,
-      'displayNameLowercase': name.toLowerCase(),
+      if (name != null && name.isNotEmpty) ...{
+        'displayName': name,
+        'displayNameLowercase': name.toLowerCase(),
+      },
+      if (avatarUrl != null && avatarUrl.isNotEmpty) 'avatarUrl': avatarUrl,
     };
   }
 
@@ -963,7 +981,7 @@ class UserRepository {
       hasLocationConsent: hasLocationConsent,
     );
     final trainerPublicSubset = trainerSubsetDelPartial != null
-        ? await _conNombreDeLaCuenta(uid, trainerSubsetDelPartial)
+        ? await _conIdentidadDeLaCuenta(uid, trainerSubsetDelPartial)
         : await _trainerIdentityOnlySubset(uid, efectivo);
 
     if (publicSubset == null && trainerPublicSubset == null) {
