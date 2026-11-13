@@ -701,6 +701,67 @@ void main() {
     expect(find.text('Ver resumen de la semana'), findsOneWidget);
   });
 
+  // ── #1715: PRs de tiempo y de distancia ──────────────────────────────────
+
+  testWidgets(
+      '#1715 PRS: el récord de tiempo se lee mm:ss y el de distancia en '
+      'metros, cada uno con su marca anterior y el badge PR', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        recordCount: 2,
+        exercises: [
+          _exercise(
+            id: 'plank',
+            name: 'Plancha',
+            bestWeightKg: 0,
+            bestSetReps: 0,
+            bestDurationSeconds: 75,
+            sessionVolumeKg: 0,
+            records: const [
+              (
+                recordType: ProgressionRecordType.longestDuration,
+                value: 75.0,
+                previousBest: 60.0,
+                set: null,
+                previousSet: null,
+              ),
+            ],
+          ),
+          _exercise(
+            id: 'carry',
+            name: 'Farmer carry',
+            bestWeightKg: 0,
+            bestSetReps: 0,
+            bestDistanceMeters: 60,
+            sessionVolumeKg: 0,
+            records: const [
+              (
+                recordType: ProgressionRecordType.longestDistance,
+                value: 60.0,
+                previousBest: 40.0,
+                set: null,
+                previousSet: null,
+              ),
+            ],
+          ),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tiempo máximo'), findsOneWidget);
+    expect(find.text('01:15'), findsOneWidget);
+    expect(find.text('→ 01:00'), findsOneWidget);
+    expect(find.text('Distancia máxima'), findsOneWidget);
+    expect(find.text('60'), findsOneWidget);
+    expect(find.text('→ 40 m'), findsOneWidget);
+    expect(find.text('PR'), findsNWidgets(2));
+    // Ni un «kg» pegado a un tiempo o a unos metros.
+    expect(find.text('→ 60 kg'), findsNothing);
+    expect(find.text('75 kg'), findsNothing);
+  });
+
   // ── Sección EJERCICIOS ───────────────────────────────────────────────────
 
   testWidgets(
