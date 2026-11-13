@@ -203,6 +203,10 @@ class _SessionRecordRow extends StatelessWidget {
       ProgressionRecordType.bestSetVolume =>
         l10n.progressionMetricBestSetVolume,
       ProgressionRecordType.bestSessionVolume => l10n.progressionMetricVolume,
+      ProgressionRecordType.longestDuration =>
+        l10n.progressionMetricLongestDuration,
+      ProgressionRecordType.longestDistance =>
+        l10n.progressionMetricLongestDistance,
     };
     // #1512: la mejor serie se muestra COMO SERIE («80 kg × 7»), no como el
     // producto «560 kg·reps», que era jerga. El resto de los récords son un

@@ -3972,6 +3972,12 @@ class AppL10nEs extends AppL10n {
   String get progressionMetricVolume => 'Volumen';
 
   @override
+  String get progressionMetricLongestDuration => 'Tiempo máximo';
+
+  @override
+  String get progressionMetricLongestDistance => 'Distancia máxima';
+
+  @override
   String progressionFrequency(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -10368,6 +10374,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get progressionMetricVolume => 'Volumen';
+
+  @override
+  String get progressionMetricLongestDuration => 'Tiempo máximo';
+
+  @override
+  String get progressionMetricLongestDistance => 'Distancia máxima';
 
   @override
   String progressionFrequency(int count) {
