@@ -405,7 +405,15 @@ final class WorkoutCoordinator: ObservableObject {
                 // El atleta podrá corregirlo cuando exista la edición (F4).
                 reps: spec.reps ?? spec.repsMax ?? spec.repsMin,
                 weightKg: spec.weightKg,
-                completedAt: Date()
+                completedAt: Date(),
+                // #1701: una serie por tiempo o por distancia se guardaba como
+                // `reps: 0, weightKg: 0` y su metrica se perdia. Se guarda lo
+                // prescripto —la cuenta solo carga la serie al llegar a cero, y
+                // la distancia es un toque sin valor editable—, y un valor nulo
+                // o `<= 0` queda en nil, igual que en el telefono. Las series
+                // por reps no llevan ninguno.
+                durationSeconds: setLogMetric(spec.durationSeconds),
+                distanceMeters: setLogMetric(spec.distanceMeters)
             )
         )
         session = current

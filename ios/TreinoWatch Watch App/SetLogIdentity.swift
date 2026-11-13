@@ -124,3 +124,65 @@ func resolveSetLogWriteTarget(
 
     return .write(docId: deterministic)
 }
+
+/// La metrica propia de una serie por TIEMPO o por DISTANCIA que se guarda, o
+/// nil si no hay nada que guardar (#1701).
+///
+/// Un valor nulo o `<= 0` es nil: un «0 s» o un «0 m» afirmaria una medicion
+/// que no ocurrio. Es la MISMA regla que el `_logSet` del telefono y el
+/// `logSet` del reloj Wear, y vive aca para que `LoggedSet` y el payload no la
+/// repitan cada uno por su lado.
+func setLogMetric<T: Numeric & Comparable>(_ value: T?) -> T? {
+    guard let metric = value, metric > 0 else { return nil }
+    return metric
+}
+
+/// Los campos del documento de `setLogs` tal como los manda el reloj por REST.
+///
+/// Es lo que `HistorySync.writeSetLog` pone en el cuerpo de un PATCH SIN
+/// `updateMask`: Firestore lo toma como el documento ENTERO, asi que una clave
+/// que no esta no existe. Por eso las metricas de #1701 se OMITEN cuando no hay
+/// valor, en vez de escribirse en cero o en nulo: una serie por reps tiene que
+/// quedar con las mismas claves que antes, y su documento identico al que
+/// escribe el telefono (`includeIfNull: false` en `SetLog`).
+///
+/// Va suelta, con tipos primitivos, por la misma razon que
+/// `resolveSetLogWriteTarget`: sin `LoggedSet` ni `HistorySync` se puede
+/// compilar y medir en el host. `completedAtISO` llega ya formateado, porque
+/// formatear la fecha es de `HistorySync` y no una decision de este payload.
+///
+/// El valor interno es `Any` (`stringValue`/`integerValue` llevan `String`,
+/// `doubleValue` lleva `Double`): es el formato de valores de Firestore REST.
+func setLogFirestoreFields(
+    docId: String,
+    exerciseId: String,
+    exerciseName: String,
+    setNumber: Int,
+    reps: Int?,
+    weightKg: Double?,
+    completedAtISO: String,
+    durationSeconds: Int?,
+    distanceMeters: Double?
+) -> [String: [String: Any]] {
+    // Tipados aparte: dentro de un literal cuyo valor es `Any`, un `?? 0` no
+    // tiene por que resolverse a `Double`, y un `0` entero en `doubleValue`
+    // seria otra cosa que lo que escribia `writeSetLog`.
+    let repCount: Int = reps ?? 0
+    let weight: Double = weightKg ?? 0
+    var fields: [String: [String: Any]] = [
+        "id": ["stringValue": docId],
+        "exerciseId": ["stringValue": exerciseId],
+        "exerciseName": ["stringValue": exerciseName],
+        "setNumber": ["integerValue": String(setNumber)],
+        "reps": ["integerValue": String(repCount)],
+        "weightKg": ["doubleValue": weight],
+        "completedAt": ["timestampValue": completedAtISO],
+    ]
+    if let seconds = setLogMetric(durationSeconds) {
+        fields["durationSeconds"] = ["integerValue": String(seconds)]
+    }
+    if let meters = setLogMetric(distanceMeters) {
+        fields["distanceMeters"] = ["doubleValue": meters]
+    }
+    return fields
+}
