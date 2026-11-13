@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart'
-    show currentAthleteLinkProvider;
+    show currentAthleteLinkAnyStatusProvider;
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/payments/application/billing_providers.dart'
@@ -25,11 +25,12 @@ const _currentTrainerId = 'trainer-new';
 const _oldTrainerId = 'trainer-old';
 const _athleteId = 'aA';
 
-TrainerLink _link() => TrainerLink(
+TrainerLink _link({TrainerLinkStatus status = TrainerLinkStatus.active}) =>
+    TrainerLink(
       id: 'link-1',
       trainerId: _currentTrainerId,
       athleteId: _athleteId,
-      status: TrainerLinkStatus.active,
+      status: status,
       requestedAt: DateTime.utc(2026, 1, 1),
       acceptedAt: DateTime.utc(2026, 6, 1),
       sharedWithTrainer: true,
@@ -38,10 +39,12 @@ TrainerLink _link() => TrainerLink(
 ProviderContainer _container({
   required List<Payment> payments,
   AthleteBilling? billing,
+  TrainerLinkStatus status = TrainerLinkStatus.active,
 }) =>
     ProviderContainer(
       overrides: [
-        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(_link())),
+        currentAthleteLinkAnyStatusProvider
+            .overrideWith((ref) => Stream.value(_link(status: status))),
         athletePaymentsProvider.overrideWith((ref) => Stream.value(payments)),
         athleteBillingPairProvider.overrideWith(
           (ref, pair) => Stream<AthleteBilling?>.value(billing),
@@ -53,7 +56,7 @@ ProviderContainer _container({
 /// Reads [miCuotaProvider] after every upstream async dependency has settled,
 /// so the synchronous folding inside the provider sees `data`.
 Future<MiCuotaState?> _readSettled(ProviderContainer container) async {
-  await container.read(currentAthleteLinkProvider.future);
+  await container.read(currentAthleteLinkAnyStatusProvider.future);
   await container.read(athletePaymentsProvider.future);
   await container.read(
     athleteBillingPairProvider(
@@ -103,5 +106,79 @@ void main() {
         expect(state.totalArs, equals(8000));
       },
     );
+  });
+
+  // #1842: pausar es un hold, no un corte. Las reglas dejan leer `payments` por
+  // `athleteId` sin mirar el vínculo, y el alumno pausado le debe lo mismo a su
+  // PF que antes de la pausa. Con el provider active-only, «Tu cuota» le
+  // desaparecía.
+  group('miCuotaProvider — vínculo vivo (active|paused)', () {
+    final deuda = Payment(
+      id: 'p-1',
+      trainerId: _currentTrainerId,
+      athleteId: _athleteId,
+      amountArs: 8000,
+      concept: 'Clase suelta',
+      status: PaymentStatus.pending,
+      createdAt: DateTime.utc(2026, 6, 5),
+    );
+
+    test('con el vínculo PAUSADO el alumno sigue viendo lo que debe', () async {
+      final container = _container(
+        billing: null,
+        payments: [deuda],
+        status: TrainerLinkStatus.paused,
+      );
+      addTearDown(container.dispose);
+
+      final state = await _readSettled(container);
+
+      expect(state, isNotNull,
+          reason: 'null es «no hay vínculo»: el alumno pausado sí lo tiene');
+      expect(state!.items.single.concept, equals('Clase suelta'));
+      expect(state.totalArs, equals(8000));
+    });
+
+    test('pausado, igual se descarta lo de un PF anterior', () async {
+      final container = _container(
+        billing: null,
+        status: TrainerLinkStatus.paused,
+        payments: [
+          deuda,
+          Payment(
+            id: 'p-old',
+            trainerId: _oldTrainerId,
+            athleteId: _athleteId,
+            amountArs: 5000,
+            concept: 'Deuda con entrenador anterior',
+            status: PaymentStatus.pending,
+            createdAt: DateTime.utc(2026, 3, 10),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final state = await _readSettled(container);
+
+      expect(state!.items.map((i) => i.concept), ['Clase suelta']);
+    });
+
+    for (final status in [
+      TrainerLinkStatus.pending,
+      TrainerLinkStatus.terminated,
+    ]) {
+      test('un vínculo $status NO es vivo: no hay cuota que mostrar', () async {
+        final container = _container(
+          billing: null,
+          payments: [deuda],
+          status: status,
+        );
+        addTearDown(container.dispose);
+
+        final state = await _readSettled(container);
+
+        expect(state, isNull);
+      });
+    }
   });
 }

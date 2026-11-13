@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart'
-    show currentAthleteLinkProvider;
+    show currentAthleteLinkAnyStatusProvider;
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/payments/application/mi_cuota_provider.dart';
@@ -43,7 +43,7 @@ void main() {
       () async {
         final container = ProviderContainer(
           overrides: [
-            currentAthleteLinkProvider
+            currentAthleteLinkAnyStatusProvider
                 .overrideWith((ref) => Stream.value(_link())),
             athletePaymentsProvider.overrideWith(
               (ref) => Stream<List<Payment>>.error(Exception('boom')),
@@ -52,7 +52,7 @@ void main() {
         );
         addTearDown(container.dispose);
 
-        await container.read(currentAthleteLinkProvider.future);
+        await container.read(currentAthleteLinkAnyStatusProvider.future);
         // Let the payments stream surface its error.
         await container.read(athletePaymentsProvider.future).then(
               (_) {},
@@ -71,9 +71,10 @@ void main() {
       () async {
         final container = ProviderContainer(
           overrides: [
-            currentAthleteLinkProvider.overrideWith((ref) => Stream.value(
-                  throw Exception('link boom'),
-                )),
+            currentAthleteLinkAnyStatusProvider
+                .overrideWith((ref) => Stream.value(
+                      throw Exception('link boom'),
+                    )),
             athletePaymentsProvider.overrideWith(
               (ref) => Stream<List<Payment>>.value(const []),
             ),
@@ -81,7 +82,7 @@ void main() {
         );
         addTearDown(container.dispose);
 
-        await container.read(currentAthleteLinkProvider.future).then(
+        await container.read(currentAthleteLinkAnyStatusProvider.future).then(
               (_) {},
               onError: (Object _) {},
             );

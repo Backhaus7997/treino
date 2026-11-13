@@ -8,6 +8,7 @@
 /// Sección: coach_hub/pagos — contrato: sin Scaffold, sin HEX, es-AR + // i18n.
 library;
 
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 
 // ── Estado ────────────────────────────────────────────────────────────────────
@@ -20,6 +21,16 @@ enum PagoEstado { vencido, porVencer, pagado }
 
 /// Deriva el [PagoEstado] y una etiqueta legible es-AR para [p] al momento
 /// [now].
+///
+/// **[now] es wall-clock ART** (`argentinaNow()`), no un instante real: lo
+/// pasan así todos los callers y es la convención de `argentina_time.dart`
+/// (`mondayOfWeekArt`). `dueAt` es un instante real —los diálogos de cobro lo
+/// guardan como el fin del día ART elegido, `4 nov 23:59:59 ART` =
+/// `5 nov 02:59:59 UTC`—, así que se lleva al MISMO marco con [toArgentina]
+/// antes de compararlo y de contar días. Compararlo en UTC contra un `now` ya
+/// corrido a ART dejaba un lado un día adelante del otro: el 4 de noviembre a
+/// las 10:00 ART ese pago decía «Mañana», y pasada la medianoche ART seguía
+/// «por vencer» hasta las 03:00 (#1824).
 ///
 /// Reglas (alineadas con `pagos_buckets_provider.dart`, REQ-VENC-11):
 /// - `paid` → `(pagado, 'Pagado')`.
@@ -37,16 +48,17 @@ enum PagoEstado { vencido, porVencer, pagado }
   }
 
   final dueAt = p.dueAt;
-  final nowUtc = now.toUtc();
+  final nowArt = now.toUtc();
 
   if (dueAt != null) {
-    final dueUtc = dueAt.toUtc();
-    if (dueUtc.isBefore(nowUtc)) {
-      final n = _diasDeAtraso(dueUtc, nowUtc);
+    // Mismo marco que [now]: ART.
+    final dueArt = toArgentina(dueAt.toUtc());
+    if (dueArt.isBefore(nowArt)) {
+      final n = _diasDeAtraso(dueArt, nowArt);
       return (estado: PagoEstado.vencido, label: 'Vencido ${n}d'); // i18n
     }
 
-    final n = _diasHastaVencimiento(dueUtc, nowUtc);
+    final n = _diasHastaVencimiento(dueArt, nowArt);
     final label = switch (n) {
       0 => 'Hoy', // i18n
       1 => 'Mañana', // i18n
@@ -56,8 +68,9 @@ enum PagoEstado { vencido, porVencer, pagado }
   }
 
   // Legacy fallback (dueAt == null): compara createdAt contra el inicio del
-  // mes actual, igual que pagos_buckets_provider.dart.
-  final periodStart = DateTime.utc(nowUtc.year, nowUtc.month, 1);
+  // mes actual, igual que pagos_buckets_provider.dart. Sólo alcanza a los pagos
+  // sin `dueAt`; es la MISMA regla en los dos lados y no se tocó en #1824.
+  final periodStart = DateTime.utc(nowArt.year, nowArt.month, 1);
   if (p.createdAt.toUtc().isBefore(periodStart)) {
     return (estado: PagoEstado.vencido, label: 'Vencido'); // i18n
   }
@@ -68,16 +81,16 @@ enum PagoEstado { vencido, porVencer, pagado }
 
 DateTime _fechaSinHora(DateTime d) => DateTime.utc(d.year, d.month, d.day);
 
-/// Días de atraso de [dueUtc] respecto de [nowUtc], en días de calendario,
-/// con mínimo 1 (asume que ya se validó `dueUtc.isBefore(nowUtc)`).
-int _diasDeAtraso(DateTime dueUtc, DateTime nowUtc) {
-  final diff = _fechaSinHora(nowUtc).difference(_fechaSinHora(dueUtc)).inDays;
+/// Días de atraso de [dueArt] respecto de [nowArt], en días de calendario,
+/// con mínimo 1 (asume que ya se validó `dueArt.isBefore(nowArt)`).
+int _diasDeAtraso(DateTime dueArt, DateTime nowArt) {
+  final diff = _fechaSinHora(nowArt).difference(_fechaSinHora(dueArt)).inDays;
   return diff < 1 ? 1 : diff;
 }
 
-/// Días de calendario hasta [dueUtc] desde [nowUtc] (asume `dueUtc` no
-/// anterior a `nowUtc`).
-int _diasHastaVencimiento(DateTime dueUtc, DateTime nowUtc) {
-  final diff = _fechaSinHora(dueUtc).difference(_fechaSinHora(nowUtc)).inDays;
+/// Días de calendario hasta [dueArt] desde [nowArt] (asume `dueArt` no
+/// anterior a `nowArt`).
+int _diasHastaVencimiento(DateTime dueArt, DateTime nowArt) {
+  final diff = _fechaSinHora(dueArt).difference(_fechaSinHora(nowArt)).inDays;
   return diff < 0 ? 0 : diff;
 }

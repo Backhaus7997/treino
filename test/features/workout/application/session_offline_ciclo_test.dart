@@ -41,6 +41,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_init.dart';
+import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
@@ -50,12 +51,15 @@ import 'package:treino/features/workout/domain/set_log.dart';
 import 'stub_factories.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {
+  /// Lo que emite `watchSetLogs`. Vacío salvo que un test lo cambie.
+  Stream<List<SetLog>> setLogsStream = const Stream<List<SetLog>>.empty();
+
   @override
   Stream<List<SetLog>> watchSetLogs({
     required String uid,
     required String sessionId,
   }) =>
-      const Stream<List<SetLog>>.empty();
+      setLogsStream;
 
   /// Lo que emite `watchSessionFinished`. Vacío salvo que un test lo cambie.
   Stream<bool> finishedStream = const Stream<bool>.empty();
@@ -407,6 +411,180 @@ void main() {
 
         sub.close();
         container.dispose();
+      });
+    });
+
+    // #1805/#1810 arregló el reloj. Las mutaciones de series y el reconciliador
+    // del stream tenían el MISMO problema: `state = AsyncError(...)` conserva el
+    // dato anterior, así que `state.value` devuelve la sesión vieja sin tirar y
+    // el `state = AsyncData(...)` que sigue borra el aviso de «el servidor
+    // rechazó tu entreno».
+    group('con el create RECHAZADO, nada pisa el error con un AsyncData', () {
+      late _MockSessionRepository repo;
+      late ProviderContainer container;
+      late FreshSession init;
+      late SessionNotifier notifier;
+      late void Function(Object) rechazar;
+      late StreamController<List<SetLog>> remoto;
+
+      AsyncValue<dynamic> estado() =>
+          container.read(sessionNotifierProvider(init));
+
+      Future<void> turno() => Future<void>.delayed(Duration.zero);
+
+      setUp(() async {
+        repo = _MockSessionRepository();
+        final routine = _routine();
+        remoto = StreamController<List<SetLog>>.broadcast();
+        addTearDown(remoto.close);
+        repo.setLogsStream = remoto.stream;
+
+        when(() => repo.create(
+              uid: any(named: 'uid'),
+              routineId: any(named: 'routineId'),
+              routineName: any(named: 'routineName'),
+              startedAt: any(named: 'startedAt'),
+              dayNumber: any(named: 'dayNumber'),
+              weekNumber: any(named: 'weekNumber'),
+              waitForServer: any(named: 'waitForServer'),
+              onServerRejected: any(named: 'onServerRejected'),
+            )).thenAnswer((inv) {
+          rechazar =
+              inv.namedArguments[#onServerRejected] as void Function(Object);
+          return Future<Session>.value(makeSession());
+        });
+        when(() => repo.addSetLog(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              setLog: any(named: 'setLog'),
+            )).thenAnswer((inv) async => LoggedSet(
+              setLog:
+                  (inv.namedArguments[#setLog] as SetLog).copyWith(id: 'doc-1'),
+              acknowledged: Future<void>.value(),
+            ));
+        when(() => repo.updateSetLog(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              setLog: any(named: 'setLog'),
+            )).thenAnswer((_) async {});
+        when(() => repo.deleteSetLog(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              setLogId: any(named: 'setLogId'),
+            )).thenAnswer((_) async {});
+
+        container = _container(repo, routine);
+        addTearDown(container.dispose);
+        init = FreshSession(routineId: routine.id, dayNumber: 1);
+        final sub = container.listen(
+          sessionNotifierProvider(init),
+          (_, __) {},
+          fireImmediately: true,
+        );
+        addTearDown(sub.close);
+        await container.read(sessionNotifierProvider(init).future);
+        notifier = container.read(sessionNotifierProvider(init).notifier);
+      });
+
+      void rechazarElCreate() {
+        rechazar(Exception('permission-denied'));
+      }
+
+      test('control: SIN error, marcar una serie la guarda en el estado',
+          () async {
+        await notifier.logSet(makeSetLog());
+
+        verify(() => repo.addSetLog(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              setLog: any(named: 'setLog'),
+            )).called(1);
+        expect(estado().hasError, isFalse);
+        expect(estado().requireValue.setLogs, hasLength(1));
+      });
+
+      test('logSet no escribe y no pisa el error', () async {
+        rechazarElCreate();
+        await turno();
+        expect(estado().hasError, isTrue);
+
+        await notifier.logSet(makeSetLog());
+
+        verifyNever(() => repo.addSetLog(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              setLog: any(named: 'setLog'),
+            ));
+        expect(estado().hasError, isTrue,
+            reason: 'el atleta tiene que seguir viendo el rechazo');
+      });
+
+      test('updateSet no escribe y no pisa el error', () async {
+        rechazarElCreate();
+        await turno();
+
+        await notifier.updateSet(makeSetLog(id: 'doc-1'));
+
+        verifyNever(() => repo.updateSetLog(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              setLog: any(named: 'setLog'),
+            ));
+        expect(estado().hasError, isTrue);
+      });
+
+      test('addSet y removeSet no pisan el error', () async {
+        final slot = makeSlot(exerciseId: 'e1', targetSets: 2);
+        rechazarElCreate();
+        await turno();
+
+        await notifier.addSet(slot);
+        await notifier.removeSet(slot, makeSetLog(id: 'doc-1'));
+
+        verifyNever(() => repo.deleteSetLog(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              setLogId: any(named: 'setLogId'),
+            ));
+        expect(estado().hasError, isTrue);
+      });
+
+      test('un snapshot del stream de series no pisa el error', () async {
+        rechazarElCreate();
+        await turno();
+
+        remoto.add([makeSetLog(id: 'doc-9', setNumber: 1)]);
+        await turno();
+
+        expect(estado().hasError, isTrue,
+            reason: 'el reconciliador remoto reescribía la sesión como '
+                'AsyncData con el dato viejo');
+      });
+
+      test(
+          'si el rechazo llega MIENTRAS se escribe una serie, la serie no '
+          'pisa el error al volver', () async {
+        final enVuelo = Completer<LoggedSet>();
+        when(() => repo.addSetLog(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              setLog: any(named: 'setLog'),
+            )).thenAnswer((_) => enVuelo.future);
+
+        final marcando = notifier.logSet(makeSetLog());
+        await turno();
+        rechazarElCreate(); // el servidor rechaza con la escritura en vuelo
+        await turno();
+        expect(estado().hasError, isTrue);
+
+        enVuelo.complete(LoggedSet(
+          setLog: makeSetLog(id: 'doc-1'),
+          acknowledged: Future<void>.value(),
+        ));
+        await marcando;
+
+        expect(estado().hasError, isTrue,
+            reason: 'la escritura que volvió no puede reescribir el estado');
       });
     });
 
