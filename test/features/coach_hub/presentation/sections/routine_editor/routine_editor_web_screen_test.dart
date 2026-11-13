@@ -2401,6 +2401,42 @@ void main() {
     });
   });
 
+  // -- Campo Descanso (#1797) -------------------------------------------------
+  group('RoutineEditorWebScreen — campo Descanso (#1797)', () {
+    testWidgets('muestra «180» entero: el campo no lo recorta', (tester) async {
+      // Con 60 px de ancho y el padding del tema (18 a cada lado) quedaban
+      // 16 px para el texto: «180» pide 20 y se veía «80».
+      final repo = _MockRoutineRepository();
+      final base = _simpleRoutine();
+      when(() => repo.getById(any())).thenAnswer(
+        (_) async => base.copyWith(
+          days: [
+            base.days.single.copyWith(
+              slots: [base.days.single.slots.single.copyWith(restSeconds: 180)],
+            ),
+          ],
+        ),
+      );
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      final campo = find.byKey(const Key('routine_editor_rest_field'));
+      final editable = find.descendant(
+        of: campo,
+        matching: find.byType(EditableText),
+      );
+      final et = tester.widget<EditableText>(editable);
+      final pintado = TextPainter(
+        text: TextSpan(text: '180', style: et.style),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      expect(et.controller.text, '180');
+      expect(
+        tester.getSize(editable).width,
+        greaterThanOrEqualTo(pintado.width),
+      );
+    });
+  });
+
   group('RoutineEditorWebScreen — edit mode', () {
     testWidgets('loads and populates an existing web-editable routine', (
       tester,
