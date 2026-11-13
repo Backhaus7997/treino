@@ -2019,6 +2019,75 @@ service cloud.firestore {
       // sin poder esconder campos sueltos.
       allow read: if request.auth != null;
 
+      // ── rachaSemanas: acotada, no forjable (#1698) ───────────────────────
+      //
+      // `rachaSemanas` ordena el ranking de racha del gym, y la escribe el
+      // CLIENTE: `SessionRepository.finish` la recalcula desde las sesiones y
+      // `UserPublicProfileRepository.updateCounters` la guarda con el sello
+      // `rachaSemanasUpdatedAt`. No hay CF que la derive, así que estas reglas
+      // no pueden hacerla "sólo del servidor" —como `lifetimeVolumeKg`— sin
+      // portar la racha y la rutina activa a una función. Lo que SÍ pueden es
+      // acotar cuánto puede subir de una escritura a la otra. Antes de esto
+      // `{rachaSemanas: 9999}` por REST pasaba: el dueño se coronaba solo.
+      //
+      // EL TECHO: una racha honesta sólo crece una semana por semana, así que
+      // lo máximo que el dueño puede dejar escrito es el valor guardado MÁS
+      // una semana por cada semana ART transcurrida desde el sello (una sola
+      // si nunca hubo sello: un doc sembrado en 0 por seed_racha_semanas.js).
+      // BAJAR es libre —una racha cortada reescribe 1 o 0—. Con "una semana
+      // por semana" quedan cubiertos los casos honestos de salto: las
+      // escrituras perdidas (app matada antes del ACK, sesiones del reloj que
+      // no pasan por `finish`) suman las semanas que se saltearon.
+      //
+      // EL SELLO: sólo `request.time` (el `serverTimestamp()` que ya manda el
+      // cliente) o el que ya estaba. Sin esto el techo no vale nada: con un
+      // sello en el pasado el dueño reabriría el cupo, y con uno en el futuro
+      // la racha nunca decae en lectura (`effectiveRachaSemanas`). Tampoco se
+      // puede sacar. Y una SUBA exige renovar el sello en la MISMA escritura:
+      // si no, el mismo cupo se reusa en cada escritura.
+      //
+      // QUÉ NO CIERRA, escrito porque es real: un dueño que no entrena puede
+      // seguir sumando 1 por semana a mano, y `sessions` es de su propiedad,
+      // así que tampoco una CF que la derive sería a prueba de un cliente
+      // hostil. Lo que se cierra es el salto instantáneo —de 0 a 9999— y el
+      // sello inmortal. Cerrar del todo es la CF: ver el PR de #1698.
+      //
+      // Semana = lunes–domingo en ART (UTC-3 fijo, sin DST), igual que
+      // `mondayOfWeekArt` (Dart) y `weekly-streak.ts`. 356400000 es el lunes
+      // 1970-01-05 00:00 ART en ms desde epoch; 604800000 es una semana.
+      function artWeekIndex(ts) {
+        return math.floor((ts.toMillis() - 356400000) / 604800000);
+      }
+
+      // Valor que dejó la última escritura. Lo no numérico (doc legacy mal
+      // tipado) cuenta como 0: no se puede apoyar un techo en basura.
+      function rachaGuardada(prior) {
+        let v = prior.get('rachaSemanas', 0);
+        return v is number ? v : 0;
+      }
+
+      // Techo de lo que el dueño puede escribir sobre `prior`. Un sello
+      // futuro da semanas negativas: cupo 0, no negativo.
+      function rachaTopeDelDueno(prior) {
+        let sello = prior.get('rachaSemanasUpdatedAt', null);
+        let semanas = sello is timestamp
+          ? artWeekIndex(request.time) - artWeekIndex(sello)
+          : 1;
+        return rachaGuardada(prior) + (semanas > 0 ? semanas : 0);
+      }
+
+      // El disyunto `unchanged` es el del #849: un valor que no cambia no paga
+      // el techo, así un doc que ya arrastra una racha legacy inflada se puede
+      // seguir editando (la custodia está en que el valor que CAMBIA paga todo).
+      function rachaSemanasOk(d, prior) {
+        return unchanged(d, prior, 'rachaSemanas')
+            || (d.rachaSemanas is int
+                && d.rachaSemanas >= 0
+                && d.rachaSemanas <= rachaTopeDelDueno(prior)
+                && (d.rachaSemanas <= rachaGuardada(prior)
+                    || d.get('rachaSemanasUpdatedAt', null) == request.time));
+      }
+
       // Only the owner can create their own doc; uid in body must match doc
       // id. Field allowlist applies from create onward. gymId, when
       // present, must match the athlete's own private gymId (AD-4). The 4
@@ -2068,9 +2137,12 @@ service cloud.firestore {
                     && request.resource.data.get('hiddenFromDiscovery', false) == false
                     // Sello de frescura de `rachaSemanas`, siempre derivado
                     // por UserPublicProfileRepository.updateCounters (server
-                    // timestamp) — timestamp cuando está presente.
-                    && (!('rachaSemanasUpdatedAt' in request.resource.data)
-                        || request.resource.data.rachaSemanasUpdatedAt is timestamp)
+                    // timestamp): ausente, o el `request.time`. Un create no
+                    // puede sembrar una racha (#1698): ausente, null o 0.
+                    && (request.resource.data.get('rachaSemanasUpdatedAt', null) == null
+                        || request.resource.data.rachaSemanasUpdatedAt == request.time)
+                    && (request.resource.data.get('rachaSemanas', null) == null
+                        || request.resource.data.rachaSemanas == 0)
                     // #552: freshness stamp for `racha`, always derived by
                     // UserPublicProfileRepository.updateCounters (server
                     // timestamp) — timestamp when present.
@@ -2138,14 +2210,16 @@ service cloud.firestore {
                     // Tiene que estar en el hasOnly de arriba: si no, una
                     // cuenta oculta no podría actualizar más su perfil.
                     && unchanged(request.resource.data, resource.data, 'hiddenFromDiscovery')
-                    // Sello de frescura de `rachaSemanas` — timestamp cuando
-                    // está presente. El disyunto `unchanged` es el del #849:
-                    // sin él, el chequeo de TIPO valida el DOCUMENTO y no la
-                    // escritura, y un doc con el campo mal tipado no se puede
-                    // actualizar nunca más.
-                    && (!('rachaSemanasUpdatedAt' in request.resource.data)
-                        || unchanged(request.resource.data, resource.data, 'rachaSemanasUpdatedAt')
-                        || request.resource.data.rachaSemanasUpdatedAt is timestamp)
+                    // Sello de frescura de `rachaSemanas` — el que ya estaba o el
+                    // del servidor (`request.time`), nunca uno elegido por el
+                    // dueño, y tampoco se puede sacar (#1698). El disyunto
+                    // `unchanged` es el del #849: sin él, el chequeo de TIPO
+                    // valida el DOCUMENTO y no la escritura, y un doc con el
+                    // campo mal tipado no se puede actualizar nunca más.
+                    && (unchanged(request.resource.data, resource.data, 'rachaSemanasUpdatedAt')
+                        || request.resource.data.get('rachaSemanasUpdatedAt', null) == request.time)
+                    // El valor, acotado: ver `rachaTopeDelDueno` (#1698).
+                    && rachaSemanasOk(request.resource.data, resource.data)
                     // #552: freshness stamp for `racha` — timestamp when
                     // present (always serverTimestamp() derived in
                     // UserPublicProfileRepository.updateCounters).
