@@ -109,30 +109,61 @@ class UserPublicProfileRepository {
   /// `displayNameLowercase`/`n`. Keeping value and stamp in the SAME write
   /// is what makes [effectiveRachaSemanas]'s read-time decay trustworthy — un
   /// valor escrito sin sello (o al revés) decae mal.
+  ///
+  /// #1698 — las reglas acotan cuánto puede subir `rachaSemanas` de una
+  /// escritura a la otra (ver `rachaTopeDelDueno` en `firestore.rules`), así
+  /// que el valor pedido se recorta al techo [rachaSemanasCeiling] antes de
+  /// escribir. En el flujo normal el techo no muerde: una racha honesta sube
+  /// +1 por semana. Si igual rebota, los demás contadores siguen su camino.
   Future<void> updateCounters(String uid, Map<String, Object?> fields) async {
+    var rest = fields;
+    final requested = fields['rachaSemanas'];
     if (fields.containsKey('rachaSemanas')) {
+      final ceiling = requested is int ? await _rachaCeiling(uid) : null;
       final stamped = <String, Object?>{
         ...fields,
+        'rachaSemanas':
+            ceiling != null && requested is int && requested > ceiling
+                ? ceiling
+                : requested,
         'rachaSemanasUpdatedAt': FieldValue.serverTimestamp(),
       };
       try {
         await _col.doc(uid).set(stamped, SetOptions(merge: true));
         return;
       } on FirebaseException catch (e) {
-        // Transicional: hasta que se deployen las rules con
-        // `rachaSemanas`/`rachaSemanasUpdatedAt` en el allowlist de
-        // userPublicProfiles, el write sellado se rechaza. Caemos a la forma
-        // sin sello para que `workoutsCount` siga fluyendo en vez de congelar
-        // todos los contadores en silencio. El board, mientras tanto, muestra
-        // 0 en racha —que es lo correcto: sin sello no hay frescura que
-        // verificar. Sacar cuando el deploy de rules esté vivo.
+        // Las reglas rechazaron la racha (un techo que el cliente no pudo
+        // calcular, el reloj corrido en el borde de la semana, o reglas viejas
+        // sin `rachaSemanas` en el allowlist). Caemos a los demás contadores
+        // para que `workoutsCount` siga fluyendo en vez de congelarse en
+        // silencio, y la racha queda como estaba: el board, sin sello nuevo,
+        // la decae a 0 en vez de mostrar un número que no se pudo verificar.
         // Not covered by fake_cloud_firestore (it does not enforce rules);
-        // covered by the T35-style manual emulator pass, like the rest of
-        // this file's permission behavior.
+        // covered by the rules suite (`user-public-profiles-rules.test.ts`).
         if (e.code != 'permission-denied') rethrow;
+        rest = {...fields}..remove('rachaSemanas');
       }
     }
-    await _col.doc(uid).set(fields, SetOptions(merge: true));
+    if (rest.isEmpty) return;
+    await _col.doc(uid).set(rest, SetOptions(merge: true));
+  }
+
+  /// El techo de `rachaSemanas` sobre lo que hoy guarda el doc, o `null` si no
+  /// se pudo leer (sin red ni caché): entonces no se recorta nada y deciden las
+  /// reglas, que son la autoridad.
+  Future<int?> _rachaCeiling(String uid) async {
+    try {
+      final data = (await _col.doc(uid).get()).data();
+      final stored = data?['rachaSemanas'];
+      final stamp = data?['rachaSemanasUpdatedAt'];
+      return rachaSemanasCeiling(
+        stored: stored is num ? stored.toInt() : null,
+        stamp: stamp is Timestamp ? stamp.toDate() : null,
+        now: _now(),
+      );
+    } on FirebaseException {
+      return null;
+    }
   }
 
   /// Flips the athlete's `rankingOptIn` flag via the same partial-merge path
