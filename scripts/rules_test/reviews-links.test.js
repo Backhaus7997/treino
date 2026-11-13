@@ -174,6 +174,48 @@ test('SCENARIO-RV-LINK-03c: a TERMINATED link does not authorize a review create
   );
 });
 
+// #1840: el alumno que TERMINA el vínculo puede reseñar al PF. Un vínculo
+// terminado que fue real (`acceptedAt` != null) autoriza; un pedido rechazado
+// o cancelado (sin `acceptedAt`) no, y el 03c de arriba lo sigue fijando.
+async function seedTerminated(linkId, extra) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('trainer_links').doc(linkId).set({
+      trainerId: 'coach', athleteId: 'athlete', status: 'terminated', requestedAt: new Date(), ...extra,
+    });
+  });
+}
+const reviewOf = (linkId, extra = {}) => ({
+  id: `${linkId}_athlete`, linkId, athleteId: 'athlete', trainerId: 'coach', rating: 4, comment: null,
+  createdAt: new Date(), updatedAt: new Date(), ...extra,
+});
+
+test('#1840: un vínculo TERMINADO que fue real (acceptedAt) autoriza la reseña', async () => {
+  await seedTerminated('link-ex', {
+    acceptedAt: new Date(), terminatedAt: new Date(), terminationReason: 'athlete-terminated',
+  });
+  const athlete = testEnv.authenticatedContext('athlete');
+  await assertSucceeds(athlete.firestore().doc('reviews/link-ex_athlete').set(reviewOf('link-ex')));
+});
+
+test.each([
+  ['un pedido rechazado', { acceptedAt: null, terminationReason: 'declined' }],
+  ['un pedido cancelado por el alumno', { acceptedAt: null, terminationReason: 'cancelled-by-athlete' }],
+])('#1840: %s (terminated sin acceptedAt) NO autoriza', async (_name, extra) => {
+  await seedTerminated('link-no', extra);
+  const athlete = testEnv.authenticatedContext('athlete');
+  await assertFails(athlete.firestore().doc('reviews/link-no_athlete').set(reviewOf('link-no')));
+});
+
+test('#1840: sobre un vínculo terminado real, otro alumno o un trainerId ajeno siguen denegados', async () => {
+  await seedTerminated('link-ex2', { acceptedAt: new Date() });
+  await assertFails(testEnv.authenticatedContext('intruder').firestore().doc('reviews/link-ex2_intruder').set(
+    reviewOf('link-ex2', { id: 'link-ex2_intruder', athleteId: 'intruder' }),
+  ));
+  await assertFails(testEnv.authenticatedContext('athlete').firestore().doc('reviews/link-ex2_athlete').set(
+    reviewOf('link-ex2', { trainerId: 'someOtherTrainer' }),
+  ));
+});
+
 // A review naming a trainerId that does not match the link's real trainerId
 // must be denied even if the doc-id/linkId/athleteId all line up.
 test('SCENARIO-RV-LINK-03d: review trainerId must match the linked trainer, not an arbitrary victim', async () => {
