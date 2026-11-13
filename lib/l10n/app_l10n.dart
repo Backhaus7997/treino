@@ -1088,10 +1088,10 @@ abstract class AppL10n {
   /// **'MIS RUTINAS'**
   String get athleteRoutinesButtonLabel;
 
-  /// Aviso de la card del PF en la tab Coach cuando el vínculo está pausado. Sólo afirma lo que la app y las reglas permiten con un vínculo pausado: ver las rutinas asignadas y los archivos compartidos, y escribirle al PF.
+  /// Aviso de la card del PF en la tab Coach cuando el vínculo está pausado. Sólo afirma lo que la app y las reglas permiten con un vínculo pausado: ver las rutinas asignadas, los archivos compartidos, el plan nutricional y la agenda, y escribirle al PF.
   ///
   /// In es_AR, this message translates to:
-  /// **'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas y archivos— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.'**
+  /// **'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas, archivos, plan nutricional y agenda— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.'**
   String get athleteLinkPausedNote;
 
   /// Título de la pantalla read-only del plan nutricional del alumno.
@@ -5894,10 +5894,10 @@ abstract class AppL10n {
   /// **'Pausar vínculo'**
   String get coachHubDashboardPauseLinkTitle;
 
-  /// Coach Hub web dashboard — confirmation dialog body for pausing a link. Same copy is used from the alumnos section.
+  /// Coach Hub web dashboard — confirmation dialog body for pausing a link. Same copy is used from the alumnos section. Sólo afirma lo que pausar hace de verdad (#1843): el alumno conserva rutinas, plan nutricional, agenda y chat, y el PF deja de ver sus sesiones (se revoca `session_shares`). NO promete un bloqueo de sesiones: nada lo aplica.
   ///
   /// In es_AR, this message translates to:
-  /// **'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.'**
+  /// **'El alumno conserva sus rutinas, su plan nutricional, la agenda y el chat. Vos dejás de ver sus sesiones hasta que reanudes el vínculo.'**
   String get coachHubDashboardPauseLinkBody;
 
   /// Coach Hub web dashboard — confirmation dialog title before terminating a link.

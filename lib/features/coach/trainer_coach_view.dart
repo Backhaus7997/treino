@@ -567,8 +567,11 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                         context,
                         ref,
                         title: 'Pausar vínculo',
+                        // Lo que pausar hace de verdad (#1843): el alumno sigue
+                        // viendo lo suyo y vos dejás de ver sus sesiones. NO es
+                        // un «read-only»: nada le bloquea al alumno registrar.
                         body:
-                            '¿Querés pausar el vínculo con este alumno? Va a quedar en read-only hasta que reanudes.',
+                            '¿Querés pausar el vínculo con este alumno? Conserva sus rutinas, su plan nutricional, la agenda y el chat, y vos dejás de ver sus sesiones hasta que reanudes.',
                         confirmLabel: 'Pausar',
                         confirmBg: palette.accent,
                         action: () => ref

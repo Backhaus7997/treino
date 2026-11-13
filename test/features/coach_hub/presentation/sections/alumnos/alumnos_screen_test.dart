@@ -922,6 +922,44 @@ void main() {
       verifyNever(() => repo.terminate(any(), reason: any(named: 'reason')));
     });
 
+    // #1843 — el diálogo prometía «no podrá registrar sesiones nuevas», y nada
+    // lo aplica: el alumno pausado sigue pudiendo registrar. El texto dice lo
+    // que pausar hace de verdad.
+    testWidgets(
+        'pausar abre un diálogo que dice lo que pausar hace, sin prometer un '
+        'bloqueo que no existe', (tester) async {
+      final repo = _MockRepo();
+      when(() => repo.pause(any())).thenAnswer((_) async {});
+
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        repo: repo,
+      );
+
+      await tester.tap(find.byTooltip('Opciones del alumno'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pausar').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pausar vínculo'), findsOneWidget);
+      expect(
+        find.text(
+          'El alumno conserva sus rutinas, su plan nutricional, la agenda y '
+          'el chat. Vos dejás de ver sus sesiones hasta que reanudes el '
+          'vínculo.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('no podrá registrar'), findsNothing);
+
+      await tester.tap(find.text('Pausar').last); // botón confirmar
+      await tester.pumpAndSettle();
+
+      verify(() => repo.pause('l_a1')).called(1);
+    });
+
     testWidgets('alumno re-vinculado (terminado + activo) → una sola fila',
         (tester) async {
       // El stream viene requestedAt DESC: el activo (más reciente) primero.

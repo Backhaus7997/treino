@@ -325,9 +325,9 @@
   "@athleteRoutinesButtonLabel": {
     "description": "Botón de la tab Coach, con el vínculo pausado, que lleva a Entrenar donde sigue el plan que el PF le asignó."
   },
-  "athleteLinkPausedNote": "Tu PF pausó el vínculo. Lo que ya te dejó —rutinas y archivos— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.",
+  "athleteLinkPausedNote": "Tu PF pausó el vínculo. Lo que ya te dejó —rutinas, archivos, plan nutricional y agenda— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.",
   "@athleteLinkPausedNote": {
-    "description": "Aviso de la card del PF en la tab Coach cuando el vínculo está pausado. Sólo afirma lo que la app y las reglas permiten con un vínculo pausado: ver las rutinas asignadas y los archivos compartidos, y escribirle al PF."
+    "description": "Aviso de la card del PF en la tab Coach cuando el vínculo está pausado. Sólo afirma lo que la app y las reglas permiten con un vínculo pausado: ver las rutinas asignadas, los archivos compartidos, el plan nutricional y la agenda, y escribirle al PF."
   },
   "athleteNutritionPlanScreenTitle": "PLAN NUTRICIONAL",
   "@athleteNutritionPlanScreenTitle": {
@@ -2630,9 +2630,9 @@
   "@coachHubDashboardPauseLinkTitle": {
     "description": "Coach Hub web dashboard — confirmation dialog title before pausing a link."
   },
-  "coachHubDashboardPauseLinkBody": "El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.",
+  "coachHubDashboardPauseLinkBody": "El alumno conserva sus rutinas, su plan nutricional, la agenda y el chat. Vos dejás de ver sus sesiones hasta que reanudes el vínculo.",
   "@coachHubDashboardPauseLinkBody": {
-    "description": "Coach Hub web dashboard — confirmation dialog body for pausing a link. Same copy is used from the alumnos section."
+    "description": "Coach Hub web dashboard — confirmation dialog body for pausing a link. Same copy is used from the alumnos section. Sólo afirma lo que pausar hace de verdad (#1843): el alumno conserva rutinas, plan nutricional, agenda y chat, y el PF deja de ver sus sesiones (se revoca `session_shares`). NO promete un bloqueo de sesiones: nada lo aplica."
   },
   "coachHubDashboardTerminateLinkTitle": "Terminar vínculo",
   "@coachHubDashboardTerminateLinkTitle": {
