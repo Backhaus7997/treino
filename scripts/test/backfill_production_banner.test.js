@@ -38,6 +38,7 @@ const BACKFILLS = [
   'backfill_gym_names.js',
   'backfill_user_search_prefixes.js',
   'backfill_chat_closed_unlinked.js', // #1697: escribe sobre `chats/`
+  'backfill_trainer_athlete_pairs.js', // #1806: escribe sobre `trainer_athlete_pairs/`
 ];
 
 /**

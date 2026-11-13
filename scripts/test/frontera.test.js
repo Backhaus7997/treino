@@ -233,13 +233,18 @@ test('los 56 scripts que inicializan Firebase pasan por la frontera', () => {
   // `lib/admin`, imprime el banner ANTES de inicializar y es DRY-RUN POR DEFECTO
   // (escribe sólo con `--write`; `--write --dry-run` NO).
   //
+  // El 57 es `backfill_trainer_athlete_pairs.js` (#1806): escribe
+  // `trainer_athlete_pairs` para los pares vinculados antes de la CF que lo
+  // mantiene. Entra por `lib/admin`, imprime el banner ANTES de inicializar y es
+  // DRY-RUN POR DEFECTO (escribe sólo con `--apply`; `--apply --dry-run` NO).
+  //
   // El número está clavado a propósito: si alguien agrega un script que entra
   // por `lib/`, este test lo cuenta y hay que subirlo — leyendo el diff. Es el
   // recordatorio de que la lista se mira, no se asume.
   const cableados = ARCHIVOS.filter(({ codigo }) => IMPORTA_LA_FRONTERA.test(codigo));
   assert.strictEqual(
     cableados.length,
-    56,
+    57,
     `cableados: ${cableados.length}. Si agregaste o sacaste un script, actualizá ` +
       'este número Y confirmá que el nuevo entra por lib/:\n  ' +
       cableados.map((a) => a.nombre).join('\n  '),
