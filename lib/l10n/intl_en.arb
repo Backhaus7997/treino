@@ -1309,6 +1309,8 @@
   "insightsNextWeekTooltip": "Next week",
   "insightsWeekRange": "WEEK · {start} – {end}",
   "insightsDayMusclesHeading": "MUSCLES OF THE DAY",
+  "insightsDaySetsUnit": "SETS",
+  "insightsBackButton": "BACK",
   "coachDailyHeatmapSectionTitle": "MUSCLES OF THE DAY",
   "profileLoadError": "We couldn't load your profile. Please try again.",
   "sessionDetailNoSets": "This session has no logged sets.",

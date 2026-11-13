@@ -3022,6 +3022,14 @@
   "@insightsDayMusclesHeading": {
     "description": "Encabezado de la tarjeta de músculos trabajados en el día elegido de la tira de la semana de InsightsScreen. Mismo texto que coachDailyHeatmapSectionTitle, que es del detalle de alumno del PF."
   },
+  "insightsDaySetsUnit": "SETS",
+  "@insightsDaySetsUnit": {
+    "description": "Unidad que va después de la cantidad en cada fila de la tarjeta de músculos del día de InsightsScreen (p. ej. «6 SETS»). Va en mayúsculas porque se dibuja con la tipografía de etiquetas."
+  },
+  "insightsBackButton": "VOLVER",
+  "@insightsBackButton": {
+    "description": "Botón del pie de InsightsScreen: vuelve a la pantalla anterior o a Inicio (_safePopOrHome)."
+  },
   "coachDailyHeatmapSectionTitle": "MÚSCULOS DEL DÍA",
   "@coachDailyHeatmapSectionTitle": {
     "description": "Section header for the shared DailyHeatmapSection (per-day body heat-map + day-strip) in the coach's mobile athlete detail screen (charts-redesign PR2b, AD5)."

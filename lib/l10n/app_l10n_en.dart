@@ -3602,6 +3602,12 @@ class AppL10nEn extends AppL10n {
   String get insightsDayMusclesHeading => 'MUSCLES OF THE DAY';
 
   @override
+  String get insightsDaySetsUnit => 'SETS';
+
+  @override
+  String get insightsBackButton => 'BACK';
+
+  @override
   String get coachDailyHeatmapSectionTitle => 'MUSCLES OF THE DAY';
 
   @override

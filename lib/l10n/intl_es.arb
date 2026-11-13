@@ -750,6 +750,8 @@
   "insightsNextWeekTooltip": "Semana siguiente",
   "insightsWeekRange": "SEMANA · {start} – {end}",
   "insightsDayMusclesHeading": "MÚSCULOS DEL DÍA",
+  "insightsDaySetsUnit": "SETS",
+  "insightsBackButton": "VOLVER",
   "coachDailyHeatmapSectionTitle": "MÚSCULOS DEL DÍA",
   "profileLoadError": "No pudimos cargar tu perfil. Inténtalo de nuevo.",
   "sessionDetailNoSets": "Esta sesión no tiene sets registrados.",
