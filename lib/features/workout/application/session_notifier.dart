@@ -79,15 +79,33 @@ class SessionNotifier
 
   @override
   Future<SessionState> build(SessionInit arg) async {
+    // Este provider es autoDispose y Riverpod 2.6 NO cancela un `build` en
+    // vuelo: si el atleta sale del player mientras se leen la rutina o la
+    // sesión, el build sigue corriendo contra un provider ya descartado. Sin
+    // este aviso `_buildFresh` creaba igual una sesión `active` que ninguna
+    // pantalla iba a mostrar ni cerrar (#1755).
+    //
+    // Es una variable de ESTE build y no el campo `_disposed`: ése se registra
+    // recién al final, y un campo compartido no distingue un build viejo de uno
+    // nuevo si el provider se invalida.
+    var descartado = false;
+    ref.onDispose(() => descartado = true);
+
     final state = switch (arg) {
       FreshSession(
         routineId: final rid,
         dayNumber: final dn,
         weekNumber: final wn,
       ) =>
-        await _buildFresh(rid, dn, wn),
+        await _buildFresh(rid, dn, wn, seDescarto: () => descartado),
       ResumeSession(sessionId: final sid) => await _buildResume(sid),
     };
+
+    // Sin pantalla no hay quién cierre el timer ni los streams: no se arman.
+    if (descartado) {
+      throw StateError(
+          'El player se cerró antes de terminar de armar la sesión');
+    }
 
     // El timer empieza DESPUÉS de armar el estado para que ambos paths
     // compartan el mismo punto de inicio. Diseño §7.
@@ -205,8 +223,9 @@ class SessionNotifier
   Future<SessionState> _buildFresh(
     String routineId,
     int dayNumber,
-    int weekNumber,
-  ) async {
+    int weekNumber, {
+    required bool Function() seDescarto,
+  }) async {
     // Misma cota que en `_buildResume`: empezar un entreno tampoco puede quedar
     // colgado sin salida.
     final routine = await ref
@@ -233,6 +252,12 @@ class SessionNotifier
     final uid = ref.read(currentUidProvider);
     if (uid == null) {
       throw StateError('SessionNotifier construido sin usuario autenticado');
+    }
+    // Último punto antes de ESCRIBIR: el atleta pudo irse mientras se leía la
+    // rutina (#1755). Entre este chequeo y `create` no hay ningún `await`, así
+    // que no queda ventana. Escribir acá dejaría una sesión `active` huérfana.
+    if (seDescarto()) {
+      throw StateError('El player se cerró antes de crear la sesión');
     }
     final session = await repo.create(
       uid: uid,

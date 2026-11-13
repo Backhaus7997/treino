@@ -8,6 +8,8 @@
 // keyboard, reps non-editable, block gating).
 // SCENARIO-037: player renders correct week's set count via effectiveSetsForWeek.
 
+import 'dart:async';
+
 import 'package:clock/clock.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +28,8 @@ import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
+import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/application/weekly_streak_providers.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/workout/presentation/exercise_detail_screen.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
@@ -572,6 +576,173 @@ void main() {
       await tester.tap(find.text('SQUAT'));
       await tester.pumpAndSettle();
       expect(find.byType(ExerciseDetailScreen), findsOneWidget);
+    });
+  });
+
+  // ── #1755: el Atrás del sistema en una sesión nueva ──────────────────────
+  //
+  // El swipe desde el borde izquierdo y el botón Atrás del sistema llegan al
+  // player como `handlePopRoute`, no como un tap en la flecha del header. Estos
+  // tests simulan eso, sobre el `SessionNotifier` REAL y un repositorio sobre
+  // `FakeFirebaseFirestore`: lo que importa es qué queda en Firestore.
+  group('#1755: Atrás del sistema en una sesión nueva', () {
+    const uid = 'u1';
+    const confirmacion = '¿Seguro que querés abandonar?';
+    late FakeFirebaseFirestore firestore;
+
+    /// La rutina que lee el player al arrancar. Mientras no se completa, el
+    /// player está en `loading`: es la ventana de «recién tocó EMPEZAR».
+    late Completer<Routine?> rutina;
+
+    /// `_kInit` pide el día 4: la rutina tiene que tenerlo.
+    Routine rutinaDelDia4() => makeRoutine(days: [makeDay(dayNumber: 4)]);
+
+    /// Monta el player ENCIMA de otra ruta (como lo deja EMPEZAR), para que el
+    /// pop sea observable: si sale, queda 'base-stub'.
+    Future<void> abrirElPlayer(WidgetTester tester) async {
+      // Se crean ACÁ y no en un `setUp`: un `Completer` nacido fuera de la zona
+      // del test agenda sus callbacks en la zona real, y el reloj falso de
+      // `testWidgets` nunca los corre.
+      firestore = FakeFirebaseFirestore();
+      rutina = Completer<Routine?>();
+      final router = GoRouter(routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) =>
+              const Scaffold(body: Center(child: Text('base-stub'))),
+        ),
+        GoRoute(
+          path: '/player',
+          builder: (_, __) => const SessionPlayerScreen(init: _kInit),
+        ),
+        GoRoute(
+          path: '/workout',
+          builder: (_, __) =>
+              const Scaffold(body: Center(child: Text('workout-stub'))),
+        ),
+      ]);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sessionRepositoryProvider.overrideWithValue(
+              SessionRepository(firestore: firestore),
+            ),
+            currentUidProvider.overrideWithValue(uid),
+            routineByIdProvider('r1').overrideWith((_) => rutina.future),
+            weeklyStreakTargetProvider.overrideWithValue(3),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            routerConfig: router,
+          ),
+        ),
+      );
+      unawaited(router.push<void>('/player'));
+      await tester.pump();
+      // Termina la transición de entrada (el ticker arranca en el primer
+      // frame, de ahí los dos pasos): con la ruta de abajo ya fuera de
+      // escena, «base-stub» sólo se ve si el player se fue.
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    /// Deja correr los `await` del build y las escrituras del Firestore falso.
+    Future<void> asentar(WidgetTester tester) async {
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    Future<List<Map<String, dynamic>>> sesiones() async {
+      final snap = await firestore
+          .collection('users')
+          .doc(uid)
+          .collection('sessions')
+          .get();
+      return [for (final d in snap.docs) d.data()];
+    }
+
+    testWidgets('cargando: Atrás pide confirmación y NO saca del player',
+        (tester) async {
+      await abrirElPlayer(tester);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(find.textContaining(confirmacion), findsOneWidget);
+      expect(find.byType(SessionPlayerScreen), findsOneWidget);
+      expect(find.text('base-stub'), findsNothing);
+
+      rutina.complete(rutinaDelDia4());
+      await asentar(tester);
+    });
+
+    testWidgets(
+        'cargando: abandonar antes de que exista la sesión sale SIN dejar una '
+        'sesión activa huérfana', (tester) async {
+      await abrirElPlayer(tester);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.tap(find.text('Abandonar'));
+      await tester.pumpAndSettle();
+      expect(find.text('workout-stub'), findsOneWidget);
+      expect(find.byType(SessionPlayerScreen), findsNothing);
+
+      // La rutina llega DESPUÉS de que el atleta se fue: el build del notifier
+      // sigue corriendo, y no puede crear la sesión.
+      rutina.complete(rutinaDelDia4());
+      await asentar(tester);
+
+      expect(await sesiones(), isEmpty,
+          reason: 'sin pantalla no hay sesión: crearla la deja `active` y '
+              'Inicio ofrece retomar un entreno que nadie vio');
+    });
+
+    testWidgets('cargando: «Cancelar» se queda y la sesión arranca normal',
+        (tester) async {
+      await abrirElPlayer(tester);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.tap(find.text('Cancelar'));
+      // Sin `pumpAndSettle`: el spinner anima para siempre.
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.textContaining(confirmacion), findsNothing);
+      expect(find.byType(SessionPlayerScreen), findsOneWidget);
+
+      rutina.complete(rutinaDelDia4());
+      await asentar(tester);
+
+      expect(find.text('ABANDONAR'), findsOneWidget);
+      final creadas = await sesiones();
+      expect(creadas, hasLength(1));
+      expect(creadas.single['status'], 'active');
+    });
+
+    testWidgets('sesión ya cargada: Atrás pide confirmación y abandona',
+        (tester) async {
+      await abrirElPlayer(tester);
+      rutina.complete(rutinaDelDia4());
+      await asentar(tester);
+      expect(find.text('ABANDONAR'), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(find.textContaining(confirmacion), findsOneWidget);
+      expect(find.text('base-stub'), findsNothing);
+
+      await tester.tap(find.text('Abandonar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('workout-stub'), findsOneWidget);
+      final cerradas = await sesiones();
+      expect(cerradas, hasLength(1));
+      expect(cerradas.single['status'], 'finished');
     });
   });
 
