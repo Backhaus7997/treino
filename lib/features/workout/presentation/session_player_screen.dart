@@ -1043,8 +1043,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         ? ref.watch(routineByIdProvider(routineId))
         : const AsyncLoading<Routine?>();
     final routineSplit = routineAsync.valueOrNull?.split ?? '';
+    final cargando = sessionAsync.isLoading;
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: palette.bg,
       body: sessionAsync.when(
         loading: () => Center(
@@ -1093,6 +1094,25 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           ),
         ),
       ),
+    );
+
+    // El PopScope de [_cuerpoDelPlayer] sólo existe con la sesión resuelta. Con
+    // la sesión CARGANDO —la ventana de «recién toqué EMPEZAR»— el Atrás del
+    // sistema (botón o swipe desde el borde) no encontraba ninguno y sacaba
+    // del player sin diálogo (#1755). Éste cubre ese estado con LA MISMA
+    // confirmación; con la sesión cargada le deja el turno al de adentro.
+    //
+    // Con dos PopScope en la misma ruta, Flutter avisa a TODOS cuando el pop se
+    // bloquea —también al que tiene `canPop: true`—. Por eso éste chequea
+    // `cargando` y no hace nada con la sesión cargada: si no, el diálogo
+    // saldría dos veces. En error no hay nada que proteger y Atrás sale.
+    return PopScope(
+      canPop: !cargando,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _isFinalizing || !cargando) return;
+        _showAbandonConfirm();
+      },
+      child: scaffold,
     );
   }
 

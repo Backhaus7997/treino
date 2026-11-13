@@ -130,6 +130,67 @@ void main() {
     );
   });
 
+  // ── Si el player se va antes de que exista la sesión, no se crea ──────────
+  //
+  // #1755. `_buildFresh` lee la rutina y DESPUÉS crea la sesión `active`. El
+  // provider es autoDispose: si el atleta sale mientras la rutina carga, el
+  // build sigue corriendo (Riverpod 2.6 no lo cancela) y creaba igual una
+  // sesión que ninguna pantalla iba a mostrar ni cerrar — Inicio la ofrecía
+  // después como «Entrenamiento en curso».
+  test('si la pantalla se va antes de que cargue la rutina, no crea la sesión',
+      () async {
+    final repo = MockSessionRepository();
+    when(() => repo.create(
+          uid: any(named: 'uid'),
+          routineId: any(named: 'routineId'),
+          routineName: any(named: 'routineName'),
+          startedAt: any(named: 'startedAt'),
+          dayNumber: any(named: 'dayNumber'),
+          weekNumber: any(named: 'weekNumber'),
+          waitForServer: any(named: 'waitForServer'),
+          onServerRejected: any(named: 'onServerRejected'),
+        )).thenAnswer((_) async => makeSession());
+
+    final rutina = Completer<Routine?>();
+    final container = ProviderContainer(
+      overrides: [
+        sessionRepositoryProvider.overrideWithValue(repo),
+        currentUidProvider.overrideWithValue('u1'),
+        analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+        routineByIdProvider('r1').overrideWith((_) => rutina.future),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    const init = FreshSession(routineId: 'r1', dayNumber: 1);
+    // La pantalla escuchando: arranca el build, que queda esperando la rutina.
+    final pantalla =
+        container.listen(sessionNotifierProvider(init), (_, __) {});
+    await Future<void>.delayed(Duration.zero);
+
+    // El atleta se va: el último listener se cierra y el provider se descarta.
+    pantalla.close();
+    await Future<void>.delayed(Duration.zero);
+    expect(container.exists(sessionNotifierProvider(init)), isFalse,
+        reason: 'precondición del test: el notifier ya se descartó');
+
+    // La rutina llega tarde.
+    rutina.complete(makeRoutine(days: [makeDay(dayNumber: 1)]));
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    verifyNever(() => repo.create(
+          uid: any(named: 'uid'),
+          routineId: any(named: 'routineId'),
+          routineName: any(named: 'routineName'),
+          startedAt: any(named: 'startedAt'),
+          dayNumber: any(named: 'dayNumber'),
+          weekNumber: any(named: 'weekNumber'),
+          waitForServer: any(named: 'waitForServer'),
+          onServerRejected: any(named: 'onServerRejected'),
+        ));
+  });
+
   // ── El build de la sesión no puede quedarse colgado ──────────────────────
   //
   // Medido en el simulador el 2026-08-12: el player quedó en el spinner más de
