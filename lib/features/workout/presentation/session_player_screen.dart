@@ -1145,11 +1145,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                   physics: const ClampingScrollPhysics(),
                   children: [
                     const SizedBox(height: 12),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: _AttendanceCard(),
-                    ),
-                    const SizedBox(height: 14),
+                    // Lleva su propio margen de abajo: si no se dibuja, no deja
+                    // un hueco entre el header y las estadísticas.
+                    const _SessionGymCard(),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: _SessionStatsCard(state: state),
@@ -1305,69 +1303,60 @@ class _SessionHeader extends StatelessWidget {
   }
 }
 
-// ── _AttendanceCard ───────────────────────────────────────────────────────────
+// ── _SessionGymCard ───────────────────────────────────────────────────────────
 
-class _AttendanceCard extends ConsumerWidget {
-  const _AttendanceCard();
+/// El gimnasio del atleta, arriba del player. Es información, NO una asistencia.
+///
+/// Antes era `_AttendanceCard`: decía «Asistencia marcada» con un tilde y una
+/// hora (`DateTime.now()`) y no había nada detrás (#1768). No existe ningún
+/// registro de asistencia ni de check-in a un gimnasio: `Session` no tiene ese
+/// campo, la «asistencia» del código es la de un TURNO con el PF
+/// (`AppointmentAttendance`), y `gymId` es autodeclarado —las reglas lo dicen—,
+/// así que ni siquiera sería una prueba de que el atleta está en el gimnasio.
+/// El spec original (REQ-SESSION-SCREEN-003) la dejó como placeholder visual
+/// hasta una «Etapa 6» que nunca existió.
+///
+/// Se dibuja SÓLO con un gimnasio real y su nombre ya resuelto. Sin gimnasio, o
+/// mientras el nombre carga, no hay nada verdadero que decir y no se dibuja
+/// nada: el «Sin gimnasio asignado» de antes era falso mientras el nombre
+/// cargaba. Y sin ninguna hora: la de antes era la del momento de dibujar.
+class _SessionGymCard extends ConsumerWidget {
+  const _SessionGymCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final profileAsync = ref.watch(userProfileProvider);
-    final gymId = profileAsync.valueOrNull?.gymId;
+    final gymId =
+        ref.watch(userProfileProvider.select((p) => p.valueOrNull?.gymId));
+    if (!hasRealGym(gymId)) return const SizedBox.shrink();
     // DETAIL context (self): `gymDisplayNameProvider` (Google en vivo).
-    final gymName = !hasRealGym(gymId)
-        ? ''
-        : ref.watch(gymDisplayNameProvider(gymId)).valueOrNull ?? '';
-    final now = DateTime.now().toLocal();
-    final hh = now.hour.toString().padLeft(2, '0');
-    final mm = now.minute.toString().padLeft(2, '0');
-    final timeStr = '$hh:$mm';
+    final gymName = ref.watch(gymDisplayNameProvider(gymId)).valueOrNull ?? '';
+    if (gymName.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Icon(TreinoIcon.gym, color: palette.accent, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Asistencia marcada',
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: palette.textPrimary,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.gym, color: palette.accent, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                gymName,
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: palette.textPrimary,
                 ),
-                Text(
-                  gymName.isEmpty ? 'Sin gimnasio asignado' : gymName,
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 12,
-                    color: palette.textMuted,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-          Text(
-            timeStr,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: palette.textMuted,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20),
-        ],
+          ],
+        ),
       ),
     );
   }
