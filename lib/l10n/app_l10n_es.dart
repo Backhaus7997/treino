@@ -3642,6 +3642,12 @@ class AppL10nEs extends AppL10n {
   String get insightsDayMusclesHeading => 'MÚSCULOS DEL DÍA';
 
   @override
+  String get insightsDaySetsUnit => 'SETS';
+
+  @override
+  String get insightsBackButton => 'VOLVER';
+
+  @override
   String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';
 
   @override
@@ -10047,6 +10053,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get insightsDayMusclesHeading => 'MÚSCULOS DEL DÍA';
+
+  @override
+  String get insightsDaySetsUnit => 'SETS';
+
+  @override
+  String get insightsBackButton => 'VOLVER';
 
   @override
   String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';

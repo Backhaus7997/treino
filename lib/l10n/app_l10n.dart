@@ -6410,6 +6410,18 @@ abstract class AppL10n {
   /// **'MÚSCULOS DEL DÍA'**
   String get insightsDayMusclesHeading;
 
+  /// Unidad que va después de la cantidad en cada fila de la tarjeta de músculos del día de InsightsScreen (p. ej. «6 SETS»). Va en mayúsculas porque se dibuja con la tipografía de etiquetas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SETS'**
+  String get insightsDaySetsUnit;
+
+  /// Botón del pie de InsightsScreen: vuelve a la pantalla anterior o a Inicio (_safePopOrHome).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLVER'**
+  String get insightsBackButton;
+
   /// Section header for the shared DailyHeatmapSection (per-day body heat-map + day-strip) in the coach's mobile athlete detail screen (charts-redesign PR2b, AD5).
   ///
   /// In es_AR, this message translates to:

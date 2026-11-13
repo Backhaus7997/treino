@@ -7,6 +7,8 @@ import 'package:treino/features/insights/application/insights_providers.dart';
 import 'package:treino/features/insights/domain/muscle_group.dart';
 import 'package:treino/features/insights/domain/weekly_insights.dart';
 import 'package:treino/features/insights/presentation/volume_by_group_screen.dart';
+import 'package:treino/features/workout/application/exercise_providers.dart';
+import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 /// [stats-hub] Dedicated "Volumen por grupo" screen — promoted from
@@ -78,5 +80,52 @@ void main() {
       find.text('Necesitás una rutina asignada para ver tu volumen objetivo.'),
       findsOneWidget,
     );
+  });
+
+  // QA-498 / #1825: `ref.invalidate` NO cascada, y `exercisesProvider` no es
+  // autoDispose: invalidar solo la semana re-leía el MISMO error cacheado del
+  // catálogo y el reintento no recuperaba nunca. El reintento tiene que
+  // invalidar también el catálogo (`retryWeekInsights`).
+  testWidgets(
+      'el reintento invalida el catálogo: se recupera de un fallo en frío',
+      (tester) async {
+    final weekStart = mondayOfWeek(DateTime.now().toLocal());
+    var lecturasDelCatalogo = 0;
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [
+        exercisesProvider.overrideWith((ref) async {
+          lecturasDelCatalogo++;
+          if (lecturasDelCatalogo == 1) throw StateError('catálogo sin red');
+          return const <Exercise>[];
+        }),
+        // La semana depende del catálogo, como la real.
+        athleteWeekInsightsProvider((uid: 'u1', weekStart: weekStart))
+            .overrideWith((ref) async {
+          await ref.watch(exercisesProvider.future);
+          return WeeklyInsights(
+            weekStart: weekStart,
+            weekEnd: weekStart.add(const Duration(days: 6)),
+            daysTrained: List<bool>.filled(7, false),
+            sessionsCount: 2,
+            plannedSessionsCount: 5,
+            setsByGroup: const {MuscleGroupDisplay.pecho: 6},
+            targetByGroup: const {MuscleGroupDisplay.pecho: 10},
+          );
+        }),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reintentar'), findsOneWidget);
+    expect(find.text('6 / 10 sets'), findsNothing);
+
+    await tester.tap(find.text('Reintentar'));
+    await tester.pumpAndSettle();
+
+    expect(lecturasDelCatalogo, 2,
+        reason: 'reintentar tiene que volver a leer el catálogo');
+    expect(find.text('Reintentar'), findsNothing);
+    expect(find.text('6 / 10 sets'), findsOneWidget);
   });
 }

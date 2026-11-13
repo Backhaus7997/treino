@@ -697,6 +697,7 @@ class _MuscleSetsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final hasSets = sets > 0;
     final dotColor = hasSets ? palette.accent : palette.textMuted;
     final labelColor = hasSets ? palette.textPrimary : palette.textMuted;
@@ -730,7 +731,7 @@ class _MuscleSetsRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Text(
-          'SETS',
+          l10n.insightsDaySetsUnit,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w600,
             fontSize: 11,
@@ -931,6 +932,7 @@ class _VolverButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton(
@@ -943,7 +945,7 @@ class _VolverButton extends StatelessWidget {
           ),
         ),
         child: Text(
-          'VOLVER',
+          l10n.insightsBackButton,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 14,
