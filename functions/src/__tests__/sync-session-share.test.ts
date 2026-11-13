@@ -400,6 +400,39 @@ describe("status leaves active → share revoked", () => {
     expect(store.ops).toEqual([`get:${ATHLETE}`, `delete:${ATHLETE}`]);
   });
 
+  it("is INERT on pending → terminated: a request that never was active has no share to revoke (#1812)", async () => {
+    // Rechazo, cancelación, o una solicitud DUPLICADA del mismo par. El share
+    // que hay en el store es el del vínculo VIVO del mismo par —mismo trainerId,
+    // así que el chequeo de propiedad lo dejaría borrar— y un `pending` nunca
+    // llegó a otorgarlo.
+    const store = installFirestore({ [ATHLETE]: TRAINER_A });
+
+    await syncSessionShareHandler(
+      APP,
+      link("pending"),
+      link("terminated", TRAINER_A, {
+        terminationReason: "cancelled-by-athlete",
+      }),
+    );
+
+    expect(shareOwner(store)).toBe(TRAINER_A);
+    // Ni siquiera lee: sale antes del `get()`.
+    expect(store.ops).toEqual([]);
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining("solicitud pending terminada"),
+      { trainerId: TRAINER_A, athleteId: ATHLETE },
+    );
+  });
+
+  it("still revokes on paused → terminated (la guarda es sólo de las pending)", async () => {
+    const store = installFirestore({ [ATHLETE]: TRAINER_A });
+
+    await syncSessionShareHandler(APP, link("paused"), link("terminated"));
+
+    expect(store.docs.has(ATHLETE)).toBe(false);
+    expect(store.ops).toEqual([`get:${ATHLETE}`, `delete:${ATHLETE}`]);
+  });
+
   it("still cleans up an orphan share on a non-active no-op write", async () => {
     // The revoke path does not check for a transition, on purpose: a share that
     // outlived its link is stale by definition. Safe because the grant path now
@@ -590,6 +623,26 @@ describe("sequences over a persisting store", () => {
     await syncSessionShareHandler(APP, link("active"), link("active"));
     expect(shareOwner(store)).toBe(TRAINER_A);
     expect(store.ops).toEqual([`get:${ATHLETE}`, `set:${ATHLETE}`]);
+  });
+
+  it("#1812: aceptar una solicitud y terminar su duplicada NO deja al PF sin el share", async () => {
+    // Dos solicitudes pending del mismo par. El PF acepta la A (otorga el share)
+    // y la B (`pending → terminated`) se termina un instante después. Los dos
+    // eventos son triggers independientes y no hay orden entre ellos: sin la
+    // guarda, si el de la B corría DESPUÉS, el PF perdía sessions, setLogs y
+    // measurements del alumno hasta la próxima escritura sobre la A.
+    const store = installFirestore();
+    const duplicada = link("terminated", TRAINER_A, { terminationReason: "cancelled-by-athlete" });
+
+    await syncSessionShareHandler(APP, link("pending"), link("active"));
+    await syncSessionShareHandler(APP, link("pending"), duplicada);
+    expect(shareOwner(store)).toBe(TRAINER_A);
+
+    // Y al revés: el evento de la B primero no cambia nada.
+    store.docs.clear();
+    await syncSessionShareHandler(APP, link("pending"), duplicada);
+    await syncSessionShareHandler(APP, link("pending"), link("active"));
+    expect(shareOwner(store)).toBe(TRAINER_A);
   });
 
   it("KNOWN LIMIT: PF1 resuming its paused link takes the share back from PF2", async () => {

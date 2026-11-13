@@ -11,9 +11,11 @@ import 'session_recognition.dart';
 
 /// Un récord personal logrado EN esta sesión: el valor de hoy superó
 /// estrictamente al mejor histórico ([previousBest]) de ese [recordType].
-/// Solo los 3 tipos por-set del detalle de ejercicio (peso máximo, 1RM
-/// estimado, mejor volumen de set) — `bestSessionVolume` queda afuera a
-/// propósito: el volumen de la sesión ya tiene su tile en el grid 2×2.
+/// Solo los tipos por-set del detalle de ejercicio (peso máximo, 1RM
+/// estimado, mejor volumen de set y, en un ejercicio por tiempo o distancia,
+/// el tiempo / los metros más largos — #1715, en segundos y metros) —
+/// `bestSessionVolume` queda afuera a propósito: el volumen de la sesión ya
+/// tiene su tile en el grid 2×2.
 ///
 /// [set]/[previousSet]: sólo en `bestSetVolume`, la serie que dio [value] y
 /// la que dio [previousBest]. El resumen muestra «80 kg × 7», no el producto
@@ -141,8 +143,6 @@ SessionHighlights aggregateSessionHighlights({
 
     SetLog? best;
     var volume = 0.0;
-    int? bestDuration;
-    double? bestDistance;
     for (final log in logs) {
       if (log.weightKg > 0) volume += log.reps * log.weightKg;
       if (best == null ||
@@ -150,15 +150,11 @@ SessionHighlights aggregateSessionHighlights({
           (log.weightKg == best.weightKg && log.reps > best.reps)) {
         best = log;
       }
-      final seconds = log.durationSeconds;
-      if (seconds != null && (bestDuration == null || seconds > bestDuration)) {
-        bestDuration = seconds;
-      }
-      final meters = log.distanceMeters;
-      if (meters != null && (bestDistance == null || meters > bestDistance)) {
-        bestDistance = meters;
-      }
     }
+    // La misma regla que las series históricas del agregador (#1715): así el
+    // récord de hoy y el de Insights no pueden divergir.
+    final bestDuration = bestDurationSecondsOf(logs);
+    final bestDistance = bestDistanceMetersOf(logs);
 
     final hadExerciseBefore = prior.any((s) =>
         (priorLogsBySession[s.id] ?? const []).any((l) => l.exerciseId == id));
@@ -237,6 +233,11 @@ SessionHighlights aggregateSessionHighlights({
       checkRecord(ProgressionRecordType.heaviestWeight, todayMaxWeight);
       checkRecord(ProgressionRecordType.oneRepMax, todayOneRepMax);
       checkRecord(ProgressionRecordType.bestSetVolume, todayBestSetVolume);
+      // #1715: lo guardado es lo que el atleta completó, así que el récord de
+      // una plancha sube cuando el plan sube. Igualar la marca no cuenta.
+      checkRecord(
+          ProgressionRecordType.longestDuration, bestDuration?.toDouble());
+      checkRecord(ProgressionRecordType.longestDistance, bestDistance);
       recordCount += records.length;
     }
 

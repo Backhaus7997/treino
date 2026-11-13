@@ -207,9 +207,11 @@ void main() {
 
     testWidgets(
       'shows "Usuario eliminado" while chatsForCurrentUserProvider is still '
-      'loading (documented original behavior, preserved for the '
-      'peer-unknown path: otherUid stays null → pubAsync is `data(null)`, '
-      'NOT `loading` → falls into the data branch with p == null)',
+      'loading AND the chat doc does not exist (documented original '
+      'behavior, preserved for the peer-unknown path: otherUid stays null → '
+      'pubAsync is `data(null)`, NOT `loading` → falls into the data branch '
+      'with p == null). Con el doc del chat cargando o presente el header '
+      'resuelve al peer: ver el group de #1758.',
       (tester) async {
         final chatsController = StreamController<List<Chat>>();
         addTearDown(chatsController.close);
@@ -217,6 +219,9 @@ void main() {
         final container = _buildContainer(overrides: [
           chatsForCurrentUserProvider.overrideWith(
             (ref) => chatsController.stream,
+          ),
+          chatByIdProvider(_chatId).overrideWith(
+            (ref) => Stream<Chat?>.value(null),
           ),
         ]);
         addTearDown(container.dispose);
@@ -269,6 +274,94 @@ void main() {
           ),
           userPublicProfileProvider(_athleteUid).overrideWith(
             (ref) => Stream<UserPublicProfile?>.value(null),
+          ),
+        ]);
+        addTearDown(container.dispose);
+
+        await _pumpPane(
+          tester,
+          container,
+          const ChatDetailPane(chatId: _chatId),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Usuario eliminado'), findsOneWidget);
+      },
+    );
+  });
+
+  // #1758 — un chat recién creado desde la ficha del alumno no está en
+  // `chatsForCurrentUserProvider` (la query ordena por `lastMessageAt` y
+  // Firestore excluye los docs sin el campo). El header tiene que resolver al
+  // interlocutor leyendo el doc del chat, no caer en «Usuario eliminado».
+  group(
+      'ChatDetailPane header — chat sin mensajes, fuera de '
+      'chatsForCurrentUserProvider', () {
+    testWidgets(
+      'resuelve el nombre por el doc del chat (no dice «Usuario eliminado»)',
+      (tester) async {
+        final container = _buildContainer(overrides: [
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.value(const []),
+          ),
+          chatByIdProvider(_chatId).overrideWith(
+            (ref) => Stream<Chat?>.value(_stubChat()),
+          ),
+          userPublicProfileProvider(_athleteUid).overrideWith(
+            (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+          ),
+        ]);
+        addTearDown(container.dispose);
+
+        await _pumpPane(
+          tester,
+          container,
+          const ChatDetailPane(chatId: _chatId),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Agustín'), findsOneWidget);
+        expect(find.text('Usuario eliminado'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'mientras el doc del chat carga muestra «…», no «Usuario eliminado»',
+      (tester) async {
+        final chatController = StreamController<Chat?>();
+        addTearDown(chatController.close);
+
+        final container = _buildContainer(overrides: [
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.value(const []),
+          ),
+          chatByIdProvider(_chatId)
+              .overrideWith((ref) => chatController.stream),
+        ]);
+        addTearDown(container.dispose);
+
+        await _pumpPane(
+          tester,
+          container,
+          const ChatDetailPane(chatId: _chatId),
+        );
+        await tester.pump();
+
+        expect(find.text('…'), findsOneWidget);
+        expect(find.text('Usuario eliminado'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'si el doc del chat no existe, el header sigue diciendo «Usuario '
+      'eliminado» (no inventa un nombre)',
+      (tester) async {
+        final container = _buildContainer(overrides: [
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.value(const []),
+          ),
+          chatByIdProvider(_chatId).overrideWith(
+            (ref) => Stream<Chat?>.value(null),
           ),
         ]);
         addTearDown(container.dispose);

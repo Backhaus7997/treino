@@ -1082,6 +1082,18 @@ abstract class AppL10n {
   /// **'MIS ARCHIVOS'**
   String get athleteFilesButtonLabel;
 
+  /// Botón de la tab Coach, con el vínculo pausado, que lleva a Entrenar donde sigue el plan que el PF le asignó.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS RUTINAS'**
+  String get athleteRoutinesButtonLabel;
+
+  /// Aviso de la card del PF en la tab Coach cuando el vínculo está pausado. Sólo afirma lo que la app y las reglas permiten con un vínculo pausado: ver las rutinas asignadas y los archivos compartidos, y escribirle al PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas y archivos— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.'**
+  String get athleteLinkPausedNote;
+
   /// Título de la pantalla read-only del plan nutricional del alumno.
   ///
   /// In es_AR, this message translates to:
@@ -5930,6 +5942,24 @@ abstract class AppL10n {
   /// **'No pudimos terminar el vínculo.'**
   String get coachHubDashboardTerminateLinkError;
 
+  /// Línea que se suma al diálogo de terminar un vínculo (Coach Hub y tab Coach del PF) cuando el PF tiene sesiones futuras con ese alumno: terminar el vínculo las cancela (#1792).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{También se cancela 1 sesión agendada con este alumno y se le avisa.} other{También se cancelan {count} sesiones agendadas con este alumno y se le avisa.}}'**
+  String coachHubTerminateLinkAppointmentsWarning(int count);
+
+  /// No description provided for @coachHubTerminateLinkAppointmentsWarningUnknown.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos revisar tus sesiones con este alumno. Las que tengas a futuro también se cancelan y se le avisa.'**
+  String get coachHubTerminateLinkAppointmentsWarningUnknown;
+
+  /// No description provided for @coachHubTerminateLinkAppointmentsError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cancelar las sesiones futuras con este alumno, así que el vínculo sigue activo. Probá de nuevo.'**
+  String get coachHubTerminateLinkAppointmentsError;
+
   /// Coach Hub web dashboard — snackbar when resume() fails.
   ///
   /// In es_AR, this message translates to:
@@ -6943,6 +6973,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Volumen'**
   String get progressionMetricVolume;
+
+  /// [#1715] Label for the longest-timed-set metric (chip, personal record, session PR) of a timed exercise like a plank.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tiempo máximo'**
+  String get progressionMetricLongestDuration;
+
+  /// [#1715] Label for the longest-distance-set metric (chip, personal record, session PR) of a distance exercise like a farmer's carry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Distancia máxima'**
+  String get progressionMetricLongestDistance;
 
   /// Frecuencia stat label showing session count in the last 8 weeks.
   ///

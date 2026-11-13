@@ -303,12 +303,7 @@ class AppointmentRepository {
         .where('status', isEqualTo: 'confirmed')
         .get();
 
-    // Firestore caps a WriteBatch at 500 operations; chunk to stay under it so
-    // a long, dense series can't overflow a single commit.
-    const maxBatchOps = 500;
-    var batch = _firestore.batch();
-    var opsInBatch = 0;
-    var count = 0;
+    final refs = <DocumentReference<Map<String, Object?>>>[];
     final isTrainer = actorUid == trainerId;
     for (final d in snap.docs) {
       final appt = Appointment.fromJson({...d.data(), 'id': d.id});
@@ -324,30 +319,98 @@ class AppointmentRepository {
         // boundary.
         continue;
       }
-      batch.update(d.reference, {
-        'status': 'cancelled',
-        'cancelledAt': FieldValue.serverTimestamp(),
-        'cancelledBy': actorUid,
-        'cancellationLog': FieldValue.arrayUnion([
-          <String, Object?>{
-            'byUid': actorUid,
-            'atMs': atMs,
-            if (reason != null) 'reason': reason,
-          },
-        ]),
-      });
-      count++;
-      opsInBatch++;
-      if (opsInBatch == maxBatchOps) {
-        await batch.commit().boundedWrite;
-        batch = _firestore.batch();
-        opsInBatch = 0;
-      }
+      refs.add(d.reference);
     }
-    if (opsInBatch > 0) {
+    await _commitCancellations(
+      refs,
+      actorUid: actorUid,
+      reason: reason,
+      atMs: atMs,
+    );
+    return refs.length;
+  }
+
+  // ─── cancelFutureForPair ───────────────────────────────────────────────────
+  //
+  // Al TERMINAR un vínculo, los turnos futuros del par siguen `confirmed`
+  // ocupando horario (#1792): ninguna Cloud Function los toca (la única que
+  // cancela turnos es la cascada de borrado de cuenta). Esto cancela los del PF
+  // que todavía no empezaron, por el MISMO camino que `cancel()` (update parcial
+  // del Path 1 de las reglas, sin gate de 24h para el PF), así que el alumno
+  // recibe las notificaciones de siempre. Sólo lo llama el PF (el atleta no puede
+  // cancelar a menos de 24h). Queries de igualdad pura: sin índice compuesto.
+
+  /// Los turnos `confirmed` del par que todavía no empezaron.
+  Future<List<Appointment>> listFutureConfirmedForPair({
+    required String trainerId,
+    required String athleteId,
+    DateTime? now,
+  }) async {
+    final reference = now ?? nowWall();
+    final snap = await _appointments
+        .where('trainerId', isEqualTo: trainerId)
+        .where('athleteId', isEqualTo: athleteId)
+        .where('status', isEqualTo: 'confirmed')
+        .get();
+    return snap.docs
+        .map((d) => Appointment.fromJson({...d.data(), 'id': d.id}))
+        .where((a) => a.startsAt.isAfter(reference))
+        .toList();
+  }
+
+  /// Cancela los turnos futuros del par y devuelve cuántos fueron.
+  Future<int> cancelFutureForPair({
+    required String trainerId,
+    required String athleteId,
+    required String actorUid,
+    String? reason,
+    DateTime? now,
+  }) async {
+    final futuros = await listFutureConfirmedForPair(
+      trainerId: trainerId,
+      athleteId: athleteId,
+      now: now,
+    );
+    await _commitCancellations(
+      [for (final a in futuros) _appointments.doc(a.id)],
+      actorUid: actorUid,
+      reason: reason,
+      // TRUE UTC instant, como `cancel()`: registra CUÁNDO se canceló.
+      atMs: DateTime.now().toUtc().millisecondsSinceEpoch,
+    );
+    return futuros.length;
+  }
+
+  /// Marca como canceladas [refs], en lotes. Lo común de [cancelFutureSeries] y
+  /// [cancelFutureForPair]: el update parcial que las reglas aceptan en el
+  /// Path 1 (ver `cancel()`).
+  Future<void> _commitCancellations(
+    List<DocumentReference<Map<String, Object?>>> refs, {
+    required String actorUid,
+    required int atMs,
+    String? reason,
+  }) async {
+    // Firestore caps a WriteBatch at 500 operations; chunk to stay under it so
+    // a long, dense series can't overflow a single commit.
+    const maxBatchOps = 500;
+    for (var i = 0; i < refs.length; i += maxBatchOps) {
+      final batch = _firestore.batch();
+      for (final ref in refs.skip(i).take(maxBatchOps)) {
+        batch.update(ref, {
+          'status': 'cancelled',
+          'cancelledAt': FieldValue.serverTimestamp(),
+          'cancelledBy': actorUid,
+          'cancellationLog': FieldValue.arrayUnion([
+            <String, Object?>{
+              'byUid': actorUid,
+              'atMs': atMs,
+              if (reason != null) 'reason': reason,
+            },
+          ]),
+        });
+      }
       await batch.commit().boundedWrite;
     }
-    return count;
   }
 
   // ─── updateNotes ──────────────────────────────────────────────────────────

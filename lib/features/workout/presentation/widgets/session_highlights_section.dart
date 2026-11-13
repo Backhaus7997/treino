@@ -13,6 +13,7 @@ import '../../application/session_highlights.dart';
 import '../../application/session_recognition.dart';
 import '../../domain/exercise_progression.dart';
 import 'best_set_label.dart';
+import 'mmss.dart';
 
 // NOTA l10n: los ARB los está tocando otra rama en vuelo, así que los strings
 // NUEVOS de este archivo van como literales es-AR con TODO(l10n) — mismo
@@ -203,6 +204,10 @@ class _SessionRecordRow extends StatelessWidget {
       ProgressionRecordType.bestSetVolume =>
         l10n.progressionMetricBestSetVolume,
       ProgressionRecordType.bestSessionVolume => l10n.progressionMetricVolume,
+      ProgressionRecordType.longestDuration =>
+        l10n.progressionMetricLongestDuration,
+      ProgressionRecordType.longestDistance =>
+        l10n.progressionMetricLongestDistance,
     };
     // #1512: la mejor serie se muestra COMO SERIE («80 kg × 7»), no como el
     // producto «560 kg·reps», que era jerga. El resto de los récords son un
@@ -213,11 +218,20 @@ class _SessionRecordRow extends StatelessWidget {
     final previousSet = record.previousSet;
     final showsSet =
         record.recordType == ProgressionRecordType.bestSetVolume && set != null;
-    String value(double v) => _formatRecordValue(v,
-        isOneRepMax: isOneRepMax, localeName: l10n.localeName);
+    // #1715: el tiempo se lee «01:15» (sin unidad) y la distancia en metros.
+    final isDuration =
+        record.recordType == ProgressionRecordType.longestDuration;
+    String value(double v) => isDuration
+        ? formatMMSS(v.round())
+        : _formatRecordValue(v,
+            isOneRepMax: isOneRepMax, localeName: l10n.localeName);
 
     // Con la serie, la unidad va DENTRO del texto («kg × 7»): no hay sufijo.
-    final unit = showsSet ? '' : 'kg';
+    final unit = showsSet || isDuration
+        ? ''
+        : record.recordType == ProgressionRecordType.longestDistance
+            ? 'm'
+            : 'kg';
     final newValue = showsSet ? serie(set) : value(record.value);
     final previous = !showsSet
         ? value(record.previousBest)

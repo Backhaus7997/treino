@@ -28,8 +28,14 @@ class PostRepository {
   /// doc under this same id.
   String newPostId() => _posts.doc().id;
 
-  /// Creates a post doc. Reads `users/{uid}.gymId` once to denormalize
-  /// `authorGymId`. Returns the persisted post with its assigned id.
+  /// Creates a post doc. Reads `users/{uid}` once to denormalize the author's
+  /// gym, name and avatar. Returns the persisted post with its assigned id.
+  ///
+  /// #1698 — las reglas exigen que `authorGymId`, `authorDisplayName` y
+  /// `authorAvatarUrl` coincidan con `users/{uid}` del autor. Lo que trae
+  /// [input] viene del perfil en memoria, que puede ir un paso atrás del doc
+  /// (un cambio de nombre o de gym desde otro dispositivo), así que cuando el
+  /// doc existe manda él, y [input] sólo rellena lo que el doc no tiene.
   Future<Post> create(Post input) async {
     // Guideline 1.2 de App Review: el contenido con terminos vetados no llega
     // a postearse. Va antes de la lectura del user doc para no gastar un round
@@ -39,18 +45,27 @@ class PostRepository {
     // Read gymId from the user doc for denormalization (ADR: authorGymId)
     final userSnap =
         await _firestore.collection('users').doc(input.authorUid).get();
-    final rawGymId = userSnap.data()?['gymId'] as String?;
+    final userData = userSnap.data();
+    final rawGymId = userData?['gymId'] as String?;
     // "SIN GYM" no es un gym: un post no se denormaliza con el sentinel.
     final gymId = hasRealGym(rawGymId) ? rawGymId : null;
+    final displayName = userData?['displayName'];
+    final avatarUrl = userData?['avatarUrl'];
 
-    // If input already has an explicit authorGymId (e.g., from tests), keep it;
-    // otherwise use the value from the user doc.
-    final resolvedGymId = input.authorGymId ?? gymId;
+    // Sin doc de usuario (un test, o una cuenta a medio alta) no hay nada que
+    // pisar: queda lo que trae [input] y las reglas deciden.
+    final resolvedGymId = userSnap.exists ? gymId : input.authorGymId;
 
     final ref = _posts.doc(input.id.isEmpty ? null : input.id);
     final post = input.copyWith(
       id: ref.id,
       authorGymId: resolvedGymId,
+      authorDisplayName: displayName is String && displayName.isNotEmpty
+          ? displayName
+          : input.authorDisplayName,
+      authorAvatarUrl: userSnap.exists
+          ? (avatarUrl is String ? avatarUrl : null)
+          : input.authorAvatarUrl,
     );
     await ref.set(post.toJson());
     return post;

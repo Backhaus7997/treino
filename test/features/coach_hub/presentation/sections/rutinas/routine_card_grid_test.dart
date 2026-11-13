@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart'
     show trainerLinkRepositoryProvider, trainerLinksStreamProvider;
+import 'package:treino/features/coach/application/template_quota_provider.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/routine_card_grid.dart';
@@ -22,6 +24,7 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../../../helpers/fake_analytics_service.dart';
 import '../../../../../helpers/trainer_links.dart';
@@ -615,6 +618,127 @@ void _menuDeRutinasTests() {
       expect(find.text('Poné un nombre.'), findsOneWidget);
       // El diálogo sigue abierto.
       expect(find.byKey(const Key('publicar_nombre_field')), findsOneWidget);
+    });
+  });
+
+  // #1784: el server rebota el create/restore de una plantilla con
+  // `permission-denied` (regla `templateQuotaOk`). El aviso del tope necesita
+  // un número concreto; sin él `mostrarAvisoTopeDePlantillasPorRebote`
+  // devuelve `false` y no muestra nada — y los dos call sites de la grilla
+  // ignoraban ese `false`, así que el PF no veía NADA.
+  group('RoutineCard — el rebote del tope de plantillas no es silencioso', () {
+    setUpAll(() => registerFallbackValue(_routine(id: 'fallback')));
+
+    final denegado = FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'permission-denied',
+    );
+
+    Future<void> pumpConCuota(
+      WidgetTester tester,
+      Routine rutina,
+      RoutineRepository repo,
+      AsyncValue<TemplateQuota> cuota,
+    ) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          routineRepositoryProvider.overrideWithValue(repo),
+          templateQuotaProvider.overrideWithValue(cuota),
+          analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: RoutineCardGrid(routines: [rutina]),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> publicarComoPlantilla(WidgetTester tester) async {
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Publicar como plantilla'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Publicar'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'publicar como plantilla: el server rebota y NO hay tope conocido → '
+        'toast de error, no silencio', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createTemplate(any())).thenThrow(denegado);
+
+      await pumpConCuota(
+        tester,
+        _routine(id: 'r1', assignedTo: _athlete),
+        repo,
+        // El gate falla abierto mientras la cuota carga: pasa, y el server
+        // rebota.
+        const AsyncValue.loading(),
+      );
+      await publicarComoPlantilla(tester);
+
+      verify(() => repo.createTemplate(any())).called(1);
+      expect(
+          find.textContaining('tope de plantillas de tu plan'), findsOneWidget);
+      // Y no el genérico «probá de nuevo»: reintentar no sirve contra un tope.
+      expect(find.text('No se pudo. Probá de nuevo.'), findsNothing);
+    });
+
+    testWidgets(
+        'publicar como plantilla: el server rebota y SÍ hay tope conocido '
+        '(carrera) → el aviso del tope, no el toast', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createTemplate(any())).thenThrow(denegado);
+
+      await pumpConCuota(
+        tester,
+        _routine(id: 'r1', assignedTo: _athlete),
+        repo,
+        // 2 de 3: el gate local deja pasar (le queda un lugar), pero el
+        // server ya contaba 3.
+        const AsyncValue.data((limit: 3, count: 2)),
+      );
+      await publicarComoPlantilla(tester);
+
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(
+          find.textContaining('tope de plantillas de tu plan'), findsNothing);
+    });
+
+    testWidgets(
+        'recuperar una plantilla archivada: el server rebota y NO hay tope '
+        'conocido → toast de error, no silencio', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.unarchive(any())).thenThrow(denegado);
+
+      await pumpConCuota(
+        tester,
+        _routine(
+          id: 'r1',
+          source: RoutineSource.trainerTemplate,
+          status: RoutineStatus.archived,
+        ),
+        repo,
+        const AsyncValue.loading(),
+      );
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Recuperar'));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.unarchive('r1')).called(1);
+      expect(
+          find.textContaining('tope de plantillas de tu plan'), findsOneWidget);
     });
   });
 

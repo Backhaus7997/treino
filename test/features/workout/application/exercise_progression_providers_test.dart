@@ -355,4 +355,45 @@ void main() {
       expect(oldEx.periodsWithData, contains(ChartPeriod.last30d));
     });
   });
+
+  // ── #1715 — ejercicios por tiempo y por distancia ──────────────────────────
+
+  group('#1715 tiempo y distancia', () {
+    SetLog metricLog(String sessionId, String exId, String exName,
+            {int? seconds, double? meters}) =>
+        SetLog(
+          id: '${sessionId}_$exId',
+          exerciseId: exId,
+          exerciseName: exName,
+          setNumber: 1,
+          reps: 0,
+          weightKg: 0,
+          completedAt: DateTime(2025, 1, 1),
+          durationSeconds: seconds,
+          distanceMeters: meters,
+        );
+
+    test('las series por tiempo y por distancia marcan período; sin métrica no',
+        () async {
+      final sToday = _s('sToday', _artDay(0));
+      when(() => repo.listSetLogs(uid: 'a1', sessionId: 'sToday'))
+          .thenAnswer((_) async => [
+                metricLog('sToday', 'plank', 'Plancha', seconds: 60),
+                metricLog('sToday', 'carry', 'Farmer carry', meters: 40),
+                metricLog('sToday', 'old', 'Plancha vieja'),
+              ]);
+
+      final container = _container(repo: repo, sessions: [sToday]);
+      addTearDown(container.dispose);
+
+      final list =
+          await container.read(athleteExerciseListProvider('a1').future);
+
+      ExerciseListEntry entry(String id) =>
+          list.firstWhere((e) => e.exerciseId == id);
+      expect(entry('plank').periodsWithData, ChartPeriod.values.toSet());
+      expect(entry('carry').periodsWithData, ChartPeriod.values.toSet());
+      expect(entry('old').periodsWithData, isEmpty);
+    });
+  });
 }

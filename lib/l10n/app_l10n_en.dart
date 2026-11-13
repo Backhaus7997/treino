@@ -549,6 +549,13 @@ class AppL10nEn extends AppL10n {
   String get athleteFilesButtonLabel => 'MY FILES';
 
   @override
+  String get athleteRoutinesButtonLabel => 'MY ROUTINES';
+
+  @override
+  String get athleteLinkPausedNote =>
+      'Your trainer paused the link. What they already left you — routines and files — is still within reach, and you can message them. It resumes when your trainer reactivates it.';
+
+  @override
   String get athleteNutritionPlanScreenTitle => 'NUTRITION PLAN';
 
   @override
@@ -3306,6 +3313,27 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t end the link.';
 
   @override
+  String coachHubTerminateLinkAppointmentsWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count scheduled sessions with this student will also be cancelled, and they will be notified.',
+      one:
+          '1 scheduled session with this student will also be cancelled, and they will be notified.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get coachHubTerminateLinkAppointmentsWarningUnknown =>
+      'We couldn\'t check your sessions with this student. Any upcoming ones will also be cancelled, and they will be notified.';
+
+  @override
+  String get coachHubTerminateLinkAppointmentsError =>
+      'We couldn\'t cancel the upcoming sessions with this student, so the link is still active. Try again.';
+
+  @override
   String get coachHubDashboardResumeLinkError =>
       'We couldn\'t resume the link.';
 
@@ -3900,6 +3928,12 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get progressionMetricVolume => 'Volume';
+
+  @override
+  String get progressionMetricLongestDuration => 'Longest time';
+
+  @override
+  String get progressionMetricLongestDistance => 'Longest distance';
 
   @override
   String progressionFrequency(int count) {

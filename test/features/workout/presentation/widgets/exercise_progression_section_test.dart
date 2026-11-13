@@ -73,8 +73,11 @@ PersonalRecordsListLabels _personalRecordsLabels() =>
       oneRepMaxLabel: '1RM',
       bestSetVolumeLabel: 'Mejor serie',
       bestSessionVolumeLabel: 'Volumen',
+      longestDurationLabel: 'Tiempo máximo',
+      longestDistanceLabel: 'Distancia máxima',
       volumeUnit: 'kg·reps',
       weightUnit: 'kg',
+      distanceUnit: 'm',
       emptyText: 'Sin datos suficientes para este ejercicio.',
       localeName: 'es_AR',
     );

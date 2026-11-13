@@ -682,6 +682,160 @@ void main() {
     });
   });
 
+  // ── #1715 — ejercicios por TIEMPO y por DISTANCIA ──────────────────────────
+  // Una plancha o un carry guardan peso 0 y reps 0 (#1702): las series de peso
+  // quedan vacías por construcción (#368) y no había gráfico ni récord.
+  group('aggregateExerciseProgression [#1715 — tiempo y distancia]', () {
+    // Helper LOCAL: `_log` de arriba es de reps/peso y no lleva métrica.
+    SetLog metricLog(
+      String sessionId,
+      String exerciseId, {
+      int? seconds,
+      double? meters,
+      int setNumber = 1,
+      int reps = 0,
+      double weightKg = 0,
+    }) =>
+        SetLog(
+          id: '${sessionId}_${exerciseId}_$setNumber',
+          exerciseId: exerciseId,
+          exerciseName: exerciseId == 'plank' ? 'Plancha' : 'Farmer carry',
+          setNumber: setNumber,
+          reps: reps,
+          weightKg: weightKg,
+          completedAt: DateTime(2025, 1, 1),
+          durationSeconds: seconds,
+          distanceMeters: meters,
+        );
+
+    final s1 = _session('s1', DateTime(2025, 1, 5));
+    final s2 = _session('s2', DateTime(2025, 1, 10));
+    final s3 = _session('s3', DateTime(2025, 1, 15));
+
+    ExerciseProgression run(
+      String exerciseId,
+      Map<String, List<SetLog>> logs, {
+      ChartPeriodWindow? periodWindow,
+    }) =>
+        aggregateExerciseProgression(
+          exerciseId: exerciseId,
+          sessionsDesc: [s3, s2, s1],
+          logsBySession: logs,
+          now: DateTime(2025, 2, 1),
+          periodWindow: periodWindow,
+        );
+
+    test(
+        'plancha: la serie más larga de cada sesión, y el récord es la '
+        'PRIMERA vez que se logra el máximo', () {
+      final result = run('plank', {
+        's1': [
+          metricLog('s1', 'plank', seconds: 30),
+          metricLog('s1', 'plank', seconds: 45, setNumber: 2),
+          metricLog('s1', 'plank', seconds: 40, setNumber: 3),
+        ],
+        's2': [metricLog('s2', 'plank', seconds: 75)],
+        's3': [metricLog('s3', 'plank', seconds: 75)],
+      });
+
+      expect(result.bestDurationSeries.map((p) => p.value), [45, 75, 75]);
+      expect(result.bestDistanceSeries, isEmpty);
+      expect(result.heaviestWeightSeries, isEmpty);
+      expect(result.oneRepMaxSeries, isEmpty);
+      expect(result.personalRecords.map((r) => r.recordType),
+          [ProgressionRecordType.longestDuration]);
+      expect(result.personalRecords.single.value, 75);
+      expect(result.personalRecords.single.achievedAt, s2.startedAt.toLocal());
+      expect(result.exerciseName, 'Plancha');
+    });
+
+    test('carry: los metros más largos de cada sesión, y su récord', () {
+      final result = run('carry', {
+        's1': [
+          metricLog('s1', 'carry', meters: 20),
+          metricLog('s1', 'carry', meters: 40, setNumber: 2),
+        ],
+        's2': [metricLog('s2', 'carry', meters: 37.5)],
+      });
+
+      expect(result.bestDistanceSeries.map((p) => p.value), [40, 37.5]);
+      expect(result.bestDurationSeries, isEmpty);
+      expect(result.personalRecords.map((r) => r.recordType),
+          [ProgressionRecordType.longestDistance]);
+      expect(result.personalRecords.single.value, 40);
+    });
+
+    test(
+        'series viejas sin métrica (antes de #1701) no hacen puntos, pero la '
+        'sesión cuenta en la frecuencia', () {
+      final result = run('plank', {
+        's1': [metricLog('s1', 'plank')],
+        's2': [metricLog('s2', 'plank', seconds: 0)],
+        's3': [metricLog('s3', 'plank', seconds: 50)],
+      });
+
+      expect(result.bestDurationSeries.map((p) => p.value), [50]);
+      expect(result.frequencySessionCount, 3);
+    });
+
+    test('un ejercicio de peso no genera series ni récords de tiempo', () {
+      final result = aggregateExerciseProgression(
+        exerciseId: 'squat',
+        sessionsDesc: _sessionsDesc,
+        logsBySession: _logsBySession,
+        now: DateTime(2025, 2, 1),
+      );
+
+      final types = result.personalRecords.map((r) => r.recordType);
+      expect(result.bestDurationSeries, isEmpty);
+      expect(result.bestDistanceSeries, isEmpty);
+      expect(types, isNot(contains(ProgressionRecordType.longestDuration)));
+      expect(types, isNot(contains(ProgressionRecordType.longestDistance)));
+      expect(result.heaviestWeightSeries, isNotEmpty);
+    });
+
+    test('plancha lastrada: peso y tiempo conviven, cada uno con su récord',
+        () {
+      final result = run('plank', {
+        's1': [metricLog('s1', 'plank', seconds: 45, reps: 1, weightKg: 10)],
+        's2': [metricLog('s2', 'plank', seconds: 60, reps: 1, weightKg: 12.5)],
+      });
+
+      expect(result.heaviestWeightSeries.map((p) => p.value), [10, 12.5]);
+      expect(result.bestDurationSeries.map((p) => p.value), [45, 60]);
+      expect(result.personalRecords.map((r) => r.recordType), [
+        ProgressionRecordType.heaviestWeight,
+        ProgressionRecordType.oneRepMax,
+        ProgressionRecordType.bestSetVolume,
+        ProgressionRecordType.bestSessionVolume,
+        ProgressionRecordType.longestDuration,
+      ]);
+    });
+
+    test('helpers: ignoran null y no positivos; isChartableSet', () {
+      SetLog set({int? seconds, double? meters, double kg = 0}) => SetLog(
+            id: 'x',
+            exerciseId: 'e',
+            exerciseName: 'E',
+            setNumber: 1,
+            reps: 0,
+            weightKg: kg,
+            completedAt: DateTime(2025, 1, 1),
+            durationSeconds: seconds,
+            distanceMeters: meters,
+          );
+
+      expect(bestDurationSecondsOf([set(), set(seconds: 0)]), isNull);
+      expect(bestDurationSecondsOf([set(seconds: 30), set(seconds: 90)]), 90);
+      expect(bestDistanceMetersOf([set(), set(meters: 0)]), isNull);
+      expect(bestDistanceMetersOf([set(meters: 20), set(meters: 42.5)]), 42.5);
+      expect(isChartableSet(set(kg: 20)), isTrue);
+      expect(isChartableSet(set(seconds: 30)), isTrue);
+      expect(isChartableSet(set(meters: 10)), isTrue);
+      expect(isChartableSet(set()), isFalse);
+    });
+  });
+
   group('derivePersonalRecords [AD3 — pure fn, first-achieved date]', () {
     test('empty series → empty personal records', () {
       expect(derivePersonalRecords(const []), isEmpty);

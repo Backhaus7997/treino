@@ -30,6 +30,7 @@ import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
 import { trainerEntry } from "../mail/templates";
 import { TRAINER_ACCOUNT_DELETED_REASON } from "../cascade/trainer-data";
+import { DUPLICATE_REQUEST_REASON } from "../subscriptions/cancel-duplicate-pending-links";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -548,6 +549,54 @@ describe("SCENARIO-640: reason=account-deleted → sendFcm NOT called", () => {
     await expect(
       notifyOnLinkChangeHandler(testApp, "link-test", undefined, afterData, mock),
     ).resolves.not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1812 — `acceptTrainerLink` cancela la solicitud DUPLICADA al aceptar otra del mismo par
+// ---------------------------------------------------------------------------
+describe("#1812: reason=duplicate-request → sin push al PF, y se purga", () => {
+  const trainerId = "trainer-link-dup";
+  const athleteId = "athlete-link-dup";
+  const linkId = "link-dup";
+  const pending = { trainerId, athleteId, status: "pending" };
+  // Lo que escribe `cancelDuplicatePendingLinks`: la convención de una cancelación + el marcador.
+  const cancelada = { ...pending, status: "terminated", terminationReason: "cancelled-by-athlete" };
+  const duplicada = { ...cancelada, reason: DUPLICATE_REQUEST_REASON };
+  const linkDoc = () => db().collection("trainer_links").doc(linkId);
+
+  beforeEach(async () => {
+    await seedUser(trainerId, ["trainer-token-dup"]);
+    await seedUser(athleteId, ["athlete-token-dup"]);
+    await seedPublicProfile(athleteId, "Alumno Dup");
+  });
+  afterEach(async () => {
+    await linkDoc().delete().catch(() => undefined);
+    const hist = await db().collection("users").doc(trainerId).collection("notifications").get();
+    await Promise.all(hist.docs.map((d) => d.ref.delete()));
+    await cleanup(trainerId, athleteId);
+  });
+
+  it("no le manda «X canceló su solicitud» al PF que acaba de aceptar, y purga el doc", async () => {
+    const mock = makeMockMessaging();
+    await linkDoc().set(duplicada);
+
+    await notifyOnLinkChangeHandler(testApp, linkId, pending, duplicada, mock);
+
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
+    expect((await linkDoc().get()).exists).toBe(false); // es una cancelación: no queda terminated para siempre
+  });
+
+  it("CONTROL: la misma cancelación sin el marcador SÍ le avisa al PF (es lo que el marcador evita)", async () => {
+    const mock = makeMockMessaging();
+    await linkDoc().set(cancelada);
+
+    await notifyOnLinkChangeHandler(testApp, linkId, pending, cancelada, mock);
+
+    const calls = (mock.sendEachForMulticast as jest.Mock).mock.calls.map((c) => c[0] as MulticastMessage);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].tokens).toEqual(["trainer-token-dup"]);
+    expect(calls[0].notification?.title).toBe("Solicitud cancelada");
   });
 });
 
