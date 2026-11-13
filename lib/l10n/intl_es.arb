@@ -1050,6 +1050,8 @@
   "progressionSearchNoResults": "Ningún ejercicio tuyo coincide con la búsqueda.",
   "insightsTileMeasurementsTitle": "Medidas",
   "insightsTileMeasurementsSubtitle": "Peso y medidas corporales en el tiempo",
+  "profileInsightsTileTitle": "Insights",
+  "profileInsightsTileSubtitle": "Tu semana, tu racha y tus reportes",
   "measurementsScreenTitle": "MEDIDAS",
   "measurementsSelfLogNotesHint": "Notas (opcional)…",
   "measurementsAddSelfLog": "Registrar medición",

@@ -9,6 +9,9 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/domain/trainer_public_profile.dart';
 import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -16,6 +19,8 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile/domain/user_session_stats.dart';
 import 'package:treino/features/profile/profile_screen.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
 
 /// Minimal [AuthNotifier] stub that does not call Firebase.
@@ -71,6 +76,16 @@ Widget _buildScreen({required List<Override> overrides}) {
             builder: (_, __) => const Scaffold(body: Text('SETTINGS')),
           ),
         ],
+      ),
+      // Fullscreen, fuera del shell (como en `router.dart`): a Insights y a
+      // Medidas se entra con `push` y se vuelve con la flecha (#1719).
+      GoRoute(
+        path: '/home/insights',
+        builder: (_, __) => const Scaffold(body: Text('INSIGHTS_ROUTE')),
+      ),
+      GoRoute(
+        path: '/home/insights/measurements',
+        builder: (_, __) => const Scaffold(body: Text('MEASUREMENTS_ROUTE')),
       ),
     ],
   );
@@ -290,5 +305,107 @@ void main() {
     await tester.tap(find.text('Salir'));
     await tester.pumpAndSettle();
     expect(_signOuts, 1);
+  });
+
+  // #1719: Perfil no tenía entrada a Insights ni a Medidas; se llegaba sólo
+  // desde la card «Esta semana» de Inicio.
+  group('#1719 — acceso a Insights y Medidas desde Perfil', () {
+    List<Override> overrides() => [
+          ..._baseOverrides(),
+          userSessionStatsProvider.overrideWith((_) async =>
+              const UserSessionStats(
+                  totalSessions: 0, totalVolumeKg: 0, streak: 0)),
+        ];
+
+    // Viewport alto: todo el Perfil entra sin scrollear, así el toque no
+    // depende de dónde quede cada fila al hacer `ensureVisible`.
+    void usarViewportAlto(WidgetTester tester) {
+      tester.view.physicalSize = const Size(800, 2600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+    }
+
+    Finder boton(String label) => find.byWidgetPredicate(
+          (w) =>
+              w is Semantics &&
+              w.properties.button == true &&
+              w.properties.label == label,
+        );
+
+    testWidgets(
+        'el alumno ve Insights y Medidas en ENTRENAMIENTO, como botones con '
+        'etiqueta para lectores de pantalla', (tester) async {
+      usarViewportAlto(tester);
+      await tester.pumpWidget(_buildScreen(overrides: overrides()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ENTRENAMIENTO'), findsOneWidget);
+      expect(find.text('Mis ejercicios'), findsOneWidget);
+      expect(find.text('Insights'), findsOneWidget);
+      expect(find.text('Medidas'), findsOneWidget);
+      expect(boton('Insights'), findsOneWidget);
+      expect(boton('Medidas'), findsOneWidget);
+    });
+
+    testWidgets(
+        'tocar Insights abre /home/insights y la flecha vuelve a Perfil',
+        (tester) async {
+      usarViewportAlto(tester);
+      await tester.pumpWidget(_buildScreen(overrides: overrides()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Insights'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('INSIGHTS_ROUTE'), findsOneWidget);
+      expect(find.text('MEASUREMENTS_ROUTE'), findsNothing);
+
+      // `push`, no `go`: la pantalla de Perfil sigue debajo.
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      expect(navigator.canPop(), isTrue);
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('INSIGHTS_ROUTE'), findsNothing);
+      expect(find.text('Insights'), findsOneWidget);
+    });
+
+    testWidgets('tocar Medidas abre /home/insights/measurements',
+        (tester) async {
+      usarViewportAlto(tester);
+      await tester.pumpWidget(_buildScreen(overrides: overrides()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Medidas'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MEASUREMENTS_ROUTE'), findsOneWidget);
+      expect(find.text('INSIGHTS_ROUTE'), findsNothing);
+    });
+
+    testWidgets('el PF no tiene entrada a Insights ni a Medidas',
+        (tester) async {
+      const uid = 'trainer-uid';
+      await tester.pumpWidget(_buildScreen(overrides: [
+        ..._baseOverrides(),
+        currentUidProvider.overrideWithValue(uid),
+        userProfileProvider.overrideWith(
+          (_) => Stream.value(UserProfile(
+            uid: uid,
+            email: 'pf@test.com',
+            displayName: 'Coach Ana',
+            role: UserRole.trainer,
+            createdAt: DateTime(2025),
+            updatedAt: DateTime(2025),
+          )),
+        ),
+        trainerLinksStreamProvider.overrideWith((_) => Stream.value(const [])),
+        trainerByIdProvider(uid)
+            .overrideWith((_) async => const TrainerPublicProfile(uid: uid)),
+      ]));
+      await tester.pumpAndSettle();
+
+      // Es la vista del PF, no la del alumno.
+      expect(find.text('ENTRENAMIENTO'), findsNothing);
+      expect(find.text('Insights'), findsNothing);
+      expect(find.text('Medidas'), findsNothing);
+    });
   });
 }

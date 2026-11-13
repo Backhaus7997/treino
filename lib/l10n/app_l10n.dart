@@ -7431,6 +7431,18 @@ abstract class AppL10n {
   /// **'Peso y medidas corporales en el tiempo'**
   String get insightsTileMeasurementsSubtitle;
 
+  /// Perfil (alumno) → grupo ENTRENAMIENTO: título de la fila que abre el hub de Insights (/home/insights). La fila de Medidas, justo debajo, reusa insightsTileMeasurementsTitle/Subtitle (#1719).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Insights'**
+  String get profileInsightsTileTitle;
+
+  /// Perfil (alumno) → grupo ENTRENAMIENTO: subtítulo de la fila de Insights.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu semana, tu racha y tus reportes'**
+  String get profileInsightsTileSubtitle;
+
   /// Header title for the dedicated MeasurementsScreen.
   ///
   /// In es_AR, this message translates to:

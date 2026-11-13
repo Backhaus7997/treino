@@ -1530,6 +1530,8 @@
   "progressionSearchNoResults": "None of your exercises match the search.",
   "insightsTileMeasurementsTitle": "Body measurements",
   "insightsTileMeasurementsSubtitle": "Body weight and measurements over time",
+  "profileInsightsTileTitle": "Insights",
+  "profileInsightsTileSubtitle": "Your week, your streak and your reports",
   "measurementsScreenTitle": "BODY MEASUREMENTS",
   "measurementsSelfLogNotesHint": "Notes (optional)…",
   "measurementsAddSelfLog": "Log measurement",

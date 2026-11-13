@@ -4302,6 +4302,13 @@ class AppL10nEs extends AppL10n {
       'Peso y medidas corporales en el tiempo';
 
   @override
+  String get profileInsightsTileTitle => 'Insights';
+
+  @override
+  String get profileInsightsTileSubtitle =>
+      'Tu semana, tu racha y tus reportes';
+
+  @override
   String get measurementsScreenTitle => 'MEDIDAS';
 
   @override
@@ -10626,6 +10633,13 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get insightsTileMeasurementsSubtitle =>
       'Peso y medidas corporales en el tiempo';
+
+  @override
+  String get profileInsightsTileTitle => 'Insights';
+
+  @override
+  String get profileInsightsTileSubtitle =>
+      'Tu semana, tu racha y tus reportes';
 
   @override
   String get measurementsScreenTitle => 'MEDIDAS';
