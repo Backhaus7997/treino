@@ -2963,6 +2963,43 @@ void main() {
       // firma de una contaminación entre tests, no de un bug.
       await tester.pump(const Duration(seconds: 6));
     });
+
+    // El test de arriba mira el cartel en el primer frame, con el editor
+    // todavía en pantalla: la transición de salida recién arranca. El editor se
+    // dispone cuando ésta termina, y `dispose()` hacía `clearSnackBars()` — el
+    // aviso de «dónde quedó la copia» se iba a los ~300 ms, justo cuando el PF
+    // lo estaba leyendo en la pantalla de atrás, que es para lo que se avisa
+    // «antes de que el editor se cierre».
+    testWidgets(
+        'el aviso de la copia SOBREVIVE al cierre del editor: se lee en la '
+        'pantalla de atrás', (tester) async {
+      await editando(tester);
+      await cambiarAlgo(tester);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guardar como copia'));
+      // Sin pumpAndSettle: llevaría el reloj más allá de los 4 s del cartel y
+      // lo desharía por su propio timer. Y en pasos CHICOS: la animación de
+      // salida del cartel (la que dispara `clearSnackBars`) necesita frames
+      // POSTERIORES al `dispose`; un solo pump de 800 ms lo dispone en su
+      // último frame y el test mira antes de que el cartel llegue a irse.
+      await tester.pump();
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      expect(find.text('AlumnoDetail'), findsOneWidget,
+          reason:
+              'el editor ya se cerró: se está mirando la pantalla de atrás');
+      expect(
+        find.textContaining('La original quedó como estaba'),
+        findsOneWidget,
+        reason: 'el aviso es lo único que le dice al PF dónde quedó la copia',
+      );
+
+      await tester.pump(const Duration(seconds: 6)); // drenar el SnackBar
+    });
   });
 
   group('RoutineEditorWebScreen — rep ranges + notes (Fase 1)', () {

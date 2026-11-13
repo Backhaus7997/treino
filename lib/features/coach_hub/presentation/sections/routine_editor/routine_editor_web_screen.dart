@@ -577,6 +577,12 @@ class _RoutineEditorWebScreenState
   /// desmontado y `ScaffoldMessenger.of` explota.
   ScaffoldMessengerState? _messenger;
 
+  /// `true` cuando esta pantalla dejó un aviso PARA que se lea al salir
+  /// (hoy: dónde quedó la copia, [_avisarCopiaGuardada]). `dispose` no lo
+  /// limpia: se muestra justo antes de cerrar y es lo único que le dice al PF
+  /// qué pasó, en la pantalla de atrás.
+  bool _avisoDeSalida = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -589,7 +595,14 @@ class _RoutineEditorWebScreenState
     // en el `ScaffoldMessenger` de la app y no en la ruta, así que sin esto
     // «sale de la Semana 3 · Deshacer» te seguía hasta Chat — y su Deshacer
     // apuntaba a un editor que ya no existe.
-    _messenger?.clearSnackBars();
+    //
+    // Salvo el que se dejó A PROPÓSITO para la pantalla de atrás: el aviso de
+    // «Se guardó la copia» se muestra antes de salir y este `dispose` corre
+    // cuando la ruta ya se fue, así que lo borraba a los pocos cientos de ms,
+    // con el PF todavía leyéndolo. Al ser el último aviso mostrado, reemplazó
+    // al que hubiera (`showTreinoToast` cierra el visible): no queda ninguno
+    // del editor atrás.
+    if (!_avisoDeSalida) _messenger?.clearSnackBars();
     _exitGuard.soltar(this);
     _nameCtrl.dispose();
     _splitCtrl.dispose();
@@ -2713,6 +2726,7 @@ class _RoutineEditorWebScreenState
   /// sobrevive al `pop` y se lee en la pantalla de atrás — que es justo donde
   /// el PF va a buscar la copia.
   void _avisarCopiaGuardada(String nombre) {
+    _avisoDeSalida = true;
     showTreinoToast(
       context,
       'Se guardó «$nombre» en tus plantillas. La original quedó como '
