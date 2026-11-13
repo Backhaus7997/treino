@@ -1,6 +1,10 @@
+import 'dart:async' show StreamController;
+
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart' show GoRoute, RouteBase;
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/router.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
@@ -178,6 +182,67 @@ ProviderContainer _loggedInContainer({
       accountDeletionInFlightProvider.overrideWith((ref) => deletionInFlight),
     ],
   );
+}
+
+// ---------------------------------------------------------------------------
+// Rutas exclusivas del PF (#1743)
+// ---------------------------------------------------------------------------
+
+/// Plantilla de la ruta → una URL concreta que la matchea. Son las pantallas
+/// que SÓLO existen para el PF.
+const _rutasSoloDelPF = <String, String>{
+  '/coach/actividad': '/coach/actividad',
+  '/coach/athlete/:athleteId': '/coach/athlete/ath-1',
+  '/coach/athlete/:athleteId/plan/:routineId': '/coach/athlete/ath-1/plan/r-1',
+  '/coach/athlete/:athleteId/historial': '/coach/athlete/ath-1/historial',
+  '/coach/athlete/:athleteId/nutricion': '/coach/athlete/ath-1/nutricion',
+  '/coach/athlete/:athleteId/session/:sessionId':
+      '/coach/athlete/ath-1/session/s-1',
+  '/coach/athlete/:athleteId/plan/:routineId/exercise/:exerciseId':
+      '/coach/athlete/ath-1/plan/r-1/exercise/e-1',
+  '/coach/availability-editor': '/coach/availability-editor',
+  '/profile/availability-editor': '/profile/availability-editor',
+  '/profile/edit-trainer': '/profile/edit-trainer',
+  '/profile/trainer-preview/:uid': '/profile/trainer-preview/pf-1',
+  '/workout/routine-editor/:athleteId': '/workout/routine-editor/ath-1',
+  '/workout/import-pdf/:athleteId': '/workout/import-pdf/ath-1',
+  '/workout/import-pdf/:athleteId/preview': '/workout/import-pdf/ath-1/preview',
+  '/workout/template-editor': '/workout/template-editor',
+  '/facturacion/planes': '/facturacion/planes',
+};
+
+/// Rutas que el alumno SÍ usa y que cuelgan de los mismos prefijos
+/// (`/coach/...`, `/workout/...`, `/profile/...`): el gate no puede tocarlas.
+const _rutasDelAlumno = <String>[
+  '/home',
+  '/coach',
+  '/coach?tab=agenda',
+  '/coach/agenda',
+  '/coach/agenda?trainerId=pf-1',
+  '/coach/nutricion',
+  '/coach/archivos',
+  '/coach/chat/c-1?other=pf-1',
+  '/coach/trainer/pf-1',
+  '/workout',
+  '/workout/my-routine-editor',
+  '/workout/customize-routine/r-1',
+  '/profile',
+  '/profile/edit-personal',
+  '/feed/messages',
+];
+
+/// Path completo de cada ruta registrada, con el del padre pegado adelante.
+Iterable<String> _fullPaths(List<RouteBase> routes,
+    [String parent = '']) sync* {
+  for (final r in routes) {
+    if (r is GoRoute) {
+      final full = r.path.startsWith('/') ? r.path : '$parent/${r.path}';
+      yield full;
+      yield* _fullPaths(r.routes, full);
+    } else {
+      yield* _fullPaths(r.routes, parent);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -676,6 +741,150 @@ void main() {
 
       expect(location, equals('/verificar-mail'));
       expect(callRedirect(c, location), isNull);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // Gate de rol — las pantallas exclusivas del PF no abren para un alumno
+  // (#1743). Las escrituras ya las frenaba el servidor; la pantalla abría igual.
+  // ────────────────────────────────────────────────────────────────────────
+  group('gate de rol — rutas exclusivas del PF (#1743)', () {
+    Future<ProviderContainer> listo(UserProfile profile) async {
+      final c = _loggedInContainer(profile: profile);
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      return c;
+    }
+
+    test('la lista de rutas del test sigue siendo la del router REAL', () {
+      // Si una ruta se renombra, el gate (que compara por prefijo) se queda
+      // protegiendo un path que ya no existe y la nueva queda abierta. Que este
+      // test se caiga es la señal para actualizar `_rutasSoloPF`.
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      final router = buildRouter(
+        refreshListenable: ValueNotifier<int>(0),
+        read: c.read,
+      );
+      final registradas = _fullPaths(router.configuration.routes).toSet();
+
+      for (final plantilla in _rutasSoloDelPF.keys) {
+        expect(registradas, contains(plantilla),
+            reason: '$plantilla ya no está registrada en el router');
+      }
+    });
+
+    for (final entry in _rutasSoloDelPF.entries) {
+      final plantilla = entry.key;
+      final url = entry.value;
+
+      test('alumno + $plantilla → /home', () async {
+        final c = await listo(_athleteProfile());
+        expect(callRedirect(c, url), equals('/home'));
+      });
+
+      test('trainer + $plantilla → pasa', () async {
+        final c = await listo(_trainerComplete());
+        expect(callRedirect(c, url), isNull);
+      });
+    }
+
+    test('con query: el gate mira el path, no el string entero', () async {
+      final c = await listo(_athleteProfile());
+      expect(
+        callRedirect(c, '/coach/availability-editor?trainerId=seed-coach-001'),
+        equals('/home'),
+        reason: 'ofrecía Editar/Eliminar la disponibilidad de OTRO PF',
+      );
+      expect(
+        callRedirect(c, '/profile/edit-trainer?mode=onboarding'),
+        equals('/home'),
+      );
+    });
+
+    test('el PF con el perfil incompleto sigue yendo a SU onboarding',
+        () async {
+      // El gate del PF incompleto corre antes y es del trainer: no puede
+      // quedar mal parado por el gate de rol.
+      final c = await listo(_trainerIncomplete());
+      expect(
+        callRedirect(c, '/coach/athlete/ath-1'),
+        equals('/profile/edit-trainer?mode=onboarding'),
+      );
+      expect(callRedirect(c, '/profile/edit-trainer?mode=onboarding'), isNull);
+    });
+
+    for (final url in _rutasDelAlumno) {
+      test('alumno + $url → pasa (no es exclusiva del PF)', () async {
+        final c = await listo(_athleteProfile());
+        expect(callRedirect(c, url), isNull);
+      });
+    }
+
+    test('un prefijo parecido no cuenta: el match es por segmento', () async {
+      final c = await listo(_athleteProfile());
+      expect(callRedirect(c, '/coach/athletes'), isNull);
+      expect(callRedirect(c, '/profile/edit-trainer-x'), isNull);
+      expect(callRedirect(c, '/workout/routine-editors'), isNull);
+    });
+
+    test('mientras el perfil carga NO redirige (el router re-evalúa después)',
+        () async {
+      // Un PF con el perfil todavía sin leer no puede rebotar de su propia
+      // pantalla: sin perfil no hay forma de saber qué rol tiene.
+      final mockUser = MockUser();
+      when(() => mockUser.email).thenReturn(null);
+      final c = ProviderContainer(
+        overrides: [
+          authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(mockUser)),
+          ),
+          emailGateEnabledProvider
+              .overrideWith((ref) => Stream<bool>.value(false)),
+          userProfileProvider.overrideWith(
+            (ref) => StreamController<UserProfile?>().stream,
+          ),
+          userProfileHasPendingWritesProvider
+              .overrideWith((ref) => Stream<bool>.value(false)),
+          accountDeletionInFlightProvider.overrideWith((ref) => false),
+        ],
+      );
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      expect(c.read(userProfileProvider).isLoading, isTrue);
+      expect(callRedirect(c, '/coach/athlete/ath-1'), isNull);
+    });
+
+    test('sin sesión manda a /welcome, no a /home', () async {
+      final c = _anonContainer();
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      expect(callRedirect(c, '/coach/athlete/ath-1'), equals('/welcome'));
+    });
+
+    test('un alumno sin fecha de nacimiento cae en el gate de edad primero',
+        () async {
+      // Los requisitos de la cuenta (edad, mail, onboarding) le ganan al gate
+      // de rol: primero se completa la cuenta, después se decide a dónde va.
+      final c = await listo(_athletePreAgeGate());
+      expect(callRedirect(c, '/coach/athlete/ath-1'), equals('/birth-date'));
+    });
+
+    test('desde la ruta del PF el redirect llega a un punto fijo en /home',
+        () async {
+      final c = await listo(_athleteProfile());
+      var location = '/coach/athlete/ath-1/plan/r-1';
+      final visited = <String>[location];
+      for (var i = 0; i < 10; i++) {
+        final next = callRedirect(c, location);
+        if (next == null) break;
+        expect(visited, isNot(contains(next)),
+            reason: 'ciclo de redirect: ${visited.join(" → ")} → $next');
+        visited.add(next);
+        location = next;
+      }
+      expect(location, equals('/home'));
     });
   });
 }

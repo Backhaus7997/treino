@@ -135,6 +135,42 @@ const _publicRoutes = {
   '/forgot-password',
 };
 
+/// Rutas que existen SÓLO para el PF (#1743): una cuenta que no es `trainer`
+/// no entra, y [authRedirect] la manda a `/home`.
+///
+/// Cada entrada cubre la ruta y todo lo que cuelga de ella
+/// (`/coach/athlete` cubre `/coach/athlete/:id/plan/...`). Es una lista
+/// EXPLÍCITA y no un prefijo como `/coach/`: bajo `/coach` también viven
+/// pantallas del alumno (`agenda`, `nutricion`, `archivos`, `chat`, el perfil
+/// público de un PF) que un gate por prefijo rompería.
+///
+/// Si agregás una ruta que sólo el PF debería ver, sumala acá. Las escrituras
+/// las frena el servidor igual, pero la pantalla no tiene que abrirle a quien
+/// no corresponde (ofrecía, por ejemplo, editar la disponibilidad de otro PF).
+const _rutasSoloPF = [
+  '/coach/actividad',
+  '/coach/athlete',
+  '/coach/availability-editor',
+  '/profile/availability-editor',
+  '/profile/edit-trainer',
+  '/profile/trainer-preview',
+  '/workout/routine-editor',
+  '/workout/import-pdf',
+  '/workout/template-editor',
+  '/facturacion/planes',
+];
+
+/// ¿[location] es una pantalla exclusiva del PF? Ver [_rutasSoloPF].
+///
+/// Compara contra el PATH y por SEGMENTO: `authRedirect` recibe a veces la
+/// ubicación con query (`/profile/edit-trainer?mode=onboarding`), y un
+/// `startsWith` a secas atraparía rutas que sólo comparten el comienzo del
+/// nombre (`/coach/athletes`, `/profile/edit-trainer-x`).
+bool _esRutaSoloDePF(String location) {
+  final path = Uri.tryParse(location)?.path ?? location;
+  return _rutasSoloPF.any((r) => path == r || path.startsWith('$r/'));
+}
+
 /// Pure redirect logic — extracted as a top-level function so it is unit-testable
 /// without a widget tree (REQ-AUTH-022, REQ-AUTH-023, REQ-AUTH-024).
 ///
@@ -169,12 +205,11 @@ String? authRedirect(
   // recién registrados, y `/profile-setup → /home` para usuarios existentes.
   //
   // Role-awareness (Etapa 7, Option A): el outer 5-tab shell se comparte
-  // entre athlete y trainer. No hay rutas trainer-specific en Fase 1, así
-  // que tampoco hay redirects por role acá. La diferenciación visual vive
-  // en CoachScreen, que despacha a AthleteCoachView o TrainerCoachView
-  // según UserProfile.role. Cuando Fase 5 introduzca rutas /trainer/...,
-  // el branch va EXACTAMENTE acá — después del gate de profile completo y
-  // antes del redirect "/public → /home".
+  // entre athlete y trainer, y la diferenciación visual vive en CoachScreen,
+  // que despacha a AthleteCoachView o TrainerCoachView según
+  // UserProfile.role. Las rutas que SÓLO existen para el PF (`_rutasSoloPF`)
+  // tienen su gate de rol más abajo — después del gate de profile completo y
+  // antes del redirect "/public → /home" (#1743).
   if (loggedIn && !isProfileSetup) {
     // Account deletion gate: while the CF cascade is in flight, the
     // Firestore profile is deleted BEFORE the Auth user (cascade order).
@@ -329,6 +364,22 @@ String? authRedirect(
         !location.startsWith('/profile/edit-trainer')) {
       return '/profile/edit-trainer?mode=onboarding';
     }
+
+    // Gate de rol (#1743): las pantallas exclusivas del PF no abren para un
+    // alumno. Va ÚLTIMO a propósito: los gates de arriba son requisitos de la
+    // cuenta (edad, mail, perfil completo) y le ganan, y acá `profile` ya está
+    // resuelto — mientras carga, el `isLoading` de más arriba devuelve null y el
+    // router re-evalúa cuando llega el perfil, así que un PF nunca rebota por
+    // un perfil que todavía no se leyó.
+    //
+    // A `/home` y no a una pantalla de error: es el mismo destino que ya usan
+    // `/abrir/alumno` y la salida de los gates, y un alumno que llegó acá por un
+    // link reenviado no tiene nada que corregir.
+    if (!isPublic &&
+        profile.role != UserRole.trainer &&
+        _esRutaSoloDePF(location)) {
+      return '/home';
+    }
   }
 
   // Onboarding-complete gate — saca al atleta de /profile-setup una vez que el
@@ -367,17 +418,13 @@ String? authRedirect(
 /// en un bottom sheet que abre la campanita del header (#393), no en una
 /// pantalla con ruta propia. No hay más lejos a dónde apuntar en mobile hoy.
 ///
-/// DEUDA CONOCIDA, encontrada en revisión adversarial: `authRedirect` (el
-/// gate de auth de mobile) NO chequea `profile.role` antes de dejar pasar a
-/// `/coach/athlete/:id` — a diferencia de `coachHubRedirect`, que manda a
-/// cualquier no-trainer a `/not-allowed` ANTES de aplicar el destino fino.
-/// Un link de `discomfort-reported` (el único de los 5 mails con
-/// `to=alumno`) reenviado a, o abierto por, una cuenta que no es ese
-/// trainer llega igual a esa pantalla. El impacto real es acotado —las
-/// reglas de Firestore degradan cada sección con permission-denied, y el
-/// perfil público ya es legible por cualquier autenticado— pero es una
-/// asimetría real entre los dos routers que valdría la pena cerrar con un
-/// gate de rol en `authRedirect`, no en este switch puntual.
+/// El gate de rol vive en `authRedirect` y no en este switch: una cuenta que no
+/// es trainer abre `/abrir/profe?to=alumno` y `authRedirect` la saca de
+/// `/coach/athlete/:id` hacia `/home` (`_rutasSoloPF`, #1743). Era la DEUDA
+/// CONOCIDA de la revisión adversarial: a diferencia de `coachHubRedirect`, que
+/// manda a cualquier no-trainer a `/not-allowed`, el router mobile dejaba pasar
+/// un link de `discomfort-reported` reenviado a una cuenta que no es ese
+/// trainer.
 String mobileTrainerEntryPath(DeepLinkDestination? dest) => switch (dest?.to) {
       DeepLinkTo.facturacion => '/facturacion/planes',
       DeepLinkTo.agenda => '/coach?tab=agenda',
