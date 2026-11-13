@@ -1,8 +1,7 @@
 // Tests para SessionPlayerScreen — SCENARIO-274..276 (_SessionHeader, TASK-202a)
-// + SCENARIO-277..278 (_AttendanceCard, TASK-203a).
-// TASK-203a: _AttendanceCard fue incluida en el commit 202b junto con el esqueleto
-// de la pantalla — los tests 277-278 son GREEN desde el primer run (desviación
-// documentada en apply-progress.md).
+// + _SessionGymCard (#1768). Antes era _AttendanceCard (SCENARIO-277..278), que
+// afirmaba una «Asistencia marcada» que no existe: esos dos escenarios se
+// reemplazaron por los de abajo, que fijan lo contrario.
 //
 // Updated for the 5-change redesign (per-set model, duration timer, weight
 // keyboard, reps non-editable, block gating).
@@ -17,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/gyms/application/gym_display_name_provider.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_init.dart';
@@ -229,7 +229,7 @@ UserProfile _makeProfile({String? gymId}) => UserProfile(
       gymId: gymId,
     );
 
-// ── _SessionHeader + _AttendanceCard tests ───────────────────────────────────
+// ── _SessionHeader + _SessionGymCard tests ───────────────────────────────────
 
 void main() {
   // ── #1728: si la sesión no se puede abrir, la pantalla trae su salida ──────
@@ -415,40 +415,109 @@ void main() {
     });
   });
 
-  // ── _AttendanceCard (TASK-203a) ───────────────────────────────────────────
+  // ── _SessionGymCard (#1768) ───────────────────────────────────────────────
+  //
+  // No existe ningún registro de asistencia: la tarjeta no puede afirmar una.
+  // Sólo muestra el gimnasio del atleta, y sólo cuando es real y ya resolvió.
 
-  group('_AttendanceCard', () {
-    List<Override> attendanceOverrides(UserProfile profile) => [
+  group('_SessionGymCard', () {
+    List<Override> gymOverrides(
+      UserProfile profile, {
+      Future<String> Function()? gymName,
+    }) =>
+        [
           ...(_stateOverride(_defaultState())),
           userProfileProvider.overrideWith(
             (ref) => Stream.value(profile),
           ),
+          if (gymName != null)
+            gymDisplayNameProvider(profile.gymId).overrideWith(
+              (ref) => gymName(),
+            ),
         ];
 
-    // SCENARIO-277: 'Asistencia marcada' aparece
-    testWidgets('SCENARIO-277: renderiza "Asistencia marcada"', (tester) async {
+    Future<void> montar(WidgetTester tester, List<Override> overrides) async {
       await tester.pumpWidget(
-        _wrapProvider(
-          const SessionPlayerScreen(init: _kInit),
-          attendanceOverrides(_makeProfile()),
+        _wrapProvider(const SessionPlayerScreen(init: _kInit), overrides),
+      );
+      // El perfil llega por un stream y el nombre por un future: un frame cada
+      // uno.
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+    }
+
+    void expectSinAfirmaciones() {
+      expect(find.text('Asistencia marcada'), findsNothing);
+      expect(find.text('Sin gimnasio asignado'), findsNothing);
+    }
+
+    testWidgets('con gimnasio real y su nombre resuelto lo muestra, y nada más',
+        (tester) async {
+      await montar(
+        tester,
+        gymOverrides(
+          _makeProfile(gymId: 'g1'),
+          gymName: () async => 'Smart Fit Centro',
         ),
       );
-      await tester.pump();
-      expect(find.text('Asistencia marcada'), findsOneWidget);
+      expect(find.text('Smart Fit Centro'), findsOneWidget);
+      expectSinAfirmaciones();
+
+      // La tarjeta es el ícono y el nombre: ni tilde ni hora.
+      final fila = find.ancestor(
+        of: find.text('Smart Fit Centro'),
+        matching: find.byType(Row),
+      );
+      expect(
+        find.descendant(of: fila.first, matching: find.byType(Text)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+            of: fila.first, matching: find.byIcon(TreinoIcon.checkCircleFill)),
+        findsNothing,
+      );
     });
 
-    // SCENARIO-278: 'Sin gimnasio asignado' cuando gymId es null
-    testWidgets(
-        'SCENARIO-278: renderiza "Sin gimnasio asignado" cuando gymId es null',
+    testWidgets('sin gimnasio no hay tarjeta ni «Sin gimnasio asignado»',
         (tester) async {
-      await tester.pumpWidget(
-        _wrapProvider(
-          const SessionPlayerScreen(init: _kInit),
-          attendanceOverrides(_makeProfile(gymId: null)),
-        ),
+      await montar(tester, gymOverrides(_makeProfile(gymId: null)));
+      expectSinAfirmaciones();
+      expect(find.byIcon(TreinoIcon.gym), findsNothing);
+    });
+
+    testWidgets('el marcador legacy «no-gym» cuenta como sin gimnasio',
+        (tester) async {
+      await montar(tester, gymOverrides(_makeProfile(gymId: 'no-gym')));
+      expectSinAfirmaciones();
+      expect(find.byIcon(TreinoIcon.gym), findsNothing);
+    });
+
+    testWidgets(
+        'con gimnasio real pero el nombre sin resolver no se dibuja nada '
+        '(antes decía «Sin gimnasio asignado», que era falso)', (tester) async {
+      final pendiente = Completer<String>();
+      await montar(
+        tester,
+        gymOverrides(_makeProfile(gymId: 'g1'),
+            gymName: () => pendiente.future),
       );
+      expectSinAfirmaciones();
+      expect(find.byIcon(TreinoIcon.gym), findsNothing);
+
+      pendiente.complete('');
       await tester.pump();
-      expect(find.text('Sin gimnasio asignado'), findsOneWidget);
+    });
+
+    testWidgets('un gimnasio cuyo nombre queda vacío tampoco dibuja la tarjeta',
+        (tester) async {
+      await montar(
+        tester,
+        gymOverrides(_makeProfile(gymId: 'g1'), gymName: () async => ''),
+      );
+      expectSinAfirmaciones();
+      expect(find.byIcon(TreinoIcon.gym), findsNothing);
     });
   });
 
