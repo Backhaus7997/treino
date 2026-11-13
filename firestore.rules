@@ -5069,7 +5069,26 @@ service cloud.firestore {
                   // coach-private-collections-rules.test.ts, cuyo fileDoc() es
                   // exactamente ese cliente viejo.
                   && (!request.resource.data.keys().hasAny(['sharedWithAthlete'])
-                      || request.resource.data.sharedWithAthlete is bool);
+                      || request.resource.data.sharedWithAthlete is bool)
+                  // ── ROL (#1698) ──────────────────────────────────────────
+                  //
+                  // Quien crea tiene que ser un PF de verdad. Era la única de
+                  // las colecciones que el PF escribe sobre un alumno y el
+                  // alumno LEE que no pedía rol (las otras cinco lo tienen
+                  // desde rules-hardening Slice C, AD-1 opción b): cualquier
+                  // cuenta —un atleta, un alumno suelto— creaba
+                  // `{trainerId: <ella>, athleteId: <víctima>}` y, como
+                  // `AthleteFileRepository.upload` marca `sharedWithAthlete:
+                  // true` por default, el archivo aparecía en la pantalla de
+                  // Archivos de la víctima (`sharedAthleteFilesProvider`) con
+                  // el `fileName` y el `downloadUrl` que el atacante eligió.
+                  //
+                  // Es el mismo alcance que AD-1: rol, NO rol + vínculo —un PF
+                  // real sin vínculo con la víctima sigue pudiendo, atribuible
+                  // por su `trainerId`—, porque `trainer_links` tiene ids
+                  // autogenerados y una regla no puede preguntar por el par.
+                  // Va ÚLTIMO: es la única cláusula que paga una lectura.
+                  && tieneRolDePF(request.auth.uid);
       // ⚠️ ACOPLAMIENTO: este hasOnly debe coincidir exactamente con las keys
       // de AthleteFile.toJson(). Si el modelo suma un campo y esta lista no,
       // todos los updates del flag fallan con permission-denied.
