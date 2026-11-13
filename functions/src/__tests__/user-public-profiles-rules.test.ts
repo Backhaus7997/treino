@@ -315,9 +315,11 @@ describe("userPublicProfiles rules — isProfilePublic privacy flag", () => {
     const alice = testEnv.authenticatedContext(uid);
     const ref = alice.firestore().collection(COL_PROFILES).doc(uid);
 
-    // Exact updateCounters shape of FriendshipRepository.accept — a real
-    // prod merge with no other paired field.
-    await assertSucceeds(ref.set({ followersCount: 4 }, { merge: true }));
+    // updateCounters shape of SessionRepository.finish — a real prod merge
+    // with no other paired field. (Era `followersCount: 4`, el shape de
+    // FriendshipRepository.accept, retirado en PR3d: desde #1835 ese
+    // contador es CF-only.)
+    await assertSucceeds(ref.set({ workoutsCount: 4 }, { merge: true }));
   });
 
   it("allows a first-ever write (create) carrying isProfilePublic", async () => {
@@ -770,6 +772,53 @@ describe("userPublicProfiles rules — rachaSemanas acotada (#1698)", () => {
             .update({ rachaSemanas: 12 }),
         );
       });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9. followersCount / followingCount — CF-write-only (auditoría QA 2026-11-06).
+//
+// Los mantiene SÓLO `maintainFollowCounters` (Admin SDK) desde #315; el
+// cliente no los escribe en ningún camino (`rg followersCount lib/` da sólo
+// lectura). Antes el dueño se ponía `{followersCount: 999999}` por REST y su
+// perfil público lo mostraba. Re-presentar el valor guardado sigue andando:
+// es lo que trae el doc mergeado en cualquier escritura parcial.
+// ---------------------------------------------------------------------------
+describe("userPublicProfiles rules — contadores de follow (CF-write-only)", () => {
+  const uid = "athlete-follow-counters";
+  const ref = () => testEnv.authenticatedContext(uid).firestore().collection(COL_PROFILES).doc(uid);
+
+  it.each([
+    ["inflar followersCount", { followersCount: 999999 }],
+    ["inflar followingCount", { followingCount: 999999 }],
+    ["un +1 sin follow detrás", { followersCount: 4 }],
+    ["bajarlo a 0", { followersCount: 0 }],
+    ["borrarlo", { followersCount: deleteField() }],
+  ])("deniega al dueño %s", async (_name, write) => {
+    await seed(uid, { userGymId: "gym-a", profile: { followersCount: 3, followingCount: 2 } });
+    await assertFails(ref().update(write));
+  });
+
+  it("deniega un create que siembra un contador; acepta ausente, null o 0", async () => {
+    await seed(uid, { userGymId: "gym-a" });
+    await assertFails(setDoc(doc(testEnv.authenticatedContext(uid).firestore(), COL_PROFILES, uid), {
+      uid, followersCount: 50,
+    }));
+    await assertSucceeds(setDoc(doc(testEnv.authenticatedContext(uid).firestore(), COL_PROFILES, uid), {
+      uid, followersCount: null, followingCount: 0,
+    }));
+  });
+
+  it("deja pasar escrituras que no tocan los contadores (los re-presenta el merge)", async () => {
+    await seed(uid, { userGymId: "gym-a", profile: { followersCount: 3, followingCount: 2 } });
+    await assertSucceeds(ref().set({ workoutsCount: 7, followersCount: 3 }, { merge: true }));
+  });
+
+  it("la CF (Admin SDK) los sigue escribiendo", async () => {
+    await seed(uid, { userGymId: "gym-a", profile: { followersCount: 3 } });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await assertSucceeds(ctx.firestore().collection(COL_PROFILES).doc(uid).update({ followersCount: 4 }));
     });
   });
 });
