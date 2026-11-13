@@ -123,7 +123,8 @@ List<Override> _firstRunOverrides({
       userCreatedRoutinesProvider(_uid).overrideWith(
         (ref) => Stream.value(created),
       ),
-      assignedRoutinesProvider(_uid).overrideWith((ref) async => assigned),
+      assignedRoutinesProvider(_uid)
+          .overrideWith((ref) => Stream.value(assigned)),
       activeSessionForUidProvider.overrideWith((ref) async => null),
       todaysRoutineProvider.overrideWith((ref) async => null),
       weeklyInsightsProvider.overrideWith((ref) async => null),
@@ -463,7 +464,7 @@ void main() {
             (ref) => Stream.value(const <Routine>[]),
           ),
           assignedRoutinesProvider(_uid)
-              .overrideWith((ref) async => const <Routine>[]),
+              .overrideWith((ref) => Stream.value(const <Routine>[])),
           todaysRoutineProvider.overrideWith((ref) async => null),
           weeklyInsightsProvider.overrideWith((ref) async => null),
           currentAthleteLinkProvider.overrideWith(

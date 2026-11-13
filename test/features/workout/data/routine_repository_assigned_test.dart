@@ -182,6 +182,108 @@ void main() {
     });
   });
 
+  // ─── watchAssignedTo ──────────────────────────────────────────────────────
+  //
+  // La versión en vivo de `listAssignedTo` (#1698): mismo contrato (archivadas
+  // fuera, doc sin `status` dentro, sólo `trainer-assigned`) y además RE-EMITE.
+
+  group('RoutineRepository.watchAssignedTo', () {
+    Future<List<List<String>>> escuchar(String uid) async {
+      final emisiones = <List<String>>[];
+      final sub = repo
+          .watchAssignedTo(uid)
+          .listen((l) => emisiones.add(l.map((r) => r.id).toList()));
+      addTearDown(sub.cancel);
+      await pumpEventQueue();
+      return emisiones;
+    }
+
+    test('emite la lista actual, más nueva primero, sólo la del alumno',
+        () async {
+      await seedAssignedRoutine(
+        id: 'r-old',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        createdAt: Timestamp.fromMillisecondsSinceEpoch(1000000),
+      );
+      await seedAssignedRoutine(
+        id: 'r-new',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        createdAt: Timestamp.fromMillisecondsSinceEpoch(2000000),
+      );
+      await seedAssignedRoutine(
+        id: 'r-other',
+        assignedTo: 'athlete-2',
+        assignedBy: 'trainer-1',
+      );
+
+      expect((await escuchar('athlete-1')).last, ['r-new', 'r-old']);
+    });
+
+    test('un plan que el PF asigna DESPUÉS aparece sin volver a leer',
+        () async {
+      await seedAssignedRoutine(
+        id: 'r-1',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        createdAt: Timestamp.fromMillisecondsSinceEpoch(1000000),
+      );
+      final emisiones = await escuchar('athlete-1');
+      expect(emisiones.last, ['r-1']);
+
+      await seedAssignedRoutine(
+        id: 'r-2',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        createdAt: Timestamp.fromMillisecondsSinceEpoch(2000000),
+      );
+      await pumpEventQueue();
+
+      expect(emisiones.last, ['r-2', 'r-1']);
+    });
+
+    test('un plan que el PF ARCHIVA después desaparece sin volver a leer',
+        () async {
+      // El caso de `cleanupAssignedPlansOnUnlink`: el vínculo termina con la
+      // app del alumno abierta.
+      await seedAssignedRoutine(
+        id: 'r-1',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        status: 'active',
+      );
+      final emisiones = await escuchar('athlete-1');
+      expect(emisiones.last, ['r-1']);
+
+      await firestore
+          .collection('routines')
+          .doc('r-1')
+          .update({'status': 'archived'});
+      await pumpEventQueue();
+
+      expect(emisiones.last, isEmpty);
+    });
+
+    test('una ARCHIVADA no se emite nunca, y un doc SIN status sí', () async {
+      // Mismo candado que `listAssignedTo`: el filtro va en el cliente porque
+      // una igualdad en Firestore excluiría los docs anteriores a Fase 6.
+      await seedAssignedRoutine(
+        id: 'r-archivada',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-ex',
+        status: 'archived',
+      );
+      await seedAssignedRoutine(
+        id: 'r-legacy',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+      );
+
+      expect((await escuchar('athlete-1')).last, ['r-legacy']);
+    });
+  });
+
   // ─── listAuthoredBy ───────────────────────────────────────────────────────
 
   group('RoutineRepository.listAuthoredBy', () {
