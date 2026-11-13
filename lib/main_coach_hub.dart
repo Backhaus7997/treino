@@ -83,9 +83,12 @@ Future<void> main() async {
   // Analytics: según lo que el usuario haya elegido, NO siempre. Espejo de
   // `lib/main.dart` — la Política de Privacidad promete poder revocar el
   // consentimiento en cualquier momento, y eso vale para las dos superficies.
-  // La llamada vive acá abajo porque necesita las preferencias.
-  await FirebaseAnalytics.instance
-      .setAnalyticsCollectionEnabled(analyticsConsentFromPrefs(prefs));
+  // La llamada vive acá abajo porque necesita las preferencias. Con
+  // `USE_EMULATOR` queda apagada: Analytics no tiene emulador y sale a
+  // producción (#1698). Ver `analyticsEfectiva`.
+  await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(
+    analyticsEfectiva(analyticsConsentFromPrefs(prefs)),
+  );
 
   runApp(
     ProviderScope(
