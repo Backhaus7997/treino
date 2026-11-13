@@ -50,20 +50,32 @@ el `8080` ya está ocupado suele ser el emulador de otra sesión: no lo mates.
 npm --prefix scripts run seed:emulator
 ```
 
-**3. Las suites**, contra el simulador booteado. Una por vez es lo más
-legible; el primer build de iOS tarda ~15 min y los siguientes ~1 min:
+**3. Las suites**, contra el simulador (iOS) o el AVD (Android) booteado. Una
+por vez es lo más legible; el primer build de iOS tarda ~15 min y los
+siguientes ~1 min:
 
 ```bash
+# iOS
 flutter test integration_test/login_to_home_test.dart -d <udid-del-simulador> --dart-define=USE_EMULATOR=true
+# Android: el flavor es obligatorio (hay dos, `phone` y `wear`)
+flutter test integration_test/login_to_home_test.dart -d <id-del-avd> --flavor phone --dart-define=USE_EMULATOR=true
 ```
 
 o todas juntas:
 
 ```bash
+# iOS
 flutter test integration_test/ -d <udid-del-simulador> --dart-define=USE_EMULATOR=true
+# Android
+flutter test integration_test/ -d <id-del-avd> --flavor phone --dart-define=USE_EMULATOR=true
 ```
 
-El UDID sale de `xcrun simctl list devices booted`.
+Sin `--flavor phone` el build de Android no compila: `android/app/build.gradle.kts`
+declara los flavors `phone` y `wear` y no hay uno por defecto. En iOS el flag NO
+va: el proyecto sólo tiene el esquema `Runner`.
+
+El UDID sale de `xcrun simctl list devices booted`; el id del AVD, de
+`flutter devices`.
 
 ## Qué asume cada suite del entorno
 
