@@ -47,8 +47,11 @@ ExerciseProgressionChartLabels _chartLabels() => ExerciseProgressionChartLabels(
       oneRepMaxLabel: '1RM',
       bestSetVolumeLabel: 'Mejor serie',
       bestSessionVolumeLabel: 'Volumen',
+      longestDurationLabel: 'Tiempo máximo',
+      longestDistanceLabel: 'Distancia máxima',
       volumeUnit: 'kg·reps',
       weightUnit: 'kg',
+      distanceUnit: 'm',
       frequencyLabel: (n) =>
           n == 1 ? '1 sesión en este período' : '$n sesiones en este período',
       singlePointHint: 'Necesitás al menos 2 sesiones para ver la evolución.',

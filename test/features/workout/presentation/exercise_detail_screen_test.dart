@@ -520,6 +520,42 @@ void main() {
       expect(find.text('Aún no entrenaste este ejercicio'), findsNothing);
     });
 
+    // #1715: la progresión de una plancha tiene gráfico y récord, no «sin datos».
+    testWidgets('#1715: a timed exercise charts its time and lists its record',
+        (tester) async {
+      _useTallViewport(tester);
+      final timed = ExerciseProgression(
+        exerciseId: 'bench-press',
+        exerciseName: 'Plancha',
+        heaviestWeightSeries: const [],
+        oneRepMaxSeries: const [],
+        bestSetVolumeSeries: const [],
+        bestSessionVolumeSeries: const [],
+        bestDurationSeries: [pt(d1, 60), pt(d2, 90)],
+        personalRecords: [
+          PersonalRecord(
+            recordType: ProgressionRecordType.longestDuration,
+            value: 90,
+            achievedAt: d2,
+          ),
+        ],
+        frequencySessionCount: 2,
+      );
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        statsOverrides(progression: timed),
+        uid: 'user-1',
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // El chip de tiempo, y el mismo label en la fila del récord con su valor.
+      expect(find.text('Tiempo máximo'), findsNWidgets(2));
+      expect(find.text('01:30'), findsOneWidget);
+      expect(find.text('Peso máximo'), findsNothing);
+      expect(find.text('Sin datos para este ejercicio.'), findsNothing);
+    });
+
     testWidgets('#1716: a timed exercise shows its best time, not «0 reps»',
         (tester) async {
       _useTallViewport(tester);
