@@ -4232,6 +4232,13 @@ class AppL10nEn extends AppL10n {
       'Body weight and measurements over time';
 
   @override
+  String get profileInsightsTileTitle => 'Insights';
+
+  @override
+  String get profileInsightsTileSubtitle =>
+      'Your week, your streak and your reports';
+
+  @override
   String get measurementsScreenTitle => 'BODY MEASUREMENTS';
 
   @override

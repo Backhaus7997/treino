@@ -3818,6 +3818,14 @@
   "@insightsTileMeasurementsSubtitle": {
     "description": "Tile subtitle for the Anthropometry stats-hub entry."
   },
+  "profileInsightsTileTitle": "Insights",
+  "@profileInsightsTileTitle": {
+    "description": "Perfil (alumno) → grupo ENTRENAMIENTO: título de la fila que abre el hub de Insights (/home/insights). La fila de Medidas, justo debajo, reusa insightsTileMeasurementsTitle/Subtitle (#1719)."
+  },
+  "profileInsightsTileSubtitle": "Tu semana, tu racha y tus reportes",
+  "@profileInsightsTileSubtitle": {
+    "description": "Perfil (alumno) → grupo ENTRENAMIENTO: subtítulo de la fila de Insights."
+  },
   "measurementsScreenTitle": "MEDIDAS",
   "measurementsSelfLogNotesHint": "Notas (opcional)…",
   "@measurementsSelfLogNotesHint": {
