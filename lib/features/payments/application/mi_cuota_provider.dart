@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../coach/application/trainer_link_providers.dart'
-    show currentAthleteLinkProvider;
+    show currentAthleteLinkVivoProvider;
 import '../../coach/domain/trainer_link_status.dart';
 import '../domain/athlete_billing.dart';
 import '../domain/payment.dart';
@@ -33,7 +33,7 @@ class MiCuotaItem {
   final String concept;
 }
 
-/// What the current athlete owes their active trainer, plus the trainer's
+/// What the current athlete owes their trainer, plus the trainer's
 /// payment alias (resolved by the widget). Read-only: the athlete pays offline
 /// and the trainer confirms — see "solo informativo" decision (2026-06-03).
 class MiCuotaState {
@@ -58,10 +58,13 @@ class MiCuotaState {
 /// and this provider just reads the resulting ledger: any `Payment` with
 /// `status == pending` addressed to this athlete IS what's owed, full stop.
 ///
-/// Returns `data(null)` when there is no active link (nothing to show).
+/// Returns `data(null)` when there is no LIVE link (nothing to show). Live =
+/// `active` or `paused` ([kEstadosDeVinculoVivo]): pausing is a hold, not a cut,
+/// and the rules let the athlete read what they owe by `athleteId` regardless of
+/// the link (#1842) — so a paused athlete still sees their cuota.
 final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
   // ── 1. Athlete's link ──────────────────────────────────────────────────────
-  final linkAsync = ref.watch(currentAthleteLinkProvider);
+  final linkAsync = ref.watch(currentAthleteLinkVivoProvider);
 
   if (linkAsync.isLoading && !linkAsync.hasValue) {
     return const AsyncValue.loading();
@@ -71,7 +74,7 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
   }
 
   final link = linkAsync.valueOrNull;
-  if (link == null || link.status != TrainerLinkStatus.active) {
+  if (link == null || !kEstadosDeVinculoVivo.contains(link.status)) {
     return const AsyncValue.data(null);
   }
 
@@ -83,7 +86,7 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
   if (paymentsAsync.hasError && !paymentsAsync.hasValue) {
     return AsyncValue.error(paymentsAsync.error!, paymentsAsync.stackTrace!);
   }
-  // Scope to the ACTIVE trainer (fix #333). athletePaymentsProvider streams
+  // Scope to the CURRENT trainer (fix #333). athletePaymentsProvider streams
   // every payment addressed to this athlete across ALL trainers (a terminated
   // link's included), so without this filter a previous trainer's pending
   // charge would surface under "Tu cuota" attributed to the current one.
