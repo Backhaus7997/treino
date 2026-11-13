@@ -15,13 +15,17 @@ void main() {
   late FakeFirebaseFirestore firestore;
   late UserRepository repo;
 
-  Future<void> seed(String uid, UserRole role) async {
+  Future<void> seed(
+    String uid,
+    UserRole role, {
+    String? avatarUrl = urlVieja,
+  }) async {
     final now = DateTime.utc(2026, 1, 1);
     await firestore.collection('users').doc(uid).set(UserProfile(
           uid: uid,
           email: 'seed@test.com',
           displayName: 'Viejo Nombre',
-          avatarUrl: urlVieja,
+          avatarUrl: avatarUrl,
           role: role,
           createdAt: now,
           updatedAt: now,
@@ -159,6 +163,92 @@ void main() {
 
     final card = await tarjeta('pf-1');
     expect(card!['avatarUrl'], urlVieja);
+  });
+
+  // #1717 — la tarjeta NACE con la foto que la cuenta ya tenía. El alta del
+  // mobile (o un alumno promovido a PF) deja `users/{uid}.avatarUrl` cargado
+  // antes de que exista `trainerPublicProfiles/{uid}`; la tarjeta la crea el
+  // primer guardado de PF, que no manda la foto.
+  group('#1717 — la tarjeta nace con la foto de la cuenta', () {
+    test('PF sin tarjeta: el primer guardado de PF la crea con la foto',
+        () async {
+      await seed('pf-1', UserRole.trainer);
+
+      await repo.update('pf-1', {'trainerBio': 'Hola'});
+
+      final card = await tarjeta('pf-1');
+      expect(card!['avatarUrl'], urlVieja);
+      expect(card['trainerBio'], 'Hola');
+    });
+
+    test(
+        'el guardado del paso `pf` del Hub (manda displayName, no la foto) '
+        'también la completa', () async {
+      await seed('pf-1', UserRole.trainer);
+
+      await repo.update('pf-1', {
+        'displayName': 'Viejo Nombre',
+        'trainerBio': 'Hola',
+        'trainerOffersOnline': true,
+      });
+
+      final card = await tarjeta('pf-1');
+      expect(card!['avatarUrl'], urlVieja);
+      expect(card['displayName'], 'Viejo Nombre');
+    });
+
+    test('un avatarUrl explícito en el partial gana sobre el de la cuenta',
+        () async {
+      await seed('pf-1', UserRole.trainer);
+
+      await repo.update('pf-1', {'trainerBio': 'Hola', 'avatarUrl': urlNueva});
+
+      final card = await tarjeta('pf-1');
+      expect(card!['avatarUrl'], urlNueva);
+    });
+
+    test('una tarjeta existente sin foto se cura en el siguiente guardado',
+        () async {
+      await seed('pf-1', UserRole.trainer);
+      await firestore.collection('trainerPublicProfiles').doc('pf-1').set({
+        'uid': 'pf-1',
+        'displayName': 'Viejo Nombre',
+        'displayNameLowercase': 'viejo nombre',
+      });
+
+      await repo.update('pf-1', {'trainerBio': 'Nueva bio'});
+
+      final card = await tarjeta('pf-1');
+      expect(card!['avatarUrl'], urlVieja);
+      expect(card['trainerBio'], 'Nueva bio');
+    });
+
+    test('cuenta sin foto: no se escribe avatarUrl en la tarjeta', () async {
+      await seed('pf-1', UserRole.trainer, avatarUrl: null);
+
+      await repo.update('pf-1', {'trainerBio': 'Hola'});
+
+      final card = await tarjeta('pf-1');
+      expect(card!.containsKey('avatarUrl'), isFalse);
+    });
+
+    test('cuenta con la foto en blanco: no se escribe avatarUrl', () async {
+      await seed('pf-1', UserRole.trainer, avatarUrl: '   ');
+
+      await repo.update('pf-1', {'trainerBio': 'Hola'});
+
+      final card = await tarjeta('pf-1');
+      expect(card!.containsKey('avatarUrl'), isFalse);
+    });
+
+    test('un alumno que guarda no crea la tarjeta ni se lleva la foto',
+        () async {
+      await seed('al-1', UserRole.athlete);
+
+      await repo.update('al-1', {'heightCm': 170});
+
+      expect(await tarjeta('al-1'), isNull);
+    });
   });
 
   test('usuario sin doc en users: no espeja y no tira', () async {
