@@ -9489,6 +9489,24 @@ abstract class AppL10n {
   /// **'No pudimos bloquear. Probá de nuevo.'**
   String get moderationBlockError;
 
+  /// Desbloquear a alguien que el usuario bloqueo. Label del item del menu de moderacion (reemplaza a Bloquear si ya esta bloqueado), del boton del aviso de bloqueo del chat y de la lista de bloqueados.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Desbloquear'**
+  String get moderationUnblockAction;
+
+  /// Success snackbar after unblocking someone.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Desbloqueaste a {name}.'**
+  String moderationUnblockSuccess(String name);
+
+  /// Error snackbar when unblocking fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos desbloquear. Probá de nuevo.'**
+  String get moderationUnblockError;
+
   /// Error mostrado cuando el filtro de terminos vetados rechaza un texto. NO nombra el termino que lo disparo a proposito: decirlo convierte al filtro en un oraculo para encontrarle el borde.
   ///
   /// In es_AR, this message translates to:

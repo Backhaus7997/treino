@@ -490,6 +490,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 _ComposerNotice(
                   palette: palette,
                   message: l10n.chatBlockedComposerNotice,
+                  // El aviso dice «Desbloqueala para escribirle»: acá está
+                  // el botón que lo hace. Sólo en este aviso y no en el de
+                  // chat cerrado, donde desbloquear no reabriría nada.
+                  actionLabel: l10n.moderationUnblockAction,
+                  onAction: () => unblockUser(
+                    context,
+                    ref,
+                    targetUid: widget.otherUid,
+                    targetDisplayName: pubAsync.valueOrNull?.displayName ??
+                        l10n.chatScreenTitleFallback,
+                  ),
                 ),
               _Composer(
                 controller: _textController,
@@ -841,11 +852,22 @@ class _Composer extends StatelessWidget {
 ///
 /// Es sólo texto: no expone nada que no se vea ya en el perfil de la otra
 /// persona ni dice quién terminó el vínculo.
+///
+/// Con [actionLabel] y [onAction] suma un botón de texto debajo del mensaje
+/// (el aviso de bloqueo, para desbloquear). Sin ellos es sólo texto, como el
+/// del chat cerrado.
 class _ComposerNotice extends StatelessWidget {
-  const _ComposerNotice({required this.palette, required this.message});
+  const _ComposerNotice({
+    required this.palette,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
 
   final AppPalette palette;
   final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -862,12 +884,32 @@ class _ComposerNotice extends StatelessWidget {
           Icon(TreinoIcon.infoCircle, size: 18, color: palette.textMuted),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              message,
-              style: GoogleFonts.barlow(
-                fontSize: 14,
-                color: palette.textMuted,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  style: GoogleFonts.barlow(
+                    fontSize: 14,
+                    color: palette.textMuted,
+                  ),
+                ),
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: AppSpacing.s8),
+                  TextButton(
+                    key: const ValueKey('chat-composer-notice-action'),
+                    onPressed: onAction,
+                    style: TextButton.styleFrom(
+                      foregroundColor: palette.accentText,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      alignment: Alignment.centerLeft,
+                    ),
+                    child: Text(actionLabel!),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
