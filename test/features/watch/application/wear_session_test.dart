@@ -17,7 +17,9 @@ import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_log_identity.dart';
+import 'package:treino/features/workout/domain/set_spec.dart';
 
 class _MockWorkoutService extends Mock implements WearWorkoutService {}
 
@@ -136,7 +138,17 @@ DateTime get _reciente =>
 /// mira las activas, y el cálculo de posición quiere justamente historial.
 DateTime get _viejo => DateTime.now().toUtc().subtract(const Duration(days: 1));
 
-RoutineSlot _slot(String nombre, {int series = 3, int rest = 60}) =>
+/// [durationSeconds] arma una serie por TIEMPO (la forma legacy, que
+/// `effectiveSets` sintetiza en un `SetSpec` por serie) y [distanceMeters] una
+/// por DISTANCIA (el modelo por serie, con `exerciseMode: distance`). Sin
+/// ninguno es la serie por reps de siempre.
+RoutineSlot _slot(
+  String nombre, {
+  int series = 3,
+  int rest = 60,
+  int? durationSeconds,
+  double? distanceMeters,
+}) =>
     RoutineSlot(
       exerciseId: nombre,
       exerciseName: nombre,
@@ -145,6 +157,14 @@ RoutineSlot _slot(String nombre, {int series = 3, int rest = 60}) =>
       targetRepsMin: 8,
       targetRepsMax: 12,
       restSeconds: rest,
+      durationSeconds: durationSeconds,
+      exerciseMode:
+          distanceMeters != null ? ExerciseMode.distance : ExerciseMode.reps,
+      sets: [
+        if (distanceMeters != null)
+          for (var i = 0; i < series; i++)
+            SetSpec(distanceMeters: distanceMeters),
+      ],
     );
 
 final rutina = Routine(
@@ -172,6 +192,37 @@ const hoy = WearTodaysWorkout(
   numWeeks: 1,
 );
 
+/// Una rutina aparte, con un ejercicio de cada métrica, para los tests de
+/// #1701. No se le suma un día a [rutina]: los tests de posición cuentan sus
+/// días, y un tercero movería el «siguiente» de todos.
+final rutinaConMetricas = Routine(
+  id: 'r-metricas',
+  name: 'Core y acarreo',
+  level: ExperienceLevel.beginner,
+  numWeeks: 1,
+  days: [
+    RoutineDay(dayNumber: 1, name: 'Mixto', slots: [
+      _slot('plancha', series: 2, durationSeconds: 60),
+      _slot('trineo', series: 2, distanceMeters: 25),
+      _slot('press', series: 1),
+    ]),
+  ],
+);
+
+const hoyConMetricas = WearTodaysWorkout(
+  routineId: 'r-metricas',
+  dayName: 'Mixto',
+  dayNumber: 1,
+  routineName: 'Core y acarreo',
+  exercises: [
+    WearExercisePreview(name: 'plancha', setCount: 2),
+    WearExercisePreview(name: 'trineo', setCount: 2),
+    WearExercisePreview(name: 'press', setCount: 1),
+  ],
+  weekNumber: 0,
+  numWeeks: 1,
+);
+
 void main() {
   late FakeFirebaseFirestore firestore;
   late SessionRepository repo;
@@ -188,13 +239,17 @@ void main() {
 
   /// [sinRutina] distingue "no la pasaron" de "la rutina NO existe". Con un
   /// `?? rutina` el caso nulo era inalcanzable y el test pasaba sin probar nada.
-  ProviderContainer contenedor({bool sinRutina = false}) {
+  ProviderContainer contenedor({
+    bool sinRutina = false,
+    Routine? conRutina,
+  }) {
     final c = ProviderContainer(
       overrides: [
         currentUidProvider.overrideWithValue(uid),
         sessionRepositoryProvider.overrideWithValue(repo),
-        routineByIdProvider
-            .overrideWith((ref, id) async => sinRutina ? null : rutina),
+        routineByIdProvider.overrideWith(
+          (ref, id) async => sinRutina ? null : (conRutina ?? rutina),
+        ),
         wearWorkoutServiceProvider.overrideWithValue(nativo),
       ],
     );
@@ -503,9 +558,12 @@ void main() {
   });
 
   group('marcar series', () {
-    Future<WearSessionRunning> arrancado(ProviderContainer c) async {
+    Future<WearSessionRunning> arrancado(
+      ProviderContainer c, {
+      WearTodaysWorkout entreno = hoy,
+    }) async {
       await pumpEventQueue();
-      await c.read(wearSessionProvider.notifier).start(hoy);
+      await c.read(wearSessionProvider.notifier).start(entreno);
       await pumpEventQueue();
       return c.read(wearSessionProvider) as WearSessionRunning;
     }
@@ -573,6 +631,105 @@ void main() {
       final docs = await docsDeSeries(corriendo.session.sessionId);
       // El slot es targetRepsMin 8 / targetRepsMax 12.
       expect(docs.single['reps'], 12);
+    });
+
+    // #1701: una serie por tiempo o por distancia se guardaba como
+    // `reps: 0, weightKg: 0`, y ni los segundos ni los metros quedaban en
+    // ningún lado. Se lee el documento TAL CUAL quedó en Firestore: lo que
+    // importa es la clave en el wire, no lo que diga el modelo.
+    group('una serie por tiempo o distancia guarda su métrica (#1701)', () {
+      test('una serie por TIEMPO escribe los segundos prescriptos', () async {
+        final c = contenedor(conRutina: rutinaConMetricas);
+        final corriendo = await arrancado(c, entreno: hoyConMetricas);
+
+        await c
+            .read(wearSessionProvider.notifier)
+            .logSet(exerciseId: 'plancha', setNumber: 1);
+        await pumpEventQueue();
+
+        final doc = (await docsDeSeries(corriendo.session.sessionId)).single;
+        expect(doc['durationSeconds'], 60);
+        // Sin metros: una plancha no los tiene, y un `0` afirmaría una
+        // medición que no ocurrió.
+        expect(doc.containsKey('distanceMeters'), isFalse);
+      });
+
+      test('una serie por DISTANCIA escribe los metros prescriptos', () async {
+        final c = contenedor(conRutina: rutinaConMetricas);
+        final corriendo = await arrancado(c, entreno: hoyConMetricas);
+
+        await c
+            .read(wearSessionProvider.notifier)
+            .logSet(exerciseId: 'trineo', setNumber: 2);
+        await pumpEventQueue();
+
+        final doc = (await docsDeSeries(corriendo.session.sessionId)).single;
+        expect(doc['distanceMeters'], 25.0);
+        expect(doc['setNumber'], 2);
+        expect(doc.containsKey('durationSeconds'), isFalse);
+      });
+
+      test('una serie por REPS sigue sin llevar ninguna de las dos claves',
+          () async {
+        final c = contenedor(conRutina: rutinaConMetricas);
+        final corriendo = await arrancado(c, entreno: hoyConMetricas);
+
+        await c
+            .read(wearSessionProvider.notifier)
+            .logSet(exerciseId: 'press', setNumber: 1);
+        await pumpEventQueue();
+
+        final doc = (await docsDeSeries(corriendo.session.sessionId)).single;
+        expect(doc['reps'], 12);
+        expect(doc.containsKey('durationSeconds'), isFalse);
+        expect(doc.containsKey('distanceMeters'), isFalse);
+      });
+
+      test('una métrica en cero se guarda como ausente, no como 0', () async {
+        // La misma regla que el `_logSet` del teléfono: `<= 0` es null.
+        const cero = Routine(
+          id: 'r-cero',
+          name: 'Cero',
+          level: ExperienceLevel.beginner,
+          numWeeks: 1,
+          days: [
+            RoutineDay(dayNumber: 1, name: 'Cero', slots: [
+              RoutineSlot(
+                exerciseId: 'raro',
+                exerciseName: 'raro',
+                muscleGroup: 'chest',
+                targetSets: 1,
+                targetRepsMin: 8,
+                targetRepsMax: 12,
+                restSeconds: 60,
+                sets: [SetSpec(durationSeconds: 0, distanceMeters: 0)],
+              ),
+            ]),
+          ],
+        );
+        final c = contenedor(conRutina: cero);
+        final corriendo = await arrancado(
+          c,
+          entreno: const WearTodaysWorkout(
+            routineId: 'r-cero',
+            dayName: 'Cero',
+            dayNumber: 1,
+            routineName: 'Cero',
+            exercises: [WearExercisePreview(name: 'raro', setCount: 1)],
+            weekNumber: 0,
+            numWeeks: 1,
+          ),
+        );
+
+        await c
+            .read(wearSessionProvider.notifier)
+            .logSet(exerciseId: 'raro', setNumber: 1);
+        await pumpEventQueue();
+
+        final doc = (await docsDeSeries(corriendo.session.sessionId)).single;
+        expect(doc.containsKey('durationSeconds'), isFalse);
+        expect(doc.containsKey('distanceMeters'), isFalse);
+      });
     });
 
     test('una serie que no existe en el plan no escribe nada', () async {
