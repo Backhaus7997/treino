@@ -190,6 +190,8 @@ export { promoteChatToInquiry } from "./chat/promote-chat-to-inquiry";
 export { syncChatOnTrainerLink } from "./chat/sync-chat-on-trainer-link";
 // #1833: cancela los turnos futuros del par cuando termina un vínculo vivo.
 export { cancelAppointmentsOnUnlink } from "./cancel-appointments-on-unlink";
+// #1806: `trainer_athlete_pairs/{trainerId}_{athleteId}`, el par que las reglas leen.
+export { syncTrainerAthletePair } from "./sync-trainer-athlete-pair";
 // Paywall Fase 7 (downgrade): reconcilian `entitlement` cuando el PF queda
 // por encima de su limite. Hacen falta LOS DOS — el trigger ve los cambios de
 // suscripcion al instante, y el barrido ve lo que ningun trigger puede ver:
