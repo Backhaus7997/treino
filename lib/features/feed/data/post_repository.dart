@@ -1,5 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
+    show
+        CollectionReference,
+        DocumentSnapshot,
+        FirebaseException,
+        FirebaseFirestore,
+        QuerySnapshot,
+        Timestamp;
 
 import '../../../core/moderation/moderation_guard.dart';
 import '../domain/post.dart';
@@ -130,6 +136,7 @@ class PostRepository {
     }
     final snap =
         await query.orderBy('createdAt', descending: true).limit(limit).get();
+    _exigirRespuestaConfirmada([snap]);
     return _pageFromSnapshot(
       posts: snap.docs.map(_fromDoc).whereType<Post>().toList(),
       fetchedDocumentCount: snap.docs.length,
@@ -154,6 +161,7 @@ class PostRepository {
 
     const chunkSize = 10;
     final results = <Post>[];
+    final snaps = <QuerySnapshot<Map<String, Object?>>>[];
     var chunkReachedLimit = false;
 
     for (var i = 0; i < friendUids.length; i += chunkSize) {
@@ -172,9 +180,11 @@ class PostRepository {
       }
       final snap =
           await query.orderBy('createdAt', descending: true).limit(limit).get();
+      snaps.add(snap);
       chunkReachedLimit = chunkReachedLimit || snap.docs.length == limit;
       results.addAll(snap.docs.map(_fromDoc).whereType<Post>());
     }
+    _exigirRespuestaConfirmada(snaps, hayPosts: results.isNotEmpty);
 
     // Each chunk is sorted server-side, but the merged list across chunks is
     // not globally ordered — re-sort newest-first client-side.
@@ -208,10 +218,43 @@ class PostRepository {
     }
     final snap =
         await query.orderBy('createdAt', descending: true).limit(limit).get();
+    _exigirRespuestaConfirmada([snap]);
     return _pageFromSnapshot(
       posts: snap.docs.map(_fromDoc).whereType<Post>().toList(),
       fetchedDocumentCount: snap.docs.length,
       limit: limit,
+    );
+  }
+
+  /// Un feed que vuelve vacío DESDE LA CACHÉ no dice «no hay posts»: dice «no
+  /// pude preguntar».
+  ///
+  /// Sin red, un `.get()` de una query no falla: con la caché fría devuelve un
+  /// `QuerySnapshot` vacío con `isFromCache == true`, y las tres pestañas
+  /// pintaban el estado vacío en vez del error con Reintentar que ya tiene
+  /// `_FeedAsyncBody` (QA E2E 2026-11-06). Mismo agujero que
+  /// `TrainerLinkRepository.watchForAthlete` documenta para los vínculos.
+  ///
+  /// Se tira `unavailable` —el código de Firestore para «sin conexión»— y el
+  /// provider termina en `AsyncError`. Sólo si NO hay ningún post para mostrar:
+  /// los cacheados se muestran (datos viejos pero reales). Con varios chunks
+  /// (`whereIn` de a 10) basta que alguno vuelva vacío-de-caché y el total esté
+  /// vacío. Un vacío confirmado por el servidor SÍ es un vacío real y pasa.
+  /// En `loadMore` el throw también sirve: su `catch` conserva lo cargado y
+  /// deja `hasMore` en true.
+  void _exigirRespuestaConfirmada(
+    List<QuerySnapshot<Map<String, Object?>>> snaps, {
+    bool hayPosts = false,
+  }) {
+    if (hayPosts) return;
+    final sinConfirmar = snaps.any(
+      (snap) => snap.docs.isEmpty && snap.metadata.isFromCache,
+    );
+    if (!sinConfirmar) return;
+    throw FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'unavailable',
+      message: 'No se pudo confirmar el feed con el servidor (sin conexión).',
     );
   }
 
