@@ -304,6 +304,23 @@ export async function syncSessionShareHandler(
     return;
   }
 
+  // GUARDA DE LA SOLICITUD QUE SE TERMINA (#1812): `pending → terminated`
+  // (un rechazo, una cancelación, una solicitud duplicada del mismo par) no
+  // tiene share que revocar. El share se otorga SÓLO
+  // dentro de la rama `status === "active"` de arriba, y un doc que estaba
+  // `pending` nunca estuvo ahí: no hay nada suyo que soltar. Caer al camino de
+  // abajo borraba el share de un vínculo VIVO del MISMO par, y el chequeo de
+  // trainerId no lo ve (es el mismo PF). Mismo razonamiento que la guarda del
+  // DELETE de arriba, para el UPDATE; la del DELETE sigue pidiendo `terminated`
+  // + sin `acceptedAt` porque ahí `before` ya puede ser cualquier cosa.
+  if (before?.status === "pending" && status === "terminated") {
+    logger.info(
+      "syncSessionShare: solicitud pending terminada — no hay share propio que revocar",
+      { trainerId, athleteId },
+    );
+    return;
+  }
+
   // Link deleted or no longer active → conditionally remove the share.
   //
   // Este camino a proposito NO mira si el status cambio: un share que sobrevivio
