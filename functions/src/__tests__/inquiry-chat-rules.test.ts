@@ -314,8 +314,11 @@ describe("chats/create — consulta denegada (#637)", () => {
 describe("chats/create — las tres ramas siguen siendo excluyentes (#637)", () => {
   // La invariante del archivo: un doc de chat sólo lleva `linkId` si nombra un
   // link válido. Si la rama nueva fuese un `|| esConsulta`, este payload haría
-  // true la disyunción y el linkId inventado quedaría persistido, regalando
-  // escritura permanente vía `senderMayPost`.
+  // true la disyunción y el linkId inventado quedaría persistido: un chat
+  // marcado como de Coach sin vínculo real, y `linkId` está pineado inmutable
+  // en `chats/update`, así que no se podría corregir después. (Hasta el
+  // 2026-10-21 además regalaba escritura permanente vía `senderMayPost`, que
+  // miraba `linkId`; hoy ya no lo mira.)
   it("DENIEGA kind:'inquiry' + linkId INVENTADO — gana la rama Coach y el link no existe", async () => {
     await seedPublishedTrainer(TRAINER);
     await assertFails(

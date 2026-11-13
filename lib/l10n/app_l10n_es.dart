@@ -3615,6 +3615,26 @@ class AppL10nEs extends AppL10n {
   String get insightsDayEmptyHint => 'No entrenaste este día.';
 
   @override
+  String get insightsScreenTitle => 'INSIGHTS';
+
+  @override
+  String get insightsEmptyState => 'Empieza a entrenar para ver tus insights.';
+
+  @override
+  String get insightsPreviousWeekTooltip => 'Semana anterior';
+
+  @override
+  String get insightsNextWeekTooltip => 'Semana siguiente';
+
+  @override
+  String insightsWeekRange(String start, String end) {
+    return 'SEMANA · $start – $end';
+  }
+
+  @override
+  String get insightsDayMusclesHeading => 'MÚSCULOS DEL DÍA';
+
+  @override
   String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';
 
   @override
@@ -9973,6 +9993,26 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get insightsDayEmptyHint => 'No entrenaste este día.';
+
+  @override
+  String get insightsScreenTitle => 'INSIGHTS';
+
+  @override
+  String get insightsEmptyState => 'Empezá a entrenar para ver tus insights.';
+
+  @override
+  String get insightsPreviousWeekTooltip => 'Semana anterior';
+
+  @override
+  String get insightsNextWeekTooltip => 'Semana siguiente';
+
+  @override
+  String insightsWeekRange(String start, String end) {
+    return 'SEMANA · $start – $end';
+  }
+
+  @override
+  String get insightsDayMusclesHeading => 'MÚSCULOS DEL DÍA';
 
   @override
   String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';

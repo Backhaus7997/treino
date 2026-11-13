@@ -1400,7 +1400,7 @@ abstract class AppL10n {
   /// **'Acepto consultas'**
   String get trainerAcceptsInquiriesTitle;
 
-  /// Subtítulo del toggle de consultas. Dice NUEVAS a propósito: `senderMayPost` autoriza incondicionalmente todo chat que ya tiene kind:inquiry, así que apagar el switch NO calla a quien ya venía hablando. Decir «sólo te escriben tus alumnos» era una promesa que el sistema no cumple.
+  /// Subtítulo del toggle de consultas. Dice NUEVAS a propósito: el switch (`acceptsInquiries`) sólo se evalúa al CREAR el chat, en `chatCreateOk`. `senderMayPost` no lo mira ni mira `kind` ni el follow: en un chat que ya existe escriben los dos miembros y sólo corta un bloqueo o `closedAt`. Así que apagar el switch NO calla a quien ya venía hablando. Decir «sólo te escriben tus alumnos» era una promesa que el sistema no cumple.
   ///
   /// In es_AR, this message translates to:
   /// **'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.'**
@@ -6361,6 +6361,42 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No entrenaste este día.'**
   String get insightsDayEmptyHint;
+
+  /// Encabezado de InsightsScreen (el hub de estadísticas del alumno), junto a la flecha de volver.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'INSIGHTS'**
+  String get insightsScreenTitle;
+
+  /// InsightsScreen de una cuenta que nunca completó un entrenamiento: no hay nada que reportar de entrenos. Debajo sigue el tile de Medidas, que sí es alcanzable (#1696).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Empezá a entrenar para ver tus insights.'**
+  String get insightsEmptyState;
+
+  /// Tooltip y etiqueta de accesibilidad del chevron ‹ de la tarjeta SEMANA de InsightsScreen: pagina a la semana anterior.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana anterior'**
+  String get insightsPreviousWeekTooltip;
+
+  /// Tooltip y etiqueta de accesibilidad del chevron › de la tarjeta SEMANA de InsightsScreen: pagina a la semana siguiente. Deshabilitado en la semana en curso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana siguiente'**
+  String get insightsNextWeekTooltip;
+
+  /// Rango de la semana mostrada en la tarjeta SEMANA de InsightsScreen. {start} y {end} ya vienen formateados con el día y el mes abreviado en mayúsculas (ej. 18 MAY y 24 MAY).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEMANA · {start} – {end}'**
+  String insightsWeekRange(String start, String end);
+
+  /// Encabezado de la tarjeta de músculos trabajados en el día elegido de la tira de la semana de InsightsScreen. Mismo texto que coachDailyHeatmapSectionTitle, que es del detalle de alumno del PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MÚSCULOS DEL DÍA'**
+  String get insightsDayMusclesHeading;
 
   /// Section header for the shared DailyHeatmapSection (per-day body heat-map + day-strip) in the coach's mobile athlete detail screen (charts-redesign PR2b, AD5).
   ///
