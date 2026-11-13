@@ -393,6 +393,10 @@ mixin _$ExerciseProgression {
   List<PersonalRecord> get personalRecords =>
       throw _privateConstructorUsedError;
   int get frequencySessionCount => throw _privateConstructorUsedError;
+  List<ProgressionPoint> get bestDurationSeries =>
+      throw _privateConstructorUsedError;
+  List<ProgressionPoint> get bestDistanceSeries =>
+      throw _privateConstructorUsedError;
 
   /// Create a copy of ExerciseProgression
   /// with the given fields replaced by the non-null parameter values.
@@ -415,7 +419,9 @@ abstract class $ExerciseProgressionCopyWith<$Res> {
       List<ProgressionPoint> bestSetVolumeSeries,
       List<ProgressionPoint> bestSessionVolumeSeries,
       List<PersonalRecord> personalRecords,
-      int frequencySessionCount});
+      int frequencySessionCount,
+      List<ProgressionPoint> bestDurationSeries,
+      List<ProgressionPoint> bestDistanceSeries});
 }
 
 /// @nodoc
@@ -441,6 +447,8 @@ class _$ExerciseProgressionCopyWithImpl<$Res, $Val extends ExerciseProgression>
     Object? bestSessionVolumeSeries = null,
     Object? personalRecords = null,
     Object? frequencySessionCount = null,
+    Object? bestDurationSeries = null,
+    Object? bestDistanceSeries = null,
   }) {
     return _then(_value.copyWith(
       exerciseId: null == exerciseId
@@ -475,6 +483,14 @@ class _$ExerciseProgressionCopyWithImpl<$Res, $Val extends ExerciseProgression>
           ? _value.frequencySessionCount
           : frequencySessionCount // ignore: cast_nullable_to_non_nullable
               as int,
+      bestDurationSeries: null == bestDurationSeries
+          ? _value.bestDurationSeries
+          : bestDurationSeries // ignore: cast_nullable_to_non_nullable
+              as List<ProgressionPoint>,
+      bestDistanceSeries: null == bestDistanceSeries
+          ? _value.bestDistanceSeries
+          : bestDistanceSeries // ignore: cast_nullable_to_non_nullable
+              as List<ProgressionPoint>,
     ) as $Val);
   }
 }
@@ -495,7 +511,9 @@ abstract class _$$ExerciseProgressionImplCopyWith<$Res>
       List<ProgressionPoint> bestSetVolumeSeries,
       List<ProgressionPoint> bestSessionVolumeSeries,
       List<PersonalRecord> personalRecords,
-      int frequencySessionCount});
+      int frequencySessionCount,
+      List<ProgressionPoint> bestDurationSeries,
+      List<ProgressionPoint> bestDistanceSeries});
 }
 
 /// @nodoc
@@ -519,6 +537,8 @@ class __$$ExerciseProgressionImplCopyWithImpl<$Res>
     Object? bestSessionVolumeSeries = null,
     Object? personalRecords = null,
     Object? frequencySessionCount = null,
+    Object? bestDurationSeries = null,
+    Object? bestDistanceSeries = null,
   }) {
     return _then(_$ExerciseProgressionImpl(
       exerciseId: null == exerciseId
@@ -553,6 +573,14 @@ class __$$ExerciseProgressionImplCopyWithImpl<$Res>
           ? _value.frequencySessionCount
           : frequencySessionCount // ignore: cast_nullable_to_non_nullable
               as int,
+      bestDurationSeries: null == bestDurationSeries
+          ? _value._bestDurationSeries
+          : bestDurationSeries // ignore: cast_nullable_to_non_nullable
+              as List<ProgressionPoint>,
+      bestDistanceSeries: null == bestDistanceSeries
+          ? _value._bestDistanceSeries
+          : bestDistanceSeries // ignore: cast_nullable_to_non_nullable
+              as List<ProgressionPoint>,
     ));
   }
 }
@@ -568,12 +596,18 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
       required final List<ProgressionPoint> bestSetVolumeSeries,
       required final List<ProgressionPoint> bestSessionVolumeSeries,
       required final List<PersonalRecord> personalRecords,
-      required this.frequencySessionCount})
+      required this.frequencySessionCount,
+      final List<ProgressionPoint> bestDurationSeries =
+          const <ProgressionPoint>[],
+      final List<ProgressionPoint> bestDistanceSeries =
+          const <ProgressionPoint>[]})
       : _heaviestWeightSeries = heaviestWeightSeries,
         _oneRepMaxSeries = oneRepMaxSeries,
         _bestSetVolumeSeries = bestSetVolumeSeries,
         _bestSessionVolumeSeries = bestSessionVolumeSeries,
-        _personalRecords = personalRecords;
+        _personalRecords = personalRecords,
+        _bestDurationSeries = bestDurationSeries,
+        _bestDistanceSeries = bestDistanceSeries;
 
   @override
   final String exerciseId;
@@ -624,10 +658,29 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
 
   @override
   final int frequencySessionCount;
+  final List<ProgressionPoint> _bestDurationSeries;
+  @override
+  @JsonKey()
+  List<ProgressionPoint> get bestDurationSeries {
+    if (_bestDurationSeries is EqualUnmodifiableListView)
+      return _bestDurationSeries;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_bestDurationSeries);
+  }
+
+  final List<ProgressionPoint> _bestDistanceSeries;
+  @override
+  @JsonKey()
+  List<ProgressionPoint> get bestDistanceSeries {
+    if (_bestDistanceSeries is EqualUnmodifiableListView)
+      return _bestDistanceSeries;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_bestDistanceSeries);
+  }
 
   @override
   String toString() {
-    return 'ExerciseProgression(exerciseId: $exerciseId, exerciseName: $exerciseName, heaviestWeightSeries: $heaviestWeightSeries, oneRepMaxSeries: $oneRepMaxSeries, bestSetVolumeSeries: $bestSetVolumeSeries, bestSessionVolumeSeries: $bestSessionVolumeSeries, personalRecords: $personalRecords, frequencySessionCount: $frequencySessionCount)';
+    return 'ExerciseProgression(exerciseId: $exerciseId, exerciseName: $exerciseName, heaviestWeightSeries: $heaviestWeightSeries, oneRepMaxSeries: $oneRepMaxSeries, bestSetVolumeSeries: $bestSetVolumeSeries, bestSessionVolumeSeries: $bestSessionVolumeSeries, personalRecords: $personalRecords, frequencySessionCount: $frequencySessionCount, bestDurationSeries: $bestDurationSeries, bestDistanceSeries: $bestDistanceSeries)';
   }
 
   @override
@@ -650,7 +703,11 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
             const DeepCollectionEquality()
                 .equals(other._personalRecords, _personalRecords) &&
             (identical(other.frequencySessionCount, frequencySessionCount) ||
-                other.frequencySessionCount == frequencySessionCount));
+                other.frequencySessionCount == frequencySessionCount) &&
+            const DeepCollectionEquality()
+                .equals(other._bestDurationSeries, _bestDurationSeries) &&
+            const DeepCollectionEquality()
+                .equals(other._bestDistanceSeries, _bestDistanceSeries));
   }
 
   @override
@@ -663,7 +720,9 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
       const DeepCollectionEquality().hash(_bestSetVolumeSeries),
       const DeepCollectionEquality().hash(_bestSessionVolumeSeries),
       const DeepCollectionEquality().hash(_personalRecords),
-      frequencySessionCount);
+      frequencySessionCount,
+      const DeepCollectionEquality().hash(_bestDurationSeries),
+      const DeepCollectionEquality().hash(_bestDistanceSeries));
 
   /// Create a copy of ExerciseProgression
   /// with the given fields replaced by the non-null parameter values.
@@ -677,14 +736,17 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
 
 abstract class _ExerciseProgression implements ExerciseProgression {
   const factory _ExerciseProgression(
-      {required final String exerciseId,
-      required final String exerciseName,
-      required final List<ProgressionPoint> heaviestWeightSeries,
-      required final List<ProgressionPoint> oneRepMaxSeries,
-      required final List<ProgressionPoint> bestSetVolumeSeries,
-      required final List<ProgressionPoint> bestSessionVolumeSeries,
-      required final List<PersonalRecord> personalRecords,
-      required final int frequencySessionCount}) = _$ExerciseProgressionImpl;
+          {required final String exerciseId,
+          required final String exerciseName,
+          required final List<ProgressionPoint> heaviestWeightSeries,
+          required final List<ProgressionPoint> oneRepMaxSeries,
+          required final List<ProgressionPoint> bestSetVolumeSeries,
+          required final List<ProgressionPoint> bestSessionVolumeSeries,
+          required final List<PersonalRecord> personalRecords,
+          required final int frequencySessionCount,
+          final List<ProgressionPoint> bestDurationSeries,
+          final List<ProgressionPoint> bestDistanceSeries}) =
+      _$ExerciseProgressionImpl;
 
   @override
   String get exerciseId;
@@ -702,6 +764,10 @@ abstract class _ExerciseProgression implements ExerciseProgression {
   List<PersonalRecord> get personalRecords;
   @override
   int get frequencySessionCount;
+  @override
+  List<ProgressionPoint> get bestDurationSeries;
+  @override
+  List<ProgressionPoint> get bestDistanceSeries;
 
   /// Create a copy of ExerciseProgression
   /// with the given fields replaced by the non-null parameter values.
@@ -718,7 +784,8 @@ mixin _$ExerciseListEntry {
 
   /// [#377] Periods whose CURRENT window holds at least one chartable set
   /// for this exercise — same predicate the aggregator uses to build the
-  /// series (countsAsWorkout session, weightKg > 0). The section widget
+  /// series (countsAsWorkout session, `isChartableSet`: weightKg > 0, or a
+  /// timed / distance set #1715). The section widget
   /// bounds the default preselection to the active period with this, so
   /// the screen never opens on the chart's empty state by itself.
   Set<ChartPeriod> get periodsWithData => throw _privateConstructorUsedError;
@@ -842,14 +909,16 @@ class _$ExerciseListEntryImpl implements _ExerciseListEntry {
 
   /// [#377] Periods whose CURRENT window holds at least one chartable set
   /// for this exercise — same predicate the aggregator uses to build the
-  /// series (countsAsWorkout session, weightKg > 0). The section widget
+  /// series (countsAsWorkout session, `isChartableSet`: weightKg > 0, or a
+  /// timed / distance set #1715). The section widget
   /// bounds the default preselection to the active period with this, so
   /// the screen never opens on the chart's empty state by itself.
   final Set<ChartPeriod> _periodsWithData;
 
   /// [#377] Periods whose CURRENT window holds at least one chartable set
   /// for this exercise — same predicate the aggregator uses to build the
-  /// series (countsAsWorkout session, weightKg > 0). The section widget
+  /// series (countsAsWorkout session, `isChartableSet`: weightKg > 0, or a
+  /// timed / distance set #1715). The section widget
   /// bounds the default preselection to the active period with this, so
   /// the screen never opens on the chart's empty state by itself.
   @override
@@ -905,7 +974,8 @@ abstract class _ExerciseListEntry implements ExerciseListEntry {
 
   /// [#377] Periods whose CURRENT window holds at least one chartable set
   /// for this exercise — same predicate the aggregator uses to build the
-  /// series (countsAsWorkout session, weightKg > 0). The section widget
+  /// series (countsAsWorkout session, `isChartableSet`: weightKg > 0, or a
+  /// timed / distance set #1715). The section widget
   /// bounds the default preselection to the active period with this, so
   /// the screen never opens on the chart's empty state by itself.
   @override

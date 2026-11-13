@@ -3372,6 +3372,27 @@ class AppL10nEs extends AppL10n {
       'No pudimos terminar el vínculo.';
 
   @override
+  String coachHubTerminateLinkAppointmentsWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'También se cancelan $count sesiones agendadas con este alumno y se le avisa.',
+      one:
+          'También se cancela 1 sesión agendada con este alumno y se le avisa.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get coachHubTerminateLinkAppointmentsWarningUnknown =>
+      'No pudimos revisar tus sesiones con este alumno. Las que tengas a futuro también se cancelan y se le avisa.';
+
+  @override
+  String get coachHubTerminateLinkAppointmentsError =>
+      'No pudimos cancelar las sesiones futuras con este alumno, así que el vínculo sigue activo. Inténtalo de nuevo.';
+
+  @override
   String get coachHubDashboardResumeLinkError =>
       'No pudimos reanudar el vínculo.';
 
@@ -3640,6 +3661,12 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get insightsDayMusclesHeading => 'MÚSCULOS DEL DÍA';
+
+  @override
+  String get insightsDaySetsUnit => 'SETS';
+
+  @override
+  String get insightsBackButton => 'VOLVER';
 
   @override
   String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';
@@ -3970,6 +3997,12 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get progressionMetricVolume => 'Volumen';
+
+  @override
+  String get progressionMetricLongestDuration => 'Tiempo máximo';
+
+  @override
+  String get progressionMetricLongestDistance => 'Distancia máxima';
 
   @override
   String progressionFrequency(int count) {
@@ -9773,6 +9806,27 @@ class AppL10nEsAr extends AppL10nEs {
       'No pudimos terminar el vínculo.';
 
   @override
+  String coachHubTerminateLinkAppointmentsWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'También se cancelan $count sesiones agendadas con este alumno y se le avisa.',
+      one:
+          'También se cancela 1 sesión agendada con este alumno y se le avisa.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get coachHubTerminateLinkAppointmentsWarningUnknown =>
+      'No pudimos revisar tus sesiones con este alumno. Las que tengas a futuro también se cancelan y se le avisa.';
+
+  @override
+  String get coachHubTerminateLinkAppointmentsError =>
+      'No pudimos cancelar las sesiones futuras con este alumno, así que el vínculo sigue activo. Probá de nuevo.';
+
+  @override
   String get coachHubDashboardResumeLinkError =>
       'No pudimos reanudar el vínculo.';
 
@@ -10041,6 +10095,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get insightsDayMusclesHeading => 'MÚSCULOS DEL DÍA';
+
+  @override
+  String get insightsDaySetsUnit => 'SETS';
+
+  @override
+  String get insightsBackButton => 'VOLVER';
 
   @override
   String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';
@@ -10368,6 +10428,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get progressionMetricVolume => 'Volumen';
+
+  @override
+  String get progressionMetricLongestDuration => 'Tiempo máximo';
+
+  @override
+  String get progressionMetricLongestDistance => 'Distancia máxima';
 
   @override
   String progressionFrequency(int count) {

@@ -11,7 +11,6 @@ import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
-import '../../moderation/presentation/blocked_users_screen.dart';
 import '../application/correos_promocionales_providers.dart';
 import '../application/recordatorios_entrenamiento_providers.dart';
 import '../application/user_providers.dart';
@@ -301,7 +300,7 @@ class PrivacyScreen extends ConsumerWidget {
                       key: const ValueKey('privacy-blocked-users-entry'),
                       icon: TreinoIcon.block,
                       title: l10n.blockedUsersTitle,
-                      onTap: () => BlockedUsersScreen.open(context),
+                      onTap: () => context.push('/profile/settings/bloqueados'),
                     ),
                   ),
                 ),

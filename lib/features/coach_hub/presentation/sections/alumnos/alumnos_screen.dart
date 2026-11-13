@@ -11,6 +11,9 @@ import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_destructive_menu_item.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/coach/application/agenda_providers.dart'
+    show appointmentRepositoryProvider;
+import 'package:treino/features/coach/application/terminar_vinculo.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -625,15 +628,8 @@ class _RosterTable extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
-    // Ventana de 30 días, día-truncada (UTC) — se computa UNA vez acá (no por
-    // fila) para que la family key de finishedInWindowByUidProvider quede
-    // estable entre rebuilds (mismo criterio que inactivosProvider).
-    // Ventana de dias en ART (#671): con UTC, "Ultimo entreno" de alguien
-    // que entreno hoy a la tarde se leia "Ayer" pasadas las 21:00.
-    final now = argentinaNow();
-    final todayStart = DateTime.utc(now.year, now.month, now.day);
-    final windowFrom = todayStart.subtract(const Duration(days: 30));
-    final windowTo = todayStart.add(const Duration(days: 1));
+    // Se computa UNA vez acá (no por fila): ver `_ultimoEntrenoWindow`.
+    final window = _ultimoEntrenoWindow();
 
     return CoachHubDataTable(
       columns: [
@@ -722,9 +718,7 @@ class _RosterTable extends ConsumerWidget {
             l10n,
             entry,
             gymNameFor(entry.link),
-            todayStart: todayStart,
-            windowFrom: windowFrom,
-            windowTo: windowTo,
+            window: window,
           ),
       ],
       loading: loading,
@@ -742,32 +736,19 @@ class _RosterTable extends ConsumerWidget {
     AppL10n l10n,
     _RosterEntry entry,
     String? gymName, {
-    required DateTime todayStart,
-    required DateTime windowFrom,
-    required DateTime windowTo,
+    required _UltimoEntrenoWindow window,
   }) {
     final link = entry.link;
     final estado = entry.estado;
     final profile = profiles[link.athleteId];
     final name = profile?.displayName ?? l10n.coachHubAlumnosNameFallback;
 
-    // Camino barato (sin campo denormalizado): bounded query por-alumno vía
-    // finishedInWindowByUidProvider, ordenada finishedAt DESC — el primer
-    // elemento ya es la sesión más reciente dentro de la ventana.
-    final windowKey =
-        (athleteId: link.athleteId, from: windowFrom, to: windowTo);
-    final sessionsInWindow =
-        ref.watch(finishedInWindowByUidProvider(windowKey)).valueOrNull ??
-            const [];
-    final lastFinishedAt =
-        sessionsInWindow.isEmpty ? null : sessionsInWindow.first.finishedAt;
-
     return CoachHubRow(
       id: link.athleteId,
       cells: {
         'alumno': name,
         'estado': estado.label(l10n),
-        'ultimoEntreno': lastWorkoutLabel(l10n, lastFinishedAt, todayStart),
+        'ultimoEntreno': _ultimoEntrenoLabel(ref, l10n, link.athleteId, window),
       },
       cellWidgets: {
         'alumno': _AlumnoCell(
@@ -786,6 +767,53 @@ class _RosterTable extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Ventana de 30 días del «Último entreno» + el "hoy" día-truncado (UTC) con
+/// el que se computa.
+typedef _UltimoEntrenoWindow = ({
+  DateTime todayStart,
+  DateTime from,
+  DateTime to,
+});
+
+/// Ventana de 30 días, día-truncada (UTC). La tabla la computa UNA vez (no por
+/// fila) para que la family key de `finishedInWindowByUidProvider` quede
+/// estable entre rebuilds (mismo criterio que `inactivosProvider`).
+///
+/// Ventana de días en ART (#671): con UTC, «Último entreno» de alguien que
+/// entrenó hoy a la tarde se leía «Ayer» pasadas las 21:00.
+_UltimoEntrenoWindow _ultimoEntrenoWindow() {
+  final now = argentinaNow();
+  final todayStart = DateTime.utc(now.year, now.month, now.day);
+  return (
+    todayStart: todayStart,
+    from: todayStart.subtract(const Duration(days: 30)),
+    to: todayStart.add(const Duration(days: 1)),
+  );
+}
+
+/// Texto de «Último entreno» de [athleteId]. La tabla Y las cards lo dibujan
+/// con esta función: misma fuente y mismo formato. Antes las cards leían sólo
+/// «¿entrenó hoy?» (`finishedTodayByUidProvider`) y decían «—» para quien
+/// había entrenado hace 6 días, mientras la tabla decía «Hace 6 días» (#1761).
+///
+/// Camino barato (sin campo denormalizado): bounded query por-alumno vía
+/// `finishedInWindowByUidProvider`, ordenada finishedAt DESC — el primer
+/// elemento ya es la sesión más reciente dentro de la ventana.
+String _ultimoEntrenoLabel(
+  WidgetRef ref,
+  AppL10n l10n,
+  String athleteId,
+  _UltimoEntrenoWindow window,
+) {
+  final windowKey = (athleteId: athleteId, from: window.from, to: window.to);
+  final sessionsInWindow =
+      ref.watch(finishedInWindowByUidProvider(windowKey)).valueOrNull ??
+          const [];
+  final lastFinishedAt =
+      sessionsInWindow.isEmpty ? null : sessionsInWindow.first.finishedAt;
+  return lastWorkoutLabel(l10n, lastFinishedAt, window.todayStart);
 }
 
 /// Etiqueta relativa de la columna «Último entreno», dado el `finishedAt` de
@@ -1209,18 +1237,34 @@ class _RowActionsState extends ConsumerState<_RowActions> {
     );
   }
 
+  /// Terminar también cancela los turnos futuros con el alumno, ANTES de
+  /// terminar (#1792). Ver `terminar_vinculo.dart`.
   Future<void> _terminate(BuildContext context, WidgetRef ref) async {
     final l10n = AppL10n.of(context);
+    final appointments = ref.read(appointmentRepositoryProvider);
+    final turnos = await contarTurnosFuturos(appointments, widget.link);
+    if (!context.mounted) return;
+    final aviso = avisoDeTurnosAlTerminar(l10n, turnos);
     final ok = await _confirmAction(
       context,
       title: l10n.coachHubDashboardTerminateLinkTitle,
-      body: l10n.coachHubDashboardTerminateLinkBody,
+      body: aviso.isEmpty
+          ? l10n.coachHubDashboardTerminateLinkBody
+          : '${l10n.coachHubDashboardTerminateLinkBody}\n\n$aviso',
       confirmLabel: l10n.coachHubActionTerminate,
     );
     if (!ok) return;
-    await ref
-        .read(trainerLinkRepositoryProvider)
-        .terminate(widget.link.id, reason: 'trainer-terminated');
+    try {
+      await terminarVinculoLiberandoTurnos(
+        links: ref.read(trainerLinkRepositoryProvider),
+        appointments: appointments,
+        link: widget.link,
+      );
+    } on TurnosFuturosSinCancelar {
+      _showError(l10n.coachHubTerminateLinkAppointmentsError);
+    } catch (_) {
+      _showError(l10n.coachHubDashboardTerminateLinkError);
+    }
   }
 
   /// Resuelve (o crea) el chat 1-1 con el alumno vía [chatForOtherUidProvider]
@@ -1567,10 +1611,13 @@ class _RosterCard extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final name = profile?.displayName ?? l10n.coachHubAlumnosNameFallback;
-    final trainedToday =
-        (ref.watch(finishedTodayByUidProvider(link.athleteId)).valueOrNull ??
-                const [])
-            .isNotEmpty;
+    final ultimoEntreno = _ultimoEntrenoLabel(
+      ref,
+      l10n,
+      link.athleteId,
+      _ultimoEntrenoWindow(),
+    );
+    final trainedToday = ultimoEntreno == l10n.coachHubAlumnosLastWorkoutToday;
     final color = estado.color(palette);
 
     return GestureDetector(
@@ -1635,7 +1682,7 @@ class _RosterCard extends ConsumerWidget {
                   style: TextStyle(color: palette.textMuted, fontSize: 11),
                 ),
                 Text(
-                  trainedToday ? l10n.coachHubAlumnosLastWorkoutToday : '—',
+                  ultimoEntreno,
                   style: TextStyle(
                     color: trainedToday ? palette.accent : palette.textMuted,
                     fontSize: 12,

@@ -9,7 +9,6 @@ import '../../../core/utils/argentina_time.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
-import '../../workout/application/exercise_providers.dart';
 import '../application/insights_providers.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
@@ -57,7 +56,7 @@ class VolumeByGroupScreen extends ConsumerWidget {
                 child: CircularProgressIndicator(color: palette.accent),
               ),
               error: (_, __) => _ErrorState(
-                onRetry: () => _retryWeek(ref, uid, weekStart),
+                onRetry: () => retryWeekInsights(ref, uid, weekStart),
               ),
               data: (insights) => insights == null
                   ? Center(
@@ -129,16 +128,6 @@ void _safePopOrInsights(BuildContext context) {
 }
 
 // ── Error state ───────────────────────────────────────────────────────────────
-
-/// QA-498: `ref.invalidate` NO cascada a las dependencias, y [exercisesProvider]
-/// NO es autoDispose — cachea su `AsyncError` para toda la vida del container.
-/// Invalidar solo [athleteWeekInsightsProvider] re-leía el MISMO error cacheado
-/// del catálogo: un reintentar que nunca podía recuperar. Mismo criterio que el
-/// `_retry` de MuscleDistributionScreen (#376).
-void _retryWeek(WidgetRef ref, String uid, DateTime weekStart) {
-  ref.invalidate(exercisesProvider);
-  ref.invalidate(athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)));
-}
 
 class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.onRetry});

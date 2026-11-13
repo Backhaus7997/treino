@@ -386,6 +386,79 @@ void main() {
     });
   });
 
+  // #1792 — terminar un vínculo libera los turnos futuros del par.
+  group('#1792 — cancelFutureForPair() / listFutureConfirmedForPair()', () {
+    final now = DateTime.utc(2026, 7, 1, 12, 0);
+
+    Future<void> seed(
+      String id,
+      DateTime at, {
+      String trainer = trainerId,
+      String athlete = athleteId,
+      AppointmentStatus status = AppointmentStatus.confirmed,
+    }) =>
+        firestore.collection('appointments').doc(id).set(Appointment(
+              id: id,
+              trainerId: trainer,
+              athleteId: athlete,
+              athleteDisplayName: athleteDisplayName,
+              startsAt: at,
+              durationMin: durationMin,
+              status: status,
+            ).toJson());
+
+    Future<Map<String, Object?>> docOf(String id) async =>
+        (await firestore.collection('appointments').doc(id).get()).data()!;
+
+    setUp(() async {
+      await seed('empezada', now.subtract(const Duration(hours: 1)));
+      await seed('en-3-horas', now.add(const Duration(hours: 3)));
+      await seed('en-3-dias', now.add(const Duration(days: 3)));
+      await seed('ya-cancelado', now.add(const Duration(days: 2)),
+          status: AppointmentStatus.cancelled);
+      await seed('otro-alumno', now.add(const Duration(days: 2)),
+          athlete: 'otro-athlete');
+    });
+
+    test('cancela los confirmados y futuros del par (<24h incluido) y nada más',
+        () async {
+      final n = await repo.cancelFutureForPair(
+        trainerId: trainerId,
+        athleteId: athleteId,
+        actorUid: trainerId,
+        reason: 'Vínculo terminado por el entrenador.',
+        now: now,
+      );
+
+      expect(n, 2);
+      for (final id in ['en-3-horas', 'en-3-dias']) {
+        final d = await docOf(id);
+        expect(d['status'], 'cancelled', reason: id);
+        expect(d['cancelledBy'], trainerId, reason: id);
+        final log = (d['cancellationLog']! as List).single as Map;
+        expect(log['reason'], 'Vínculo terminado por el entrenador.');
+      }
+      expect((await docOf('empezada'))['status'], 'confirmed');
+      expect((await docOf('otro-alumno'))['status'], 'confirmed');
+    });
+
+    test('más de 500 turnos: los cancela todos (lotes de 500)', () async {
+      for (var i = 0; i < 520; i++) {
+        await seed('masivo-$i', now.add(Duration(days: 10, minutes: i)),
+            athlete: 'masivo');
+      }
+
+      final n = await repo.cancelFutureForPair(
+        trainerId: trainerId,
+        athleteId: 'masivo',
+        actorUid: trainerId,
+        now: now,
+      );
+
+      expect(n, 520);
+    });
+  });
+
   group('#1492 — setAttendance()', () {
     late Appointment appt;
 

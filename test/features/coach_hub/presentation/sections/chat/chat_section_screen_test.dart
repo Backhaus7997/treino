@@ -15,6 +15,7 @@ import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/cha
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
+import 'package:treino/features/chat/domain/message.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/chat_section_screen.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -251,6 +252,54 @@ void main() {
         expect(container.read(selectedChatIdProvider), _chatId);
       },
     );
+
+    testWidgets(
+        'un chat recién creado desde la ficha (todavía fuera de la lista) '
+        'muestra el nombre del alumno, no «Usuario eliminado» (#1758)',
+        (tester) async {
+      // `abrirChatConAlumno` crea el chat y lo selecciona. Sin mensajes no
+      // tiene `lastMessageAt`, así que `chatsForCurrentUserProvider` no lo
+      // trae: el uid del interlocutor sale del doc del chat.
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWithValue(_pfUid),
+        chatsForCurrentUserProvider.overrideWith(
+          (ref) => Stream<List<Chat>>.value(const []),
+        ),
+        chatByIdProvider(_chatId).overrideWith(
+          (ref) => Stream<Chat?>.value(_stubChat()),
+        ),
+        userPublicProfileProvider(_athleteUid).overrideWith(
+          (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+        ),
+        messagesProvider(_chatId).overrideWith(
+          (ref) => Stream<List<Message>>.value(const []),
+        ),
+      ]);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(size: Size(1200, 800)),
+          child: UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
+              home: const Scaffold(body: ChatSectionScreen()),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      container.read(selectedChatIdProvider.notifier).state = _chatId;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Vicente'), findsOneWidget);
+      expect(find.text('Usuario eliminado'), findsNothing);
+    });
 
     testWidgets('al abrir un chat, el pane recibe el `peerUid`',
         (tester) async {

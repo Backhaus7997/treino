@@ -117,7 +117,11 @@ Widget _invitacionesListFor(List<TrainerLink> links, SolicitudTab tab) {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       for (final link in filtered) ...[
-        _SolicitudTile(link: link),
+        // Key por id: el `_busy` vive en el State del tile. Sin key, Flutter
+        // matchea por posición: al salir la fila aceptada/rechazada (queda en
+        // «Procesando…» hasta que el stream la saca), el State pasa a la fila
+        // siguiente y ésta hereda el spinner.
+        _SolicitudTile(key: ValueKey('solicitud_tile_${link.id}'), link: link),
         if (link != filtered.last) const SizedBox(height: AppSpacing.s8),
       ],
     ],
@@ -253,7 +257,7 @@ class _EmptyForTab extends StatelessWidget {
 /// `trainerLinkRepositoryProvider.accept/decline` con confirmación previa
 /// (`TreinoDialog`) + `busy` local + snackbar (patrón `_PendingRequestTile`).
 class _SolicitudTile extends ConsumerStatefulWidget {
-  const _SolicitudTile({required this.link});
+  const _SolicitudTile({super.key, required this.link});
 
   final TrainerLink link;
 

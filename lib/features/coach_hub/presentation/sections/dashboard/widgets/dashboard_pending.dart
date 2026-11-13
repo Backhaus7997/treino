@@ -168,7 +168,9 @@ class _PendingContent extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final link in list) ...[
-          _PendingRequestTile(link: link),
+          // Key por id: ver `_invitacionesListFor` (invitaciones_screen.dart).
+          _PendingRequestTile(
+              key: ValueKey('pending_tile_${link.id}'), link: link),
           if (link != list.last) const SizedBox(height: AppSpacing.s8),
         ],
       ],
@@ -215,7 +217,7 @@ class _SectionError extends StatelessWidget {
 /// Tile de una solicitud pendiente. Keys preservadas:
 /// `pending_request_*`/`accept_*`/`decline_*`.
 class _PendingRequestTile extends ConsumerStatefulWidget {
-  const _PendingRequestTile({required this.link});
+  const _PendingRequestTile({super.key, required this.link});
   final TrainerLink link;
 
   @override

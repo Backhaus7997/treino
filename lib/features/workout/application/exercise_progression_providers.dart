@@ -159,8 +159,9 @@ final exerciseSessionHistoryProvider = FutureProvider.autoDispose
 /// [#377] Each entry carries [ExerciseListEntry.periodsWithData]: the
 /// [ChartPeriod]s whose CURRENT window holds at least one chartable set for
 /// that exercise — same predicate the aggregator applies to build the series
-/// (countsAsWorkout session per #372, weightKg > 0 per #368, ART calendar-day
-/// window via [sessionInCurrentWindow]). All 3 periods are resolved in this
+/// (countsAsWorkout session per #372, [isChartableSet]: weightKg > 0 per #368
+/// or a timed / distance set per #1715, ART calendar-day window via
+/// [sessionInCurrentWindow]). All 3 periods are resolved in this
 /// single scan on purpose: the family key stays the athleteUid, so switching
 /// periods on screen reuses the cached list instead of re-reading Firestore.
 /// List MEMBERSHIP is deliberately untouched — an exercise outside the active
@@ -215,7 +216,7 @@ final athleteExerciseListProvider = FutureProvider.autoDispose
     if (periodsForSession.isEmpty) continue;
 
     for (final log in logsPerSession[i]) {
-      if (log.weightKg <= 0) continue;
+      if (!isChartableSet(log)) continue;
       periodsByExercise
           .putIfAbsent(log.exerciseId, () => <ChartPeriod>{})
           .addAll(periodsForSession);

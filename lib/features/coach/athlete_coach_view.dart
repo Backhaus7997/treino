@@ -548,6 +548,16 @@ class _ActionRow extends ConsumerWidget {
     // container survives disposal. ADR-RV-007, mirrors ADR-FPS-006.
     // ignore: use_build_context_synchronously
     final container = ProviderScope.containerOf(context, listen: false);
+    // #1840: el sheet se abre sobre el Navigator RAÍZ, capturado acá. Este
+    // `context` NO sobrevive al `await`: `terminate()` es un `update`, y la
+    // compensación de latencia emite el vínculo terminado por
+    // `currentAthleteLinkProvider` antes del ack del servidor, así que la card
+    // se reconstruye sin esta fila y `context.mounted` daba false: el sheet no
+    // se abría nunca. El Navigator raíz no se desmonta con la card.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    // Sólo un vínculo que fue real se puede reseñar terminado (la regla de
+    // `reviews` pide `acceptedAt`): sin él, el sheet terminaría en un error.
+    final ofrecerResena = link.acceptedAt != null;
     final linkId = link.id;
     final trainerId = link.trainerId;
     final athleteId = link.athleteId;
@@ -570,11 +580,10 @@ class _ActionRow extends ConsumerWidget {
     container.invalidate(currentAthleteLinkProvider);
     container.invalidate(currentAthleteLinkAnyStatusProvider);
 
-    // Show review sheet — context is still valid here because we checked
-    // mounted already and the sheet uses the container, not this widget's ref.
-    if (context.mounted) {
+    // Show review sheet on the root navigator captured above (#1840).
+    if (ofrecerResena && navigator.mounted) {
       await showModalBottomSheet<void>(
-        context: context,
+        context: navigator.context,
         useRootNavigator: true,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
