@@ -173,7 +173,7 @@ Future<_Mocks> _pumpSection(
         authStateChangesProvider
             .overrideWith((ref) => Stream.value(_userWithUid('athlete-1'))),
         assignedRoutinesProvider('athlete-1')
-            .overrideWith((ref) async => assigned),
+            .overrideWith((ref) => Stream.value(assigned)),
         userCreatedRoutinesProvider('athlete-1')
             .overrideWith((ref) => Stream.value(own)),
         userProfileProvider.overrideWith(
@@ -533,7 +533,7 @@ void main() {
         tester,
         extraOverrides: [
           assignedRoutinesProvider('athlete-1')
-              .overrideWith((ref) => completer.future),
+              .overrideWith((ref) => completer.future.asStream()),
         ],
       );
       await tester.pump();
@@ -560,7 +560,7 @@ void main() {
         tester,
         extraOverrides: [
           assignedRoutinesProvider('athlete-1')
-              .overrideWith((ref) => completer.future),
+              .overrideWith((ref) => completer.future.asStream()),
         ],
       );
       await tester.pump();
@@ -594,10 +594,10 @@ void main() {
         tester,
         activeRoutineId: 'plan-1',
         extraOverrides: [
-          assignedRoutinesProvider('athlete-1').overrideWith((ref) async {
+          assignedRoutinesProvider('athlete-1').overrideWith((ref) async* {
             attempts++;
             if (attempts == 1) throw Exception('backend down');
-            return [_makeCoachPlan(id: 'plan-1', name: 'Plan Fuerza')];
+            yield [_makeCoachPlan(id: 'plan-1', name: 'Plan Fuerza')];
           }),
         ],
       );

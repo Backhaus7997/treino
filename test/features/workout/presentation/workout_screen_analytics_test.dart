@@ -52,7 +52,8 @@ Future<void> _pumpWorkout(
         sessionsByUidProvider.overrideWith((ref, uid) async => []),
         authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
         currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
-        assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
+        assignedRoutinesProvider('test-uid')
+            .overrideWith((ref) => Stream.value([])),
         userCreatedRoutinesProvider('test-uid')
             .overrideWith((ref) => Stream.value(const <Routine>[])),
         // Sin esto EXPLORAR queda en spinner y nada asienta.
