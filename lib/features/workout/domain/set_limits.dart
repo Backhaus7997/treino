@@ -14,6 +14,10 @@ const int kMaxReps = 999;
 /// Max load in kg for a single set.
 const double kMaxWeightKg = 500.0;
 
+/// Max distance of a distance set, in meters (100 km). Un tope de sanidad, no
+/// de entrenamiento: deja afuera `99999999999`, no una salida larga.
+const double kMaxDistanceMeters = 100000.0;
+
 /// Clamps a rep count into `[0, kMaxReps]`. Used on prefill to neutralize
 /// already-corrupt Firestore docs written before the caps existed.
 int clampReps(int reps) => reps.clamp(0, kMaxReps);

@@ -6378,7 +6378,7 @@ class _SetRowState extends State<_SetRow> {
   }
 
   void _stepDistance(double delta) {
-    final next = ((_currentDistance ?? 0) + delta).clamp(0, kMaxWeightKg);
+    final next = ((_currentDistance ?? 0) + delta).clamp(0, kMaxDistanceMeters);
     final value = next <= 0 ? null : double.parse(next.toStringAsFixed(2));
     final text = value == null ? '' : formatWeightKg(value);
     widget.editableSet.distanceMeters = value;
@@ -6530,6 +6530,10 @@ class _SetRowState extends State<_SetRow> {
               palette: palette,
               hint: 'm',
               decimal: true,
+              // La distancia NO es un peso (#1846): su tope es el de la web, no
+              // los 500 de `kMaxWeightKg`.
+              max: kMaxDistanceMeters,
+              unit: 'm',
               hasError: widget.isInvalid,
               onDecimalChanged: (v) {
                 s.distanceMeters = v != null && v > 0 ? v : null;
