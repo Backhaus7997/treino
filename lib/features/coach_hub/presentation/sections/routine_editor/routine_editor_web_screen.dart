@@ -17,6 +17,7 @@ import '../../../../workout/application/custom_exercise_providers.dart';
 import '../../../../workout/application/exercise_filter.dart';
 import '../../../../workout/application/exercise_providers.dart';
 import '../../../../workout/domain/custom_exercise.dart';
+import '../../../../workout/presentation/widgets/bounded_number_formatter.dart';
 import '../../../../workout/presentation/widgets/superset_block.dart';
 import '../../../../workout/presentation/widgets/quick_entry_panel.dart';
 import '../../../../workout/presentation/widgets/quick_entry_parser.dart';
@@ -58,6 +59,7 @@ import '../../../../workout/domain/routine_slot.dart';
 import '../../../../workout/domain/routine_source.dart';
 import '../../../../workout/domain/routine_visibility.dart';
 import '../../../../workout/domain/set_enums.dart';
+import '../../../../workout/domain/set_limits.dart';
 import '../../../../workout/domain/set_spec.dart';
 import '../../shell/responsive.dart' as rsp;
 import '../../widgets/create_custom_exercise_dialog.dart';
@@ -1919,6 +1921,10 @@ class _RoutineEditorWebScreenState
         return 'El día "${day.name}" necesita al menos un ejercicio.'; // i18n
       }
       for (final slot in day.slots) {
+        if (_descansoFueraDeTope(slot)) {
+          final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
+          return '$name tiene un descanso de más de $kMaxRestSeconds s.'; // i18n
+        }
         // Presence-mask backstop (Fase 4c): with the toggle's canonicalization
         // rules this should be unreachable, but a non-empty mask that names no
         // valid week would create an invisible ghost slot — refuse it.
@@ -1945,6 +1951,9 @@ class _RoutineEditorWebScreenState
             // as valid (mirrors mobile's isSetValid). One source of truth for
             // both this submit check and the live markers below.
             if (_isSetValid(slot, set)) continue;
+            if (!_enRango(set)) {
+              return '$name tiene un valor fuera de rango$wk.'; // i18n
+            }
             if (slot.exerciseMode == ExerciseMode.duration) {
               return '$name tiene una serie sin duración$wk.'; // i18n
             } else if (slot.exerciseMode == ExerciseMode.distance) {
@@ -1969,6 +1978,9 @@ class _RoutineEditorWebScreenState
   /// A single set's countable target is complete. Shared by the submit check
   /// [_firstValidationError] and every live marker so they can't diverge.
   bool _isSetValid(_EditorSlot slot, _EditorSet set) {
+    // Primero, y también para «al fallo»: un valor fuera de tope no puede
+    // pasar por ningún camino (mismo orden que `isSetValid` del teléfono).
+    if (!_enRango(set)) return false;
     if (set.type == SetType.failure) return true;
     if (slot.exerciseMode == ExerciseMode.duration) {
       return set.durationSeconds != null && set.durationSeconds! > 0;
@@ -1982,6 +1994,21 @@ class _RoutineEditorWebScreenState
     }
     return set.reps != null && set.reps! > 0;
   }
+
+  /// Ningún valor de la serie pasa del tope de dominio (`set_limits.dart`).
+  /// Los campos no dejan TIPEAR uno, pero un documento guardado antes de los
+  /// topes sí puede traerlo: no se re-escribe hasta que el PF lo corrija.
+  bool _enRango(_EditorSet s) =>
+      (s.reps ?? 0) <= kMaxReps &&
+      (s.repsMin ?? 0) <= kMaxReps &&
+      (s.repsMax ?? 0) <= kMaxReps &&
+      (s.weightKg ?? 0) <= kMaxWeightKg &&
+      (s.durationSeconds ?? 0) <= kMaxDurationSeconds &&
+      (s.distanceMeters ?? 0) <= kMaxDistanceMeters;
+
+  /// El descanso del ejercicio pasa del tope (es del ejercicio, no de la semana).
+  bool _descansoFueraDeTope(_EditorSlot slot) =>
+      slot.exercise != null && slot.restSeconds > kMaxRestSeconds;
 
   /// The slot has an incomplete set in week [w] — but only for weeks it is
   /// actually scheduled in (absent weeks never run, so they can't be "wrong").
@@ -2000,7 +2027,7 @@ class _RoutineEditorWebScreenState
 
   bool _slotHasError(_EditorSlot slot) {
     if (slot.exercise == null) return false; // empty slots block at day level
-    if (_slotIsGhost(slot)) return true;
+    if (_slotIsGhost(slot) || _descansoFueraDeTope(slot)) return true;
     for (var w = 0; w < slot.weeklySets.length; w++) {
       if (_slotHasErrorInWeek(slot, w)) return true;
     }
@@ -2012,9 +2039,15 @@ class _RoutineEditorWebScreenState
   String? _slotErrorText(_EditorSlot slot) {
     if (slot.exercise == null) return null;
     if (_slotIsGhost(slot)) return 'No está en ninguna semana.'; // i18n
+    if (_descansoFueraDeTope(slot)) {
+      return 'El descanso pasa el máximo ($kMaxRestSeconds s).'; // i18n
+    }
     for (var w = 0; w < slot.weeklySets.length; w++) {
       if (!_slotHasErrorInWeek(slot, w)) continue;
       final wk = _numWeeks > 1 ? ' (Semana ${w + 1})' : ''; // i18n
+      if (slot.weeklySets[w].any((s) => !_enRango(s))) {
+        return 'Hay un valor fuera de rango$wk.'; // i18n
+      }
       if (slot.exerciseMode == ExerciseMode.duration) {
         return 'Falta la duración de una serie$wk.'; // i18n
       }
@@ -4523,9 +4556,21 @@ class _SlotCard extends StatelessWidget {
                   SizedBox(
                     width: 60,
                     child: TextFormField(
+                      key: const Key('routine_editor_rest_field'),
                       initialValue: slot.restSeconds.toString(),
                       keyboardType: TextInputType.number,
                       onChanged: onRestChanged,
+                      inputFormatters: [
+                        BoundedNumberFormatter(
+                          max: kMaxRestSeconds.toDouble(),
+                          decimal: false,
+                          onOverMax: () => _avisarTope(
+                            context,
+                            kMaxRestSeconds.toDouble(),
+                            'seg',
+                          ),
+                        ),
+                      ],
                       style: GoogleFonts.barlow(
                         color: palette.textPrimary,
                         fontSize: 13,
@@ -4784,6 +4829,10 @@ class _SetRow extends StatelessWidget {
             // Duration exercises (planks, cardio) have no weight — just seconds.
             Expanded(
               child: _numberField(
+                context,
+                fieldKey: const Key('routine_editor_duration_field'),
+                max: kMaxDurationSeconds.toDouble(),
+                unidad: 'seg',
                 initial: set.durationSeconds?.toString() ?? '',
                 hint: 'seg', // i18n
                 onChanged: onDurationChanged,
@@ -4794,6 +4843,10 @@ class _SetRow extends StatelessWidget {
             // Distancia (sled, carry, sprint): sólo metros, sin peso.
             Expanded(
               child: _numberField(
+                context,
+                fieldKey: const Key('routine_editor_distance_field'),
+                max: kMaxDistanceMeters,
+                unidad: 'm',
                 initial: formatWeightKg(set.distanceMeters),
                 hint: 'm', // i18n
                 decimal: true,
@@ -4805,6 +4858,10 @@ class _SetRow extends StatelessWidget {
             if (isRange) ...[
               Expanded(
                 child: _numberField(
+                  context,
+                  fieldKey: const Key('routine_editor_reps_min_field'),
+                  max: kMaxReps.toDouble(),
+                  unidad: 'reps',
                   initial: set.repsMin?.toString() ?? '',
                   hint: 'mín', // i18n
                   onChanged: onRepsMinChanged,
@@ -4814,6 +4871,10 @@ class _SetRow extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _numberField(
+                  context,
+                  fieldKey: const Key('routine_editor_reps_max_field'),
+                  max: kMaxReps.toDouble(),
+                  unidad: 'reps',
                   initial: set.repsMax?.toString() ?? '',
                   hint: 'máx', // i18n
                   onChanged: onRepsMaxChanged,
@@ -4823,6 +4884,10 @@ class _SetRow extends StatelessWidget {
             ] else
               Expanded(
                 child: _numberField(
+                  context,
+                  fieldKey: const Key('routine_editor_reps_field'),
+                  max: kMaxReps.toDouble(),
+                  unidad: 'reps',
                   initial: set.reps?.toString() ?? '',
                   hint: 'reps', // i18n
                   onChanged: onRepsChanged,
@@ -4832,6 +4897,10 @@ class _SetRow extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: _numberField(
+                context,
+                fieldKey: const Key('routine_editor_weight_field'),
+                max: kMaxWeightKg,
+                unidad: 'kg',
                 initial: set.weightKg?.toString() ?? '',
                 hint: 'kg', // i18n
                 decimal: true,
@@ -4851,10 +4920,14 @@ class _SetRow extends StatelessWidget {
     );
   }
 
-  Widget _numberField({
+  Widget _numberField(
+    BuildContext context, {
+    required Key fieldKey,
     required String initial,
     required String hint,
     required ValueChanged<String> onChanged,
+    required double max,
+    required String unidad,
     bool decimal = false,
     bool invalid = false,
   }) {
@@ -4862,11 +4935,22 @@ class _SetRow extends StatelessWidget {
       borderSide: BorderSide(color: palette.danger),
     );
     return TextFormField(
+      key: fieldKey,
       initialValue: initial,
       keyboardType: decimal
           ? const TextInputType.numberWithOptions(decimal: true)
           : TextInputType.number,
       onChanged: onChanged,
+      // El mismo formatter que el editor del teléfono: sin negativos, sin
+      // letras ni `Infinity`, y la tecla que pasaría del tope se rechaza con
+      // aviso.
+      inputFormatters: [
+        BoundedNumberFormatter(
+          max: max,
+          decimal: decimal,
+          onOverMax: () => _avisarTope(context, max, unidad),
+        ),
+      ],
       style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 13),
       decoration: InputDecoration(
         isDense: true,
@@ -4878,6 +4962,12 @@ class _SetRow extends StatelessWidget {
     );
   }
 }
+
+/// La tecla se rechazó por el tope: lo dice, en vez de dejar un campo que
+/// «no responde». Mismo aviso que el editor del teléfono (`inputMaxReached`),
+/// con el copy acá porque este archivo no usa `AppL10n` (constraint C-6).
+void _avisarTope(BuildContext context, double max, String unidad) =>
+    showTreinoToast(context, 'Máximo ${max.toInt()} $unidad'); // i18n
 
 // ── Rep-mode chip (Reps fijas / Rango) ───────────────────────────────────────
 
