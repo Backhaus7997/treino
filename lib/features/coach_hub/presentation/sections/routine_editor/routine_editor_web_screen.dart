@@ -366,6 +366,19 @@ class _RoutineEditorWebScreenState
   /// The routine being edited (its identity fields are preserved on save).
   Routine? _loadedRoutine;
 
+  /// La rutina que ESTA pantalla creó, si ya creó una (#1733).
+  ///
+  /// El primer guardado de un editor nuevo hace un `create`; si el PF se queda
+  /// en la pantalla y guarda otra vez, ese segundo guardado tiene que
+  /// ACTUALIZAR el mismo documento. Sin esto vuelve a la rama de creación y
+  /// deja dos rutinas iguales. Se anota apenas vuelve el `create`, antes de que
+  /// cualquier otra cosa pueda fallar.
+  Routine? _creada;
+
+  /// Hay un documento detrás de este formulario: se cargó uno (modo edición) o
+  /// esta pantalla lo acaba de crear.
+  bool get _yaExiste => _isEditing || _creada != null;
+
   /// True while the existing routine is being fetched (edit mode only).
   bool _loading = false;
 
@@ -2320,13 +2333,17 @@ class _RoutineEditorWebScreenState
         // O sea: el aviso, que es cosmético, se llevaría puesto el refresco,
         // que no lo es.
         copiaGuardada = copia.name;
-      } else if (_isEditing) {
+      } else if (_yaExiste) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
         // createdAt, …). updateTemplate/updateAssigned each write only
         // name/split/level/days/numWeeks/summary — `days` is rebuilt from a
         // form that models 100% of RoutineSlot's schema, so nothing is lost on
         // re-save (Fase 4c).
-        final draft = _loadedRoutine!.copyWith(
+        //
+        // `_creada` cuando el documento lo creó esta misma pantalla: el
+        // segundo guardado de un editor nuevo actualiza ese id (#1733).
+        final base = _loadedRoutine ?? _creada!;
+        final draft = base.copyWith(
           name: _nameCtrl.text.trim(),
           split: _splitCtrl.text.trim(),
           level: _level,
@@ -2336,7 +2353,7 @@ class _RoutineEditorWebScreenState
           // Sólo la plantilla los edita. En un plan asignado se conservan los
           // del doc cargado —`_goals` se hidrató de ahí y el selector no se
           // muestra—, y `updateAssigned` ni siquiera los manda.
-          goals: widget.isTemplate ? _goalsOrdered : _loadedRoutine!.goals,
+          goals: widget.isTemplate ? _goalsOrdered : base.goals,
         );
         if (widget.isTemplate) {
           await repo.updateTemplate(uid: trainerUid, draft: draft);
@@ -2364,7 +2381,7 @@ class _RoutineEditorWebScreenState
           assignedBy: trainerUid,
           visibility: RoutineVisibility.private,
         );
-        await repo.createTemplate(template);
+        _creada = await repo.createTemplate(template);
         analytics.logRoutineCreated(
           source: analyticsSource,
           daysCount: days.length,
@@ -2408,13 +2425,18 @@ class _RoutineEditorWebScreenState
           // assignTemplateToAthlete.
           visibility: RoutineVisibility.private,
         );
-        await repo.createAssigned(routine);
+        _creada = await repo.createAssigned(routine);
         analytics.logRoutineCreated(
           source: analyticsSource,
           daysCount: days.length,
           weeksCount: _numWeeks,
         );
       }
+      // El documento YA está escrito: el guardado deja de estar en vuelo. Va
+      // antes de todo lo que sigue, que es cosmético y puede fallar sin cambiar
+      // esto, y es lo que deja volver a apretar Guardar si la pantalla sigue.
+      if (mounted) setState(() => _submitting = false);
+
       // La grilla de la sección Rutinas. `routinesAuthoredByProvider` es un
       // `FutureProvider.autoDispose` que esa pantalla WATCHEA, y el editor
       // llega por `context.push`: la ruta de abajo sigue montada, así que el
@@ -2448,7 +2470,6 @@ class _RoutineEditorWebScreenState
       if (copiaGuardada != null && mounted) {
         _avisarCopiaGuardada(copiaGuardada);
       }
-      if (mounted) context.pop();
     } catch (error) {
       if (!mounted) return;
       if (isPermissionDenied(error)) {
@@ -2482,7 +2503,14 @@ class _RoutineEditorWebScreenState
         }
         _errorIsDenial = false;
       });
+      return;
     }
+
+    // FUERA del `try`, a propósito (#1733). Salir toca el router, y el router
+    // puede negarse; si esa excepción cayera en el `catch` de arriba, el PF
+    // leería «No pudimos guardar» sobre una rutina que sí se guardó, y el
+    // reintento la duplicaría.
+    if (mounted) _salir();
   }
 
   /// El servidor rechazó la escritura por permisos.
@@ -2536,7 +2564,7 @@ class _RoutineEditorWebScreenState
             collection: 'routines',
             // Una copia es un CREATE aunque `_isEditing` sea true: se
             // escribe un documento nuevo y el original ni se toca.
-            operation: (_isEditing && modo != _ModoDeGuardado.copia)
+            operation: (_yaExiste && modo != _ModoDeGuardado.copia)
                 ? 'update'
                 : 'create',
             surface: 'routine_editor_web',
@@ -2665,9 +2693,30 @@ class _RoutineEditorWebScreenState
 
   // ── Discard guard ────────────────────────────────────────────────────────
 
+  /// A dónde cae el editor cuando no hay pantalla de atrás: abierto por un link
+  /// directo, un F5 o una pestaña nueva. La lista de la que el editor es el
+  /// detalle: las rutinas del alumno, o la sección Rutinas para una plantilla.
+  String get _rutaDeRespaldo =>
+      widget.isTemplate ? '/rutinas' : '/rutinas/${widget.athleteId}';
+
+  /// Sale del editor.
+  ///
+  /// `pop()` a secas asume que SIEMPRE se llegó empujando, y no es cierto: con
+  /// el editor como única ruta `GoRouterDelegate.pop` tira `GoError('There is
+  /// nothing to pop')` —en release también, no es un `assert`—. Eso hacía que
+  /// «Volver» no hiciera nada y que Guardar mostrara un error sobre una
+  /// rutina ya guardada (#1733). Mismo criterio que `athlete_routines_screen`.
+  void _salir() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(_rutaDeRespaldo);
+    }
+  }
+
   Future<void> _onBackTap() async {
     if (!_isDirty) {
-      context.pop();
+      _salir();
       return;
     }
     final palette = AppPalette.of(context);
@@ -2704,7 +2753,7 @@ class _RoutineEditorWebScreenState
         ],
       ),
     );
-    if (confirmed == true && mounted) context.pop();
+    if (confirmed == true && mounted) _salir();
   }
 
   // ── Build ────────────────────────────────────────────────────────────────
