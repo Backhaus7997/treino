@@ -18,6 +18,7 @@ class AuthInput extends StatefulWidget {
     this.obscureText = false,
     this.suffixToggle = false,
     this.validator,
+    this.autovalidateMode,
     this.keyboardType,
     this.inputFormatters,
     this.textInputAction,
@@ -37,6 +38,15 @@ class AuthInput extends StatefulWidget {
   final bool obscureText;
   final bool suffixToggle;
   final FormFieldValidator<String>? validator;
+
+  /// Cuándo corre [validator]. `null` lo deja como estaba: sólo cuando un
+  /// `Form` ancestro llama a `validate()` (login, registro).
+  ///
+  /// Un campo FUERA de un `Form` necesita uno explícito: sin `Form` nadie
+  /// llama a `validate()`, y su [validator] no corre nunca. Es el caso de los
+  /// pasos de profile setup, que deshabilitan SIGUIENTE según el borrador y
+  /// usan el validador sólo para decir por qué (#1698).
+  final AutovalidateMode? autovalidateMode;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final TextInputAction? textInputAction;
@@ -118,6 +128,7 @@ class _AuthInputState extends State<AuthInput> {
           autofillHints: widget.autofillHints,
           enabled: widget.enabled,
           validator: widget.validator,
+          autovalidateMode: widget.autovalidateMode,
           style: GoogleFonts.barlow(
             color: palette.textPrimary,
             fontSize: 16,

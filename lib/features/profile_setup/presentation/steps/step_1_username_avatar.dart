@@ -115,6 +115,11 @@ class _Step1UsernameAvatarState extends ConsumerState<Step1UsernameAvatar> {
             enableSuggestions: false,
             textInputAction: TextInputAction.done,
             validator: ProfileSetupValidators.validateUsername,
+            // No hay `Form` en el paso, así que sin esto el validador no corre
+            // nunca y SIGUIENTE queda apagado sin decir por qué (#1698). Recién
+            // después de que el usuario escribe: un rojo en el campo vacío del
+            // primer render es ruido (mismo criterio que `Step2BornAt`).
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             onFieldSubmitted: (_) {},
           ),
           _UsernameAvailabilityStatus(availability: availability),

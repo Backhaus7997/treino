@@ -179,9 +179,10 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
     _usernameDebounce?.cancel();
     final trimmed = value.trim();
 
-    // Formato inválido → no consultamos. El validator del campo ya muestra el
-    // error de formato; reseteamos a `unknown` para que no quede un estado
-    // verde/rojo viejo.
+    // Formato inválido → no consultamos. El error de formato lo muestra el
+    // validator del campo (`Step1UsernameAvatar` lo corre con
+    // `autovalidateMode`: no hay `Form`); reseteamos a `unknown` para que no
+    // quede un estado verde/rojo viejo.
     if (ProfileSetupValidators.validateUsername(value) != null) {
       // Token nuevo así descartamos cualquier check en vuelo.
       _usernameCheckToken++;

@@ -80,6 +80,10 @@ class _Step5WeightHeightState extends ConsumerState<Step5WeightHeight> {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.next,
             validator: ProfileSetupValidators.validateBodyWeightKg,
+            // Sin `Form` en el paso, el validador no corre solo: sin esto
+            // SIGUIENTE queda apagado sin decir por qué (#1698). Ver
+            // `Step1UsernameAvatar`.
+            autovalidateMode: AutovalidateMode.onUserInteraction,
           ),
           const SizedBox(height: 14),
           AuthInput(
@@ -91,6 +95,7 @@ class _Step5WeightHeightState extends ConsumerState<Step5WeightHeight> {
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             textInputAction: TextInputAction.done,
             validator: ProfileSetupValidators.validateHeightCm,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
           ),
           const SizedBox(height: 20),
           Text(

@@ -25,7 +25,9 @@ class ProfileSetupValidators {
   static String? validateBodyWeightKg(String? value) {
     if (value == null || value.trim().isEmpty) return 'Ingresá tu peso';
     final n = double.tryParse(value.replaceAll(',', '.'));
-    if (n == null) return 'Número inválido';
+    // `NaN` parsea, pero no es menor ni mayor que nada: sin esto pasaba los dos
+    // rangos de abajo y el draft lo rechazaba sin mensaje.
+    if (n == null || n.isNaN) return 'Número inválido';
     if (n <= 20) return 'Mínimo 20 kg';
     if (n >= 300) return 'Máximo 300 kg';
     return null;
