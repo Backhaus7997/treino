@@ -195,6 +195,8 @@
   "agendaButtonLabel": "MY SCHEDULE",
   "athleteNutritionPlanButtonLabel": "MY NUTRITION PLAN",
   "athleteFilesButtonLabel": "MY FILES",
+  "athleteRoutinesButtonLabel": "MY ROUTINES",
+  "athleteLinkPausedNote": "Your trainer paused the link. What they already left you — routines and files — is still within reach, and you can message them. It resumes when your trainer reactivates it.",
   "athleteNutritionPlanScreenTitle": "NUTRITION PLAN",
   "athleteNutritionChooseOneHint": "Choose one",
   "athleteNutritionEmptyGroup": "Your coach has not added options here yet.",

@@ -549,6 +549,13 @@ class AppL10nEn extends AppL10n {
   String get athleteFilesButtonLabel => 'MY FILES';
 
   @override
+  String get athleteRoutinesButtonLabel => 'MY ROUTINES';
+
+  @override
+  String get athleteLinkPausedNote =>
+      'Your trainer paused the link. What they already left you — routines and files — is still within reach, and you can message them. It resumes when your trainer reactivates it.';
+
+  @override
   String get athleteNutritionPlanScreenTitle => 'NUTRITION PLAN';
 
   @override

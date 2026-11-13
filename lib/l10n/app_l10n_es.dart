@@ -557,6 +557,13 @@ class AppL10nEs extends AppL10n {
   String get athleteFilesButtonLabel => 'MIS ARCHIVOS';
 
   @override
+  String get athleteRoutinesButtonLabel => 'MIS RUTINAS';
+
+  @override
+  String get athleteLinkPausedNote =>
+      'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas y archivos— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.';
+
+  @override
   String get athleteNutritionPlanScreenTitle => 'PLAN NUTRICIONAL';
 
   @override
@@ -6948,6 +6955,13 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get athleteFilesButtonLabel => 'MIS ARCHIVOS';
+
+  @override
+  String get athleteRoutinesButtonLabel => 'MIS RUTINAS';
+
+  @override
+  String get athleteLinkPausedNote =>
+      'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas y archivos— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.';
 
   @override
   String get athleteNutritionPlanScreenTitle => 'PLAN NUTRICIONAL';

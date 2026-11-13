@@ -321,6 +321,14 @@
   "@athleteFilesButtonLabel": {
     "description": "Botón de la tab Coach que abre los archivos compartidos con el alumno."
   },
+  "athleteRoutinesButtonLabel": "MIS RUTINAS",
+  "@athleteRoutinesButtonLabel": {
+    "description": "Botón de la tab Coach, con el vínculo pausado, que lleva a Entrenar donde sigue el plan que el PF le asignó."
+  },
+  "athleteLinkPausedNote": "Tu PF pausó el vínculo. Lo que ya te dejó —rutinas y archivos— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.",
+  "@athleteLinkPausedNote": {
+    "description": "Aviso de la card del PF en la tab Coach cuando el vínculo está pausado. Sólo afirma lo que la app y las reglas permiten con un vínculo pausado: ver las rutinas asignadas y los archivos compartidos, y escribirle al PF."
+  },
   "athleteNutritionPlanScreenTitle": "PLAN NUTRICIONAL",
   "@athleteNutritionPlanScreenTitle": {
     "description": "Título de la pantalla read-only del plan nutricional del alumno."
