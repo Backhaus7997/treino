@@ -598,7 +598,17 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
       case ResultadoDeRestaurar.topeDePlantillas:
         // El contador local se adelantó o hubo una carrera: el mismo aviso
         // que el embudo, no el mensaje genérico de abajo.
-        await mostrarAvisoTopeDePlantillasPorRebote(context, ref);
+        //
+        // Pero ese aviso necesita un tope concreto en mano: sin él devuelve
+        // `false` y no muestra NADA. Ignorar el `false` dejaba al PF con el
+        // spinner apagado y ninguna explicación (#1784): cae al toast.
+        if (!await mostrarAvisoTopeDePlantillasPorRebote(context, ref)) {
+          if (!mounted) return;
+          _avisar(
+              'No se pudo recuperar la plantilla. Es probable que hayas '
+              'llegado al tope de plantillas de tu plan.', // i18n
+              type: TreinoToastType.error);
+        }
       case ResultadoDeRestaurar.falloAlRestaurar:
         _avisar('No se pudo. Probá de nuevo.',
             type: TreinoToastType.error); // i18n
@@ -647,7 +657,16 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
     // El tope de plantillas se maneja aparte: es el único caso que muestra el
     // aviso del embudo (con VER PLANES) y no un snackbar de texto.
     if (resultado == ResultadoDePublicar.topeDePlantillas) {
-      await mostrarAvisoTopeDePlantillasPorRebote(context, ref);
+      // Ese aviso necesita un tope concreto en mano: si la cuota local no lo
+      // resolvió devuelve `false` y no muestra nada, y el PF se quedaba sin
+      // saber por qué no pasó nada (#1784). Cae al toast de error.
+      if (!await mostrarAvisoTopeDePlantillasPorRebote(context, ref)) {
+        if (!mounted) return;
+        _avisar(
+            'No se pudo crear la plantilla. Es probable que hayas llegado al '
+            'tope de plantillas de tu plan.', // i18n
+            type: TreinoToastType.error);
+      }
       return;
     }
     final (mensaje, tipo) = switch (resultado) {
