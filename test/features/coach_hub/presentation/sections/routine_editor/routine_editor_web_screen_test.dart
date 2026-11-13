@@ -2,6 +2,8 @@
 // single week, normal sets). Mirrors the mocking pattern of
 // routine_editor_athlete_mode_test.dart (mobile).
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -23,6 +25,8 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/blocked_students_screen.dart'
     show kBlockedStudentsRoutePath;
+import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routes.dart'
+    show routineEditorRoutes;
 import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_editor_web_screen.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -173,7 +177,15 @@ class _EspiaDelListado extends ConsumerWidget {
   }
 }
 
-Future<void> _pumpEditor(
+/// Devuelve el router, para que un test pueda hacer lo que hace el sidebar del
+/// Hub: un `go` a otra sección.
+///
+/// Con [enElShell] las pantallas son las REALES del editor (`routineEditorRoutes`,
+/// con su `onExit`) dentro de UN `ShellRoute` junto con la pantalla de atrás,
+/// como en `coach_hub_router.dart`. Importa: con la pantalla de atrás FUERA del
+/// shell, un `push` arma una página que contiene al shell entero y `pop`,
+/// `PopScope` y `onExit` se comportan distinto.
+Future<GoRouter> _pumpEditor(
   WidgetTester tester, {
   RoutineRepository? repo,
   String? routineId,
@@ -183,6 +195,7 @@ Future<void> _pumpEditor(
   bool observarListadoDeRutinas = false,
   bool abiertoPorUrl = false,
   GoRouterRedirect? redirect,
+  bool enElShell = false,
 }) async {
   // Desktop viewport — Coach Hub web dialogs (exercise picker) assume it.
   // Raised 900 → 1100 when the RESUMEN field (#648) landed above DÍAS: the
@@ -207,6 +220,30 @@ Future<void> _pumpEditor(
     initialLocation: abiertoPorUrl ? rutaDelEditor : '/alumnos/$_athleteId',
     redirect: redirect,
     routes: [
+      // Va PRIMERO: go_router toma la primera ruta que matchea, así que con
+      // [enElShell] estas tapan a las de abajo y todo lo demás queda igual.
+      if (enElShell)
+        ShellRoute(
+          // `Scaffold` stands in for CoachHubScaffold, que es quien provee el
+          // Material ancestor.
+          pageBuilder: (_, __, child) =>
+              NoTransitionPage(child: Scaffold(body: child)),
+          routes: [
+            GoRoute(
+              path: '/alumnos/:id',
+              builder: (_, __) => const Text('AlumnoDetail'),
+            ),
+            ...routineEditorRoutes,
+            GoRoute(
+              path: '/rutinas/:athleteId',
+              builder: (_, __) => const Text('RutinasDelAlumno'),
+            ),
+            GoRoute(
+              path: '/rutinas',
+              builder: (_, __) => const Text('Rutinas'),
+            ),
+          ],
+        ),
       GoRoute(
         path: '/alumnos/:id',
         // Con `observarListadoDeRutinas`, la pantalla de atrás WATCHEA
@@ -317,6 +354,7 @@ Future<void> _pumpEditor(
     tester.state<ScrollableState>(vertical.first).position.jumpTo(0);
     await tester.pumpAndSettle();
   }
+  return router;
 }
 
 /// A web-editable (simple, single-week, reps) routine — the kind edit mode
@@ -2348,6 +2386,220 @@ void main() {
       // Sigue siendo SU plan: la identidad del documento creado se conserva.
       expect(draft.assignedTo, _athleteId);
       expect(draft.source, RoutineSource.trainerAssigned);
+    });
+  });
+
+  // -- Salir con cambios sin guardar (#1732) --------------------------------
+  //
+  // El `PopScope` y la flecha ya preguntaban. No cubrían las otras salidas del
+  // Hub: el sidebar (un `go`) y Atrás del navegador reemplazan la pila sin pasar
+  // por un `PopScope`. Estos tests corren con `enElShell`: las rutas REALES del
+  // editor, dentro de un `ShellRoute` como en producción, porque `onExit` y
+  // `pop` se comportan distinto según dónde esté la pantalla de atrás.
+  group('RoutineEditorWebScreen — salir con cambios sin guardar (#1732)', () {
+    Future<void> escribirNombre(WidgetTester tester) async {
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('el sidebar (un go) con cambios pregunta, y Volver se queda', (
+      tester,
+    ) async {
+      final router = await _pumpEditor(tester, enElShell: true);
+      await escribirNombre(tester);
+
+      router.go('/rutinas');
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+
+      await tester.tap(find.text('Volver').last);
+      await tester.pumpAndSettle();
+
+      // Sigue en el editor y con lo que había escrito.
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('Rutinas'), findsNothing);
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const Key('routine_editor_name_field')),
+            )
+            .controller!
+            .text,
+        'Fuerza',
+      );
+    });
+
+    testWidgets('el sidebar con cambios: Descartar deja ir', (tester) async {
+      final router = await _pumpEditor(tester, enElShell: true);
+      await escribirNombre(tester);
+
+      router.go('/rutinas');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rutinas'), findsOneWidget);
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+    });
+
+    testWidgets('el sidebar SIN cambios sale sin preguntar', (tester) async {
+      final router = await _pumpEditor(tester, enElShell: true);
+
+      router.go('/rutinas');
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('Rutinas'), findsOneWidget);
+    });
+
+    testWidgets(
+        'un segundo intento de salir con el diálogo abierto no lo apila',
+        (tester) async {
+      final router = await _pumpEditor(tester, enElShell: true);
+      await escribirNombre(tester);
+
+      router.go('/rutinas');
+      await tester.pump();
+      router.go('/alumnos/$_athleteId');
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+    });
+
+    testWidgets('Atrás del sistema con cambios pregunta', (tester) async {
+      await _pumpEditor(tester, enElShell: true);
+      await escribirNombre(tester);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+      expect(find.text('AlumnoDetail'), findsOneWidget);
+    });
+
+    testWidgets('la flecha pregunta UNA vez: la ruta no vuelve a preguntar', (
+      tester,
+    ) async {
+      await _pumpEditor(tester, enElShell: true);
+      await escribirNombre(tester);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('AlumnoDetail'), findsOneWidget);
+    });
+
+    testWidgets('guardar con cambios sale sin preguntar si descartar', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(_creaConId('n1'));
+      await _pumpEditor(tester, repo: repo, enElShell: true);
+      await _fillMinimalValidForm(tester);
+
+      await _tapGuardar(tester);
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('AlumnoDetail'), findsOneWidget);
+    });
+
+    testWidgets('guardar una EDICIÓN con cambios tampoco pregunta', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        routineId: 'r1',
+        enElShell: true,
+      );
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza v2',
+      );
+      await tester.pumpAndSettle();
+
+      await _tapGuardar(tester);
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('AlumnoDetail'), findsOneWidget);
+    });
+
+    testWidgets('lo tipeado MIENTRAS se guarda no se da por guardado', (
+      tester,
+    ) async {
+      // El PF sigue escribiendo con la escritura en vuelo. Eso no llegó a
+      // ningún lado: la salida pregunta, y si se queda, el 2º guardado
+      // ACTUALIZA la rutina ya creada en vez de crear otra.
+      final escritura = Completer<Routine>();
+      var creaciones = 0;
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer((_) {
+        creaciones++;
+        return escritura.future;
+      });
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, enElShell: true);
+      await _fillMinimalValidForm(tester);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza 5x semana',
+      );
+      final enviada = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      escritura.complete(enviada.copyWith(id: 'n1'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+      await tester.tap(find.text('Volver').last);
+      await tester.pumpAndSettle();
+      await _tapGuardar(tester);
+
+      expect(creaciones, 1);
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      expect(draft.id, 'n1');
+      expect(draft.name, 'Fuerza 5x semana');
+    });
+
+    test('las cuatro rutas del editor llevan el onExit', () {
+      final rutas = routineEditorRoutes.whereType<GoRoute>().toList();
+
+      expect(rutas.map((r) => r.path), [
+        '/routine-editor/:athleteId',
+        '/routine-editor/:athleteId/:routineId',
+        '/template-editor',
+        '/template-editor/:templateId',
+      ]);
+      expect(rutas.every((r) => r.onExit != null), isTrue);
     });
   });
 
