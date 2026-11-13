@@ -775,7 +775,7 @@ void main() {
           perfil: Stream<UserProfile?>.value(_perfil(rol)),
           extra: [
             currentUidProvider.overrideWith((_) => _uid),
-            blockedUidsProvider(_uid)
+            blockedUidsConfirmedProvider(_uid)
                 .overrideWith((_) => Stream.value(const <String>[])),
           ],
         );

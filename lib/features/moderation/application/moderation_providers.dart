@@ -24,6 +24,18 @@ final blockedUidsProvider =
   return ref.watch(blockRepositoryProvider).watchBlockedUids(uid);
 });
 
+/// La lista de bloqueados para quien la MUESTRA («Usuarios bloqueados»): sin
+/// red y con la caché fría termina en `AsyncError` (`unavailable`) en vez de
+/// publicar un `[]` que la pantalla dibujaría como «No bloqueaste a nadie».
+///
+/// Es aparte de [blockedUidsProvider] a propósito: ése lo leen el feed, el chat
+/// y [myBlockedUidsProvider], que ante el frío asumen «sin bloqueos». Ver
+/// [BlockRepository.watchBlockedUidsConfirmed].
+final blockedUidsConfirmedProvider =
+    StreamProvider.family.autoDispose<List<String>, String>((ref, uid) {
+  return ref.watch(blockRepositoryProvider).watchBlockedUidsConfirmed(uid);
+});
+
 /// Conveniencia: UIDs que el usuario ACTUAL bloqueó, o `[]` si no hay sesión
 /// o mientras el stream no emitió el primer valor.
 ///

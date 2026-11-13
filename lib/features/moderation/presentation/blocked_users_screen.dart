@@ -24,8 +24,9 @@ import 'moderation_actions.dart';
 ///
 /// **Vacío ≠ error**: una lista que no cargó no se muestra como «No bloqueaste
 /// a nadie» (el mismo agujero del feed sin red). Por eso mira
-/// [blockedUidsProvider] y no [myBlockedUidsProvider], que ante error devuelve
-/// `[]` a propósito.
+/// [blockedUidsConfirmedProvider] y no [myBlockedUidsProvider], que ante error
+/// devuelve `[]` a propósito, ni [blockedUidsProvider], que sin red y con la
+/// caché fría también publica `[]` (#1831).
 class BlockedUsersScreen extends ConsumerWidget {
   const BlockedUsersScreen({super.key});
 
@@ -53,7 +54,7 @@ class BlockedUsersScreen extends ConsumerWidget {
       color: palette.textMuted,
     );
 
-    Widget body() => ref.watch(blockedUidsProvider(uid!)).when(
+    Widget body() => ref.watch(blockedUidsConfirmedProvider(uid!)).when(
           loading: () =>
               Center(child: CircularProgressIndicator(color: palette.accent)),
           error: (_, __) => Center(
@@ -62,7 +63,8 @@ class BlockedUsersScreen extends ConsumerWidget {
               children: [
                 Text(l10n.blockedUsersLoadError, style: muted),
                 TextButton(
-                  onPressed: () => ref.invalidate(blockedUidsProvider(uid)),
+                  onPressed: () =>
+                      ref.invalidate(blockedUidsConfirmedProvider(uid)),
                   style: TextButton.styleFrom(
                     foregroundColor: palette.accentText,
                   ),
