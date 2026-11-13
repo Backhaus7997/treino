@@ -580,4 +580,35 @@ class AppointmentRepository {
             .map((d) => Appointment.fromJson({...d.data(), 'id': d.id}))
             .toList());
   }
+
+  // ─── watchCancelledForTrainer ─────────────────────────────────────────────
+  //
+  // Los turnos CANCELADOS del PF en un rango. Existe porque `watchForTrainer`
+  // filtra `status == 'confirmed'` A PROPÓSITO (la agenda y `computeFreeSlots`
+  // sólo quieren los vivos: un turno cancelado libera el horario), y eso dejaba
+  // al «Resumen del día» sin ningún cancelado que contar — CANCELADAS daba 0
+  // siempre (#1729).
+  //
+  // Misma forma que `watchForTrainer` con otro valor de `status`, así que usa
+  // el índice compuesto `trainerId + status + startsAt` que ya está desplegado:
+  // no hay índice nuevo. Las reglas de lectura de `appointments` dejan al PF
+  // leer los suyos sin mirar el estado.
+
+  Stream<List<Appointment>> watchCancelledForTrainer(
+    String trainerId, {
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) {
+    return _appointments
+        .where('trainerId', isEqualTo: trainerId)
+        .where('status', isEqualTo: 'cancelled')
+        .where('startsAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(fromDate.toUtc()))
+        .where('startsAt',
+            isLessThanOrEqualTo: Timestamp.fromDate(toDate.toUtc()))
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => Appointment.fromJson({...d.data(), 'id': d.id}))
+            .toList());
+  }
 }

@@ -86,6 +86,22 @@ final trainerAppointmentsStreamProvider = StreamProvider.autoDispose
       );
 });
 
+/// Real-time stream of CANCELLED appointments for a trainer within a date
+/// range. #1729.
+///
+/// Sibling of [trainerAppointmentsStreamProvider], which only carries
+/// `confirmed` ones on purpose. Only the "Resumen del día" reads this — never
+/// feed it to the agenda or [freeSlotsProvider]: a cancelled session frees its
+/// slot.
+final trainerCancelledAppointmentsStreamProvider = StreamProvider.autoDispose
+    .family<List<Appointment>, TrainerAppointmentsKey>((ref, key) {
+  return ref.read(appointmentRepositoryProvider).watchCancelledForTrainer(
+        key.trainerId,
+        fromDate: key.fromDate,
+        toDate: key.toDate,
+      );
+});
+
 // ─── Derived providers ────────────────────────────────────────────────────
 
 /// Computes free bookable slots for a specific date.

@@ -1091,6 +1091,16 @@ class _ResumenDelDiaCard extends ConsumerWidget {
         : ref.watch(
             trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)),
           );
+    // #1729: el stream de arriba trae SÓLO `confirmed` (lo necesita la agenda),
+    // así que CANCELADAS daba 0 siempre. Los cancelados del día vienen de un
+    // stream hermano, acotado a hoy: son pocos y sólo este resumen los lee.
+    final cancelledAsync = trainerId.isEmpty
+        ? const AsyncValue<List<Appointment>>.data(<Appointment>[])
+        : ref.watch(
+            trainerCancelledAppointmentsStreamProvider(
+              _todayAppointmentsKey(trainerId),
+            ),
+          );
 
     // Distinguir loading/error de un día genuinamente en cero (QA H3): antes
     // `apptAsync.valueOrNull ?? []` colapsaba AMBOS a 0/0/0, así que un
@@ -1110,13 +1120,21 @@ class _ResumenDelDiaCard extends ConsumerWidget {
       ),
       data: (all) {
         // QA-HOME-001: startsAt is Argentina wall-clock, so "now" must be too.
-        final counts = dashboardDayCounts(all, argentinaNow());
+        //
+        // Loading o error del stream de cancelados NO es "0 canceladas" (la
+        // misma lógica de QA H3): esa columna muestra "—" y las otras dos, que
+        // no dependen de él, siguen mostrando sus números.
+        final cancelledToday = cancelledAsync.valueOrNull;
+        final counts = dashboardDayCounts(
+          [...all, ...?cancelledToday],
+          argentinaNow(),
+        );
         return _statsRow(
           context,
           palette,
           pending: '${counts.pending}',
           done: '${counts.done}',
-          cancelled: '${counts.cancelled}',
+          cancelled: cancelledToday == null ? '—' : '${counts.cancelled}',
         );
       },
     );
@@ -2791,5 +2809,18 @@ TrainerAppointmentsKey _appointmentsKey(String trainerId) {
     trainerId: trainerId,
     fromDate: window.from,
     toDate: window.to,
+  );
+}
+
+/// Hoy en el calendario ART, para el stream de cancelados del resumen (#1729).
+/// `startsAt` es hora de pared argentina (QA-HOME-001), así que el día sale de
+/// [argentinaNow] igual que en el hero del Hub — no de `DateTime.now().toUtc()`.
+TrainerAppointmentsKey _todayAppointmentsKey(String trainerId) {
+  final now = argentinaNow();
+  final todayStart = DateTime.utc(now.year, now.month, now.day);
+  return TrainerAppointmentsKey(
+    trainerId: trainerId,
+    fromDate: todayStart,
+    toDate: todayStart.add(const Duration(days: 1)),
   );
 }
