@@ -39,6 +39,7 @@ import {
   archiveOrphanAssignedPlanOnCreate,
   cleanupAssignedPlansOnUnlinkHandler,
 } from "../cleanup-assigned-plans";
+import { DUPLICATE_REQUEST_REASON } from "../subscriptions/cancel-duplicate-pending-links";
 
 const db = () => getFirestore(testApp);
 
@@ -216,6 +217,20 @@ describe("cleanupAssignedPlansOnUnlinkHandler guards", () => {
       expect(count).toBe(1);
       expect(await statusOf(ASSIGNED_TA)).toBe("archived");
     }
+  });
+
+  // #1812 — `acceptTrainerLink` cancela las otras solicitudes pending del par al aceptar una: el
+  // par queda con un vínculo VIVO y archivarle los planes sería quitárselos a un alumno activo.
+  it("#1812: skips a duplicate request cancelled on accept; WITHOUT the marker the same write archives", async () => {
+    const cancelada = { terminationReason: "cancelled-by-athlete" };
+    const marcada = link("terminated", { ...cancelada, reason: DUPLICATE_REQUEST_REASON });
+
+    expect((await cleanupAssignedPlansOnUnlinkHandler(testApp, link("pending"), marcada)).count).toBe(0);
+    expect(await statusOf(ASSIGNED_TA)).not.toBe("archived");
+
+    const sinMarcador = link("terminated", cancelada);
+    expect((await cleanupAssignedPlansOnUnlinkHandler(testApp, link("pending"), sinMarcador)).count).toBe(1);
+    expect(await statusOf(ASSIGNED_TA)).toBe("archived");
   });
 
   it("skips a no-op write (status unchanged)", async () => {

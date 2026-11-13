@@ -42,6 +42,9 @@
  *     usable (owner decision). Archiving them would hide them from the athlete,
  *     whose list filters by status. Reads are allowed by `assignedTo ==
  *     auth.uid` with no link check.
+ *   - reason === 'duplicate-request' → skip (#1812). `acceptTrainerLink` cancela
+ *     las demás solicitudes pending del par al aceptar una: el par queda con un
+ *     vínculo vivo, y archivarle los planes sería quitárselos a un alumno activo.
  *   - before.status === after.status (no-op write) → skip.
  *   - after.status !== 'terminated' → skip.
  *
@@ -69,6 +72,7 @@ import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
+import { DUPLICATE_REQUEST_REASON } from "./subscriptions/cancel-duplicate-pending-links";
 import { TRAINER_ACCOUNT_DELETED_REASON } from "./cascade/trainer-data";
 import { LIVE_LINK_STATUSES } from "./chat/sync-chat-on-trainer-link";
 
@@ -169,6 +173,13 @@ export async function cleanupAssignedPlansOnUnlinkHandler(
     logger.info(
       `cleanupAssignedPlans: skipping reason=${TRAINER_ACCOUNT_DELETED_REASON}`,
     );
+    return { count: 0 };
+  }
+
+  // Guard: una solicitud DUPLICADA que `acceptTrainerLink` cancela al aceptar otra
+  // del mismo par (#1812). El par tiene un vínculo VIVO: sus planes se quedan.
+  if (reason === DUPLICATE_REQUEST_REASON) {
+    logger.info(`cleanupAssignedPlans: skipping reason=${DUPLICATE_REQUEST_REASON}`);
     return { count: 0 };
   }
 
