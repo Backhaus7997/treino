@@ -829,6 +829,19 @@ void main() {
       expect(callRedirect(c, '/workout/routine-editors'), isNull);
     });
 
+    test(
+        '/profile/settings/bloqueados abre para el PF Y para el alumno (#1830)',
+        () async {
+      // «Usuarios bloqueados» cuelga de Privacidad, a la que llegan los dos
+      // roles (el PF desde `TrainerProfileView`). Si alguien la suma a
+      // `_rutasSoloPF` «por ser de configuración», el alumno rebota a /home.
+      final alumno = await listo(_athleteProfile());
+      final pf = await listo(_trainerComplete());
+
+      expect(callRedirect(alumno, '/profile/settings/bloqueados'), isNull);
+      expect(callRedirect(pf, '/profile/settings/bloqueados'), isNull);
+    });
+
     test('mientras el perfil carga NO redirige (el router re-evalúa después)',
         () async {
       // Un PF con el perfil todavía sin leer no puede rebotar de su propia
