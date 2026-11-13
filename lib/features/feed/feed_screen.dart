@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -867,6 +868,11 @@ void _reportFeedError(
 ) {
   ref.listen<AsyncValue<Object?>>(provider, (previous, next) {
     if (!next.hasError || (previous?.hasError ?? false)) return;
+    // `unavailable` es «no hay conexión» (lo tira `PostRepository` cuando una
+    // query vuelve vacía de la caché): esperable, no un bug. La pantalla ya
+    // lo muestra con Reintentar; mandarlo a Crashlytics sólo sumaría ruido.
+    final error = next.error;
+    if (error is FirebaseException && error.code == 'unavailable') return;
     unawaited(
       reportNonFatal(
         next.error!,
