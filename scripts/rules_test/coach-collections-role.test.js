@@ -131,6 +131,44 @@ test('SCENARIO-CC-04: athlete-role user cannot forge athlete_billing naming them
   );
 });
 
+// ---------------------------------------------------------------------------
+// SCENARIO-CC-05 (#1698): An athlete-role user plants a SHARED file in a
+// victim's Archivos screen. athlete_files was the one coach collection the
+// athlete READS that never asked for the trainer role.
+// ---------------------------------------------------------------------------
+test('SCENARIO-CC-05: athlete-role user cannot create athlete_files naming themselves trainer', async () => {
+  await seedUserRole('attacker', 'athlete');
+
+  const attacker = testEnv.authenticatedContext('attacker');
+  await assertFails(
+    attacker.firestore().collection('athlete_files').doc('attacker_victim_1').set({
+      trainerId: 'attacker',
+      athleteId: 'victim',
+      fileName: 'plan.pdf',
+      storagePath: 'athleteFiles/attacker_victim/1.pdf',
+      downloadUrl: 'https://phishing.example.test/x',
+      sizeBytes: 1024,
+      sharedWithAthlete: true,
+    }),
+  );
+});
+
+test('SCENARIO-CC-05b: real trainer CAN create athlete_files for an athlete', async () => {
+  await seedUserRole('coach6', 'trainer');
+
+  const coach = testEnv.authenticatedContext('coach6');
+  await assertSucceeds(
+    coach.firestore().collection('athlete_files').doc('coach6_athlete_1').set({
+      trainerId: 'coach6',
+      athleteId: 'athlete',
+      fileName: 'plan.pdf',
+      storagePath: 'athleteFiles/coach6_athlete/1.pdf',
+      downloadUrl: 'https://example.test/f.pdf?token=abc',
+      sizeBytes: 1024,
+      sharedWithAthlete: true,
+    }),
+  );
+});
 
 // QA-SEC-014 (#781): el `create` de `appointments` ahora valida forma —
 // `keys().hasOnly()`, los 7 campos no-nullables presentes y cotas de texto—

@@ -25,6 +25,8 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/routine_providers.dart'
+    show routinesProvider;
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/user_routines_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
@@ -41,6 +43,7 @@ UserProfile makeProfile({
   String? avatarUrl,
   String uid = 'u1',
   String email = 'u1@test.com',
+  String? activeRoutineId,
 }) =>
     UserProfile(
       onboardingSeen: allSurfacesSeen(),
@@ -51,6 +54,7 @@ UserProfile makeProfile({
       createdAt: DateTime.utc(2026, 5, 12),
       updatedAt: DateTime.utc(2026, 5, 12),
       avatarUrl: avatarUrl,
+      activeRoutineId: activeRoutineId,
     );
 
 Session makeStubSession({DateTime? startedAt}) => Session(
@@ -103,14 +107,24 @@ List<Override> _firstRunOverrides({
   List<Routine> created = const [],
   List<Routine> assigned = const [],
   Stream<TrainerLink?>? link,
+  String? activeRoutineId,
+  Future<List<Routine>> Function()? catalog,
 }) =>
     [
-      userProfileProvider.overrideWith((ref) => Stream.value(makeProfile())),
+      userProfileProvider.overrideWith(
+        (ref) => Stream.value(makeProfile(activeRoutineId: activeRoutineId)),
+      ),
+      // El catálogo sólo se lee si hay marcador (`followedTemplateProvider`).
+      // Sin este override el provider real iría a Firestore: hermético.
+      routinesProvider.overrideWith(
+        (ref) => catalog == null ? Future.value(const <Routine>[]) : catalog(),
+      ),
       currentUidProvider.overrideWithValue(_uid),
       userCreatedRoutinesProvider(_uid).overrideWith(
         (ref) => Stream.value(created),
       ),
-      assignedRoutinesProvider(_uid).overrideWith((ref) async => assigned),
+      assignedRoutinesProvider(_uid)
+          .overrideWith((ref) => Stream.value(assigned)),
       activeSessionForUidProvider.overrideWith((ref) async => null),
       todaysRoutineProvider.overrideWith((ref) async => null),
       weeklyInsightsProvider.overrideWith((ref) async => null),
@@ -450,7 +464,7 @@ void main() {
             (ref) => Stream.value(const <Routine>[]),
           ),
           assignedRoutinesProvider(_uid)
-              .overrideWith((ref) async => const <Routine>[]),
+              .overrideWith((ref) => Stream.value(const <Routine>[])),
           todaysRoutineProvider.overrideWith((ref) async => null),
           weeklyInsightsProvider.overrideWith((ref) async => null),
           currentAthleteLinkProvider.overrideWith(
@@ -590,6 +604,91 @@ void main() {
 
       expect(find.byType(EmpezarEntrenamientoCard), findsOneWidget);
       expect(find.text('Explorar planes'), findsNothing);
+    });
+
+    // #1698: seguir una plantilla del catálogo no crea ninguna rutina propia ni
+    // asignada — sólo escribe `activeRoutineId`. Home la tomaba por «sin
+    // rutina» y le seguía mostrando la bienvenida de primer arranque.
+    testWidgets(
+        'sigue una plantilla del catálogo sin rutinas propias → EmpezarEntrenamientoCard, no la bienvenida (#1698)',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          _firstRunRouter(),
+          _firstRunOverrides(
+            activeRoutineId: 'tpl-1',
+            catalog: () async => [_routine(id: 'tpl-1')],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EmpezarEntrenamientoCard), findsOneWidget);
+      expect(find.byKey(const ValueKey('home_hero_first_run')), findsNothing);
+      expect(find.text('CREAR RUTINA'), findsNothing);
+    });
+
+    testWidgets(
+        'marcador obsoleto (no es del catálogo ni de nadie) → sigue siendo primer arranque',
+        (tester) async {
+      // Un id que ya no resuelve no es «seguir una plantilla»: es una rutina
+      // archivada o borrada. La bienvenida es lo correcto.
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          _firstRunRouter(),
+          _firstRunOverrides(
+            activeRoutineId: 'borrada',
+            catalog: () async => [_routine(id: 'tpl-1')],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('home_hero_first_run')), findsOneWidget);
+      expect(find.byType(EmpezarEntrenamientoCard), findsNothing);
+    });
+
+    testWidgets(
+        'mientras el catálogo carga NO muestra la bienvenida (no se esconde una rutina real tras una lectura incompleta)',
+        (tester) async {
+      final completer = Completer<List<Routine>>();
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          _firstRunRouter(),
+          _firstRunOverrides(
+            activeRoutineId: 'tpl-1',
+            catalog: () => completer.future,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byKey(const ValueKey('home_hero_first_run')), findsNothing);
+
+      // Y al resolver con la plantilla seguida, sigue sin ser primer arranque.
+      completer.complete([_routine(id: 'tpl-1')]);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('home_hero_first_run')), findsNothing);
+      expect(find.byType(EmpezarEntrenamientoCard), findsOneWidget);
+    });
+
+    testWidgets(
+        'si el catálogo falla NO muestra la bienvenida: no se confirmó que no siga ninguna',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          _firstRunRouter(),
+          _firstRunOverrides(
+            activeRoutineId: 'tpl-1',
+            catalog: () async => throw StateError('sin red'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('home_hero_first_run')), findsNothing);
+      expect(find.byType(EmpezarEntrenamientoCard), findsOneWidget);
     });
 
     testWidgets(

@@ -18,6 +18,7 @@ import '../application/agenda_providers.dart';
 import '../application/trainer_link_providers.dart';
 import '../domain/agenda_exceptions.dart';
 import '../domain/appointment.dart';
+import '../domain/trainer_link_status.dart' show kEstadosDeVinculoVivo;
 import '../domain/wall_clock.dart';
 import '../../../l10n/app_l10n.dart';
 import 'agenda_formatters.dart';
@@ -580,8 +581,12 @@ class AppointmentTile extends ConsumerWidget {
   Future<void> _avisarAlPf(BuildContext context, WidgetRef ref) async {
     final l10n = AppL10n.of(context);
     try {
-      final link = await ref.read(currentAthleteLinkProvider.future);
-      if (link == null) throw StateError('sin vínculo activo');
+      // Vivo, no sólo activo (#1842): con el vínculo pausado el chat sigue
+      // abierto, así que avisarle al PF tiene que andar igual.
+      final link = await ref.read(currentAthleteLinkAnyStatusProvider.future);
+      if (link == null || !kEstadosDeVinculoVivo.contains(link.status)) {
+        throw StateError('sin vínculo vivo');
+      }
       final chat = await ref.read(chatForLinkProvider(link).future);
       if (!context.mounted) return;
       context.push('/coach/chat/${chat.chatId}?other=${link.trainerId}');

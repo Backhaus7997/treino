@@ -557,6 +557,13 @@ class AppL10nEs extends AppL10n {
   String get athleteFilesButtonLabel => 'MIS ARCHIVOS';
 
   @override
+  String get athleteRoutinesButtonLabel => 'MIS RUTINAS';
+
+  @override
+  String get athleteLinkPausedNote =>
+      'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas, archivos, plan nutricional y agenda— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.';
+
+  @override
   String get athleteNutritionPlanScreenTitle => 'PLAN NUTRICIONAL';
 
   @override
@@ -3337,7 +3344,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get coachHubDashboardPauseLinkBody =>
-      'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.';
+      'El alumno conserva sus rutinas, su plan nutricional, la agenda y el chat. Vos dejás de ver sus sesiones hasta que reanudes el vínculo.';
 
   @override
   String get coachHubDashboardTerminateLinkTitle => 'Terminar vínculo';
@@ -3363,6 +3370,27 @@ class AppL10nEs extends AppL10n {
   @override
   String get coachHubDashboardTerminateLinkError =>
       'No pudimos terminar el vínculo.';
+
+  @override
+  String coachHubTerminateLinkAppointmentsWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'También se cancelan $count sesiones agendadas con este alumno y se le avisa.',
+      one:
+          'También se cancela 1 sesión agendada con este alumno y se le avisa.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get coachHubTerminateLinkAppointmentsWarningUnknown =>
+      'No pudimos revisar tus sesiones con este alumno. Las que tengas a futuro también se cancelan y se le avisa.';
+
+  @override
+  String get coachHubTerminateLinkAppointmentsError =>
+      'No pudimos cancelar las sesiones futuras con este alumno, así que el vínculo sigue activo. Inténtalo de nuevo.';
 
   @override
   String get coachHubDashboardResumeLinkError =>
@@ -3613,6 +3641,32 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get insightsDayEmptyHint => 'No entrenaste este día.';
+
+  @override
+  String get insightsScreenTitle => 'INSIGHTS';
+
+  @override
+  String get insightsEmptyState => 'Empieza a entrenar para ver tus insights.';
+
+  @override
+  String get insightsPreviousWeekTooltip => 'Semana anterior';
+
+  @override
+  String get insightsNextWeekTooltip => 'Semana siguiente';
+
+  @override
+  String insightsWeekRange(String start, String end) {
+    return 'SEMANA · $start – $end';
+  }
+
+  @override
+  String get insightsDayMusclesHeading => 'MÚSCULOS DEL DÍA';
+
+  @override
+  String get insightsDaySetsUnit => 'SETS';
+
+  @override
+  String get insightsBackButton => 'VOLVER';
 
   @override
   String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';
@@ -3943,6 +3997,12 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get progressionMetricVolume => 'Volumen';
+
+  @override
+  String get progressionMetricLongestDuration => 'Tiempo máximo';
+
+  @override
+  String get progressionMetricLongestDistance => 'Distancia máxima';
 
   @override
   String progressionFrequency(int count) {
@@ -5563,6 +5623,20 @@ class AppL10nEs extends AppL10n {
       'No pudimos desbloquear. Inténtalo de nuevo.';
 
   @override
+  String get blockedUsersTitle => 'Usuarios bloqueados';
+
+  @override
+  String get blockedUsersExplainer =>
+      'Las personas que has bloqueado no pueden escribirte, seguirte ni reaccionar a tus posts. Desbloquear no restaura los seguimientos: si se seguían, tienen que volver a seguirse.';
+
+  @override
+  String get blockedUsersEmpty => 'No has bloqueado a nadie.';
+
+  @override
+  String get blockedUsersLoadError =>
+      'No pudimos cargar tu lista. Inténtalo de nuevo.';
+
+  @override
   String get moderationBlockedMessage =>
       'Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revísalo e inténtalo de nuevo.';
 
@@ -6914,6 +6988,13 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get athleteFilesButtonLabel => 'MIS ARCHIVOS';
+
+  @override
+  String get athleteRoutinesButtonLabel => 'MIS RUTINAS';
+
+  @override
+  String get athleteLinkPausedNote =>
+      'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas, archivos, plan nutricional y agenda— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.';
 
   @override
   String get athleteNutritionPlanScreenTitle => 'PLAN NUTRICIONAL';
@@ -9697,7 +9778,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubDashboardPauseLinkBody =>
-      'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.';
+      'El alumno conserva sus rutinas, su plan nutricional, la agenda y el chat. Vos dejás de ver sus sesiones hasta que reanudes el vínculo.';
 
   @override
   String get coachHubDashboardTerminateLinkTitle => 'Terminar vínculo';
@@ -9723,6 +9804,27 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachHubDashboardTerminateLinkError =>
       'No pudimos terminar el vínculo.';
+
+  @override
+  String coachHubTerminateLinkAppointmentsWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'También se cancelan $count sesiones agendadas con este alumno y se le avisa.',
+      one:
+          'También se cancela 1 sesión agendada con este alumno y se le avisa.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get coachHubTerminateLinkAppointmentsWarningUnknown =>
+      'No pudimos revisar tus sesiones con este alumno. Las que tengas a futuro también se cancelan y se le avisa.';
+
+  @override
+  String get coachHubTerminateLinkAppointmentsError =>
+      'No pudimos cancelar las sesiones futuras con este alumno, así que el vínculo sigue activo. Probá de nuevo.';
 
   @override
   String get coachHubDashboardResumeLinkError =>
@@ -9973,6 +10075,32 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get insightsDayEmptyHint => 'No entrenaste este día.';
+
+  @override
+  String get insightsScreenTitle => 'INSIGHTS';
+
+  @override
+  String get insightsEmptyState => 'Empezá a entrenar para ver tus insights.';
+
+  @override
+  String get insightsPreviousWeekTooltip => 'Semana anterior';
+
+  @override
+  String get insightsNextWeekTooltip => 'Semana siguiente';
+
+  @override
+  String insightsWeekRange(String start, String end) {
+    return 'SEMANA · $start – $end';
+  }
+
+  @override
+  String get insightsDayMusclesHeading => 'MÚSCULOS DEL DÍA';
+
+  @override
+  String get insightsDaySetsUnit => 'SETS';
+
+  @override
+  String get insightsBackButton => 'VOLVER';
 
   @override
   String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';
@@ -10300,6 +10428,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get progressionMetricVolume => 'Volumen';
+
+  @override
+  String get progressionMetricLongestDuration => 'Tiempo máximo';
+
+  @override
+  String get progressionMetricLongestDistance => 'Distancia máxima';
 
   @override
   String progressionFrequency(int count) {
@@ -11917,6 +12051,20 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get moderationUnblockError =>
       'No pudimos desbloquear. Probá de nuevo.';
+
+  @override
+  String get blockedUsersTitle => 'Usuarios bloqueados';
+
+  @override
+  String get blockedUsersExplainer =>
+      'Las personas que bloqueaste no pueden escribirte, seguirte ni reaccionar a tus posts. Desbloquear no restaura los seguimientos: si se seguían, tienen que volver a seguirse.';
+
+  @override
+  String get blockedUsersEmpty => 'No bloqueaste a nadie.';
+
+  @override
+  String get blockedUsersLoadError =>
+      'No pudimos cargar tu lista. Probá de nuevo.';
 
   @override
   String get moderationBlockedMessage =>

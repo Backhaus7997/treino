@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
+import 'package:treino/features/coach/domain/trainer_public_profile.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/athlete_coach_view.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
@@ -16,35 +19,43 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/trainers_list_screen.dart';
 import 'package:treino/features/payments/application/mi_cuota_provider.dart';
+import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+List<Override> _baseOverrides(NutritionPlan? plan, {MiCuotaState? cuota}) => [
+      // Keep Firestore out of these widget tests. The payments "Tu cuota"
+      // section (miCuotaProvider) reads firestoreProvider, which has no
+      // Firebase app in unit tests.
+      miCuotaProvider.overrideWith(
+        (ref) => AsyncValue<MiCuotaState?>.data(cuota),
+      ),
+      // QA-COA-001: the view/harness now read currentAthleteLinkAnyStatusProvider
+      // for the card-vs-discovery decision. Bridge it to whatever each test
+      // overrides currentAthleteLinkProvider with, so the existing per-test
+      // overrides keep driving the view unchanged.
+      currentAthleteLinkAnyStatusProvider.overrideWith(
+          (ref) => ref.watch(currentAthleteLinkProvider.future).asStream()),
+      // «TU CUOTA» busca el alias de cobro del PF; sin esto pegaría contra la
+      // instancia real.
+      trainerByIdProvider.overrideWith(
+        (ref, uid) async => const TrainerPublicProfile(uid: 'trainer-1'),
+      ),
+      // #1517: la card lee el plan para decidir el peso de su CTA. Va acá y
+      // no en `overrides` porque Riverpod no deja pisar un provider dos
+      // veces en el mismo scope.
+      nutritionPlanProvider.overrideWith((ref, key) => Stream.value(plan)),
+    ];
 
 Widget _wrap(
   Widget child, {
   List<Override> overrides = const [],
   NutritionPlan? plan,
+  MiCuotaState? cuota,
 }) =>
     ProviderScope(
-      overrides: [
-        // Keep Firestore out of these widget tests. The payments "Tu cuota"
-        // section (miCuotaProvider) reads firestoreProvider, which has no
-        // Firebase app in unit tests.
-        miCuotaProvider.overrideWith(
-          (ref) => const AsyncValue<MiCuotaState?>.data(null),
-        ),
-        // QA-COA-001: the view/harness now read currentAthleteLinkAnyStatusProvider
-        // for the card-vs-discovery decision. Bridge it to whatever each test
-        // overrides currentAthleteLinkProvider with, so the existing per-test
-        // overrides keep driving the view unchanged.
-        currentAthleteLinkAnyStatusProvider.overrideWith(
-            (ref) => ref.watch(currentAthleteLinkProvider.future).asStream()),
-        // #1517: la card lee el plan para decidir el peso de su CTA. Va acá y
-        // no en `overrides` porque Riverpod no deja pisar un provider dos
-        // veces en el mismo scope.
-        nutritionPlanProvider.overrideWith((ref, key) => Stream.value(plan)),
-        ...overrides,
-      ],
+      overrides: [..._baseOverrides(plan, cuota: cuota), ...overrides],
       child: MaterialApp(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
@@ -279,32 +290,251 @@ void main() {
       expect(find.text('MENSAJE'), findsNothing);
     });
 
-    // SCEN-CHLM-018 — paused state shows TERMINAR VÍNCULO only.
-    //
-    // Background: before this change, _ActionRow returned SizedBox.shrink()
-    // for the paused case — leaving the athlete with zero affordances when
-    // the PF paused the link from Coach Hub. The minimum fix is one button:
-    // TERMINAR VÍNCULO. Resume is a PF-only action (no button on the
-    // athlete side).
-    testWidgets(
-        'SCEN-CHLM-018: status paused → muestra TERMINAR VÍNCULO y no muestra MENSAJE',
-        (tester) async {
-      await tester.pumpWidget(_wrap(
-        const AthleteCoachView(),
-        overrides: [
-          currentAthleteLinkProvider.overrideWith((ref) =>
-              Stream.value(_makeLink(status: TrainerLinkStatus.paused))),
-          userPublicProfileProvider('trainer-1')
-              .overrideWith((ref) => Stream.value(_makePub())),
-        ],
-      ));
-      await tester.pumpAndSettle();
+    // SCEN-CHLM-018 — el estado pausado. La versión original (sólo TERMINAR
+    // VÍNCULO) era el arreglo mínimo de un callejón sin salida y fijaba, de
+    // paso, que MENSAJE no se cuela en paused. #1698 la reemplaza: pausar es
+    // un hold, no un corte (el chat sigue abierto en el servidor). #1842 suma
+    // el plan nutricional, la agenda y la cuota: sus rutas y `miCuotaProvider`
+    // ya resuelven el vínculo vivo (`active|paused`).
+    group('SCEN-CHLM-018 / #1698: vínculo PAUSADO', () {
+      final pausado = _makeLink(status: TrainerLinkStatus.paused);
 
-      expect(find.text('TERMINAR VÍNCULO'), findsOneWidget);
-      // MENSAJE only renders for active; verify it does NOT bleed into paused.
-      expect(find.text('MENSAJE'), findsNothing);
-      // CANCELAR SOLICITUD is pending-only.
-      expect(find.text('CANCELAR SOLICITUD'), findsNothing);
+      List<Override> overridesPausado() => [
+            currentAthleteLinkProvider
+                .overrideWith((ref) => Stream.value(pausado)),
+            userPublicProfileProvider('trainer-1')
+                .overrideWith((ref) => Stream.value(_makePub())),
+          ];
+
+      testWidgets(
+          'muestra el PF, el estado y lo que SIGUE disponible: rutinas, '
+          'archivos, mensaje y terminar', (tester) async {
+        await tester.pumpWidget(
+          _wrap(const AthleteCoachView(), overrides: overridesPausado()),
+        );
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        expect(find.text('VÍNCULO PAUSADO'), findsOneWidget);
+        expect(find.text('Coach Joe'), findsOneWidget);
+        expect(find.text(l10n.athleteLinkPausedNote), findsOneWidget);
+        expect(find.text(l10n.athleteRoutinesButtonLabel), findsOneWidget);
+        expect(find.text(l10n.athleteFilesButtonLabel), findsOneWidget);
+        expect(find.text('MENSAJE'), findsOneWidget,
+            reason: 'el chat sigue abierto con el vínculo pausado');
+        expect(find.text('TERMINAR VÍNCULO'), findsOneWidget);
+        // CANCELAR SOLICITUD es sólo de pending.
+        expect(find.text('CANCELAR SOLICITUD'), findsNothing);
+      });
+
+      testWidgets(
+          'ofrece el plan nutricional, la agenda y la cuota: con el vínculo '
+          'pausado sus rutas y la cuota resuelven el vínculo VIVO (#1842)',
+          (tester) async {
+        await tester.pumpWidget(
+          _wrap(
+            const AthleteCoachView(),
+            overrides: overridesPausado(),
+            cuota: const MiCuotaState(items: [
+              MiCuotaItem(
+                amountArs: 15000,
+                cadence: BillingCadence.suelto,
+                concept: 'Cuota de noviembre',
+              ),
+            ]),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        expect(find.text(l10n.athleteNutritionPlanButtonLabel), findsOneWidget);
+        expect(find.text(l10n.agendaButtonLabel), findsOneWidget);
+        expect(find.text('TU CUOTA'), findsOneWidget);
+        expect(find.text('Cuota de noviembre · Suelto'), findsOneWidget);
+        // Y el «Tu PF puede ver tu historial» sigue siendo del vínculo activo:
+        // pausar le revoca al PF el acceso a las sesiones.
+        expect(find.text('Tu PF puede ver tu historial de entrenamiento.'),
+            findsNothing);
+      });
+
+      testWidgets(
+          'con plan cargado, el plan nutricional es el acceso relleno, igual '
+          'que con el vínculo activo (#1517)', (tester) async {
+        await tester.pumpWidget(
+          _wrap(
+            const AthleteCoachView(),
+            overrides: overridesPausado(),
+            plan: _makePlan(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        final relleno = _fondoDe(tester, l10n.athleteNutritionPlanButtonLabel);
+        final delineado = _fondoDe(tester, l10n.agendaButtonLabel);
+        expect(relleno, isNot(equals(delineado)));
+      });
+
+      testWidgets('pantalla chica y fuente grande: sin overflow',
+          (tester) async {
+        tester.view.physicalSize = const Size(360, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            textScaler: TextScaler.linear(1.6),
+          ),
+          child: _wrap(const AthleteCoachView(), overrides: overridesPausado()),
+        ));
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+        expect(find.text(l10n.athleteLinkPausedNote), findsOneWidget);
+      });
+
+      testWidgets(
+          'el vínculo ACTIVO no gana el aviso ni MIS RUTINAS: son del '
+          'estado pausado', (tester) async {
+        await tester.pumpWidget(_wrap(
+          const AthleteCoachView(),
+          overrides: [
+            currentAthleteLinkProvider
+                .overrideWith((ref) => Stream.value(_makeLink())),
+            userPublicProfileProvider('trainer-1')
+                .overrideWith((ref) => Stream.value(_makePub())),
+          ],
+        ));
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        expect(find.text(l10n.athleteLinkPausedNote), findsNothing);
+        expect(find.text(l10n.athleteRoutinesButtonLabel), findsNothing);
+      });
+
+      // Los tres accesos tienen que LLEGAR a algún lado: un botón que no
+      // navega no se distingue, en un test de presencia, de uno que sí.
+      Widget conRouter() {
+        final router = GoRouter(
+          initialLocation: '/coach',
+          routes: [
+            GoRoute(
+              path: '/coach',
+              builder: (_, __) => const Scaffold(body: AthleteCoachView()),
+            ),
+            GoRoute(
+              path: '/workout',
+              builder: (_, __) => const Scaffold(body: Text('DESTINO:workout')),
+            ),
+            GoRoute(
+              path: '/coach/archivos',
+              builder: (_, __) =>
+                  const Scaffold(body: Text('DESTINO:archivos')),
+            ),
+            GoRoute(
+              path: '/coach/nutricion',
+              builder: (_, state) => Scaffold(
+                body: Text(
+                  'DESTINO:nutricion:${state.uri.queryParameters['trainerId']}',
+                ),
+              ),
+            ),
+            GoRoute(
+              path: '/coach/agenda',
+              builder: (_, state) => Scaffold(
+                body: Text(
+                  'DESTINO:agenda:${state.uri.queryParameters['trainerId']}',
+                ),
+              ),
+            ),
+            GoRoute(
+              path: '/coach/chat/:chatId',
+              builder: (_, state) => Scaffold(
+                body: Text(
+                  'DESTINO:chat:${state.pathParameters['chatId']}'
+                  ':${state.uri.queryParameters['other']}',
+                ),
+              ),
+            ),
+          ],
+        );
+        return ProviderScope(
+          overrides: [
+            ..._baseOverrides(null),
+            ...overridesPausado(),
+            chatForLinkProvider(pausado).overrideWith(
+              (ref) async => Chat(
+                chatId: 'chat-1',
+                members: const ['athlete-1', 'trainer-1'],
+                createdAt: DateTime.utc(2026, 5, 18),
+              ),
+            ),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            routerConfig: router,
+          ),
+        );
+      }
+
+      testWidgets('MIS RUTINAS → Entrenar', (tester) async {
+        await tester.pumpWidget(conRouter());
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        await tester.tap(find.text(l10n.athleteRoutinesButtonLabel));
+        await tester.pumpAndSettle();
+
+        expect(find.text('DESTINO:workout'), findsOneWidget);
+      });
+
+      testWidgets('PLAN NUTRICIONAL → /coach/nutricion con el trainerId',
+          (tester) async {
+        await tester.pumpWidget(conRouter());
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        await tester.tap(find.text(l10n.athleteNutritionPlanButtonLabel));
+        await tester.pumpAndSettle();
+
+        expect(find.text('DESTINO:nutricion:trainer-1'), findsOneWidget);
+      });
+
+      testWidgets('AGENDA → /coach/agenda con el trainerId', (tester) async {
+        await tester.pumpWidget(conRouter());
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        await tester.tap(find.text(l10n.agendaButtonLabel));
+        await tester.pumpAndSettle();
+
+        expect(find.text('DESTINO:agenda:trainer-1'), findsOneWidget);
+      });
+
+      testWidgets('MIS ARCHIVOS → /coach/archivos', (tester) async {
+        await tester.pumpWidget(conRouter());
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        await tester.tap(find.text(l10n.athleteFilesButtonLabel));
+        await tester.pumpAndSettle();
+
+        expect(find.text('DESTINO:archivos'), findsOneWidget);
+      });
+
+      testWidgets('MENSAJE abre el chat con el PF', (tester) async {
+        await tester.pumpWidget(conRouter());
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('MENSAJE'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('DESTINO:chat:chat-1:trainer-1'), findsOneWidget);
+      });
     });
 
     testWidgets(

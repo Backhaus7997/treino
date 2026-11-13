@@ -220,6 +220,58 @@ describe("SC-PSD-12/13/14: cancelFutureAppointmentsAsTrainer", () => {
   });
 });
 
+// `startsAt` se guarda como hora de pared argentina etiquetada UTC (ADR-7): el instante real
+// MENOS 3 h. La cascada lo comparaba contra `Timestamp.now()`, así que los turnos de las
+// próximas ~3 h figuraban como pasados y quedaban `confirmed` bajo una cuenta borrada.
+// Se siembran COMO LOS GUARDA LA APP; a 3 días (arriba) los dos marcos coinciden.
+describe("cancelFutureAppointmentsAsTrainer: el marco de startsAt (wall-clock ART, ADR-7)", () => {
+  const pf = "psd-appt-frame-pf";
+  const MIN = 60 * 1000;
+  const HOUR = 60 * MIN;
+  const storedLikeTheApp = (realOffsetMs: number) =>
+    Timestamp.fromMillis(Date.now() + realOffsetMs - 3 * HOUR);
+  const casos: Array<[string, string, number, string]> = [
+    ["confirmed que empieza en 10 min", "confirmed", 10 * MIN, "cancelled"],
+    ["confirmed que empieza en 1 h", "confirmed", HOUR, "cancelled"],
+    ["requested que empieza en 1 h", "requested", HOUR, "cancelled"],
+    ["confirmed que empieza en 2 h 50 min", "confirmed", 170 * MIN, "cancelled"],
+    ["confirmed que empezó hace 10 min", "confirmed", -10 * MIN, "confirmed"],
+    ["confirmed que empezó hace 1 h", "confirmed", -HOUR, "confirmed"],
+  ];
+  const ids = casos.map((_, i) => `psd-appt-frame-${i}`);
+
+  afterEach(() => Promise.all(ids.map((id) => db().collection("appointments").doc(id).delete())));
+
+  it("premisa: guardado como lo guarda la app, un turno en 1 h queda ANTES de now() en instante real", () => {
+    // Si esto deja de valer, los casos de abajo ya no distinguen un marco del otro.
+    expect(storedLikeTheApp(HOUR).toMillis()).toBeLessThan(Date.now());
+  });
+
+  it.each(casos.map((c, i) => [...c, ids[i]] as [string, string, number, string, string]))(
+    "el turno %s",
+    async (_nombre, status, offset, esperado, id) => {
+      await db().collection("appointments").doc(id).set({
+        trainerId: pf,
+        athleteId: "psd-appt-frame-ath",
+        status,
+        startsAt: storedLikeTheApp(offset),
+      });
+
+      const res = await cancelFutureAppointmentsAsTrainer(testApp, pf);
+
+      const d = (await db().collection("appointments").doc(id).get()).data()!;
+      expect(d.status).toBe(esperado);
+      expect(res.count).toBe(esperado === "cancelled" ? 1 : 0);
+      if (esperado === "cancelled") {
+        expect(d.reason).toBe(TRAINER_ACCOUNT_DELETED_REASON);
+        expect(d.cancelledBy).toBe(pf);
+      } else {
+        expect(d.reason).toBeUndefined(); // lo que ya empezó no se toca
+      }
+    }
+  );
+});
+
 const OWNED_COLLECTIONS = [
   "athlete_notes",
   "athlete_billing",

@@ -201,11 +201,11 @@ class LinkStateCard extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.trainerId));
     final hasUnread = ref.watch(hasUnreadFromProvider(link.trainerId));
-    // Sólo con el vínculo activo: es el único estado que dibuja los accesos,
-    // y no hay por qué abrir el stream del plan para una solicitud pendiente.
-    // Mientras carga cuenta como "sin plan" — es el estado que no promete
-    // nada (#1517).
-    final tienePlan = link.status == TrainerLinkStatus.active &&
+    // Sólo con el vínculo vivo (`active|paused`): son los estados que dibujan
+    // los accesos, y no hay por qué abrir el stream del plan para una solicitud
+    // pendiente. Mientras carga cuenta como "sin plan" — es el estado que no
+    // promete nada (#1517).
+    final tienePlan = kEstadosDeVinculoVivo.contains(link.status) &&
         ref.watch(
           nutritionPlanProvider(
             (trainerId: link.trainerId, athleteId: link.athleteId),
@@ -253,6 +253,36 @@ class LinkStateCard extends ConsumerWidget {
               if (link.status == TrainerLinkStatus.active) ...[
                 const SizedBox(height: 14),
                 _ShareInfo(palette: palette),
+              ],
+              // PAUSADO (#1698): el PF puso el vínculo en espera, no lo cortó.
+              // Esta rama existía sólo para `active`, así que con el vínculo
+              // pausado el alumno veía el nombre del PF y un botón de TERMINAR.
+              //
+              // Lo que se suma acá es lo que sólo existe en este estado:
+              // el aviso y MIS RUTINAS. Los planes asignados no dependen del
+              // vínculo (la query es por `assignedTo`) y pausar no los archiva
+              // —eso lo hace `cleanupAssignedPlansOnUnlink`, sólo al terminar—,
+              // así que el alumno tiene que saber dónde están.
+              //
+              // El resto (plan nutricional, archivos, agenda y cuota) es el
+              // mismo bloque del vínculo activo, justo abajo: las reglas los
+              // leen por `athleteId`, y desde #1842 sus rutas y `miCuotaProvider`
+              // resuelven el vínculo VIVO (`active|paused`). MENSAJE queda en
+              // `_ActionRow`: el chat sigue abierto — `chatCreateOk` acepta
+              // `active|paused` y `syncChatOnTrainerLink` no lo cierra.
+              if (link.status == TrainerLinkStatus.paused) ...[
+                const SizedBox(height: 14),
+                _PausedInfo(
+                    palette: palette, texto: l10n.athleteLinkPausedNote),
+                const SizedBox(height: 12),
+                _AccesoDelAlumno(
+                  variante: TreinoButtonVariant.secondaryAccent,
+                  icono: TreinoIcon.tabWorkout,
+                  etiqueta: l10n.athleteRoutinesButtonLabel,
+                  onPressed: () => context.go('/workout'),
+                ),
+              ],
+              if (kEstadosDeVinculoVivo.contains(link.status)) ...[
                 const SizedBox(height: 12),
                 // Orden por importancia, no por historia. El plan nutricional
                 // es lo que el alumno viene a buscar, así que va primero y es
@@ -302,7 +332,7 @@ class LinkStateCard extends ConsumerWidget {
                   etiqueta: l10n.agendaButtonLabel,
                   // El trainerId viaja por la ruta para que el host NO tenga
                   // que volver a preguntar lo que esta pantalla ya sabe: estos
-                  // accesos sólo se dibujan si el vínculo está activo.
+                  // accesos sólo se dibujan si el vínculo está vivo.
                   onPressed: () => context.push(
                     '/coach/agenda?trainerId=${Uri.encodeComponent(link.trainerId)}',
                   ),
@@ -449,6 +479,28 @@ class _ShareInfo extends StatelessWidget {
   }
 }
 
+/// Qué sigue disponible mientras el PF tiene el vínculo pausado. El texto sale
+/// de l10n (`athleteLinkPausedNote`) y sólo afirma lo verificado: ver el
+/// comentario de [LinkStateCard].
+class _PausedInfo extends StatelessWidget {
+  const _PausedInfo({required this.palette, required this.texto});
+  final AppPalette palette;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      texto,
+      style: GoogleFonts.barlow(
+        fontStyle: FontStyle.italic,
+        fontWeight: FontWeight.w400,
+        fontSize: 13,
+        color: palette.textMuted,
+      ),
+    );
+  }
+}
+
 class _ActionRow extends ConsumerWidget {
   const _ActionRow({required this.link});
   final TrainerLink link;
@@ -484,6 +536,16 @@ class _ActionRow extends ConsumerWidget {
     // container survives disposal. ADR-RV-007, mirrors ADR-FPS-006.
     // ignore: use_build_context_synchronously
     final container = ProviderScope.containerOf(context, listen: false);
+    // #1840: el sheet se abre sobre el Navigator RAÍZ, capturado acá. Este
+    // `context` NO sobrevive al `await`: `terminate()` es un `update`, y la
+    // compensación de latencia emite el vínculo terminado por
+    // `currentAthleteLinkProvider` antes del ack del servidor, así que la card
+    // se reconstruye sin esta fila y `context.mounted` daba false: el sheet no
+    // se abría nunca. El Navigator raíz no se desmonta con la card.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    // Sólo un vínculo que fue real se puede reseñar terminado (la regla de
+    // `reviews` pide `acceptedAt`): sin él, el sheet terminaría en un error.
+    final ofrecerResena = link.acceptedAt != null;
     final linkId = link.id;
     final trainerId = link.trainerId;
     final athleteId = link.athleteId;
@@ -506,11 +568,10 @@ class _ActionRow extends ConsumerWidget {
     container.invalidate(currentAthleteLinkProvider);
     container.invalidate(currentAthleteLinkAnyStatusProvider);
 
-    // Show review sheet — context is still valid here because we checked
-    // mounted already and the sheet uses the container, not this widget's ref.
-    if (context.mounted) {
+    // Show review sheet on the root navigator captured above (#1840).
+    if (ofrecerResena && navigator.mounted) {
       await showModalBottomSheet<void>(
-        context: context,
+        context: navigator.context,
         useRootNavigator: true,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
@@ -553,7 +614,14 @@ class _ActionRow extends ConsumerWidget {
         ),
       );
     }
-    if (link.status == TrainerLinkStatus.active) {
+    // `active` y `paused` comparten MENSAJE + TERMINAR (#1698). Pausar es un
+    // hold, no un corte: el chat sigue abierto del lado del servidor
+    // (`chatCreateOk` acepta `active|paused`, `syncChatOnTrainerLink` lo deja
+    // abierto) y `ChatRepository` ya trata `paused` como vínculo vigente
+    // (QA H8), así que esconder MENSAJE era una restricción que sólo existía
+    // en esta pantalla. Reanudar sigue siendo una acción del PF.
+    if (link.status == TrainerLinkStatus.active ||
+        link.status == TrainerLinkStatus.paused) {
       return Column(
         children: [
           Stack(
@@ -629,35 +697,8 @@ class _ActionRow extends ConsumerWidget {
         ],
       );
     }
-    // Paused — the PF paused the link from Coach Hub. The athlete keeps
-    // read-only access to the plan; the only action available is to terminate
-    // the relationship (no resume from the athlete side — that's a PF action).
-    // Minimum-viable fix for the dead-end the explorer found at the previous
-    // SizedBox.shrink() below (REQ-CHLM-013, SCEN-CHLM-018, ADR-CHLM-07).
-    if (link.status == TrainerLinkStatus.paused) {
-      return SizedBox(
-        width: double.infinity,
-        child: OutlinedButton(
-          onPressed: () => _onTerminate(context, ref),
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: palette.highlight, width: 1),
-            foregroundColor: palette.highlight,
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.full),
-            ),
-          ),
-          child: Text(
-            'TERMINAR VÍNCULO',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-      );
-    }
+    // `terminated` no llega acá: `currentAthleteLinkAnyStatusProvider` sólo
+    // trae pending|active|paused.
     return const SizedBox.shrink();
   }
 

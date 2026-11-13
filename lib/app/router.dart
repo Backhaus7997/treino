@@ -56,6 +56,7 @@ import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/friend_requests_inbox_screen.dart';
 import '../features/feed/presentation/post_detail_screen.dart';
+import '../features/moderation/presentation/blocked_users_screen.dart';
 import '../features/notifications/presentation/notification_history_screen.dart';
 import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
@@ -1273,6 +1274,13 @@ GoRouter buildRouter({
                 path: 'settings/privacidad',
                 builder: (_, __) => _withBg(const PrivacyScreen()),
               ),
+              // «Usuarios bloqueados», con Desbloquear (#1698). Se abre desde
+              // la fila del final de Privacidad. Para los DOS roles (el PF
+              // también llega a Privacidad), así que NO va en `_rutasSoloPF`.
+              GoRoute(
+                path: 'settings/bloqueados',
+                builder: (_, __) => _withBg(const BlockedUsersScreen()),
+              ),
               // Índice de documentos legales. Hasta acá los legales sólo se
               // alcanzaban desde el registro y el login, así que con la cuenta
               // ya creada nadie podía releer lo que había aceptado.
@@ -1648,6 +1656,13 @@ class _AthleteNutritionPlanRouteHost extends ConsumerWidget {
 
 /// Resuelve el vínculo y monta la pantalla, o muestra el gate.
 ///
+/// ## Vínculo VIVO, no sólo activo (#1842)
+///
+/// El vínculo es [currentAthleteLinkVivoProvider]: `active` Y `paused`. Pausar
+/// es un hold, el PF sigue siendo el PF, y el plan nutricional y la agenda se
+/// leen por `athleteId` sin mirar el vínculo. Con `active` a secas, un alumno
+/// pausado que abría estas rutas caía en «No encontramos un vínculo activo».
+///
 /// ## Por qué la `pista` no alcanza sola
 ///
 /// La vista que dibuja los botones de AGENDA / NUTRICIÓN sólo los dibuja
@@ -1669,7 +1684,7 @@ Widget _montarConPista(
   required String? pista,
   required Widget Function(String trainerId) montar,
 }) {
-  final linkAsync = ref.watch(currentAthleteLinkProvider);
+  final linkAsync = ref.watch(currentAthleteLinkVivoProvider);
   return linkAsync.when(
     loading: () => (pista != null && pista.isNotEmpty)
         ? montar(pista)
@@ -1768,7 +1783,11 @@ class _GateDeVinculo extends ConsumerWidget {
               if (!faltaLaSesion) ...[
                 const SizedBox(height: 18),
                 TextButton(
-                  onPressed: () => ref.invalidate(currentAthleteLinkProvider),
+                  // El stream de abajo, no el derivado: invalidar
+                  // `currentAthleteLinkVivoProvider` reconstruiría el filtro
+                  // sin volver a preguntarle nada al servidor.
+                  onPressed: () =>
+                      ref.invalidate(currentAthleteLinkAnyStatusProvider),
                   child: Text(l10n.athleteLinkRequiredRetry),
                 ),
               ],

@@ -65,7 +65,12 @@ export { notifyOnReview } from "./notifications/notify-review";
 // #628: canal alumno → PF durante la sesión. Notifica SOLO cuando
 // kind === 'discomfort' — un comment no debe vibrarle el teléfono al PF.
 export { notifyOnExerciseFeedback } from "./notifications/notify-exercise-feedback";
-export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
+// #1723: el plan asignado DESPUÉS de terminar el vínculo (o sin vínculo) se
+// archiva al crearse; `cleanupAssignedPlansOnUnlink` sólo corre en la transición.
+export {
+  archiveOrphanAssignedPlanOnCreate,
+  cleanupAssignedPlansOnUnlink,
+} from "./cleanup-assigned-plans";
 export { propagateGymNameToProfiles } from "./gyms/propagate-gym-name";
 export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";
@@ -183,6 +188,10 @@ export { resumeTrainerLink } from "./subscriptions/resume-trainer-link";
 export { promoteChatToInquiry } from "./chat/promote-chat-to-inquiry";
 // #1697: cierra el chat del par al terminar el vínculo y lo reabre al re-vincular.
 export { syncChatOnTrainerLink } from "./chat/sync-chat-on-trainer-link";
+// #1833: cancela los turnos futuros del par cuando termina un vínculo vivo.
+export { cancelAppointmentsOnUnlink } from "./cancel-appointments-on-unlink";
+// #1806: `trainer_athlete_pairs/{trainerId}_{athleteId}`, el par que las reglas leen.
+export { syncTrainerAthletePair } from "./sync-trainer-athlete-pair";
 // Paywall Fase 7 (downgrade): reconcilian `entitlement` cuando el PF queda
 // por encima de su limite. Hacen falta LOS DOS — el trigger ve los cambios de
 // suscripcion al instante, y el barrido ve lo que ningun trigger puede ver:

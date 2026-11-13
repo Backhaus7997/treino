@@ -36,6 +36,7 @@ WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/EffortBroadcastRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/WorkoutDurationRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/SetLogIdentity.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/WorkoutSession.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/CountdownRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/PhoneTimerMirror.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/WatchSignedOutPayload.swift"

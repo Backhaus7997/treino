@@ -2,6 +2,8 @@
 // single week, normal sets). Mirrors the mocking pattern of
 // routine_editor_athlete_mode_test.dart (mobile).
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -20,9 +22,12 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart'
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/infrastructure/before_unload_guard.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/blocked_students_screen.dart'
     show kBlockedStudentsRoutePath;
+import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routes.dart'
+    show routineEditorRoutes;
 import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_editor_web_screen.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -156,6 +161,27 @@ Future<void> _agregarSemanaCopiandoLaAnterior(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// El `BeforeUnloadGuard` de los tests: el listener real habla con `window` y
+/// no existe en la VM.
+class _BeforeUnloadFalso implements BeforeUnloadGuard {
+  bool prendido = false;
+  int llamadasAPrender = 0;
+
+  @override
+  void arm() {
+    llamadasAPrender++;
+    prendido = true;
+  }
+
+  @override
+  void disarm() => prendido = false;
+}
+
+/// La respuesta de un `createAssigned`/`createTemplate` que devuelve la rutina
+/// recibida con el id que le puso Firestore.
+Future<Routine> Function(Invocation) _creaConId(String id) =>
+    (i) async => (i.positionalArguments.first as Routine).copyWith(id: id);
+
 /// Stand-in de la sección Rutinas: lo único que hace es WATCHEAR
 /// `routinesAuthoredByProvider`, que es lo que esa pantalla hace de verdad.
 class _EspiaDelListado extends ConsumerWidget {
@@ -168,7 +194,15 @@ class _EspiaDelListado extends ConsumerWidget {
   }
 }
 
-Future<void> _pumpEditor(
+/// Devuelve el router, para que un test pueda hacer lo que hace el sidebar del
+/// Hub: un `go` a otra sección.
+///
+/// Con [enElShell] las pantallas son las REALES del editor (`routineEditorRoutes`,
+/// con su `onExit`) dentro de UN `ShellRoute` junto con la pantalla de atrás,
+/// como en `coach_hub_router.dart`. Importa: con la pantalla de atrás FUERA del
+/// shell, un `push` arma una página que contiene al shell entero y `pop`,
+/// `PopScope` y `onExit` se comportan distinto.
+Future<GoRouter> _pumpEditor(
   WidgetTester tester, {
   RoutineRepository? repo,
   String? routineId,
@@ -176,6 +210,9 @@ Future<void> _pumpEditor(
   BlockedAthletes? blocked,
   List<Override> extraOverrides = const [],
   bool observarListadoDeRutinas = false,
+  bool abiertoPorUrl = false,
+  GoRouterRedirect? redirect,
+  bool enElShell = false,
 }) async {
   // Desktop viewport — Coach Hub web dialogs (exercise picker) assume it.
   // Raised 900 → 1100 when the RESUMEN field (#648) landed above DÍAS: the
@@ -189,9 +226,41 @@ Future<void> _pumpEditor(
   // initialLocation is the alumno-detail stand-in, THEN we push the editor —
   // context.pop() needs real prior history to return to, not just a bare
   // initialLocation (which go_router can't pop past).
+  // Con [abiertoPorUrl] el editor es lo ÚNICO en la pila —un link directo, un F5
+  // o una pestaña nueva—, así que no hay a dónde hacer `pop`. Es el caso que el
+  // `push` de abajo esconde: en los tests de siempre `context.pop()` anda porque
+  // la pantalla de atrás existe.
+  final rutaDelEditor = routineId == null
+      ? '/routine-editor/$_athleteId'
+      : '/routine-editor/$_athleteId/$routineId';
   final router = GoRouter(
-    initialLocation: '/alumnos/$_athleteId',
+    initialLocation: abiertoPorUrl ? rutaDelEditor : '/alumnos/$_athleteId',
+    redirect: redirect,
     routes: [
+      // Va PRIMERO: go_router toma la primera ruta que matchea, así que con
+      // [enElShell] estas tapan a las de abajo y todo lo demás queda igual.
+      if (enElShell)
+        ShellRoute(
+          // `Scaffold` stands in for CoachHubScaffold, que es quien provee el
+          // Material ancestor.
+          pageBuilder: (_, __, child) =>
+              NoTransitionPage(child: Scaffold(body: child)),
+          routes: [
+            GoRoute(
+              path: '/alumnos/:id',
+              builder: (_, __) => const Text('AlumnoDetail'),
+            ),
+            ...routineEditorRoutes,
+            GoRoute(
+              path: '/rutinas/:athleteId',
+              builder: (_, __) => const Text('RutinasDelAlumno'),
+            ),
+            GoRoute(
+              path: '/rutinas',
+              builder: (_, __) => const Text('Rutinas'),
+            ),
+          ],
+        ),
       GoRoute(
         path: '/alumnos/:id',
         // Con `observarListadoDeRutinas`, la pantalla de atrás WATCHEA
@@ -232,6 +301,17 @@ Future<void> _pumpEditor(
         path: kBlockedStudentsRoutePath,
         builder: (_, __) => const Scaffold(body: Text('SOLO_LECTURA')),
       ),
+      // A dónde cae el editor abierto por URL, que no tiene pantalla de atrás
+      // (ver `rutinasRoutes`): las rutinas del alumno, o la sección Rutinas
+      // para una plantilla.
+      GoRoute(
+        path: '/rutinas/:athleteId',
+        builder: (_, __) => const Scaffold(body: Text('RutinasDelAlumno')),
+      ),
+      GoRoute(
+        path: '/rutinas',
+        builder: (_, __) => const Scaffold(body: Text('Rutinas')),
+      ),
     ],
   );
 
@@ -261,12 +341,10 @@ Future<void> _pumpEditor(
   );
   await tester.pumpAndSettle();
 
-  router.push(
-    routineId == null
-        ? '/routine-editor/$_athleteId'
-        : '/routine-editor/$_athleteId/$routineId',
-  );
-  await tester.pumpAndSettle();
+  if (!abiertoPorUrl) {
+    router.push(rutaDelEditor);
+    await tester.pumpAndSettle();
+  }
 
   // La card del ejercicio pasó a ser `ExerciseCard`, la MISMA del editor del
   // teléfono, y nace COLAPSADA: los campos de sets no están en el árbol hasta
@@ -293,6 +371,7 @@ Future<void> _pumpEditor(
     tester.state<ScrollableState>(vertical.first).position.jumpTo(0);
     await tester.pumpAndSettle();
   }
+  return router;
 }
 
 /// A web-editable (simple, single-week, reps) routine — the kind edit mode
@@ -2401,6 +2480,468 @@ void main() {
     });
   });
 
+  // -- Guardar con el editor abierto por URL (#1733) -------------------------
+  //
+  // Con el editor como única ruta no hay nada que sacar de la pila:
+  // `context.pop()` tira `GoError`. Estaba adentro del `try` de `_submit`, así
+  // que el `catch` pintaba «No pudimos guardar» sobre una rutina ya guardada, y
+  // el reintento la duplicaba.
+  group('RoutineEditorWebScreen — editor abierto por URL (#1733)', () {
+    testWidgets('Guardar no dice «No pudimos guardar» y sale a las rutinas', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(_creaConId('n1'));
+      await _pumpEditor(tester, repo: repo, abiertoPorUrl: true);
+      await _fillMinimalValidForm(tester);
+
+      await _tapGuardar(tester);
+
+      expect(find.textContaining('No pudimos guardar'), findsNothing);
+      expect(find.text('RutinasDelAlumno'), findsOneWidget);
+      verify(() => repo.createAssigned(any())).called(1);
+    });
+
+    testWidgets('«Cancelar» sin cambios sale en vez de no hacer nada', (
+      tester,
+    ) async {
+      await _pumpEditor(tester, abiertoPorUrl: true);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('RutinasDelAlumno'), findsOneWidget);
+    });
+
+    testWidgets('«Cancelar» con cambios pregunta y, al descartar, sale', (
+      tester,
+    ) async {
+      await _pumpEditor(tester, abiertoPorUrl: true);
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('RutinasDelAlumno'), findsOneWidget);
+    });
+
+    testWidgets('editar un plan por URL y guardar tampoco falla', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        routineId: 'r1',
+        abiertoPorUrl: true,
+      );
+
+      await _tapGuardar(tester);
+
+      expect(find.textContaining('No pudimos guardar'), findsNothing);
+      expect(find.text('RutinasDelAlumno'), findsOneWidget);
+    });
+
+    testWidgets('si el editor se queda abierto, el 2º guardado ACTUALIZA', (
+      tester,
+    ) async {
+      // Algo frena la salida —acá, un redirect que devuelve al editor—: el PF
+      // sigue frente al formulario de una rutina que YA se creó. Guardar de
+      // nuevo no puede crear otra.
+      var creaciones = 0;
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer((i) {
+        creaciones++;
+        return _creaConId('n1')(i);
+      });
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        abiertoPorUrl: true,
+        redirect: (_, state) => state.matchedLocation.startsWith('/rutinas')
+            ? '/routine-editor/$_athleteId'
+            : null,
+      );
+      await _fillMinimalValidForm(tester);
+
+      await _tapGuardar(tester);
+      expect(
+          find.byKey(const Key('routine_editor_name_field')), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza 5x semana',
+      );
+      await _tapGuardar(tester);
+
+      expect(creaciones, 1, reason: 'el segundo guardado no crea otra rutina');
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      expect(draft.id, 'n1');
+      expect(draft.name, 'Fuerza 5x semana');
+      // Sigue siendo SU plan: la identidad del documento creado se conserva.
+      expect(draft.assignedTo, _athleteId);
+      expect(draft.source, RoutineSource.trainerAssigned);
+    });
+  });
+
+  // -- Salir con cambios sin guardar (#1732) --------------------------------
+  //
+  // El `PopScope` y la flecha ya preguntaban. No cubrían las otras salidas del
+  // Hub: el sidebar (un `go`) y Atrás del navegador reemplazan la pila sin pasar
+  // por un `PopScope`. Estos tests corren con `enElShell`: las rutas REALES del
+  // editor, dentro de un `ShellRoute` como en producción, porque `onExit` y
+  // `pop` se comportan distinto según dónde esté la pantalla de atrás.
+  group('RoutineEditorWebScreen — salir con cambios sin guardar (#1732)', () {
+    Future<void> escribirNombre(WidgetTester tester) async {
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('el sidebar (un go) con cambios pregunta, y Volver se queda', (
+      tester,
+    ) async {
+      final router = await _pumpEditor(tester, enElShell: true);
+      await escribirNombre(tester);
+
+      router.go('/rutinas');
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+
+      await tester.tap(find.text('Volver').last);
+      await tester.pumpAndSettle();
+
+      // Sigue en el editor y con lo que había escrito.
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('Rutinas'), findsNothing);
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const Key('routine_editor_name_field')),
+            )
+            .controller!
+            .text,
+        'Fuerza',
+      );
+    });
+
+    testWidgets('el sidebar con cambios: Descartar deja ir', (tester) async {
+      final router = await _pumpEditor(tester, enElShell: true);
+      await escribirNombre(tester);
+
+      router.go('/rutinas');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rutinas'), findsOneWidget);
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+    });
+
+    testWidgets('el sidebar SIN cambios sale sin preguntar', (tester) async {
+      final router = await _pumpEditor(tester, enElShell: true);
+
+      router.go('/rutinas');
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('Rutinas'), findsOneWidget);
+    });
+
+    testWidgets(
+        'un segundo intento de salir con el diálogo abierto no lo apila',
+        (tester) async {
+      final router = await _pumpEditor(tester, enElShell: true);
+      await escribirNombre(tester);
+
+      router.go('/rutinas');
+      await tester.pump();
+      router.go('/alumnos/$_athleteId');
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+    });
+
+    testWidgets('Atrás del sistema con cambios pregunta', (tester) async {
+      await _pumpEditor(tester, enElShell: true);
+      await escribirNombre(tester);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+      expect(find.text('AlumnoDetail'), findsOneWidget);
+    });
+
+    testWidgets('la flecha pregunta UNA vez: la ruta no vuelve a preguntar', (
+      tester,
+    ) async {
+      await _pumpEditor(tester, enElShell: true);
+      await escribirNombre(tester);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('AlumnoDetail'), findsOneWidget);
+    });
+
+    testWidgets('guardar con cambios sale sin preguntar si descartar', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(_creaConId('n1'));
+      await _pumpEditor(tester, repo: repo, enElShell: true);
+      await _fillMinimalValidForm(tester);
+
+      await _tapGuardar(tester);
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('AlumnoDetail'), findsOneWidget);
+    });
+
+    testWidgets('guardar una EDICIÓN con cambios tampoco pregunta', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        routineId: 'r1',
+        enElShell: true,
+      );
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza v2',
+      );
+      await tester.pumpAndSettle();
+
+      await _tapGuardar(tester);
+
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('AlumnoDetail'), findsOneWidget);
+    });
+
+    testWidgets('lo tipeado MIENTRAS se guarda no se da por guardado', (
+      tester,
+    ) async {
+      // El PF sigue escribiendo con la escritura en vuelo. Eso no llegó a
+      // ningún lado: la salida pregunta, y si se queda, el 2º guardado
+      // ACTUALIZA la rutina ya creada en vez de crear otra.
+      final escritura = Completer<Routine>();
+      var creaciones = 0;
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer((_) {
+        creaciones++;
+        return escritura.future;
+      });
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, enElShell: true);
+      await _fillMinimalValidForm(tester);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza 5x semana',
+      );
+      final enviada = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      escritura.complete(enviada.copyWith(id: 'n1'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+      await tester.tap(find.text('Volver').last);
+      await tester.pumpAndSettle();
+      await _tapGuardar(tester);
+
+      expect(creaciones, 1);
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      expect(draft.id, 'n1');
+      expect(draft.name, 'Fuerza 5x semana');
+    });
+
+    test('las cuatro rutas del editor llevan el onExit', () {
+      final rutas = routineEditorRoutes.whereType<GoRoute>().toList();
+
+      expect(rutas.map((r) => r.path), [
+        '/routine-editor/:athleteId',
+        '/routine-editor/:athleteId/:routineId',
+        '/template-editor',
+        '/template-editor/:templateId',
+      ]);
+      expect(rutas.every((r) => r.onExit != null), isTrue);
+    });
+  });
+
+  // -- Recargar o cerrar la pestaña (#1732) -----------------------------------
+  //
+  // F5, cerrar la pestaña o pegar otra URL no pasan por el router: sólo el
+  // navegador puede preguntar, y sólo si la página se lo pidió ANTES. El
+  // listener real no existe en la VM; acá se prueba CUÁNDO la pantalla lo
+  // prende y lo apaga, contra un guard de mentira.
+  group('RoutineEditorWebScreen — aviso al recargar o cerrar la pestaña', () {
+    late _BeforeUnloadFalso aviso;
+    setUp(() => aviso = _BeforeUnloadFalso());
+
+    List<Override> conAviso() => [
+          beforeUnloadGuardProvider.overrideWithValue(aviso),
+        ];
+
+    Future<void> escribirNombre(WidgetTester tester) async {
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('un editor sin tocar NO lo prende', (tester) async {
+      await _pumpEditor(tester, extraOverrides: conAviso());
+
+      expect(aviso.prendido, isFalse);
+      expect(aviso.llamadasAPrender, 0);
+    });
+
+    testWidgets('editar un plan existente sin tocarlo tampoco', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        routineId: 'r1',
+        extraOverrides: conAviso(),
+      );
+
+      expect(aviso.prendido, isFalse);
+    });
+
+    testWidgets('la primera edición lo prende, una sola vez', (tester) async {
+      await _pumpEditor(tester, extraOverrides: conAviso());
+
+      await escribirNombre(tester);
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_split_field')),
+        'PPL',
+      );
+      await tester.pumpAndSettle();
+
+      expect(aviso.prendido, isTrue);
+      expect(aviso.llamadasAPrender, 1);
+    });
+
+    testWidgets('guardar lo apaga: ya no hay nada que perder', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(_creaConId('n1'));
+      await _pumpEditor(tester, repo: repo, extraOverrides: conAviso());
+      await _fillMinimalValidForm(tester);
+      expect(aviso.prendido, isTrue);
+
+      await _tapGuardar(tester);
+
+      expect(aviso.prendido, isFalse);
+    });
+
+    testWidgets('irse de la pantalla (Descartar) lo apaga', (tester) async {
+      final router = await _pumpEditor(
+        tester,
+        enElShell: true,
+        extraOverrides: conAviso(),
+      );
+      await escribirNombre(tester);
+      expect(aviso.prendido, isTrue);
+
+      router.go('/rutinas');
+      await tester.pumpAndSettle();
+      expect(
+        aviso.prendido,
+        isTrue,
+        reason: 'el diálogo todavía no se contestó',
+      );
+
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(aviso.prendido, isFalse);
+    });
+
+    testWidgets('lo tipeado MIENTRAS se guarda no lo apaga', (tester) async {
+      final escritura = Completer<Routine>();
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any()))
+          .thenAnswer((_) => escritura.future);
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        enElShell: true,
+        extraOverrides: conAviso(),
+      );
+      await _fillMinimalValidForm(tester);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza 5x semana',
+      );
+      final enviada = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      escritura.complete(enviada.copyWith(id: 'n1'));
+      await tester.pumpAndSettle();
+
+      // Eso no llegó a ningún lado: la salida pregunta y el aviso sigue.
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+      expect(aviso.prendido, isTrue);
+    });
+  });
+
   group('RoutineEditorWebScreen — edit mode', () {
     testWidgets('loads and populates an existing web-editable routine', (
       tester,
@@ -2760,6 +3301,43 @@ void main() {
       // más abajo se ponía rojo por esto y pasaba en aislamiento, que es la
       // firma de una contaminación entre tests, no de un bug.
       await tester.pump(const Duration(seconds: 6));
+    });
+
+    // El test de arriba mira el cartel en el primer frame, con el editor
+    // todavía en pantalla: la transición de salida recién arranca. El editor se
+    // dispone cuando ésta termina, y `dispose()` hacía `clearSnackBars()` — el
+    // aviso de «dónde quedó la copia» se iba a los ~300 ms, justo cuando el PF
+    // lo estaba leyendo en la pantalla de atrás, que es para lo que se avisa
+    // «antes de que el editor se cierre».
+    testWidgets(
+        'el aviso de la copia SOBREVIVE al cierre del editor: se lee en la '
+        'pantalla de atrás', (tester) async {
+      await editando(tester);
+      await cambiarAlgo(tester);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guardar como copia'));
+      // Sin pumpAndSettle: llevaría el reloj más allá de los 4 s del cartel y
+      // lo desharía por su propio timer. Y en pasos CHICOS: la animación de
+      // salida del cartel (la que dispara `clearSnackBars`) necesita frames
+      // POSTERIORES al `dispose`; un solo pump de 800 ms lo dispone en su
+      // último frame y el test mira antes de que el cartel llegue a irse.
+      await tester.pump();
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      expect(find.text('AlumnoDetail'), findsOneWidget,
+          reason:
+              'el editor ya se cerró: se está mirando la pantalla de atrás');
+      expect(
+        find.textContaining('La original quedó como estaba'),
+        findsOneWidget,
+        reason: 'el aviso es lo único que le dice al PF dónde quedó la copia',
+      );
+
+      await tester.pump(const Duration(seconds: 6)); // drenar el SnackBar
     });
   });
 
@@ -4218,18 +4796,27 @@ void main() {
       String? templateId,
       FakeAnalyticsService? analytics,
       BlockedAthletes? blocked,
+      bool abiertoPorUrl = false,
     }) async {
       tester.view.physicalSize = const Size(1400, 1100);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      final rutaDelEditor = templateId == null
+          ? '/template-editor'
+          : '/template-editor/$templateId';
       final router = GoRouter(
-        initialLocation: '/biblioteca',
+        initialLocation: abiertoPorUrl ? rutaDelEditor : '/biblioteca',
         routes: [
           GoRoute(
             path: '/biblioteca',
             builder: (_, __) => const Scaffold(body: Text('Biblioteca')),
+          ),
+          // A dónde cae una plantilla abierta por URL (#1733).
+          GoRoute(
+            path: '/rutinas',
+            builder: (_, __) => const Scaffold(body: Text('Rutinas')),
           ),
           GoRoute(
             path: '/template-editor',
@@ -4271,13 +4858,26 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      router.push(
-        templateId == null
-            ? '/template-editor'
-            : '/template-editor/$templateId',
-      );
-      await tester.pumpAndSettle();
+      if (!abiertoPorUrl) {
+        router.push(rutaDelEditor);
+        await tester.pumpAndSettle();
+      }
     }
+
+    testWidgets('abierta por URL, guardar sale a Rutinas (#1733)', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createTemplate(any())).thenAnswer(_creaConId('t9'));
+      await pumpTemplate(tester, repo: repo, abiertoPorUrl: true);
+      await _fillMinimalValidForm(tester);
+
+      await _tapGuardar(tester);
+
+      expect(find.textContaining('No pudimos guardar'), findsNothing);
+      expect(find.text('Rutinas'), findsOneWidget);
+      verify(() => repo.createTemplate(any())).called(1);
+    });
 
     testWidgets('una denegación en plantilla no inventa un alumno', (
       tester,

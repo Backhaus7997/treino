@@ -657,6 +657,23 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
           reps: spec.reps ?? spec.repsMax ?? spec.repsMin ?? 0,
           weightKg: spec.weightKg ?? 0,
           completedAt: DateTime.now(),
+          // #1701: una serie por tiempo o por distancia guarda `reps: 0,
+          // weightKg: 0`, y sin su métrica el historial no sabe qué hizo el
+          // atleta. Misma regla que el `_logSet` del teléfono: un valor nulo o
+          // `<= 0` va como `null`, porque un «0 s» o «0 m» afirmaría una
+          // medición que no ocurrió. Las series por reps no llevan ninguno.
+          //
+          // El temporizador sólo marca cuando la cuenta llega a cero, así que
+          // la duración es la prescripta; la distancia es un toque sin valor
+          // editable, así que también es la prescripta.
+          durationSeconds:
+              spec.durationSeconds != null && spec.durationSeconds! > 0
+                  ? spec.durationSeconds
+                  : null,
+          distanceMeters:
+              spec.distanceMeters != null && spec.distanceMeters! > 0
+                  ? spec.distanceMeters
+                  : null,
         ),
         // El historial que el listener ya trajo. Sin esto, cada serie
         // releería la colección entera. Ver `addSetLogFromWatch`.

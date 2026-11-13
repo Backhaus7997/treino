@@ -65,6 +65,8 @@ import '../../shell/responsive.dart' as rsp;
 import '../../widgets/create_custom_exercise_dialog.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import '../../widgets/exercise_picker_dialog.dart';
+import '../../../infrastructure/before_unload_guard.dart';
+import 'routine_editor_exit_guard.dart';
 import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
 
@@ -322,6 +324,27 @@ class _RoutineEditorWebScreenState
   bool _submitting = false;
   bool _publishing = false;
   bool _isDirty = false;
+
+  /// Cuenta cada edición. Un guardado se anota la que tenía al armar el
+  /// documento: si al volver el `await` sigue igual, el formulario ES lo
+  /// guardado; si subió, el PF siguió tipeando mientras se escribía y eso
+  /// todavía no está en ningún lado.
+  int _ediciones = 0;
+
+  /// El PF ya contestó «Descartar» y la salida está en marcha. La ruta
+  /// pregunta de nuevo en su `onExit`; sin esta marca el diálogo salía dos
+  /// veces seguidas.
+  bool _salidaConfirmada = false;
+
+  /// Hay un diálogo de descartar abierto. Un segundo intento de salir mientras
+  /// tanto (Atrás del navegador con el diálogo en pantalla) no apila otro.
+  bool _preguntandoSalida = false;
+
+  late final RoutineEditorExitGuard _exitGuard;
+
+  /// El aviso del navegador para recargar o cerrar la pestaña. Se prende con la
+  /// primera edición y se apaga al guardar o al irse de la pantalla.
+  late final BeforeUnloadGuard _beforeUnload;
   String? _errorMessage;
 
   /// True cuando [_errorMessage] describe una DENEGACIÓN de permiso y no un
@@ -368,6 +391,19 @@ class _RoutineEditorWebScreenState
   /// The routine being edited (its identity fields are preserved on save).
   Routine? _loadedRoutine;
 
+  /// La rutina que ESTA pantalla creó, si ya creó una (#1733).
+  ///
+  /// El primer guardado de un editor nuevo hace un `create`; si el PF se queda
+  /// en la pantalla y guarda otra vez, ese segundo guardado tiene que
+  /// ACTUALIZAR el mismo documento. Sin esto vuelve a la rama de creación y
+  /// deja dos rutinas iguales. Se anota apenas vuelve el `create`, antes de que
+  /// cualquier otra cosa pueda fallar.
+  Routine? _creada;
+
+  /// Hay un documento detrás de este formulario: se cargó uno (modo edición) o
+  /// esta pantalla lo acaba de crear.
+  bool get _yaExiste => _isEditing || _creada != null;
+
   /// True while the existing routine is being fetched (edit mode only).
   bool _loading = false;
 
@@ -378,6 +414,9 @@ class _RoutineEditorWebScreenState
   @override
   void initState() {
     super.initState();
+    _exitGuard = ref.read(routineEditorExitGuardProvider)
+      ..registrar(this, _confirmarSalida);
+    _beforeUnload = ref.read(beforeUnloadGuardProvider);
     if (_isEditing) {
       _loading = true;
       _load();
@@ -546,6 +585,12 @@ class _RoutineEditorWebScreenState
   /// desmontado y `ScaffoldMessenger.of` explota.
   ScaffoldMessengerState? _messenger;
 
+  /// `true` cuando esta pantalla dejó un aviso PARA que se lea al salir
+  /// (hoy: dónde quedó la copia, [_avisarCopiaGuardada]). `dispose` no lo
+  /// limpia: se muestra justo antes de cerrar y es lo único que le dice al PF
+  /// qué pasó, en la pantalla de atrás.
+  bool _avisoDeSalida = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -558,7 +603,16 @@ class _RoutineEditorWebScreenState
     // en el `ScaffoldMessenger` de la app y no en la ruta, así que sin esto
     // «sale de la Semana 3 · Deshacer» te seguía hasta Chat — y su Deshacer
     // apuntaba a un editor que ya no existe.
-    _messenger?.clearSnackBars();
+    //
+    // Salvo el que se dejó A PROPÓSITO para la pantalla de atrás: el aviso de
+    // «Se guardó la copia» se muestra antes de salir y este `dispose` corre
+    // cuando la ruta ya se fue, así que lo borraba a los pocos cientos de ms,
+    // con el PF todavía leyéndolo. Al ser el último aviso mostrado, reemplazó
+    // al que hubiera (`showTreinoToast` cierra el visible): no queda ninguno
+    // del editor atrás.
+    if (!_avisoDeSalida) _messenger?.clearSnackBars();
+    _exitGuard.soltar(this);
+    _beforeUnload.disarm();
     _nameCtrl.dispose();
     _splitCtrl.dispose();
     _summaryCtrl.dispose();
@@ -803,8 +857,12 @@ class _RoutineEditorWebScreenState
   // The publication control depends on dirty state, so the first edit must
   // rebuild even when it came from a plain TextField.onChanged.
   void _markDirty() {
+    _ediciones++;
     if (_isDirty) return;
     setState(() => _isDirty = true);
+    // Recargar o cerrar la pestaña no pasa por el router: sólo el navegador
+    // puede preguntar, y sólo si se lo pedimos ANTES.
+    _beforeUnload.arm();
   }
 
   Future<void> _onTogglePublished() async {
@@ -2275,6 +2333,7 @@ class _RoutineEditorWebScreenState
       _errorIsDenial = false;
     });
 
+    final edicionesAlGuardar = _ediciones;
     final days = _days.map((d) {
       // supersetGroup ids are derived per day from the linkedToNext flags, over
       // the exercise-bearing slots only (the ones that become RoutineDay.slots).
@@ -2353,13 +2412,17 @@ class _RoutineEditorWebScreenState
         // O sea: el aviso, que es cosmético, se llevaría puesto el refresco,
         // que no lo es.
         copiaGuardada = copia.name;
-      } else if (_isEditing) {
+      } else if (_yaExiste) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
         // createdAt, …). updateTemplate/updateAssigned each write only
         // name/split/level/days/numWeeks/summary — `days` is rebuilt from a
         // form that models 100% of RoutineSlot's schema, so nothing is lost on
         // re-save (Fase 4c).
-        final draft = _loadedRoutine!.copyWith(
+        //
+        // `_creada` cuando el documento lo creó esta misma pantalla: el
+        // segundo guardado de un editor nuevo actualiza ese id (#1733).
+        final base = _loadedRoutine ?? _creada!;
+        final draft = base.copyWith(
           name: _nameCtrl.text.trim(),
           split: _splitCtrl.text.trim(),
           level: _level,
@@ -2369,7 +2432,7 @@ class _RoutineEditorWebScreenState
           // Sólo la plantilla los edita. En un plan asignado se conservan los
           // del doc cargado —`_goals` se hidrató de ahí y el selector no se
           // muestra—, y `updateAssigned` ni siquiera los manda.
-          goals: widget.isTemplate ? _goalsOrdered : _loadedRoutine!.goals,
+          goals: widget.isTemplate ? _goalsOrdered : base.goals,
         );
         if (widget.isTemplate) {
           await repo.updateTemplate(uid: trainerUid, draft: draft);
@@ -2397,7 +2460,7 @@ class _RoutineEditorWebScreenState
           assignedBy: trainerUid,
           visibility: RoutineVisibility.private,
         );
-        await repo.createTemplate(template);
+        _creada = await repo.createTemplate(template);
         analytics.logRoutineCreated(
           source: analyticsSource,
           daysCount: days.length,
@@ -2441,13 +2504,27 @@ class _RoutineEditorWebScreenState
           // assignTemplateToAthlete.
           visibility: RoutineVisibility.private,
         );
-        await repo.createAssigned(routine);
+        _creada = await repo.createAssigned(routine);
         analytics.logRoutineCreated(
           source: analyticsSource,
           daysCount: days.length,
           weeksCount: _numWeeks,
         );
       }
+      // El documento YA está escrito: el guardado deja de estar en vuelo, y el
+      // formulario es lo guardado —salvo lo que el PF haya tipeado mientras se
+      // escribía—, o sea que no queda trabajo que perder al salir. Va antes de
+      // todo lo que sigue, que es cosmético y puede fallar sin cambiar esto, y
+      // es lo que deja volver a apretar Guardar si la pantalla sigue.
+      if (mounted) {
+        final limpio = _ediciones == edicionesAlGuardar;
+        setState(() {
+          _submitting = false;
+          if (limpio) _isDirty = false;
+        });
+        if (limpio) _beforeUnload.disarm();
+      }
+
       // La grilla de la sección Rutinas. `routinesAuthoredByProvider` es un
       // `FutureProvider.autoDispose` que esa pantalla WATCHEA, y el editor
       // llega por `context.push`: la ruta de abajo sigue montada, así que el
@@ -2481,7 +2558,6 @@ class _RoutineEditorWebScreenState
       if (copiaGuardada != null && mounted) {
         _avisarCopiaGuardada(copiaGuardada);
       }
-      if (mounted) context.pop();
     } catch (error) {
       if (!mounted) return;
       if (isPermissionDenied(error)) {
@@ -2515,7 +2591,14 @@ class _RoutineEditorWebScreenState
         }
         _errorIsDenial = false;
       });
+      return;
     }
+
+    // FUERA del `try`, a propósito (#1733). Salir toca el router, y el router
+    // puede negarse; si esa excepción cayera en el `catch` de arriba, el PF
+    // leería «No pudimos guardar» sobre una rutina que sí se guardó, y el
+    // reintento la duplicaría.
+    if (mounted) _salir();
   }
 
   /// El servidor rechazó la escritura por permisos.
@@ -2569,7 +2652,7 @@ class _RoutineEditorWebScreenState
             collection: 'routines',
             // Una copia es un CREATE aunque `_isEditing` sea true: se
             // escribe un documento nuevo y el original ni se toca.
-            operation: (_isEditing && modo != _ModoDeGuardado.copia)
+            operation: (_yaExiste && modo != _ModoDeGuardado.copia)
                 ? 'update'
                 : 'create',
             surface: 'routine_editor_web',
@@ -2688,6 +2771,7 @@ class _RoutineEditorWebScreenState
   /// sobrevive al `pop` y se lee en la pantalla de atrás — que es justo donde
   /// el PF va a buscar la copia.
   void _avisarCopiaGuardada(String nombre) {
+    _avisoDeSalida = true;
     showTreinoToast(
       context,
       'Se guardó «$nombre» en tus plantillas. La original quedó como '
@@ -2698,11 +2782,50 @@ class _RoutineEditorWebScreenState
 
   // ── Discard guard ────────────────────────────────────────────────────────
 
-  Future<void> _onBackTap() async {
-    if (!_isDirty) {
+  /// A dónde cae el editor cuando no hay pantalla de atrás: abierto por un link
+  /// directo, un F5 o una pestaña nueva. La lista de la que el editor es el
+  /// detalle: las rutinas del alumno, o la sección Rutinas para una plantilla.
+  String get _rutaDeRespaldo =>
+      widget.isTemplate ? '/rutinas' : '/rutinas/${widget.athleteId}';
+
+  /// Sale del editor.
+  ///
+  /// `pop()` a secas asume que SIEMPRE se llegó empujando, y no es cierto: con
+  /// el editor como única ruta `GoRouterDelegate.pop` tira `GoError('There is
+  /// nothing to pop')` —en release también, no es un `assert`—. Eso hacía que
+  /// «Volver» no hiciera nada y que Guardar mostrara un error sobre una
+  /// rutina ya guardada (#1733). Mismo criterio que `athlete_routines_screen`.
+  void _salir() {
+    if (context.canPop()) {
       context.pop();
-      return;
+    } else {
+      context.go(_rutaDeRespaldo);
     }
+  }
+
+  /// ¿Puede irse el PF? Sin cambios, sí. Con cambios, lo decide él.
+  ///
+  /// Es lo que contestan TODAS las salidas: la flecha, el back del sistema
+  /// ([PopScope]) y la ruta (`onExit`, que ve el sidebar y Atrás del
+  /// navegador, ver [RoutineEditorExitGuard]). Un diálogo, un solo lugar.
+  Future<bool> _confirmarSalida() async {
+    if (!_isDirty || _salidaConfirmada) return true;
+    if (_preguntandoSalida || !mounted) return false;
+    _preguntandoSalida = true;
+    final descartar = await _preguntarDescartar();
+    _preguntandoSalida = false;
+    // La salida que sigue vuelve a pasar por `onExit`: sin la marca preguntaría
+    // otra vez.
+    if (descartar) _salidaConfirmada = true;
+    return descartar;
+  }
+
+  Future<void> _onBackTap() async {
+    if (!await _confirmarSalida() || !mounted) return;
+    _salir();
+  }
+
+  Future<bool> _preguntarDescartar() async {
     final palette = AppPalette.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2737,7 +2860,7 @@ class _RoutineEditorWebScreenState
         ],
       ),
     );
-    if (confirmed == true && mounted) context.pop();
+    return confirmed == true;
   }
 
   // ── Build ────────────────────────────────────────────────────────────────

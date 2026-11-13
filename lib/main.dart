@@ -201,8 +201,13 @@ Future<void> main() async {
     // preferencias, que recién se resuelven en esta línea.
     //
     // El default sigue siendo habilitado — ver `analyticsConsentFromPrefs`.
-    await FirebaseAnalytics.instance
-        .setAnalyticsCollectionEnabled(analyticsConsentFromPrefs(prefs));
+    //
+    // Con `USE_EMULATOR` queda apagada: Analytics no tiene emulador y sus
+    // eventos salen al proyecto real, que es producción (#1698). Ver
+    // `analyticsEfectiva`.
+    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(
+      analyticsEfectiva(analyticsConsentFromPrefs(prefs)),
+    );
 
     runApp(
       ProviderScope(
@@ -213,10 +218,34 @@ Future<void> main() async {
         child: const TreinoApp(),
       ),
     );
-  }, (error, stack) {
-    // Cualquier async uncaught dentro del zone cae acá.
-    if (!kIsWeb) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    }
-  });
+  }, manejarErrorNoCapturado);
+}
+
+/// Qué hace el `runZonedGuarded` de [main] con un error async no capturado.
+///
+/// En mobile va a Crashlytics como FATAL. En web se IMPRIME: Crashlytics no
+/// soporta web (`firebase_crashlytics` declara sólo android, ios y macos), y
+/// antes el handler era un `if (!kIsWeb)` sin `else`, o sea que el error se
+/// descartaba sin dejar rastro —ni en la consola del navegador— (QA E2E
+/// 2026-11-06, #1698). `debugPrint` sale por `console.log` y sobrevive al
+/// build de release; `dart:developer` no (en web `log()` es un no-op), por eso
+/// `reportNonFatal` hace lo mismo. Nunca se traga un error en silencio.
+///
+/// [web] y [registrarFatal] existen para probarla sin Firebase ni navegador.
+@visibleForTesting
+void manejarErrorNoCapturado(
+  Object error,
+  StackTrace stack, {
+  bool web = kIsWeb,
+  void Function(Object error, StackTrace stack)? registrarFatal,
+}) {
+  if (web) {
+    debugPrint('[uncaught] $error\n$stack');
+    return;
+  }
+  (registrarFatal ??
+      (e, s) => FirebaseCrashlytics.instance.recordError(e, s, fatal: true))(
+    error,
+    stack,
+  );
 }

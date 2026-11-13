@@ -223,6 +223,45 @@ service cloud.firestore {
       return u != null && u.data.get('acceptingAthletes', true) == true;
     }
 
+    // ¿El PF que escribe tiene un vínculo VIVO (active o paused) con este
+    // alumno? (#1806). Cierra el residuo de AD-1 opción b: con sólo el rol,
+    // un PF sin vínculo le cargaba pagos, mediciones o turnos al alumno de
+    // otro PF con sólo conocer su uid.
+    //
+    // `trainer_links` tiene ids autogenerados y las reglas no hacen queries,
+    // así que se lee `trainer_athlete_pairs/{pf}_{alumno}`: la conclusión de
+    // esa query, que escribe SÓLO la CF `syncTrainerAthletePair` releyendo
+    // todos los vínculos del par. `session_shares` no sirve: guarda un solo
+    // PF, se borra al pausar y lo escribe el propio alumno.
+    //
+    // KILL-SWITCH `app_config/trainer_pairs_gate.enabled`: AUSENTE ⇒ NO SE
+    // APLICA, el patrón de `paywallEnforcedFor`. Las reglas se pueden
+    // desplegar antes que el backfill sin cortarle nada a nadie; se prende
+    // con el flag cuando todos los pares vivos tienen su doc. Apagarlo vuelve
+    // al gate de sólo rol sin redeploy.
+    //
+    // Sólo se usa en los CREATE (y en recuperar un plan asignado): marcar
+    // pagado un cobro viejo, corregir una medición propia o cancelar un turno
+    // de un ex-alumno siguen siendo del PF que los escribió.
+    //
+    // Costo: con el flag apagado UNA lectura (el flag); prendido, dos. Va
+    // ÚLTIMO en cada cláusula, después de las guardas baratas. Los ids
+    // también se comparan contra el doc: un uid con `_` podría armar el id de
+    // otro par.
+    function pfConParVivo(athleteId) {
+      let gate = get(/databases/$(database)/documents/app_config/trainer_pairs_gate);
+      return gate == null
+             || gate.data.get('enabled', false) != true
+             || parVivo(request.auth.uid, athleteId);
+    }
+    function parVivo(trainerId, athleteId) {
+      let par = get(/databases/$(database)/documents/trainer_athlete_pairs/$(trainerId + '_' + athleteId));
+      return par != null
+             && par.data.get('live', false) == true
+             && par.data.get('trainerId', '') == trainerId
+             && par.data.get('athleteId', '') == athleteId;
+    }
+
     // Edad mínima de cuenta — ver `ProfileSetupValidators.kMinAgeYears` y
     // `docs/legal/terminos-y-condiciones.md`.
     //
@@ -1509,7 +1548,15 @@ service cloud.firestore {
                     && request.resource.data.status in ['active', 'archived']
                     && (resource.data.source != 'trainer-template'
                         || resource.data.get('status', 'active') != 'archived'
-                        || templateQuotaOk(request.auth.uid));
+                        || templateQuotaOk(request.auth.uid))
+                    // Recuperar un plan ASIGNADO exige el par vivo (#1723,
+                    // #1806): sin esto un ex-PF desarchivaba el plan de un
+                    // ex-alumno y le volvía a aparecer en Entrenar. La CF
+                    // `archiveOrphanAssignedPlanOnCreate` cubre sólo el create.
+                    // Archivar no pide nada: es la salida, no la entrada.
+                    && (resource.data.source != 'trainer-assigned'
+                        || resource.data.get('status', 'active') != 'archived'
+                        || pfConParVivo(resource.data.assignedTo));
 
       // DELETE (narrow): the owning trainer may delete their OWN
       // `trainer-template` docs (library cleanup) and `trainer-assigned`
@@ -1814,6 +1861,48 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gymId == authorGymId;
       }
 
+      // ── Autoría denormalizada del post (#1698) ────────────────────────────
+      //
+      // Un post lleva el gym, el nombre y el avatar de su autor, y el feed del
+      // gym se arma por `authorGymId`. El create sólo pedía `authorUid ==
+      // auth.uid`, así que cualquiera plantaba un post `privacy: 'gym'` con el
+      // `authorGymId` de OTRO gym y un nombre ajeno, y aparecía en el feed de
+      // ese gym con esa identidad. El `update` ya pineaba estos campos como
+      // inmutables; el create era la mitad que faltaba.
+      //
+      // Se pinean contra `users/{uid}` del propio autor, que es de donde el
+      // cliente los saca (`userProfileProvider`) y donde `PostRepository.create`
+      // los relee antes de escribir. Fallan CERRADO: sin doc de usuario no hay
+      // identidad que probar.
+      //
+      //  · gym: ninguno, o el que el autor tiene guardado (el sentinel
+      //    'no-gym' también, si es lo que guarda: `postSameGym` no lo matchea).
+      //  · nombre: el guardado; si el usuario no tiene nombre, los dos
+      //    fallbacks que manda el cliente ('Anónimo' del composer, '' de
+      //    compartir un entreno).
+      //  · avatar: el guardado (null y ausente son lo mismo, como en todo el
+      //    archivo).
+      //
+      // ⚠️ ALCANCE, dicho derecho: `users/{uid}.gymId` lo declara el propio
+      // usuario —en el sistema no existe autoridad de pertenencia a un gym
+      // (ver `userPublicProfiles`, AD-4)—. Esto cierra "postear en un gym que
+      // NO es el tuyo", no "postear en un gym al que no vas": quien se declara
+      // en el gym B antes de postear sigue entrando a su feed.
+      function postNombreOk(nombre, real) {
+        return (real is string && real != '')
+            ? nombre == real
+            : (nombre == '' || nombre == 'Anónimo');
+      }
+
+      function postAutorOk(d) {
+        let u = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        return u != null
+            && (d.get('authorGymId', null) == null
+                || d.authorGymId == u.data.get('gymId', null))
+            && postNombreOk(d.get('authorDisplayName', ''), u.data.get('displayName', null))
+            && d.get('authorAvatarUrl', null) == u.data.get('avatarUrl', null);
+      }
+
       allow read: if request.auth != null
                   && (
                     resource == null
@@ -1858,7 +1947,9 @@ service cloud.firestore {
                     && (request.resource.data.get('workoutSnapshot', null) == null
                         || (request.resource.data.workoutSnapshot is map
                             && request.resource.data.workoutSnapshot.get('exercises', null) is list
-                            && request.resource.data.workoutSnapshot.exercises.size() <= 30));
+                            && request.resource.data.workoutSnapshot.exercises.size() <= 30))
+                    // Va ÚLTIMO: es la única cláusula que paga una lectura.
+                    && postAutorOk(request.resource.data);
 
       // Update: only the original author, mismos bounds de shape que create —
       // sin esto el hardening del create es cosmético (el dueño podría inflar
@@ -2019,6 +2110,75 @@ service cloud.firestore {
       // sin poder esconder campos sueltos.
       allow read: if request.auth != null;
 
+      // ── rachaSemanas: acotada, no forjable (#1698) ───────────────────────
+      //
+      // `rachaSemanas` ordena el ranking de racha del gym, y la escribe el
+      // CLIENTE: `SessionRepository.finish` la recalcula desde las sesiones y
+      // `UserPublicProfileRepository.updateCounters` la guarda con el sello
+      // `rachaSemanasUpdatedAt`. No hay CF que la derive, así que estas reglas
+      // no pueden hacerla "sólo del servidor" —como `lifetimeVolumeKg`— sin
+      // portar la racha y la rutina activa a una función. Lo que SÍ pueden es
+      // acotar cuánto puede subir de una escritura a la otra. Antes de esto
+      // `{rachaSemanas: 9999}` por REST pasaba: el dueño se coronaba solo.
+      //
+      // EL TECHO: una racha honesta sólo crece una semana por semana, así que
+      // lo máximo que el dueño puede dejar escrito es el valor guardado MÁS
+      // una semana por cada semana ART transcurrida desde el sello (una sola
+      // si nunca hubo sello: un doc sembrado en 0 por seed_racha_semanas.js).
+      // BAJAR es libre —una racha cortada reescribe 1 o 0—. Con "una semana
+      // por semana" quedan cubiertos los casos honestos de salto: las
+      // escrituras perdidas (app matada antes del ACK, sesiones del reloj que
+      // no pasan por `finish`) suman las semanas que se saltearon.
+      //
+      // EL SELLO: sólo `request.time` (el `serverTimestamp()` que ya manda el
+      // cliente) o el que ya estaba. Sin esto el techo no vale nada: con un
+      // sello en el pasado el dueño reabriría el cupo, y con uno en el futuro
+      // la racha nunca decae en lectura (`effectiveRachaSemanas`). Tampoco se
+      // puede sacar. Y una SUBA exige renovar el sello en la MISMA escritura:
+      // si no, el mismo cupo se reusa en cada escritura.
+      //
+      // QUÉ NO CIERRA, escrito porque es real: un dueño que no entrena puede
+      // seguir sumando 1 por semana a mano, y `sessions` es de su propiedad,
+      // así que tampoco una CF que la derive sería a prueba de un cliente
+      // hostil. Lo que se cierra es el salto instantáneo —de 0 a 9999— y el
+      // sello inmortal. Cerrar del todo es la CF: ver el PR de #1698.
+      //
+      // Semana = lunes–domingo en ART (UTC-3 fijo, sin DST), igual que
+      // `mondayOfWeekArt` (Dart) y `weekly-streak.ts`. 356400000 es el lunes
+      // 1970-01-05 00:00 ART en ms desde epoch; 604800000 es una semana.
+      function artWeekIndex(ts) {
+        return math.floor((ts.toMillis() - 356400000) / 604800000);
+      }
+
+      // Valor que dejó la última escritura. Lo no numérico (doc legacy mal
+      // tipado) cuenta como 0: no se puede apoyar un techo en basura.
+      function rachaGuardada(prior) {
+        let v = prior.get('rachaSemanas', 0);
+        return v is number ? v : 0;
+      }
+
+      // Techo de lo que el dueño puede escribir sobre `prior`. Un sello
+      // futuro da semanas negativas: cupo 0, no negativo.
+      function rachaTopeDelDueno(prior) {
+        let sello = prior.get('rachaSemanasUpdatedAt', null);
+        let semanas = sello is timestamp
+          ? artWeekIndex(request.time) - artWeekIndex(sello)
+          : 1;
+        return rachaGuardada(prior) + (semanas > 0 ? semanas : 0);
+      }
+
+      // El disyunto `unchanged` es el del #849: un valor que no cambia no paga
+      // el techo, así un doc que ya arrastra una racha legacy inflada se puede
+      // seguir editando (la custodia está en que el valor que CAMBIA paga todo).
+      function rachaSemanasOk(d, prior) {
+        return unchanged(d, prior, 'rachaSemanas')
+            || (d.rachaSemanas is int
+                && d.rachaSemanas >= 0
+                && d.rachaSemanas <= rachaTopeDelDueno(prior)
+                && (d.rachaSemanas <= rachaGuardada(prior)
+                    || d.get('rachaSemanasUpdatedAt', null) == request.time));
+      }
+
       // Only the owner can create their own doc; uid in body must match doc
       // id. Field allowlist applies from create onward. gymId, when
       // present, must match the athlete's own private gymId (AD-4). The 4
@@ -2066,11 +2226,19 @@ service cloud.firestore {
                     // Admin SDK). Un create no puede ocultarse solo: ausente
                     // o `false`, igual que en trainerPublicProfiles.
                     && request.resource.data.get('hiddenFromDiscovery', false) == false
+                    // Contadores de follow (#1835): los escribe SÓLO la CF
+                    // `maintainFollowCounters`. Un create no los siembra:
+                    // ausentes, null (el toJson del modelo) o 0.
+                    && request.resource.data.get('followersCount', 0) in [null, 0]
+                    && request.resource.data.get('followingCount', 0) in [null, 0]
                     // Sello de frescura de `rachaSemanas`, siempre derivado
                     // por UserPublicProfileRepository.updateCounters (server
-                    // timestamp) — timestamp cuando está presente.
-                    && (!('rachaSemanasUpdatedAt' in request.resource.data)
-                        || request.resource.data.rachaSemanasUpdatedAt is timestamp)
+                    // timestamp): ausente, o el `request.time`. Un create no
+                    // puede sembrar una racha (#1698): ausente, null o 0.
+                    && (request.resource.data.get('rachaSemanasUpdatedAt', null) == null
+                        || request.resource.data.rachaSemanasUpdatedAt == request.time)
+                    && (request.resource.data.get('rachaSemanas', null) == null
+                        || request.resource.data.rachaSemanas == 0)
                     // #552: freshness stamp for `racha`, always derived by
                     // UserPublicProfileRepository.updateCounters (server
                     // timestamp) — timestamp when present.
@@ -2138,14 +2306,24 @@ service cloud.firestore {
                     // Tiene que estar en el hasOnly de arriba: si no, una
                     // cuenta oculta no podría actualizar más su perfil.
                     && unchanged(request.resource.data, resource.data, 'hiddenFromDiscovery')
-                    // Sello de frescura de `rachaSemanas` — timestamp cuando
-                    // está presente. El disyunto `unchanged` es el del #849:
-                    // sin él, el chequeo de TIPO valida el DOCUMENTO y no la
-                    // escritura, y un doc con el campo mal tipado no se puede
-                    // actualizar nunca más.
-                    && (!('rachaSemanasUpdatedAt' in request.resource.data)
-                        || unchanged(request.resource.data, resource.data, 'rachaSemanasUpdatedAt')
-                        || request.resource.data.rachaSemanasUpdatedAt is timestamp)
+                    // followersCount / followingCount (#1835): los mantiene
+                    // SÓLO `maintainFollowCounters` (Admin SDK) desde #315, y
+                    // ningún camino del cliente los escribe. Hasta acá estaban
+                    // en el hasOnly sin validar valor: el dueño se ponía
+                    // 999999 seguidores. Mismo trato que los rangos: sólo
+                    // re-presentar lo guardado, que es lo que trae el merge.
+                    && unchanged(request.resource.data, resource.data, 'followersCount')
+                    && unchanged(request.resource.data, resource.data, 'followingCount')
+                    // Sello de frescura de `rachaSemanas` — el que ya estaba o el
+                    // del servidor (`request.time`), nunca uno elegido por el
+                    // dueño, y tampoco se puede sacar (#1698). El disyunto
+                    // `unchanged` es el del #849: sin él, el chequeo de TIPO
+                    // valida el DOCUMENTO y no la escritura, y un doc con el
+                    // campo mal tipado no se puede actualizar nunca más.
+                    && (unchanged(request.resource.data, resource.data, 'rachaSemanasUpdatedAt')
+                        || request.resource.data.get('rachaSemanasUpdatedAt', null) == request.time)
+                    // El valor, acotado: ver `rachaTopeDelDueno` (#1698).
+                    && rachaSemanasOk(request.resource.data, resource.data)
                     // #552: freshness stamp for `racha` — timestamp when
                     // present (always serverTimestamp() derived in
                     // UserPublicProfileRepository.updateCounters).
@@ -2948,9 +3126,13 @@ service cloud.firestore {
       //   decorativo, que es exactamente lo que este bloque prohíbe.
       //
       // MARCA INMUTABLE: `kind` queda pineado en el `update` de abajo, igual
-      // que `linkId`. Sin eso, (a) un chat social se convertiría en consulta
-      // con un update de una línea, saltándose el gate de follow, y (b) una
-      // consulta podría escalar a chat de Coach agregándose un `linkId`.
+      // que `linkId`. Ya NO cuida un permiso de escritura: desde el
+      // 2026-10-21 (REQ-FOLLOW-012) `senderMayPost` no mira el follow, ni
+      // `kind`, ni `linkId` (en un chat existente escriben los dos miembros;
+      // sólo cortan un bloqueo o `closedAt`), y `kind` lo lee únicamente esta
+      // rama, al CREAR. Lo que cuida es que la marca diga la verdad: un chat
+      // social no se rotula consulta con un update de una línea, y una
+      // consulta no escala a chat de Coach (eso lo corta el pin de `linkId`).
       //
       // PRESUPUESTO DE LLAMADAS: la rama nueva cuesta 3 (1 exists + 2 get) y
       // sólo se evalúa ella, así que el peor caso de `chats/create` sigue
@@ -4075,8 +4257,8 @@ service cloud.firestore {
       // an arbitrary victim athlete. The gate applies ONLY to the trainer
       // disjunct — the legacy athlete self-book disjunct (`athleteId ==
       // auth.uid`) is UNCHANGED, preserving that live path (regression-
-      // tested: SCENARIO-CC-08). Role-check only, NOT a trainer_links
-      // relationship check — see design.md AD-1 / engram obs #413.
+      // tested: SCENARIO-CC-08). Role-check only at the time (AD-1); since
+      // #1806 the trainer disjunct ALSO needs a live pair (`pfConParVivo`).
       //
       // QA-SEC-014 (#781) — el create no validaba NADA del documento: sin
       // `keys().hasOnly()`, sin cap en ningún campo de texto, sin rango en
@@ -4092,8 +4274,8 @@ service cloud.firestore {
       // <5000, `nutrition_plans` <200, `payments` <=200, `measurements`
       // <=2000). Era un olvido, no una decisión.
       //
-      // El auto-booking NO se toca (Slice C lo dejó explícitamente intacto) ni
-      // se exige `trainer_links`: eso es cambio de producto. Acá sólo se acota
+      // El auto-booking NO se toca (Slice C lo dejó explícitamente intacto); el
+      // vínculo del PF lo pide `pfConParVivo` (#1806). Acá sólo se acota
       // QUÉ se puede meter adentro del documento.
       //
       // ⚠️ `startsAt` es **wall-clock UTC**, no un instante real (ADR-7,
@@ -4120,7 +4302,8 @@ service cloud.firestore {
                     && appointmentShapeOk(request.resource.data)
                     && (request.resource.data.athleteId == request.auth.uid
                         || (request.resource.data.trainerId == request.auth.uid
-                            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'));
+                            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                            && pfConParVivo(request.resource.data.athleteId)));  // #1806
       // Update: DOS caminos válidos — cancelación por un miembro (Path 1) y
       // edición del PF sobre su propio turno (Path 2). Eran tres.
       //
@@ -4656,8 +4839,9 @@ service cloud.firestore {
                     && (
                          // Athlete-self branch: may log ONLY about themselves.
                          request.resource.data.athleteId == request.auth.uid
-                         // Trainer branch (unchanged from rules-hardening Slice C).
-                         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                         // Trainer branch: rol (Slice C) + par vivo (#1806).
+                         || (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                             && pfConParVivo(request.resource.data.athleteId))
                        );
       allow update: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid
@@ -4764,14 +4948,14 @@ service cloud.firestore {
       // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
       // Requires Trainer Role: closes the "any athlete-role user forges a
       // performance_test naming themselves recordedBy" vector. Role-check
-      // only, NOT a trainer_links relationship check — see design.md AD-1 /
-      // engram obs #413.
+      // only at the time (AD-1); since #1806 also a live pair (`pfConParVivo`).
       allow create: if request.auth != null
                     && request.resource.data.recordedBy == request.auth.uid
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.athleteId is string
                     && request.resource.data.athleteId.size() > 0
-                    && performanceTestShapeOk(request.resource.data, {});
+                    && performanceTestShapeOk(request.resource.data, {})
+                    && pfConParVivo(request.resource.data.athleteId);  // #1806
       allow update: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid
                     && request.resource.data.recordedBy == resource.data.recordedBy
@@ -4806,9 +4990,8 @@ service cloud.firestore {
       // COMBINED create+update rule block, so the role gate is scoped to
       // create-only via `resource == null` (create has no prior resource
       // doc) — legit trainer UPDATES to their existing billing config are
-      // unaffected (SCENARIO-CC-06e regression test). Role-check only, NOT
-      // a trainer_links relationship check — see design.md AD-1 / engram
-      // obs #413.
+      // unaffected (SCENARIO-CC-06e regression test). Role-check only at the
+      // time (AD-1); since #1806 the create also needs a live pair.
       // QA-PAY-007 (#447): the combined create+update block is split so each
       // side can validate the money fields at the right strictness.
       //
@@ -4828,7 +5011,8 @@ service cloud.firestore {
                   && request.resource.data.amountArs > 0
                   && request.resource.data.amountArs <= 100000000
                   && request.resource.data.cadence in ['mensual', 'semanal', 'por_sesion', 'suelto']
-                  && request.resource.data.updatedAt is timestamp;
+                  && request.resource.data.updatedAt is timestamp
+                  && pfConParVivo(request.resource.data.athleteId);  // #1806
       // UPDATE — diff-based instead of keys().hasOnly(): setConfig writes via
       // set(merge:true), so request.resource.data is the POST-merge doc. A
       // legacy doc carrying a zombie field (e.g. pre-model monthlyRate) would
@@ -4951,7 +5135,25 @@ service cloud.firestore {
                   // coach-private-collections-rules.test.ts, cuyo fileDoc() es
                   // exactamente ese cliente viejo.
                   && (!request.resource.data.keys().hasAny(['sharedWithAthlete'])
-                      || request.resource.data.sharedWithAthlete is bool);
+                      || request.resource.data.sharedWithAthlete is bool)
+                  // ── ROL (#1698) ──────────────────────────────────────────
+                  //
+                  // Quien crea tiene que ser un PF de verdad. Era la única de
+                  // las colecciones que el PF escribe sobre un alumno y el
+                  // alumno LEE que no pedía rol (las otras cinco lo tienen
+                  // desde rules-hardening Slice C, AD-1 opción b): cualquier
+                  // cuenta —un atleta, un alumno suelto— creaba
+                  // `{trainerId: <ella>, athleteId: <víctima>}` y, como
+                  // `AthleteFileRepository.upload` marca `sharedWithAthlete:
+                  // true` por default, el archivo aparecía en la pantalla de
+                  // Archivos de la víctima (`sharedAthleteFilesProvider`) con
+                  // el `fileName` y el `downloadUrl` que el atacante eligió.
+                  //
+                  // Y desde #1806, además del rol, el par vivo: un PF real sin
+                  // vínculo con la víctima ya no puede (`pfConParVivo`, detrás
+                  // de su kill-switch). Van ÚLTIMOS: son las que pagan lectura.
+                  && tieneRolDePF(request.auth.uid)
+                  && pfConParVivo(request.resource.data.athleteId);
       // ⚠️ ACOPLAMIENTO: este hasOnly debe coincidir exactamente con las keys
       // de AthleteFile.toJson(). Si el modelo suma un campo y esta lista no,
       // todos los updates del flag fallan con permission-denied.
@@ -5036,7 +5238,8 @@ service cloud.firestore {
                   && request.resource.data.title is string
                   && request.resource.data.title.size() < 200
                   && request.resource.data.meals is list
-                  && tieneRolDePF(request.auth.uid);
+                  && tieneRolDePF(request.auth.uid)
+                  && pfConParVivo(request.resource.data.athleteId);  // #1806
       allow update: if request.auth != null
                   && resource.data.trainerId == request.auth.uid
                   && request.resource.data.trainerId == resource.data.trainerId
@@ -5055,9 +5258,10 @@ service cloud.firestore {
                       || request.auth.uid == resource.data.athleteId);
       // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
       // Requires Trainer Role: closes the "any athlete-role user forges a
-      // payment debt naming themselves trainer" vector. Role-check only,
-      // NOT a trainer_links relationship check — see design.md AD-1 /
-      // engram obs #413.
+      // payment debt naming themselves trainer" vector. Role-check only at
+      // the time (AD-1); since #1806 the create also needs a live pair
+      // (`pfConParVivo`). The UPDATE does not: a PF marks an ex-student's
+      // old payment as paid.
       // QA-PAY-007 (#447): create now validates the money fields — before
       // this, a legit-role trainer with a modified client could write
       // amountArs negative/zero/decimal/string (poisoning the totals both
@@ -5097,7 +5301,8 @@ service cloud.firestore {
                       || request.resource.data.paidAt is timestamp)
                   && (request.resource.data.get('dueAt', null) == null
                       || request.resource.data.dueAt is timestamp)
-                  && request.resource.data.get('lastOverdueNotifiedAt', null) == null;
+                  && request.resource.data.get('lastOverdueNotifiedAt', null) == null
+                  && pfConParVivo(request.resource.data.athleteId);  // #1806
       // REQ-VENC-13: tightened update rule — field-level protection.
       // Follows the `reviews` rule pattern (keys().hasOnly + per-field equality).
       // Audited: markPaid/markManyPaid send only {status, paidAt} — still pass.
@@ -5189,8 +5394,9 @@ service cloud.firestore {
     //   create: athlete creates their own review (athleteId == auth.uid);
     //           doc-id must equal `${linkId}_${athleteId}`; the named
     //           trainer_links/{linkId} must exist with athleteId/trainerId
-    //           matching the review payload and status in [active, paused]
-    //           (a terminated link no longer proves a live relationship);
+    //           matching the review payload, and be either live (status in
+    //           [active, paused]) or a REAL relationship that ended
+    //           (terminated with acceptedAt != null, #1840);
     //           rating must be 1..5; comment ≤500 chars.
     //   update: owner only; may change only rating, comment, updatedAt —
     //           preventing id/linkId/athleteId/trainerId/createdAt tampering.
@@ -5203,7 +5409,17 @@ service cloud.firestore {
                     && reviewId == request.resource.data.linkId + '_' + request.resource.data.athleteId
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.athleteId == request.auth.uid
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.trainerId == request.resource.data.trainerId
-                    && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status in ['active', 'paused']
+                    // #1840: también un vínculo TERMINADO que fue real. Al
+                    // terminar, la app le ofrece la reseña al alumno, y ahí el
+                    // vínculo ya es `terminated`: exigir `active|paused`
+                    // la denegaba siempre. `acceptedAt` distingue un vínculo
+                    // que existió de un pedido rechazado o cancelado (el
+                    // criterio de `clasificar` en cleanup_rejected_links.js):
+                    // quien nunca entrenó con el PF sigue sin poder reseñarlo.
+                    // Una reseña por vínculo, como siempre: el id lo fija.
+                    && (get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status in ['active', 'paused']
+                        || (get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status == 'terminated'
+                            && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.get('acceptedAt', null) != null))
                     // notBlocked() (change `moderacion-reporte-y-bloqueo`).
                     && notBlocked(request.auth.uid, request.resource.data.trainerId)
                     && request.resource.data.rating >= 1
@@ -5362,6 +5578,24 @@ service cloud.firestore {
     // escribirlo es plantarse un código propio y marcarse verificado sin abrir
     // el mail. Cerrado entero: lo usa solo la Cloud Function.
     match /verificaciones_de_mail/{uid} {
+      allow read, write: if false;
+    }
+    // Par PF-alumno (#1806): `{trainerId, athleteId, live, status, updatedAt}`,
+    // id `{trainerId}_{athleteId}`. Lo escribe SÓLO la CF
+    // `syncTrainerAthletePair` (y el backfill), con el Admin SDK. Lo leen los
+    // dos miembros; nadie lo escribe desde un cliente, porque es lo que
+    // `pfConParVivo` usa para autorizar. `resource == null` deniega: no hay
+    // lectura de un par ajeno ni oráculo de existencia.
+    match /trainer_athlete_pairs/{pairId} {
+      allow get: if request.auth != null
+                 && resource != null
+                 && request.auth.uid in [resource.data.trainerId, resource.data.athleteId];
+      allow list, write: if false;
+    }
+    // Kill-switch de `pfConParVivo`: `app_config/trainer_pairs_gate.enabled`.
+    // Ausente ⇒ apagado. Lo prende un humano con el backfill verificado.
+    // Ningún cliente lo lee ni lo escribe: lo consultan las reglas.
+    match /app_config/trainer_pairs_gate {
       allow read, write: if false;
     }
     // El interruptor del gate del mail: `app_config/email_gate`, que prende o

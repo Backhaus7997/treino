@@ -701,6 +701,8 @@ runWorkoutDuration()
 runEffortBroadcast()
 runEffortTimerBroadcast()
 runSetLogWriteTarget()
+runSetLogMetrics()
+runWorkoutSessionDecoding()
 runSetLogDeletion()
 runExerciseCursor()
 runSupersetCursor()
@@ -1068,6 +1070,254 @@ private func runSetLogWriteTarget() {
         ),
         .alreadyThere(docId: "peso-muerto__3__alt"),
         "La identidad logica manda sobre la ruta, tambien para el id alternativo"
+    )
+}
+
+// MARK: - La metrica de una serie por tiempo o por distancia (#1701)
+//
+// Una plancha de 60 s o un trineo de 25 m se escribian como `reps: 0,
+// weightKg: 0`: ni los segundos ni los metros quedaban en ningun lado, y el
+// resumen decia «0 kg». El reloj escribe cada serie con un PATCH SIN
+// `updateMask`, o sea que el documento es exactamente lo que trae el payload.
+//
+// Eso fija dos cosas que se miden acá, sobre el payload y no sobre la red:
+//   - una serie por TIEMPO o DISTANCIA lleva su metrica;
+//   - una serie por REPS conserva las claves de siempre y NINGUNA mas, para
+//     que su documento siga identico al que escribe el telefono.
+
+private func fieldString(
+    _ fields: [String: [String: Any]], _ key: String, _ type: String
+) -> String? {
+    fields[key]?[type] as? String
+}
+
+private func fieldDouble(
+    _ fields: [String: [String: Any]], _ key: String, _ type: String
+) -> Double? {
+    fields[key]?[type] as? Double
+}
+
+private func runSetLogMetrics() {
+    let momento = "2026-11-13T12:00:00Z"
+    let clavesDeSiempre: Set<String> = [
+        "id", "exerciseId", "exerciseName", "setNumber",
+        "reps", "weightKg", "completedAt",
+    ]
+
+    // La regla: lo que no es positivo no se guarda. Con tipos explicitos para
+    // que el generico no tenga que adivinar si el literal es Int o Double.
+    let sinSegundos: Int? = nil
+    let cero: Int = 0
+    let negativo: Int = -5
+    let sesenta: Int = 60
+    check(setLogMetric(sinSegundos) == nil, "Sin duracion no hay nada que guardar")
+    check(setLogMetric(cero) == nil, "Cero segundos afirmaria una medicion que no ocurrio")
+    check(setLogMetric(negativo) == nil, "Una duracion negativa no se guarda")
+    checkEqual(setLogMetric(sesenta), Optional(60), "Una duracion positiva se guarda tal cual")
+    let sinMetros: Double? = nil
+    let ceroMetros: Double = 0
+    let metrosNegativos: Double = -1.5
+    let metros: Double = 25.5
+    check(setLogMetric(sinMetros) == nil, "Sin distancia no hay nada que guardar")
+    check(setLogMetric(ceroMetros) == nil, "Cero metros afirmaria una medicion que no ocurrio")
+    check(setLogMetric(metrosNegativos) == nil, "Una distancia negativa no se guarda")
+    checkEqual(setLogMetric(metros), Optional(25.5), "Una distancia positiva se guarda tal cual")
+
+    // Una serie por TIEMPO: lleva los segundos, y los campos de siempre.
+    let plancha = setLogFirestoreFields(
+        docId: "plancha__1",
+        exerciseId: "plancha",
+        exerciseName: "Plancha",
+        setNumber: 1,
+        reps: nil,
+        weightKg: nil,
+        completedAtISO: momento,
+        durationSeconds: 60,
+        distanceMeters: nil
+    )
+    checkEqual(
+        fieldString(plancha, "durationSeconds", "integerValue"), "60",
+        "Los segundos viajan como integerValue, que es lo que Dart lee como int"
+    )
+    check(
+        plancha["distanceMeters"] == nil,
+        "Una serie por tiempo no escribe metros: un 0 afirmaria una medicion falsa"
+    )
+    checkEqual(
+        Set(plancha.keys), clavesDeSiempre.union(["durationSeconds"]),
+        "La serie por tiempo lleva las claves de siempre mas los segundos, y nada mas"
+    )
+    checkEqual(
+        fieldString(plancha, "reps", "integerValue"), "0",
+        "Sin reps se sigue escribiendo 0, como antes"
+    )
+    checkEqual(
+        fieldDouble(plancha, "weightKg", "doubleValue"), 0.0,
+        "Sin peso se sigue escribiendo 0.0 (doubleValue), como antes"
+    )
+
+    // Una serie por DISTANCIA: lleva los metros.
+    let trineo = setLogFirestoreFields(
+        docId: "trineo__2",
+        exerciseId: "trineo",
+        exerciseName: "Trineo",
+        setNumber: 2,
+        reps: nil,
+        weightKg: nil,
+        completedAtISO: momento,
+        durationSeconds: nil,
+        distanceMeters: 25
+    )
+    checkEqual(
+        fieldDouble(trineo, "distanceMeters", "doubleValue"), 25.0,
+        "Los metros viajan como doubleValue, que es lo que Dart lee como double"
+    )
+    check(
+        trineo["durationSeconds"] == nil,
+        "Una serie por distancia no escribe segundos"
+    )
+    checkEqual(
+        Set(trineo.keys), clavesDeSiempre.union(["distanceMeters"]),
+        "La serie por distancia lleva las claves de siempre mas los metros, y nada mas"
+    )
+    checkEqual(fieldString(trineo, "setNumber", "integerValue"), "2", "El numero de serie")
+
+    // Una serie por REPS: exactamente el payload de antes de #1701.
+    let press = setLogFirestoreFields(
+        docId: "press__1",
+        exerciseId: "press",
+        exerciseName: "Press banca",
+        setNumber: 1,
+        reps: 10,
+        weightKg: 62.5,
+        completedAtISO: momento,
+        durationSeconds: nil,
+        distanceMeters: nil
+    )
+    checkEqual(
+        Set(press.keys), clavesDeSiempre,
+        "Una serie por reps NO gana claves: su documento sigue identico al del telefono"
+    )
+    checkEqual(fieldString(press, "id", "stringValue"), "press__1", "El id del documento")
+    checkEqual(fieldString(press, "exerciseId", "stringValue"), "press", "El ejercicio")
+    checkEqual(fieldString(press, "exerciseName", "stringValue"), "Press banca", "El nombre")
+    checkEqual(fieldString(press, "reps", "integerValue"), "10", "Las reps")
+    checkEqual(fieldDouble(press, "weightKg", "doubleValue"), 62.5, "El peso")
+    checkEqual(fieldString(press, "completedAt", "timestampValue"), momento, "La fecha, ya formateada")
+
+    // Un cero en la metrica se omite, no se escribe: es la misma regla que en
+    // el telefono, y vale aunque quien arma el payload no haya normalizado.
+    let ceros = setLogFirestoreFields(
+        docId: "raro__1",
+        exerciseId: "raro",
+        exerciseName: "Raro",
+        setNumber: 1,
+        reps: 8,
+        weightKg: 20,
+        completedAtISO: momento,
+        durationSeconds: 0,
+        distanceMeters: 0
+    )
+    checkEqual(
+        Set(ceros.keys), clavesDeSiempre,
+        "Un 0 en la metrica se omite en vez de escribirse como 0 s / 0 m"
+    )
+
+    // El `LoggedSet` que arma el coordinator lleva lo mismo que el payload.
+    let hecha = LoggedSet(
+        exerciseId: "plancha",
+        setNumber: 1,
+        reps: nil,
+        weightKg: nil,
+        completedAt: Date(timeIntervalSinceReferenceDate: 770_000_100),
+        durationSeconds: setLogMetric(sesenta),
+        distanceMeters: setLogMetric(ceroMetros)
+    )
+    checkEqual(hecha.durationSeconds, Optional(60), "El LoggedSet lleva los segundos")
+    check(hecha.distanceMeters == nil, "y un cero de metros queda en nil")
+    check(!hecha.synced && hecha.remoteDocId == nil, "El init sigue dejando synced=false y sin remoteDocId")
+}
+
+// MARK: - El workout-session.json que ya esta en disco sigue leyendose (#1701)
+//
+// `WorkoutSessionStore.load` decodifica con `try?`: si agregar campos a
+// `LoggedSet` rompiera el decode de lo ya guardado, el atleta que actualiza el
+// reloj en medio de un entreno perderia la sesion SIN un solo error. Los
+// `Optional` sintetizados usan `decodeIfPresent`, asi que no deberia pasar; se
+// mide para que un cambio futuro a campos no opcionales no lo rompa en silencio.
+
+private func runWorkoutSessionDecoding() {
+    // Tal cual lo escribia `WorkoutSessionStore.save` antes de #1701: sin las
+    // claves `durationSeconds` ni `distanceMeters`.
+    let anterior = """
+    {"localId":"loc-1","routineId":"r1","routineName":"Fuerza","dayName":"Empuje",\
+    "dayNumber":1,"weekNumber":0,"startedAt":770000000,"remoteId":"rem-1",\
+    "loggedSets":[\
+    {"exerciseId":"press","setNumber":1,"reps":10,"weightKg":60,\
+    "completedAt":770000100,"synced":true,"remoteDocId":"abc"},\
+    {"exerciseId":"sentadilla","setNumber":1,"reps":8,"weightKg":80,\
+    "completedAt":770000200,"synced":false}]}
+    """
+    let viejo = try? JSONDecoder().decode(WorkoutSession.self, from: Data(anterior.utf8))
+    check(viejo != nil, "Un workout-session.json sin los campos nuevos tiene que seguir decodificando")
+    checkEqual(viejo?.loggedSets.count, Optional(2), "Con sus dos series")
+    check(
+        viejo?.loggedSets.first?.durationSeconds == nil
+            && viejo?.loggedSets.first?.distanceMeters == nil,
+        "Las series viejas quedan sin metrica: nil, no 0"
+    )
+    checkEqual(viejo?.loggedSets.first?.remoteDocId, Optional("abc"), "y conservan el id del documento")
+    checkEqual(viejo?.loggedSets.first?.synced, Optional(true), "y su estado de sincronizacion")
+    check(
+        viejo?.pendingSets.count == 1,
+        "La cola de pendientes se conserva: la segunda serie sigue sin subir"
+    )
+
+    // Ida y vuelta con la metrica puesta: sobrevive a un cierre de la app.
+    let conMetrica = WorkoutSession(
+        localId: "loc-2",
+        routineId: "r1",
+        routineName: "Fuerza",
+        dayName: "Mixto",
+        dayNumber: 1,
+        weekNumber: 0,
+        startedAt: Date(timeIntervalSinceReferenceDate: 770_000_000),
+        loggedSets: [
+            LoggedSet(
+                exerciseId: "plancha",
+                setNumber: 1,
+                reps: nil,
+                weightKg: nil,
+                completedAt: Date(timeIntervalSinceReferenceDate: 770_000_100),
+                durationSeconds: 60
+            ),
+            LoggedSet(
+                exerciseId: "trineo",
+                setNumber: 1,
+                reps: nil,
+                weightKg: nil,
+                completedAt: Date(timeIntervalSinceReferenceDate: 770_000_200),
+                distanceMeters: 25
+            ),
+        ],
+        remoteId: nil
+    )
+    let datos = try? JSONEncoder().encode(conMetrica)
+    let vuelta = datos.flatMap { try? JSONDecoder().decode(WorkoutSession.self, from: $0) }
+    check(vuelta == conMetrica, "La metrica sobrevive a guardar y volver a leer la sesion")
+
+    // Y una serie por reps no gana claves en disco.
+    let serieDeReps = LoggedSet(
+        exerciseId: "press",
+        setNumber: 1,
+        reps: 10,
+        weightKg: 60,
+        completedAt: Date(timeIntervalSinceReferenceDate: 770_000_100)
+    )
+    let texto = (try? JSONEncoder().encode(serieDeReps)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    check(
+        !texto.isEmpty && !texto.contains("durationSeconds") && !texto.contains("distanceMeters"),
+        "Una serie por reps se guarda en disco sin las claves nuevas"
     )
 }
 

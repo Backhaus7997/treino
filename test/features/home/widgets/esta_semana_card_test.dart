@@ -11,6 +11,10 @@ import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/home/widgets/esta_semana_card.dart';
 import 'package:treino/features/insights/application/insights_providers.dart';
 import 'package:treino/features/insights/domain/weekly_insights.dart';
+import 'package:treino/features/workout/application/exercise_providers.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
+import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -961,6 +965,120 @@ void main() {
       expect(decoration.color, AppPalette.mintMagenta.accent);
       // Y no se coló el CTA de rutinas de la semana en 0.
       expect(find.byType(OutlinedButton), findsNothing);
+    });
+  });
+
+  // ── #1720: el error ofrece una salida ───────────────────────────────────────
+  //
+  // Con la consulta de la semana fallando, la card mostraba el título y «No
+  // pudimos cargar tus insights.» y nada más: ni reintentar ni VER INSIGHTS
+  // (#1707 agregó el CTA sólo en el estado sin sesiones).
+  group('EstaSemanaCard — #1720 el error ofrece una salida', () {
+    List<Override> overridesConFallo() => [
+          weeklyInsightsProvider.overrideWith(
+            (_) => Future<WeeklyInsights?>.error(
+              Exception('test error'),
+              StackTrace.empty,
+            ),
+          ),
+        ];
+
+    testWidgets('muestra REINTENTAR y VER INSIGHTS, y no la rama con datos', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_wrapCard(overrides: overridesConFallo()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('No pudimos cargar tus insights.'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+      expect(find.text('VER INSIGHTS  →'), findsOneWidget);
+      expect(find.text('RACHA ACTUAL'), findsNothing);
+      // REINTENTAR va primero: es lo más útil si el fallo fue de red.
+      expect(
+        tester.getTopLeft(find.text('Reintentar')).dy,
+        lessThan(tester.getTopLeft(find.text('VER INSIGHTS  →')).dy),
+      );
+    });
+
+    testWidgets('VER INSIGHTS navega a /home/insights', (tester) async {
+      await tester.pumpWidget(_wrapCard(overrides: overridesConFallo()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.ensureVisible(find.text('VER INSIGHTS  →'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('VER INSIGHTS  →'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Insights'), findsOneWidget);
+    });
+
+    // El caso que trae al usuario acá: el catálogo de ejercicios falló en frío
+    // y `exercisesProvider` (que NO es autoDispose) cachea ese AsyncError.
+    // `weeklyInsightsProvider` envuelve a `athleteWeekInsightsProvider`, que lee
+    // el catálogo, y `ref.invalidate` no cascada: invalidar sólo el provider de
+    // la card, o sólo el de la semana, re-leería el mismo error para siempre.
+    testWidgets('REINTENTAR recarga también el catálogo y la card se recupera',
+        (
+      tester,
+    ) async {
+      var cargasDelCatalogo = 0;
+      await tester.pumpWidget(
+        _wrapCard(
+          overrides: [
+            currentUidProvider.overrideWithValue('uid-1'),
+            exercisesProvider.overrideWith((ref) async {
+              cargasDelCatalogo++;
+              if (cargasDelCatalogo == 1) throw Exception('catálogo offline');
+              return const <Exercise>[];
+            }),
+            athleteWeekInsightsProvider.overrideWith((ref, key) async {
+              await ref.watch(exercisesProvider.future);
+              return _makeInsights();
+            }),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('No pudimos cargar tus insights.'), findsOneWidget);
+      expect(cargasDelCatalogo, 1);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(cargasDelCatalogo, 2, reason: 'el reintento recarga el catálogo');
+      expect(find.text('No pudimos cargar tus insights.'), findsNothing);
+      expect(find.text('RACHA ACTUAL'), findsOneWidget);
+    });
+
+    testWidgets('REINTENTAR sin sesión no rompe ni recarga nada', (
+      tester,
+    ) async {
+      var cargasDelCatalogo = 0;
+      await tester.pumpWidget(
+        _wrapCard(
+          overrides: [
+            ...overridesConFallo(),
+            currentUidProvider.overrideWithValue(null),
+            exercisesProvider.overrideWith((ref) async {
+              cargasDelCatalogo++;
+              return const <Exercise>[];
+            }),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+
+      expect(cargasDelCatalogo, 0);
+      expect(find.text('Reintentar'), findsOneWidget);
     });
   });
 }

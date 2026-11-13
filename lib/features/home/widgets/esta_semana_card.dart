@@ -15,6 +15,8 @@ import '../../../l10n/app_l10n.dart';
 import '../../insights/application/insights_providers.dart';
 import '../../insights/domain/weekly_insights.dart';
 import '../../insights/presentation/widgets/body_silhouette_placeholder.dart';
+import '../../workout/application/session_providers.dart'
+    show currentUidProvider;
 
 /// ISO 8601 week number for [date] (1..53).
 ///
@@ -116,12 +118,17 @@ class _Skeleton extends StatelessWidget {
 }
 
 // ── Error fallback ────────────────────────────────────────────────────────────
+//
+// #1720: antes sólo decía «No pudimos cargar tus insights.» y la card quedaba
+// sin salida (el CTA de #1707 existía sólo en el estado sin sesiones). Ahora
+// ofrece REINTENTAR primero —es lo más útil: si el fallo fue de red, el hub va a
+// fallar igual— y debajo VER INSIGHTS, sin caja como en [_ZeroWeekState].
 
-class _ErrorFallback extends StatelessWidget {
+class _ErrorFallback extends ConsumerWidget {
   const _ErrorFallback();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return Padding(
@@ -143,6 +150,22 @@ class _ErrorFallback extends StatelessWidget {
             l10n.homeEstaSemanaLoadError,
             style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
           ),
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton(
+              // Mismo reintento que el hub: `weeklyInsightsProvider` envuelve a
+              // `athleteWeekInsightsProvider` y `ref.invalidate` no cascada, así
+              // que invalidar sólo el de la card no se recuperaría nunca.
+              onPressed: () {
+                final uid = ref.read(currentUidProvider);
+                if (uid == null) return;
+                retryWeekInsights(ref, uid, mondayOfWeek(argentinaNow()));
+              },
+              child: Text(l10n.coachRetryLabel),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const _InsightsCta(secondary: true),
         ],
       ),
     );

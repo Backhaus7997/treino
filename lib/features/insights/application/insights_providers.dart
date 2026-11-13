@@ -226,6 +226,25 @@ final weeklyInsightsProvider =
   );
 });
 
+/// Reintenta la carga de una semana de Insights (el hub y la card «Esta semana»
+/// de Inicio, que leen el mismo [athleteWeekInsightsProvider]).
+///
+/// QA-498: `ref.invalidate` NO cascada a las dependencias, y [exercisesProvider]
+/// NO es autoDispose — cachea su `AsyncError` para toda la vida del container.
+/// Invalidar solo el provider de la semana lo rebuildeaba, re-leía el MISMO
+/// error cacheado del catálogo y re-renderizaba el mismo estado de error: un
+/// botón de reintentar que no podía recuperar nunca, justo en el caso que trae
+/// al usuario acá (offline / fallo al cargar el catálogo en frío). Mismo
+/// criterio que el `_retry` de MuscleDistributionScreen y
+/// FrequentExercisesScreen (#376).
+///
+/// [weeklyInsightsProvider] (la card) no hace falta invalidarlo: envuelve a este
+/// provider con `ref.watch`, así que se recalcula solo cuando éste se invalida.
+void retryWeekInsights(WidgetRef ref, String uid, DateTime weekStart) {
+  ref.invalidate(exercisesProvider);
+  ref.invalidate(athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)));
+}
+
 // ── Week helpers ──────────────────────────────────────────────────────────────
 
 /// [UX-week-day-selector] Monday 00:00 local of the week containing [now].
