@@ -1729,6 +1729,9 @@ class AppL10nEs extends AppL10n {
   String get dashboardStatCanceladas => 'CANCELADAS';
 
   @override
+  String get dashboardStatAusentes => 'AUSENTES';
+
+  @override
   String get dashboardProximasSesionesSectionLabel => 'PRÓXIMAS SESIONES';
 
   @override
@@ -8055,6 +8058,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get dashboardStatCanceladas => 'CANCELADAS';
+
+  @override
+  String get dashboardStatAusentes => 'AUSENTES';
 
   @override
   String get dashboardProximasSesionesSectionLabel => 'PRÓXIMAS SESIONES';

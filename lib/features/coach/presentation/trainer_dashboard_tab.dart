@@ -1109,8 +1109,14 @@ class _ResumenDelDiaCard extends ConsumerWidget {
     // El hermano _ProximasSesionesList ya distinguía los estados con el mismo
     // provider; esto lo empareja. Loading muestra "—"; error, un mensaje.
     final Widget body = apptAsync.when(
-      loading: () =>
-          _statsRow(context, palette, pending: '—', done: '—', cancelled: '—'),
+      loading: () => _statsRow(
+        context,
+        palette,
+        pending: '—',
+        done: '—',
+        absent: '—',
+        cancelled: '—',
+      ),
       error: (_, __) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Text(
@@ -1133,6 +1139,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
           context,
           palette,
           pending: '${counts.pending}',
+          absent: '${counts.absent}',
           done: '${counts.done}',
           cancelled: cancelledToday == null ? '—' : '${counts.cancelled}',
         );
@@ -1170,6 +1177,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
     AppPalette palette, {
     required String pending,
     required String done,
+    required String absent,
     required String cancelled,
   }) {
     final l10n = AppL10n.of(context);
@@ -1186,6 +1194,16 @@ class _ResumenDelDiaCard extends ConsumerWidget {
           value: done,
           label: l10n.dashboardStatCompletadas,
           color: palette.textPrimary,
+          palette: palette,
+        ),
+        _Divider(palette: palette),
+        // #1737: el alumno faltó. Neutro (textMuted) a propósito: no es un
+        // problema como CANCELADAS ni un logro como COMPLETADAS, y el ámbar de
+        // `warning` no tiene variante legible como texto sobre bgCard claro.
+        _StatColumn(
+          value: absent,
+          label: l10n.dashboardStatAusentes,
+          color: palette.textMuted,
           palette: palette,
         ),
         _Divider(palette: palette),
@@ -1227,13 +1245,20 @@ class _StatColumn extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
-              letterSpacing: 1.2,
-              color: palette.textMuted,
+          // Con 4 columnas cada una queda en ~58 px a 360 de ancho, y
+          // «COMPLETADAS» (11 letras con tracking) no entra siempre: sin
+          // `scaleDown` el label se parte a mitad de palabra.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 10,
+                letterSpacing: 1.2,
+                color: palette.textMuted,
+              ),
             ),
           ),
         ],
@@ -1251,7 +1276,9 @@ class _Divider extends StatelessWidget {
     return Container(
       width: 1,
       height: 36,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
+      // Gutter interno del componente: con 4 columnas (#1737) los 8 de antes
+      // le sacaban ~6 px a cada una y «COMPLETADAS» dejaba de entrar a 360.
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.hairline),
       color: palette.border,
     );
   }

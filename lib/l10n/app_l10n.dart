@@ -3074,6 +3074,12 @@ abstract class AppL10n {
   /// **'CANCELADAS'**
   String get dashboardStatCanceladas;
 
+  /// PF mobile, Inicio → «Resumen del día»: cuántas sesiones de hoy el PF marcó como ausente (el alumno faltó, #1737). Va entre COMPLETADAS y CANCELADAS. Una columna angosta: tiene que quedar en una línea.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AUSENTES'**
+  String get dashboardStatAusentes;
+
   /// No description provided for @dashboardProximasSesionesSectionLabel.
   ///
   /// In es_AR, this message translates to:

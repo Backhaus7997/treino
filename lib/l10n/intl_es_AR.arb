@@ -1257,6 +1257,8 @@
   "dashboardStatPendientes": "PENDIENTES",
   "dashboardStatCompletadas": "COMPLETADAS",
   "dashboardStatCanceladas": "CANCELADAS",
+  "dashboardStatAusentes": "AUSENTES",
+  "@dashboardStatAusentes": {"description": "PF mobile, Inicio → «Resumen del día»: cuántas sesiones de hoy el PF marcó como ausente (el alumno faltó, #1737). Va entre COMPLETADAS y CANCELADAS. Una columna angosta: tiene que quedar en una línea."},
   "dashboardProximasSesionesSectionLabel": "PRÓXIMAS SESIONES",
   "dashboardAgendaTrailingLabel": "Agenda",
   "dashboardEntrenaronHoySectionLabel": "ENTRENARON HOY",
