@@ -704,6 +704,52 @@ void main() {
       expect(find.text('Sin entrenos'), findsOneWidget);
     });
 
+    // #1761 — la vista Cards sólo sabía «¿entrenó hoy?» y decía «—» para quien
+    // había entrenado hace 6 días, mientras la tabla decía «Hace 6 días».
+    testWidgets(
+        'Cards: «Último entreno» dice lo MISMO que la tabla '
+        '(Hoy / Ayer / Hace N días / Sin entrenos)', (tester) async {
+      final ahora = DateTime.now().toUtc();
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a2', TrainerLinkStatus.active),
+          _link('a3', TrainerLinkStatus.active),
+          _link('a4', TrainerLinkStatus.active),
+        ],
+        profiles: [
+          _prof('a1', 'Sofía'),
+          _prof('a2', 'Diego'),
+          _prof('a3', 'Lucía'),
+          _prof('a4', 'Mateo'),
+        ],
+        sessionsInWindowByAthleteId: {
+          'a1': [_sessionAt('a1', ahora)],
+          'a2': [_sessionAt('a2', ahora.subtract(const Duration(days: 1)))],
+          'a3': [_sessionAt('a3', ahora.subtract(const Duration(days: 6)))],
+        },
+      );
+
+      void expectEtiquetas() {
+        expect(find.text('Hoy'), findsOneWidget);
+        expect(find.text('Ayer'), findsOneWidget);
+        expect(find.text('Hace 6 días'), findsOneWidget);
+        expect(find.text('Sin entrenos'), findsOneWidget);
+      }
+
+      // Tabla (vista por defecto).
+      expectEtiquetas();
+
+      await tester.tap(find.text('Cards'));
+      await tester.pumpAndSettle();
+
+      // Cards: las mismas cuatro etiquetas, y ninguna «—» de relleno.
+      expect(find.byType(CoachHubDataTable), findsNothing);
+      expectEtiquetas();
+      expect(find.text('—'), findsNothing);
+    });
+
     testWidgets('terminar abre diálogo y al confirmar llama repo.terminate',
         (tester) async {
       final repo = _MockRepo();
