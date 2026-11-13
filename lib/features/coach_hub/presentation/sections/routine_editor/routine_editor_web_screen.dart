@@ -63,6 +63,7 @@ import '../../shell/responsive.dart' as rsp;
 import '../../widgets/create_custom_exercise_dialog.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import '../../widgets/exercise_picker_dialog.dart';
+import 'routine_editor_exit_guard.dart';
 import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
 
@@ -320,6 +321,23 @@ class _RoutineEditorWebScreenState
   bool _submitting = false;
   bool _publishing = false;
   bool _isDirty = false;
+
+  /// Cuenta cada edición. Un guardado se anota la que tenía al armar el
+  /// documento: si al volver el `await` sigue igual, el formulario ES lo
+  /// guardado; si subió, el PF siguió tipeando mientras se escribía y eso
+  /// todavía no está en ningún lado.
+  int _ediciones = 0;
+
+  /// El PF ya contestó «Descartar» y la salida está en marcha. La ruta
+  /// pregunta de nuevo en su `onExit`; sin esta marca el diálogo salía dos
+  /// veces seguidas.
+  bool _salidaConfirmada = false;
+
+  /// Hay un diálogo de descartar abierto. Un segundo intento de salir mientras
+  /// tanto (Atrás del navegador con el diálogo en pantalla) no apila otro.
+  bool _preguntandoSalida = false;
+
+  late final RoutineEditorExitGuard _exitGuard;
   String? _errorMessage;
 
   /// True cuando [_errorMessage] describe una DENEGACIÓN de permiso y no un
@@ -389,6 +407,8 @@ class _RoutineEditorWebScreenState
   @override
   void initState() {
     super.initState();
+    _exitGuard = ref.read(routineEditorExitGuardProvider)
+      ..registrar(this, _confirmarSalida);
     if (_isEditing) {
       _loading = true;
       _load();
@@ -570,6 +590,7 @@ class _RoutineEditorWebScreenState
     // «sale de la Semana 3 · Deshacer» te seguía hasta Chat — y su Deshacer
     // apuntaba a un editor que ya no existe.
     _messenger?.clearSnackBars();
+    _exitGuard.soltar(this);
     _nameCtrl.dispose();
     _splitCtrl.dispose();
     _summaryCtrl.dispose();
@@ -814,6 +835,7 @@ class _RoutineEditorWebScreenState
   // The publication control depends on dirty state, so the first edit must
   // rebuild even when it came from a plain TextField.onChanged.
   void _markDirty() {
+    _ediciones++;
     if (_isDirty) return;
     setState(() => _isDirty = true);
   }
@@ -2255,6 +2277,7 @@ class _RoutineEditorWebScreenState
       _errorIsDenial = false;
     });
 
+    final edicionesAlGuardar = _ediciones;
     final days = _days.map((d) {
       // supersetGroup ids are derived per day from the linkedToNext flags, over
       // the exercise-bearing slots only (the ones that become RoutineDay.slots).
@@ -2432,10 +2455,17 @@ class _RoutineEditorWebScreenState
           weeksCount: _numWeeks,
         );
       }
-      // El documento YA está escrito: el guardado deja de estar en vuelo. Va
-      // antes de todo lo que sigue, que es cosmético y puede fallar sin cambiar
-      // esto, y es lo que deja volver a apretar Guardar si la pantalla sigue.
-      if (mounted) setState(() => _submitting = false);
+      // El documento YA está escrito: el guardado deja de estar en vuelo, y el
+      // formulario es lo guardado —salvo lo que el PF haya tipeado mientras se
+      // escribía—, o sea que no queda trabajo que perder al salir. Va antes de
+      // todo lo que sigue, que es cosmético y puede fallar sin cambiar esto, y
+      // es lo que deja volver a apretar Guardar si la pantalla sigue.
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          if (_ediciones == edicionesAlGuardar) _isDirty = false;
+        });
+      }
 
       // La grilla de la sección Rutinas. `routinesAuthoredByProvider` es un
       // `FutureProvider.autoDispose` que esa pantalla WATCHEA, y el editor
@@ -2714,11 +2744,29 @@ class _RoutineEditorWebScreenState
     }
   }
 
+  /// ¿Puede irse el PF? Sin cambios, sí. Con cambios, lo decide él.
+  ///
+  /// Es lo que contestan TODAS las salidas: la flecha, el back del sistema
+  /// ([PopScope]) y la ruta (`onExit`, que ve el sidebar y Atrás del
+  /// navegador, ver [RoutineEditorExitGuard]). Un diálogo, un solo lugar.
+  Future<bool> _confirmarSalida() async {
+    if (!_isDirty || _salidaConfirmada) return true;
+    if (_preguntandoSalida || !mounted) return false;
+    _preguntandoSalida = true;
+    final descartar = await _preguntarDescartar();
+    _preguntandoSalida = false;
+    // La salida que sigue vuelve a pasar por `onExit`: sin la marca preguntaría
+    // otra vez.
+    if (descartar) _salidaConfirmada = true;
+    return descartar;
+  }
+
   Future<void> _onBackTap() async {
-    if (!_isDirty) {
-      _salir();
-      return;
-    }
+    if (!await _confirmarSalida() || !mounted) return;
+    _salir();
+  }
+
+  Future<bool> _preguntarDescartar() async {
     final palette = AppPalette.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2753,7 +2801,7 @@ class _RoutineEditorWebScreenState
         ],
       ),
     );
-    if (confirmed == true && mounted) _salir();
+    return confirmed == true;
   }
 
   // ── Build ────────────────────────────────────────────────────────────────
