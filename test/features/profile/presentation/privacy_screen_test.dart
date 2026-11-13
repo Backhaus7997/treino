@@ -19,6 +19,7 @@ import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
+import 'package:treino/features/moderation/application/moderation_providers.dart';
 import 'package:treino/features/profile/application/correos_promocionales_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
@@ -26,6 +27,8 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile/presentation/privacy_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 
 // Pantalla de Privacidad — las DOS tarjetas: analítica (por dispositivo) y
 // correos promocionales (por cuenta, `users/{uid}.notificationPrefs`).
@@ -121,6 +124,7 @@ Future<void> _montar(
   // recordatorios (sólo atleta, falla cerrado) no se dibuja. Es el estado en el
   // que corrían todos los tests anteriores a esa tarjeta.
   Stream<UserProfile?>? perfil,
+  List<Override> extra = const [],
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -139,6 +143,7 @@ Future<void> _montar(
             .overrideWith((_) => auth ?? Stream.value(_MockUser())),
         userRepositoryProvider.overrideWithValue(repo),
         if (perfil != null) userProfileProvider.overrideWith((_) => perfil),
+        ...extra,
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -705,6 +710,37 @@ void main() {
   // de racha no le llegan nunca: un interruptor que apaga algo que no recibe es
   // un control que miente. Falla CERRADO: sin rol conocido, no se dibuja.
   // ──────────────────────────────────────────────────────────────────────────
+  // #1698: la fila abre la lista de bloqueados, para los DOS roles.
+  group('PrivacyScreen — usuarios bloqueados', () {
+    for (final rol in UserRole.values) {
+      testWidgets('un ${rol.name} ve la fila y abre la lista', (tester) async {
+        final repo = _MockUserRepository();
+        when(() => repo.watchCorreosPromocionales(any()))
+            .thenAnswer((_) => Stream.value(true));
+        when(() => repo.watchRecordatoriosEntrenamiento(any()))
+            .thenAnswer((_) => Stream.value(true));
+        await _montar(
+          tester,
+          repo: repo,
+          perfil: Stream<UserProfile?>.value(_perfil(rol)),
+          extra: [
+            currentUidProvider.overrideWith((_) => _uid),
+            blockedUidsProvider(_uid)
+                .overrideWith((_) => Stream.value(const <String>[])),
+          ],
+        );
+
+        const fila = ValueKey('privacy-blocked-users-entry');
+        await tester.ensureVisible(find.byKey(fila));
+        await tester.tap(find.byKey(fila));
+        await tester.pumpAndSettle();
+
+        expect(find.text('USUARIOS BLOQUEADOS'), findsOneWidget);
+        expect(find.text('No bloqueaste a nadie.'), findsOneWidget);
+      });
+    }
+  });
+
   group('PrivacyScreen — recordatorios de entrenamiento, quién la ve', () {
     late _MockUserRepository repo;
 

@@ -2227,6 +2227,10 @@
     }
   },
   "moderationUnblockError": "We couldn't unblock them. Try again.",
+  "blockedUsersTitle": "Blocked users",
+  "blockedUsersExplainer": "People you've blocked can't message you, follow you, or react to your posts. Unblocking doesn't restore follows: if you followed each other, you'll need to follow again.",
+  "blockedUsersEmpty": "You haven't blocked anyone.",
+  "blockedUsersLoadError": "We couldn't load your list. Try again.",
   "moderationBlockedMessage": "That text can't be posted because it breaks the Community Guidelines. Please review it and try again.",
   "@moderationBlockedMessage": {},
   "privacyTitle": "Privacy",
