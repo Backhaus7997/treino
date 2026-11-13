@@ -490,11 +490,13 @@ describe("rules scanner sanity", () => {
   });
 
   it("actually removes the prose mentions that would be false positives", () => {
-    // firestore.rules explains in comments that several rules are role checks
-    // and "NOT a trainer_links relationship check". Unstripped, each of those
-    // sentences would land in the inventory as a phantom clause.
-    expect(RAW_RULES).toContain("NOT a trainer_links relationship check");
-    expect(MODEL.stripped).not.toContain("NOT a trainer_links relationship check");
+    // firestore.rules explains in comments where a rule does NOT read
+    // trainer_links (e.g. `senderMayPost`). Unstripped, each of those
+    // sentences would land in the inventory as a phantom clause. (Was "NOT a
+    // trainer_links relationship check", the role-only comments that #1806
+    // rewrote when those creates started asking for a live pair.)
+    expect(RAW_RULES).toContain("Esta regla NO lee `trainer_links` a propósito");
+    expect(MODEL.stripped).not.toContain("Esta regla NO lee `trainer_links` a propósito");
 
     const count = (text: string): number => (text.match(/trainer_links/g) ?? []).length;
     expect(count(MODEL.stripped)).toBeLessThan(count(RAW_RULES));
