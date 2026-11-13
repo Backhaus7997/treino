@@ -7,6 +7,7 @@
 /// Sección: coach_hub/pagos — contrato: sin Scaffold, sin HEX, es-AR + // i18n.
 library;
 
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart';
 
 // ── Meses en español (es-AR) ──────────────────────────────────────────────────
@@ -46,7 +47,21 @@ String fmtArs(int amount) =>
     '${amount < 0 ? '-' : ''}\$${groupThousands(amount.abs().toString())}';
 
 /// "22 mayo" — día + mes en es-AR. // i18n
-String fmtDayMonth(DateTime d) => '${d.day} ${kMesesLargos[d.month]}';
+///
+/// Es un día de CALENDARIO, y esos se sacan en ART (`argentina_time.dart`).
+/// Un instante UTC (`isUtc`: lo que deja `TimestampConverter`, p.ej. `dueAt`,
+/// que se guarda como «fin del día ART elegido») se corre a ART antes de leer
+/// día y mes: sin eso, un vencimiento del 4 a las 23:59 ART (= 5 a las 02:59
+/// UTC) se mostraba «5 noviembre» (#1773).
+///
+/// Un valor armado con el constructor local (`DateTime(2026, 5, 22)`, como el
+/// de `nextDueDate`) ya es un wall-clock de calendario: se lee tal cual. NO le
+/// pases un valor que ya esté en el marco ART (`toArgentina`/`argentinaNow`,
+/// también `isUtc`): lo correría otra vez.
+String fmtDayMonth(DateTime d) {
+  final art = d.isUtc ? toArgentina(d) : d;
+  return '${art.day} ${kMesesLargos[art.month]}';
+}
 
 /// dd/MM/yyyy — usado en historial de pagos y en otros tabs.
 ///
