@@ -180,6 +180,56 @@ void main() {
     });
   });
 
+  group('SCENARIO-PEND-06 — el «Procesando…» viaja con la solicitud', () {
+    // #1751 — el `_busy` vive en el State del tile; sin key por id, al salir
+    // la fila procesada su State pasaba a la de abajo.
+    testWidgets(
+        'aceptar la primera: la siguiente NO hereda el spinner cuando la '
+        'procesada sale de la lista', (tester) async {
+      final controller = StreamController<List<TrainerLink>>();
+      addTearDown(controller.close);
+      final svc = _MockPromotionService();
+      when(() => svc.accept(any())).thenAnswer((_) async {});
+
+      await _pump(
+        tester,
+        overrides: [
+          trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+          trainerLinkPromotionServiceProvider.overrideWithValue(svc),
+          analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+          userPublicProfileProvider('a1').overrideWith(
+            (ref) => Stream.value(_pub('a1', 'Ana')),
+          ),
+          userPublicProfileProvider('a2').overrideWith(
+            (ref) => Stream.value(_pub('a2', 'Beto')),
+          ),
+        ],
+      );
+      controller.add([
+        _link(id: 'r1', athleteId: 'a1'),
+        _link(id: 'r2', athleteId: 'a2'),
+      ]);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('accept_r1')));
+      await tester.pump();
+      await tester.pump();
+
+      // r1 queda en spinner mientras siga en la lista; r2 conserva sus botones.
+      expect(find.byKey(const Key('accept_r1')), findsNothing);
+      expect(find.byKey(const Key('accept_r2')), findsOneWidget);
+
+      // El stream en vivo saca r1 (ya es alumno): r2 sigue accionable.
+      controller.add([_link(id: 'r2', athleteId: 'a2')]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byKey(const Key('accept_r2')), findsOneWidget);
+      expect(find.byKey(const Key('decline_r2')), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+  });
+
   group('SCENARIO-PEND-04 — error muestra retry', () {
     testWidgets('stream error → mensaje + botón reintentar', (tester) async {
       await _pump(
