@@ -6908,6 +6908,18 @@ abstract class AppL10n {
   /// **'Volumen'**
   String get progressionMetricVolume;
 
+  /// [#1715] Label for the longest-timed-set metric (chip, personal record, session PR) of a timed exercise like a plank.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tiempo máximo'**
+  String get progressionMetricLongestDuration;
+
+  /// [#1715] Label for the longest-distance-set metric (chip, personal record, session PR) of a distance exercise like a farmer's carry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Distancia máxima'**
+  String get progressionMetricLongestDistance;
+
   /// Frecuencia stat label showing session count in the last 8 weeks.
   ///
   /// In es_AR, this message translates to:

@@ -3382,6 +3382,14 @@
   "@progressionMetricVolume": {
     "description": "Label for the Best Session Volume metric chip (Σ reps×weightKg per session) in the progression chart."
   },
+  "progressionMetricLongestDuration": "Tiempo máximo",
+  "@progressionMetricLongestDuration": {
+    "description": "[#1715] Label for the longest-timed-set metric (chip, personal record, session PR) of a timed exercise like a plank."
+  },
+  "progressionMetricLongestDistance": "Distancia máxima",
+  "@progressionMetricLongestDistance": {
+    "description": "[#1715] Label for the longest-distance-set metric (chip, personal record, session PR) of a distance exercise like a farmer's carry."
+  },
   "progressionFrequency": "{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}",
   "@progressionFrequency": {
     "description": "Frecuencia stat label showing session count in the last 8 weeks.",

@@ -1410,6 +1410,8 @@
   "progressionMetricOneRepMax": "1RM",
   "progressionMetricBestSetVolume": "Best set",
   "progressionMetricVolume": "Volume",
+  "progressionMetricLongestDuration": "Longest time",
+  "progressionMetricLongestDistance": "Longest distance",
   "progressionFrequency": "{count, plural, =0{No sessions in the last 8 weeks} =1{1 session in the last 8 weeks} other{{count} sessions in the last 8 weeks}}",
   "@progressionFrequency": {
     "placeholders": {
