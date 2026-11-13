@@ -3584,6 +3584,15 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t finish the session. Please try again.';
 
   @override
+  String get sessionLoadErrorTitle => 'We couldn\'t open the workout';
+
+  @override
+  String get sessionLoadErrorBody => 'Go back home and try again.';
+
+  @override
+  String get sessionLoadErrorCta => 'Back to home';
+
+  @override
   String get sessionFinishNeedOneSet =>
       'Do at least one set to finish. If you\'re not training today, tap ABANDON.';
 

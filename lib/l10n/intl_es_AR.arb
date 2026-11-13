@@ -3010,6 +3010,18 @@
   "@sessionFinishError": {
     "description": "Snackbar when finishSession/abandonSession fails so the user isn't stranded on the player (finding 22)."
   },
+  "sessionLoadErrorTitle": "No pudimos abrir el entrenamiento",
+  "@sessionLoadErrorTitle": {
+    "description": "Título del estado de error del player cuando no se pudo armar la sesión: retomar una sesión ajena, inexistente o ya cerrada, un timeout de lectura, una rutina borrada o un rechazo del servidor (#1728). No afirma cuál fue la causa, porque la pantalla no la distingue."
+  },
+  "sessionLoadErrorBody": "Volvé al inicio y probá de nuevo.",
+  "@sessionLoadErrorBody": {
+    "description": "Cuerpo del estado de error del player. Apunta al botón de abajo (sessionLoadErrorCta)."
+  },
+  "sessionLoadErrorCta": "Volver al inicio",
+  "@sessionLoadErrorCta": {
+    "description": "Botón del estado de error del player: va a Inicio con context.go('/home'). Es la única salida cuando el player es la única ruta del stack (recarga en web, deep link)."
+  },
   "sessionFinishNeedOneSet": "Hacé al menos una serie para poder terminar. Si hoy no vas a entrenar, tocá ABANDONAR.",
   "@sessionFinishNeedOneSet": {
     "description": "Caption under the disabled TERMINAR SESIÓN button while the athlete has logged zero sets (#1511). Explains why it is disabled and where the other exit is."

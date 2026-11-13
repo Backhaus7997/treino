@@ -272,7 +272,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   void _sincronizarAviso() {
     final completa = ref
             .read(sessionNotifierProvider(widget.init))
-            .value
+            .valueOrNull
             ?.isFullyCompleted ??
         false;
     _avisos.update(completa ? null : _descansoHasta);
@@ -437,7 +437,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       // es asíncrono): ahí el aviso del descanso ya no tiene sentido.
       ref.listenManual<bool>(
         sessionNotifierProvider(widget.init).select(
-          (s) => s.value?.isFullyCompleted ?? false,
+          (s) => s.valueOrNull?.isFullyCompleted ?? false,
         ),
         (_, __) => _sincronizarAviso(),
       );
@@ -564,7 +564,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
 
   /// El slot de un ejercicio del día, o null si ya no está.
   RoutineSlot? _slotDe(String exerciseId) {
-    final day = ref.read(sessionNotifierProvider(widget.init)).value?.day;
+    final day = ref.read(sessionNotifierProvider(widget.init)).valueOrNull?.day;
     if (day == null) return null;
     for (final slot in day.slots) {
       if (slot.exerciseId == exerciseId) return slot;
@@ -798,7 +798,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     if (slot.effectiveExerciseMode != ExerciseMode.distance) return null;
     final week = ref
             .read(sessionNotifierProvider(widget.init))
-            .value
+            .valueOrNull
             ?.session
             .weekNumber ??
         0;
@@ -1037,7 +1037,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
 
     final routineId = switch (widget.init) {
       FreshSession(routineId: final rid) => rid,
-      ResumeSession() => sessionAsync.value?.session.routineId,
+      ResumeSession() => sessionAsync.valueOrNull?.session.routineId,
     };
     final routineAsync = routineId != null
         ? ref.watch(routineByIdProvider(routineId))
@@ -1050,16 +1050,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         loading: () => Center(
           child: CircularProgressIndicator(color: palette.accent),
         ),
-        error: (_, __) => Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'No pudimos iniciar la sesión.',
-              style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
+        error: (_, __) => const _SessionLoadError(),
         // El subarbol que dibuja ESTA sesion sabe cual es.
         //
         // Sin esto, la fila por tiempo tenia que deducirla —y la deducia con
@@ -3449,6 +3440,64 @@ class _FinishEarlyDialog extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── _SessionLoadError ─────────────────────────────────────────────────────────
+
+/// La sesión no se pudo armar: retomar una ajena, inexistente o ya cerrada
+/// (`_buildResume` tira `StateError`), un timeout de lectura, una rutina o un
+/// día que ya no están, o el rechazo del servidor al crear (#1728).
+///
+/// Tiene que traer SU PROPIA salida. Esta pantalla no tiene AppBar, y cuando el
+/// player es la única ruta del stack —recarga en web, deep link— Atrás no tiene
+/// a dónde volver: el texto solo era un callejón sin salida. Va a Inicio con
+/// `go` y no con `pop` por esa misma razón.
+///
+/// No hay «Reintentar» a propósito: para una sesión ajena o inexistente no
+/// cambia nada, y para una sesión nueva volvería a crear otra.
+class _SessionLoadError extends StatelessWidget {
+  const _SessionLoadError();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                l10n.sessionLoadErrorTitle,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.barlowCondensed(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: palette.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.sessionLoadErrorBody,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.barlow(
+                  fontSize: 14,
+                  color: palette.textMuted,
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () => context.go('/home'),
+                child: Text(l10n.sessionLoadErrorCta),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

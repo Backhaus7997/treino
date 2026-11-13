@@ -9,6 +9,7 @@
 // SCENARIO-037: player renders correct week's set count via effectiveSetsForWeek.
 
 import 'package:clock/clock.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +21,7 @@ import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_state.dart';
+import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
@@ -226,6 +228,106 @@ UserProfile _makeProfile({String? gymId}) => UserProfile(
 // ── _SessionHeader + _AttendanceCard tests ───────────────────────────────────
 
 void main() {
+  // ── #1728: si la sesión no se puede abrir, la pantalla trae su salida ──────
+  group('#1728: retomar una sesión que no se puede abrir', () {
+    const uid = 'u1';
+    late FakeFirebaseFirestore firestore;
+
+    setUp(() => firestore = FakeFirebaseFirestore());
+
+    /// Monta el player como lo hace el deep link / la recarga en web: ES LA
+    /// ÚNICA ruta del stack, así que Atrás no tiene a dónde volver.
+    Future<void> montarRetomar(WidgetTester tester, String sessionId) async {
+      final router = GoRouter(
+        initialLocation: '/workout/session/resume/$sessionId',
+        routes: [
+          GoRoute(
+            path: '/workout/session/resume/:sessionId',
+            builder: (_, state) => SessionPlayerScreen(
+              init: ResumeSession(
+                sessionId: state.pathParameters['sessionId']!,
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/home',
+            builder: (_, __) =>
+                const Scaffold(body: Center(child: Text('home-stub'))),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            // El notifier REAL: lo que se prueba es que `_buildResume` tire
+            // con una sesión que no es la del atleta y que la pantalla lo
+            // muestre con salida, no un stub que ya devuelva error.
+            sessionRepositoryProvider.overrideWithValue(
+              SessionRepository(firestore: firestore),
+            ),
+            currentUidProvider.overrideWithValue(uid),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            routerConfig: router,
+          ),
+        ),
+      );
+      // Un frame por cada `await` del build (getActive → StateError).
+      for (var i = 0; i < 4; i++) {
+        await tester.pump();
+      }
+    }
+
+    Future<void> sembrarActiva(String ownerUid, String id) => firestore
+        .collection('users')
+        .doc(ownerUid)
+        .collection('sessions')
+        .doc(id)
+        .set(makeSession(id: id, uid: ownerUid, startedAt: DateTime.now())
+            .toJson());
+
+    void expectEstadoDeErrorConSalida() {
+      expect(find.text('No pudimos abrir el entrenamiento'), findsOneWidget);
+      expect(find.text('Volver al inicio'), findsOneWidget);
+      // El texto viejo, sin botón, era el callejón sin salida.
+      expect(find.text('No pudimos iniciar la sesión.'), findsNothing);
+    }
+
+    testWidgets('un id inexistente muestra el error con «Volver al inicio»',
+        (tester) async {
+      await montarRetomar(tester, 'no-existe');
+      expectEstadoDeErrorConSalida();
+    });
+
+    testWidgets('la sesión activa de OTRO usuario no se puede retomar',
+        (tester) async {
+      await sembrarActiva('otro-uid', 'ajena');
+      await montarRetomar(tester, 'ajena');
+      expectEstadoDeErrorConSalida();
+    });
+
+    testWidgets('un id que no es el de la sesión activa propia tampoco',
+        (tester) async {
+      await sembrarActiva(uid, 'la-activa');
+      await montarRetomar(tester, 'otra-vieja');
+      expectEstadoDeErrorConSalida();
+    });
+
+    testWidgets(
+        '«Volver al inicio» lleva a Inicio aunque no haya a dónde '
+        'hacer pop', (tester) async {
+      await montarRetomar(tester, 'no-existe');
+      await tester.tap(find.text('Volver al inicio'));
+      await tester.pumpAndSettle();
+      expect(find.text('home-stub'), findsOneWidget);
+      expect(find.byType(SessionPlayerScreen), findsNothing);
+    });
+  });
+
   group('_SessionHeader', () {
     // SCENARIO-274: título en formato correcto
     testWidgets('SCENARIO-274: renderiza el número de día en el título',
