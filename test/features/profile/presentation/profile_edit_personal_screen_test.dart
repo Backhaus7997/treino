@@ -378,6 +378,95 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
+  // #1813: peso, altura y experiencia son datos del ATLETA. Un PF llega acá
+  // desde su Perfil (#1738) y no tiene que verlos ni mandarlos.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('#1813: los datos de atleta no se le piden a un PF', () {
+    const camposDeAtleta = [
+      Key('edit_personal_weight_field'),
+      Key('edit_personal_height_field'),
+    ];
+
+    testWidgets('un PF no ve peso, altura ni experiencia, y sí lo demás',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile().copyWith(role: UserRole.trainer),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final k in camposDeAtleta) {
+        expect(find.byKey(k), findsNothing, reason: '$k es de atleta');
+      }
+      for (final etiqueta in ['PESO (KG)', 'ALTURA (CM)', 'EXPERIENCIA']) {
+        expect(find.text(etiqueta), findsNothing);
+      }
+      expect(find.text('PRINCIPIANTE'), findsNothing);
+
+      // Lo que el PF vino a cambiar, y lo que es de cualquiera, sigue.
+      expect(
+        find.byKey(const Key('edit_personal_avatar_editor')),
+        findsOneWidget,
+      );
+      expect(
+          find.byKey(const Key('edit_personal_display_name')), findsOneWidget);
+      expect(
+          find.byKey(const Key('edit_personal_phone_field')), findsOneWidget);
+      expect(
+          find.byKey(const Key('edit_personal_born_at_field')), findsOneWidget);
+      expect(find.text('GÉNERO'), findsOneWidget);
+    });
+
+    testWidgets('un atleta sigue viendo peso, altura y experiencia',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen(profile: _profile()));
+      await tester.pumpAndSettle();
+
+      for (final k in camposDeAtleta) {
+        expect(find.byKey(k), findsOneWidget);
+      }
+      expect(find.text('EXPERIENCIA'), findsOneWidget);
+      expect(find.text('PRINCIPIANTE'), findsOneWidget);
+    });
+
+    testWidgets(
+        'guardar el nombre manda SOLO el nombre, y un peso viejo fuera de '
+        'rango no bloquea el guardado', (tester) async {
+      final repo = MockUserRepository();
+      when(() => repo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        _buildScreen(
+          // 20 kg está fuera del rango 30-300 que valida el campo: si el campo
+          // siguiera en el árbol, el guardado se frenaría en el validador.
+          profile: _profile(bodyWeightKg: 20).copyWith(role: UserRole.trainer),
+          userRepository: repo,
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('edit_personal_display_name')),
+        'Ana Coach',
+      );
+      await tester.pump();
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+
+      final captured =
+          verify(() => repo.update(captureAny(), captureAny())).captured;
+      final partial = captured[1] as Map<String, Object?>;
+      expect(partial.keys, ['displayName']);
+      expect(partial['displayName'], 'Ana Coach');
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
   // Phone + birth date (datos-personales entry)
   // ──────────────────────────────────────────────────────────────────────────
   group('phone + bornAt', () {
