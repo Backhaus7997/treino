@@ -1,20 +1,23 @@
 /**
  * Tests del BACKFILL de `linkId` en chats preexistentes (notifyOnLinkChange).
  *
- * POR QUE EXISTE ESTE ARCHIVO. `senderMayPost` (firestore.rules) deja postear
- * si el DOC DEL CHAT tiene `linkId`, o si es una consulta, o si hay follow
- * aceptado. El cliente estampa `linkId` SÓLO al crear el chat. Un par que se
- * escribió primero como chat social y se vinculó DESPUES nunca lo recibe, y el
- * alumno vinculado a su PF queda viendo "Para escribirle, esta persona tiene
- * que seguirte". Completarlo desde el cliente tampoco se puede: `chats/update`
- * tiene `linkId` PINEADO INMUTABLE. Hace falta el Admin SDK.
+ * POR QUE EXISTE ESTE ARCHIVO. `linkId` es la marca de "chat de Coach"
+ * (`Chat.linkId`), NO un permiso de escritura: `senderMayPost` dejó de mirarlo
+ * el 2026-10-21 (REQ-FOLLOW-012) y hoy sólo pide membresía y ausencia de
+ * bloqueo; la escritura la corta `closedAt` (`syncChatOnTrainerLink`, #1697).
+ * El cliente estampa `linkId` SÓLO al crear el chat. Un par que se escribió
+ * primero como chat social y se vinculó DESPUES nunca lo recibe, y su chat no
+ * se reconoce como de Coach. Completarlo desde el cliente tampoco se puede:
+ * `chats/update` tiene `linkId` PINEADO INMUTABLE. Hace falta el Admin SDK. La
+ * explicación completa está en `backfillChatLinkId`
+ * (`notifications/notify-link-change.ts`).
  *
  * LA INVARIANTE QUE ESTE ARCHIVO DEFIENDE. `chatCreateOk` define qué es un
  * `linkId` válido en un chat: el link existe, su `status` está en
  * ['active','paused'], y trainerId y athleteId son los dos miembros. El
  * backfill no puede romperla, y de ahí salen los controles negativos: estampar
- * en `pending` le daría escritura al alumno ANTES de que el PF acepte, que es
- * justo el gate que el vínculo representa.
+ * en `pending` marcaría como chat de Coach uno cuyo PF todavía no aceptó, y la
+ * marca es inmutable.
  *
  * Corre contra el emulador de Firestore, igual que notify-link-change.test.ts.
  */

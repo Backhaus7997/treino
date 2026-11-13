@@ -3554,6 +3554,26 @@ class AppL10nEn extends AppL10n {
   String get insightsDayEmptyHint => 'No workout logged this day.';
 
   @override
+  String get insightsScreenTitle => 'INSIGHTS';
+
+  @override
+  String get insightsEmptyState => 'Start training to see your insights.';
+
+  @override
+  String get insightsPreviousWeekTooltip => 'Previous week';
+
+  @override
+  String get insightsNextWeekTooltip => 'Next week';
+
+  @override
+  String insightsWeekRange(String start, String end) {
+    return 'WEEK · $start – $end';
+  }
+
+  @override
+  String get insightsDayMusclesHeading => 'MUSCLES OF THE DAY';
+
+  @override
   String get coachDailyHeatmapSectionTitle => 'MUSCLES OF THE DAY';
 
   @override

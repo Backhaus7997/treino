@@ -931,6 +931,124 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('wellbeing-route'), findsOneWidget);
   });
+
+  // #1722: el encabezado, el empty state, los tooltips del paginador, el rango
+  // de la semana y el título de la tarjeta de músculos del día estaban
+  // hardcodeados en español. Con el locale en inglés se ve que ahora salen del
+  // ARB (en producción `resolveLocale` sirve siempre es-AR, así que el español
+  // queda igual).
+  group('#1722 — los textos del hub salen de l10n', () {
+    Widget wrapEn(List<Override> overrides) => ProviderScope(
+          overrides: overrides,
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('en'),
+            home: const Scaffold(body: InsightsScreen()),
+          ),
+        );
+
+    testWidgets('cuenta nueva: encabezado y empty state', (tester) async {
+      final repo = MockSessionRepository();
+      when(() => repo.listByUid('u1')).thenAnswer((_) async => const []);
+
+      await tester.pumpWidget(wrapEn([
+        currentUidProvider.overrideWithValue('u1'),
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async => const []),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.text('INSIGHTS'), findsOneWidget);
+      expect(find.text('Start training to see your insights.'), findsOneWidget);
+      expect(
+          find.text('Empezá a entrenar para ver tus insights.'), findsNothing);
+    });
+
+    testWidgets(
+        'con sesiones: tooltips del paginador, rango de la semana y título '
+        'de músculos del día', (tester) async {
+      final repo = MockSessionRepository();
+      final now = argentinaNow();
+      final todayOnly = DateTime(now.year, now.month, now.day);
+      when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+            makeSession(
+              id: 's1',
+              startedAt: todayOnly.add(const Duration(hours: 9)),
+              status: SessionStatus.finished,
+              wasFullyCompleted: true,
+              routineId: 'r1',
+            ),
+          ]);
+      when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1')).thenAnswer(
+          (_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
+
+      await tester.pumpWidget(wrapEn([
+        currentUidProvider.overrideWithValue('u1'),
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async => [
+              const Exercise(
+                id: 'e-chest',
+                name: 'Press',
+                muscleGroup: 'chest',
+                category: 'compound',
+              ),
+            ]),
+        routineByIdProvider('r1').overrideWith((ref) async => null),
+        visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Previous week'), findsOneWidget);
+      expect(find.byTooltip('Next week'), findsOneWidget);
+      expect(find.byTooltip('Semana anterior'), findsNothing);
+      expect(find.textContaining('WEEK · '), findsOneWidget);
+      expect(find.textContaining('SEMANA · '), findsNothing);
+      expect(find.text('MUSCLES OF THE DAY'), findsOneWidget);
+      expect(find.text('MÚSCULOS DEL DÍA'), findsNothing);
+    });
+
+    testWidgets('en es-AR el rango y los tooltips siguen en español',
+        (tester) async {
+      final repo = MockSessionRepository();
+      final now = argentinaNow();
+      final todayOnly = DateTime(now.year, now.month, now.day);
+      when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+            makeSession(
+              id: 's1',
+              startedAt: todayOnly.add(const Duration(hours: 9)),
+              status: SessionStatus.finished,
+              wasFullyCompleted: true,
+              routineId: 'r1',
+            ),
+          ]);
+      when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1')).thenAnswer(
+          (_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
+
+      await tester.pumpWidget(_wrap(const InsightsScreen(), [
+        currentUidProvider.overrideWithValue('u1'),
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async => [
+              const Exercise(
+                id: 'e-chest',
+                name: 'Press',
+                muscleGroup: 'chest',
+                category: 'compound',
+              ),
+            ]),
+        routineByIdProvider('r1').overrideWith((ref) async => null),
+        visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.text('INSIGHTS'), findsOneWidget);
+      expect(find.byTooltip('Semana anterior'), findsOneWidget);
+      expect(find.byTooltip('Semana siguiente'), findsOneWidget);
+      expect(find.textContaining('SEMANA · '), findsOneWidget);
+      expect(find.text('MÚSCULOS DEL DÍA'), findsOneWidget);
+    });
+  });
 }
 
 const _monthAbbrevEs = [
