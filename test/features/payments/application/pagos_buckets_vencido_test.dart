@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/utils/app_clock.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_estado.dart';
 import 'package:treino/features/payments/application/payment_providers.dart'
     show trainerPaymentsProvider;
 import 'package:treino/features/payments/domain/payment.dart';
@@ -179,5 +182,77 @@ void main() {
         );
       },
     );
+  });
+
+  // #1824 — `dueAt` es un instante real (fin del día ART elegido) y el
+  // provider mide contra `argentinaNow()`, que ya está corrido a ART. Con
+  // `dueAt.toUtc()` a secas el pago pasaba a Vencidos 3 h DESPUÉS de terminar su
+  // día, mientras el badge de la fila (`pagoEstadoOf`, en ART) ya decía
+  // «Vencido 1d»: la fila y la pestaña se contradecían.
+  group('pagosBucketsProvider — dueAt contra el reloj ART (#1824)', () {
+    // `4 nov 23:59:59 ART` = `5 nov 02:59:59 UTC`.
+    final finDelDia4 = DateTime.utc(2026, 11, 5, 2, 59, 59);
+    final pago = _pendingWithDueAt(
+      id: 'p-fin-del-dia',
+      createdAt: DateTime.utc(2026, 10, 1),
+      dueAt: finDelDia4,
+    );
+
+    // El reloj se congela en un INSTANTE REAL (local-flagged, como
+    // `DateTime.now()`): `argentinaNow()` lo corre a ART.
+    void ahoraEs(DateTime instanteUtc) =>
+        AppClock.freeze(instanteUtc.toLocal());
+    tearDown(AppClock.unfreeze);
+
+    Future<PagosBuckets> buckets() async {
+      final container = _containerWithPayments([pago]);
+      addTearDown(container.dispose);
+      return (await _readBuckets(container))!;
+    }
+
+    test('a las 23:00 ART del día del vencimiento sigue en Por vencer',
+        () async {
+      ahoraEs(DateTime.utc(2026, 11, 5, 2)); // 4 nov 23:00 ART
+
+      final b = await buckets();
+
+      expect(b.porVencer.map((p) => p.id), contains('p-fin-del-dia'));
+      expect(b.vencidos, isEmpty);
+    });
+
+    test('pasada la medianoche ART pasa a Vencidos (antes: 3 h más tarde)',
+        () async {
+      ahoraEs(DateTime.utc(2026, 11, 5, 3, 30)); // 5 nov 00:30 ART
+
+      final b = await buckets();
+
+      expect(b.vencidos.map((p) => p.id), contains('p-fin-del-dia'));
+      expect(b.porVencer, isEmpty);
+    });
+
+    // El test que importa: la fila y la pestaña dicen lo MISMO en cada momento,
+    // incluida la ventana de 3 h donde antes se contradecían.
+    for (final (etiqueta, instante) in [
+      ('4 nov 10:00 ART', DateTime.utc(2026, 11, 4, 13)),
+      ('4 nov 23:30 ART', DateTime.utc(2026, 11, 5, 2, 30)),
+      ('5 nov 00:30 ART', DateTime.utc(2026, 11, 5, 3, 30)),
+      ('5 nov 01:00 ART', DateTime.utc(2026, 11, 5, 4)),
+      ('5 nov 03:00 ART', DateTime.utc(2026, 11, 5, 6)),
+      ('6 nov 10:00 ART', DateTime.utc(2026, 11, 6, 13)),
+    ]) {
+      test('el badge y el bucket coinciden a las $etiqueta', () async {
+        ahoraEs(instante);
+
+        final b = await buckets();
+        final badge = pagoEstadoOf(pago, argentinaNow());
+
+        expect(
+          b.vencidos.isNotEmpty,
+          badge.estado == PagoEstado.vencido,
+          reason: 'badge «${badge.label}» pero '
+              '${b.vencidos.isNotEmpty ? "está en Vencidos" : "está en Por vencer"}',
+        );
+      });
+    }
   });
 }
