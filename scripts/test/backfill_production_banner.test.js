@@ -42,6 +42,7 @@ const BACKFILLS = [
   'backfill_chat_closed_unlinked.js', // #1697: escribe sobre `chats/`
   'backfill_archive_orphan_assigned_routines.js', // #1723: escribe sobre `routines/`
   'backfill_trainer_public_avatar.js', // #1718: escribe sobre `trainerPublicProfiles/`
+  'backfill_cancel_appointments_unlinked.js', // #1852: escribe sobre `appointments/`
 ];
 
 /**

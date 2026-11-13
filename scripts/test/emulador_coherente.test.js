@@ -84,6 +84,7 @@ const SCRIPTS = [
   { script: 'backfill_chat_closed_unlinked.js', argv: ['--dry-run'] }, // #1697
   { script: 'backfill_archive_orphan_assigned_routines.js', argv: ['--dry-run'] }, // #1723
   { script: 'backfill_trainer_public_avatar.js', argv: ['--dry-run'] }, // #1718
+  { script: 'backfill_cancel_appointments_unlinked.js', argv: ['--dry-run'] }, // #1852
   { script: 'seed_trainer_profiles.js', argv: [] },
   { script: 'promote_user_to_trainer.js', argv: ['uid-de-prueba'] },
   { script: 'seed_workout_catalog.js', argv: ['--exercises'] },
