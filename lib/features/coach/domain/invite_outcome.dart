@@ -54,7 +54,11 @@ class InviteRequiereDesvincular extends InviteOutcome {
 
   final String nuevoTrainerId;
 
-  /// El vínculo que habría que terminar primero.
+  /// El vínculo que habría que liberar primero.
+  ///
+  /// OJO con el estado: si es `pending` (solicitud sin aceptar) la transición
+  /// es `cancel`, y `terminate` tira `Bad state` (#1727). Es `terminate` sólo
+  /// para `active|paused`.
   final TrainerLink vinculoActual;
 }
 
