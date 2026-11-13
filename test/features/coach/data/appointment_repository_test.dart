@@ -642,6 +642,83 @@ void main() {
     );
   });
 
+  // #1729: `watchForTrainer` filtra `confirmed` a propósito, así que el
+  // «Resumen del día» nunca veía un cancelado y CANCELADAS daba 0 siempre.
+  group('watchCancelledForTrainer()', () {
+    Appointment appt({
+      required DateTime at,
+      String trainer = trainerId,
+      AppointmentStatus status = AppointmentStatus.confirmed,
+    }) =>
+        Appointment.create(
+          trainerId: trainer,
+          athleteId: athleteId,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: at,
+          durationMin: durationMin,
+          status: status,
+        );
+
+    Future<void> seed(Appointment a) =>
+        firestore.collection('appointments').doc(a.id).set(a.toJson());
+
+    test(
+      'devuelve sólo los cancelados del PF dentro del rango: no los '
+      'confirmados, ni los de otro PF, ni los de afuera de la ventana',
+      () async {
+        final cancelled = appt(
+          at: DateTime.utc(2026, 7, 5, 10, 0),
+          status: AppointmentStatus.cancelled,
+        );
+        await seed(cancelled);
+        // Confirmado en el mismo día: lo sigue trayendo `watchForTrainer`, no
+        // este.
+        await seed(appt(at: DateTime.utc(2026, 7, 5, 12, 0)));
+        // Cancelado de OTRO PF.
+        await seed(appt(
+          at: DateTime.utc(2026, 7, 5, 14, 0),
+          trainer: 'otroPf',
+          status: AppointmentStatus.cancelled,
+        ));
+        // Cancelado fuera del rango.
+        await seed(appt(
+          at: DateTime.utc(2026, 8, 1, 10, 0),
+          status: AppointmentStatus.cancelled,
+        ));
+
+        final results = await repo
+            .watchCancelledForTrainer(
+              trainerId,
+              fromDate: DateTime.utc(2026, 7, 1),
+              toDate: DateTime.utc(2026, 7, 31),
+            )
+            .first;
+
+        expect(results.map((a) => a.id), [cancelled.id]);
+        expect(results.single.status, AppointmentStatus.cancelled);
+      },
+    );
+
+    test(
+        '`watchForTrainer` sigue sin traer los cancelados (la agenda y los '
+        'slots libres dependen de eso)', () async {
+      await seed(appt(
+        at: DateTime.utc(2026, 7, 5, 10, 0),
+        status: AppointmentStatus.cancelled,
+      ));
+
+      final results = await repo
+          .watchForTrainer(
+            trainerId,
+            fromDate: DateTime.utc(2026, 7, 1),
+            toDate: DateTime.utc(2026, 7, 31),
+          )
+          .first;
+
+      expect(results, isEmpty);
+    });
+  });
+
   // ─────────────────────────────────────────────────────────────────────────
   // Slice 2a — Agenda→cobro bridge: billAppointment() + markBilled()
   // MONEY-CRITICAL: these pin the atomic create-Payment+link-appointment
