@@ -5942,6 +5942,24 @@ abstract class AppL10n {
   /// **'No pudimos terminar el vínculo.'**
   String get coachHubDashboardTerminateLinkError;
 
+  /// Línea que se suma al diálogo de terminar un vínculo (Coach Hub y tab Coach del PF) cuando el PF tiene sesiones futuras con ese alumno: terminar el vínculo las cancela (#1792).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{También se cancela 1 sesión agendada con este alumno y se le avisa.} other{También se cancelan {count} sesiones agendadas con este alumno y se le avisa.}}'**
+  String coachHubTerminateLinkAppointmentsWarning(int count);
+
+  /// No description provided for @coachHubTerminateLinkAppointmentsWarningUnknown.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos revisar tus sesiones con este alumno. Las que tengas a futuro también se cancelan y se le avisa.'**
+  String get coachHubTerminateLinkAppointmentsWarningUnknown;
+
+  /// No description provided for @coachHubTerminateLinkAppointmentsError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cancelar las sesiones futuras con este alumno, así que el vínculo sigue activo. Probá de nuevo.'**
+  String get coachHubTerminateLinkAppointmentsError;
+
   /// Coach Hub web dashboard — snackbar when resume() fails.
   ///
   /// In es_AR, this message translates to:

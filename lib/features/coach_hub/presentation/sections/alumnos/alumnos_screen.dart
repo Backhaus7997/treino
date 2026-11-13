@@ -11,6 +11,9 @@ import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_destructive_menu_item.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/coach/application/agenda_providers.dart'
+    show appointmentRepositoryProvider;
+import 'package:treino/features/coach/application/terminar_vinculo.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -1234,18 +1237,34 @@ class _RowActionsState extends ConsumerState<_RowActions> {
     );
   }
 
+  /// Terminar también cancela los turnos futuros con el alumno, ANTES de
+  /// terminar (#1792). Ver `terminar_vinculo.dart`.
   Future<void> _terminate(BuildContext context, WidgetRef ref) async {
     final l10n = AppL10n.of(context);
+    final appointments = ref.read(appointmentRepositoryProvider);
+    final turnos = await contarTurnosFuturos(appointments, widget.link);
+    if (!context.mounted) return;
+    final aviso = avisoDeTurnosAlTerminar(l10n, turnos);
     final ok = await _confirmAction(
       context,
       title: l10n.coachHubDashboardTerminateLinkTitle,
-      body: l10n.coachHubDashboardTerminateLinkBody,
+      body: aviso.isEmpty
+          ? l10n.coachHubDashboardTerminateLinkBody
+          : '${l10n.coachHubDashboardTerminateLinkBody}\n\n$aviso',
       confirmLabel: l10n.coachHubActionTerminate,
     );
     if (!ok) return;
-    await ref
-        .read(trainerLinkRepositoryProvider)
-        .terminate(widget.link.id, reason: 'trainer-terminated');
+    try {
+      await terminarVinculoLiberandoTurnos(
+        links: ref.read(trainerLinkRepositoryProvider),
+        appointments: appointments,
+        link: widget.link,
+      );
+    } on TurnosFuturosSinCancelar {
+      _showError(l10n.coachHubTerminateLinkAppointmentsError);
+    } catch (_) {
+      _showError(l10n.coachHubDashboardTerminateLinkError);
+    }
   }
 
   /// Resuelve (o crea) el chat 1-1 con el alumno vía [chatForOtherUidProvider]
