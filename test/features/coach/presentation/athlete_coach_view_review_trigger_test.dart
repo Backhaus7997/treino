@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -127,6 +129,76 @@ void main() {
 
       // Sheet must appear — proves the container was captured before await
       expect(find.byType(ReviewBottomSheet), findsOneWidget);
+    });
+
+    // #1840: lo que pasa en la app de verdad. `terminate()` es un `update`, y
+    // la compensación de latencia emite el vínculo terminado por el stream
+    // ANTES de que el `await` vuelva: la card se reconstruye sin _ActionRow y
+    // su `context` se desmonta. Los dos tests de arriba no lo ven porque su
+    // `terminate` resuelve sin que el stream emita nada en el medio.
+    Future<Completer<void>> terminarConEmisionPrevia(
+      WidgetTester tester,
+      TrainerLink link,
+    ) async {
+      final ack = Completer<void>();
+      final snapshots = StreamController<TrainerLink?>();
+      addTearDown(snapshots.close);
+      var subs = 0;
+      when(() => mockLinkRepo.terminate(any(), reason: any(named: 'reason')))
+          .thenAnswer((_) => ack.future);
+      await tester.pumpWidget(_wrap([
+        currentAthleteLinkProvider.overrideWith((ref) async* {
+          if (++subs > 1) {
+            yield null;
+            return;
+          }
+          yield link;
+          yield* snapshots.stream;
+        }),
+        userPublicProfileProvider('trainer-1')
+            .overrideWith((ref) => Stream.value(_makePub())),
+        trainerLinkRepositoryProvider.overrideWithValue(mockLinkRepo),
+        reviewRepositoryProvider.overrideWithValue(mockReviewRepo),
+        userReviewForLinkProvider('link-1:athlete-1')
+            .overrideWith((ref) => Stream.value(null)),
+      ]));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('TERMINAR VÍNCULO'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Confirmar'));
+      await tester.pumpAndSettle();
+
+      // El snapshot local del `update` llega antes que el ack del servidor.
+      snapshots.add(null);
+      await tester.pumpAndSettle();
+      expect(find.text('TERMINAR VÍNCULO'), findsNothing);
+      return ack;
+    }
+
+    testWidgets(
+        '#1840: el sheet se abre aunque la card se desmonte antes del ack',
+        (tester) async {
+      final ack = await terminarConEmisionPrevia(tester, _makeActiveLink());
+      ack.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ReviewBottomSheet), findsOneWidget);
+    });
+
+    testWidgets(
+        '#1840: sin acceptedAt (nunca fue un vínculo real) no se ofrece reseña',
+        (tester) async {
+      final ack = await terminarConEmisionPrevia(
+        tester,
+        _makeActiveLink().copyWith(acceptedAt: null),
+      );
+      ack.complete();
+      await tester.pumpAndSettle();
+
+      verify(() =>
+              mockLinkRepo.terminate('link-1', reason: 'athlete-terminated'))
+          .called(1);
+      expect(find.byType(ReviewBottomSheet), findsNothing);
     });
   });
 }

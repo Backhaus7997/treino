@@ -5326,8 +5326,9 @@ service cloud.firestore {
     //   create: athlete creates their own review (athleteId == auth.uid);
     //           doc-id must equal `${linkId}_${athleteId}`; the named
     //           trainer_links/{linkId} must exist with athleteId/trainerId
-    //           matching the review payload and status in [active, paused]
-    //           (a terminated link no longer proves a live relationship);
+    //           matching the review payload, and be either live (status in
+    //           [active, paused]) or a REAL relationship that ended
+    //           (terminated with acceptedAt != null, #1840);
     //           rating must be 1..5; comment ≤500 chars.
     //   update: owner only; may change only rating, comment, updatedAt —
     //           preventing id/linkId/athleteId/trainerId/createdAt tampering.
@@ -5340,7 +5341,17 @@ service cloud.firestore {
                     && reviewId == request.resource.data.linkId + '_' + request.resource.data.athleteId
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.athleteId == request.auth.uid
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.trainerId == request.resource.data.trainerId
-                    && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status in ['active', 'paused']
+                    // #1840: también un vínculo TERMINADO que fue real. Al
+                    // terminar, la app le ofrece la reseña al alumno, y ahí el
+                    // vínculo ya es `terminated`: exigir `active|paused`
+                    // la denegaba siempre. `acceptedAt` distingue un vínculo
+                    // que existió de un pedido rechazado o cancelado (el
+                    // criterio de `clasificar` en cleanup_rejected_links.js):
+                    // quien nunca entrenó con el PF sigue sin poder reseñarlo.
+                    // Una reseña por vínculo, como siempre: el id lo fija.
+                    && (get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status in ['active', 'paused']
+                        || (get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status == 'terminated'
+                            && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.get('acceptedAt', null) != null))
                     // notBlocked() (change `moderacion-reporte-y-bloqueo`).
                     && notBlocked(request.auth.uid, request.resource.data.trainerId)
                     && request.resource.data.rating >= 1
