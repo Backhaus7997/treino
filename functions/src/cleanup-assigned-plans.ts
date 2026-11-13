@@ -45,6 +45,12 @@
  *   - reason === 'duplicate-request' → skip (#1812). `acceptTrainerLink` cancela
  *     las demás solicitudes pending del par al aceptar una: el par queda con un
  *     vínculo vivo, y archivarle los planes sería quitárselos a un alumno activo.
+ *   - el par tiene OTRO vínculo vivo (`active` | `paused`) → skip (#1832). Las reglas
+ *     permiten varios vínculos por par (ids autogenerados): terminar uno —una
+ *     solicitud pending duplicada que el alumno cancela o el PF rechaza— no puede
+ *     quitarle los planes a un alumno que sigue siéndolo. Va por el ESTADO del par,
+ *     no por un marcador de la escritura: `duplicate-request` sólo cubre la
+ *     duplicada que cancela `acceptTrainerLink`.
  *   - before.status === after.status (no-op write) → skip.
  *   - after.status !== 'terminated' → skip.
  *
@@ -139,6 +145,20 @@ export async function archiveAssignedPlansForPair(
 }
 
 /**
+ * ¿El par (trainerId, athleteId) tiene algún vínculo `active` o `paused`? Una query de
+ * igualdad doble —sin índice compuesto, como `archiveAssignedPlansForPair`— y el status
+ * se filtra en memoria: un par tiene pocos vínculos.
+ */
+async function pairHasLiveLink(app: App, trainerId: string, athleteId: string): Promise<boolean> {
+  const snap = await getFirestore(app)
+    .collection("trainer_links")
+    .where("trainerId", "==", trainerId)
+    .where("athleteId", "==", athleteId)
+    .get();
+  return snap.docs.some((d) => (LIVE_LINK_STATUSES as readonly string[]).includes(d.get("status")));
+}
+
+/**
  * Pure handler extracted for jest testability.
  *
  * @param app    - Admin SDK app.
@@ -195,6 +215,16 @@ export async function cleanupAssignedPlansOnUnlinkHandler(
 
   if (!trainerId || !athleteId) {
     logger.warn("cleanupAssignedPlans: missing trainerId/athleteId", {
+      trainerId,
+      athleteId,
+    });
+    return { count: 0 };
+  }
+
+  // Guard: el par conserva OTRO vínculo vivo (#1832) → los planes se quedan. El doc que
+  // terminó ya está `terminated` en Firestore, así que no se cuenta a sí mismo.
+  if (await pairHasLiveLink(app, trainerId, athleteId)) {
+    logger.info("cleanupAssignedPlans: el par tiene otro vínculo vivo, los planes se quedan", {
       trainerId,
       athleteId,
     });

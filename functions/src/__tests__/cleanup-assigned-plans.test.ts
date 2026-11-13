@@ -264,6 +264,57 @@ describe("cleanupAssignedPlansOnUnlinkHandler guards", () => {
   });
 });
 
+// ── #1832: el par tiene OTRO vínculo vivo ───────────────────────────────────
+
+describe("cleanupAssignedPlansOnUnlinkHandler — otro vínculo vivo del par (#1832)", () => {
+  // Ids propios: otras suites comparten el emulador y `trainer_links`.
+  const OTHER_LINK = "plans-1832-otro-vinculo";
+  const OTHER_PF = "trainer-1832-otro";
+  const seedLink = (data: Record<string, unknown>) =>
+    db().collection("trainer_links").doc(OTHER_LINK).set(data);
+  const cancelacion = link("terminated", { terminationReason: "cancelled-by-athlete" }); // sin marcador de #1827
+  const rechazo = link("terminated", { terminationReason: "declined" });
+
+  beforeEach(seedRoutines);
+  afterEach(async () => {
+    await cleanupRoutines();
+    await db().collection("trainer_links").doc(OTHER_LINK).delete();
+  });
+
+  it.each(["active", "paused"])(
+    "con otro vínculo %s del par, cancelar o rechazar una solicitud duplicada NO archiva los planes",
+    async (vivo) => {
+      await seedLink(link(vivo));
+      for (const despues of [cancelacion, rechazo]) {
+        const { count } = await cleanupAssignedPlansOnUnlinkHandler(testApp, link("pending"), despues);
+        expect(count).toBe(0);
+        expect(await statusOf(ASSIGNED_TA)).not.toBe("archived");
+      }
+    },
+  );
+
+  it("tampoco cuando lo que termina es un vínculo y el par conserva otro vivo", async () => {
+    await seedLink(link("active"));
+    const { count } = await cleanupAssignedPlansOnUnlinkHandler(testApp, link("active"), link("terminated"));
+    expect(count).toBe(0);
+    expect(await statusOf(ASSIGNED_TA)).not.toBe("archived");
+  });
+
+  it("el vínculo vivo es del PAR: el de otro PF o de otro alumno, o uno terminado, no cuentan", async () => {
+    for (const otro of [
+      link("active", { trainerId: OTHER_PF }),
+      link("active", { athleteId: OTHER_ATHLETE }),
+      link("terminated"),
+    ]) {
+      await seedRoutines();
+      await seedLink(otro);
+      const { count } = await cleanupAssignedPlansOnUnlinkHandler(testApp, link("pending"), cancelacion);
+      expect(count).toBe(1);
+      expect(await statusOf(ASSIGNED_TA)).toBe("archived");
+    }
+  });
+});
+
 // ── #1723: el plan que se asigna a un par sin vínculo vivo ──────────────────
 
 describe("archiveOrphanAssignedPlanHandler (#1723)", () => {
