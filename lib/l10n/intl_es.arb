@@ -1430,5 +1430,6 @@
   "coachHubPdfFailedToast": "No pudimos leer tu plan.",
   "coachHubPdfFailedAction": "VER DETALLE",
   "coachAssignNoLink": "Este alumno no tiene un vínculo vigente contigo, así que no puedes asignarle una rutina.",
-  "coachAssignLinkUnverified": "No pudimos verificar tu vínculo con este alumno. Prueba de nuevo."
+  "coachAssignLinkUnverified": "No pudimos verificar tu vínculo con este alumno. Prueba de nuevo.",
+  "dashboardStatAusentes": "AUSENTES"
 }

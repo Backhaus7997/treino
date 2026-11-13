@@ -1691,6 +1691,9 @@ class AppL10nEn extends AppL10n {
   String get dashboardStatCanceladas => 'CANCELADAS';
 
   @override
+  String get dashboardStatAusentes => 'ABSENT';
+
+  @override
   String get dashboardProximasSesionesSectionLabel => 'PRÓXIMAS SESIONES';
 
   @override

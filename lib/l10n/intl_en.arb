@@ -2551,5 +2551,6 @@
   "coachHubPdfFailedToast": "We couldn’t read your plan.",
   "coachHubPdfFailedAction": "SEE DETAILS",
   "coachAssignNoLink": "This student has no active link with you, so you can't assign them a routine.",
-  "coachAssignLinkUnverified": "We couldn't verify your link with this student. Try again."
+  "coachAssignLinkUnverified": "We couldn't verify your link with this student. Try again.",
+  "dashboardStatAusentes": "ABSENT"
 }
