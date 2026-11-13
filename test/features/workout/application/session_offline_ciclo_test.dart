@@ -35,6 +35,7 @@
 
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -346,6 +347,67 @@ void main() {
         reason: 'el atleta tiene que ENTERARSE, no entrenar media hora contra '
             'una sesión que el servidor nunca aceptó.',
       );
+    });
+
+    test(
+        'un create RECHAZADO frena el reloj: el tick no pisa el error con un '
+        'AsyncData (#1805)', () {
+      // `state = AsyncError(...)` conserva el dato anterior (`hasValue` sigue
+      // en true), así que `state.value` NO tira: devuelve la sesión vieja y el
+      // tick la reescribía como `AsyncData`, borrando el aviso un segundo
+      // después de mostrarlo.
+      fakeAsync((async) {
+        final repo = _MockSessionRepository();
+        final routine = _routine();
+        late void Function(Object) rechazar;
+        when(() => repo.create(
+              uid: any(named: 'uid'),
+              routineId: any(named: 'routineId'),
+              routineName: any(named: 'routineName'),
+              startedAt: any(named: 'startedAt'),
+              dayNumber: any(named: 'dayNumber'),
+              weekNumber: any(named: 'weekNumber'),
+              waitForServer: any(named: 'waitForServer'),
+              onServerRejected: any(named: 'onServerRejected'),
+            )).thenAnswer((inv) {
+          rechazar =
+              inv.namedArguments[#onServerRejected] as void Function(Object);
+          return Future<Session>.value(makeSession());
+        });
+
+        final container = _container(repo, routine);
+        final init = FreshSession(routineId: routine.id, dayNumber: 1);
+        final sub = container.listen(
+          sessionNotifierProvider(init),
+          (_, __) {},
+          fireImmediately: true,
+        );
+        async.flushMicrotasks();
+        expect(container.read(sessionNotifierProvider(init)).hasValue, isTrue);
+        expect(async.periodicTimerCount, 1, reason: 'el reloj está corriendo');
+
+        rechazar(Exception('permission-denied'));
+        async.flushMicrotasks();
+        expect(container.read(sessionNotifierProvider(init)).hasError, isTrue);
+
+        // Tres ticks del reloj.
+        async.elapse(const Duration(seconds: 3));
+
+        expect(
+          container.read(sessionNotifierProvider(init)).hasError,
+          isTrue,
+          reason: 'el tick no puede pisar el error con un AsyncData: el '
+              'atleta dejaría de ver la salida.',
+        );
+        expect(
+          async.periodicTimerCount,
+          0,
+          reason: 'en error no hay nada que cronometrar: el reloj se frena.',
+        );
+
+        sub.close();
+        container.dispose();
+      });
     });
 
     test('el ciclo completo: empezar → marcar → terminar', () async {
