@@ -2,8 +2,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../coach/application/trainer_link_providers.dart'
-    show currentAthleteLinkProvider;
+    show currentAthleteLinkAnyStatusProvider;
 import '../../coach/domain/trainer_link.dart';
+import '../../coach/domain/trainer_link_status.dart' show kEstadosDeVinculoVivo;
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -217,6 +218,21 @@ final totalUnreadCountProvider = Provider.autoDispose<int>((ref) {
       );
 });
 
+/// El uid del PF del alumno, o null si no tiene un vínculo VIVO: `active` o
+/// `paused` ([kEstadosDeVinculoVivo]).
+///
+/// Pausar es un hold, no un corte: el chat con el PF sigue abierto
+/// (`chatCreateOk` acepta `active|paused`, `syncChatOnTrainerLink` no lo
+/// cierra) y la tab Coach ofrece MENSAJE. Con el vínculo active-only
+/// (`currentAthleteLinkProvider`) un alumno pausado quedaba sin PF acá: los
+/// mensajes de su PF no contaban en el badge de Coach y se colaban en el del
+/// Feed (#1845).
+String? _coachUidDelAlumno(Ref ref) {
+  final link = ref.watch(currentAthleteLinkAnyStatusProvider).valueOrNull;
+  if (link == null || !kEstadosDeVinculoVivo.contains(link.status)) return null;
+  return link.trainerId;
+}
+
 /// Count of unread chats where the OTHER member is the athlete's coach.
 ///
 /// Alimenta el badge de la tab COACH en el bottom nav del alumno: solo
@@ -226,16 +242,15 @@ final totalUnreadCountProvider = Provider.autoDispose<int>((ref) {
 ///
 /// Returns 0 when:
 /// - uid is null,
-/// - the athlete has no active [TrainerLink] (currentAthleteLinkProvider
-///   emits null),
+/// - the athlete has no LIVE [TrainerLink] (`active` or `paused`; see
+///   [_coachUidDelAlumno]),
 /// - the chat stream is loading/error,
 /// - or there is no chat with the coach yet.
 final unreadFromCoachProvider = Provider.autoDispose<int>((ref) {
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return 0;
-  final link = ref.watch(currentAthleteLinkProvider).valueOrNull;
-  if (link == null) return 0;
-  final coachUid = link.trainerId;
+  final coachUid = _coachUidDelAlumno(ref);
+  if (coachUid == null) return 0;
   return ref.watch(chatsForCurrentUserProvider).maybeWhen(
         data: (chats) => chats
             .where((c) => c.members.contains(coachUid) && chatHasUnread(c, uid))
@@ -256,8 +271,7 @@ final unreadFromCoachProvider = Provider.autoDispose<int>((ref) {
 final unreadFromFriendsProvider = Provider.autoDispose<int>((ref) {
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return 0;
-  final link = ref.watch(currentAthleteLinkProvider).valueOrNull;
-  final coachUid = link?.trainerId;
+  final coachUid = _coachUidDelAlumno(ref);
   return ref.watch(chatsForCurrentUserProvider).maybeWhen(
         data: (chats) => chats
             .where((c) =>

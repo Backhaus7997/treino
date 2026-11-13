@@ -22,6 +22,7 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart'
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/infrastructure/before_unload_guard.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/blocked_students_screen.dart'
     show kBlockedStudentsRoutePath;
@@ -158,6 +159,22 @@ Future<void> _agregarSemanaCopiandoLaAnterior(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('duplicate_week_confirm_button')));
   await tester.pumpAndSettle();
+}
+
+/// El `BeforeUnloadGuard` de los tests: el listener real habla con `window` y
+/// no existe en la VM.
+class _BeforeUnloadFalso implements BeforeUnloadGuard {
+  bool prendido = false;
+  int llamadasAPrender = 0;
+
+  @override
+  void arm() {
+    llamadasAPrender++;
+    prendido = true;
+  }
+
+  @override
+  void disarm() => prendido = false;
 }
 
 /// La respuesta de un `createAssigned`/`createTemplate` que devuelve la rutina
@@ -2263,6 +2280,206 @@ void main() {
     });
   });
 
+  // -- Numéricos con tope (#1796) --------------------------------------------
+  //
+  // Antes ningún campo tenía formatter: se aceptaba `-50` kg, `99999999999`
+  // reps e `Infinity`. Los topes son los de `set_limits.dart`: 999 reps, 500
+  // kg, 600 s de descanso, 5999 s de duración y 100 000 m de distancia.
+  group('RoutineEditorWebScreen — numéricos acotados', () {
+    Future<void> agregarEjercicio(WidgetTester tester) async {
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+      await expandirEjercicios(tester);
+    }
+
+    Finder campo(String clave) => find.byKey(Key(clave)).first;
+    final reps = campo('routine_editor_reps_field');
+    final kg = campo('routine_editor_weight_field');
+    final seg = campo('routine_editor_duration_field');
+    final metros = campo('routine_editor_distance_field');
+    final descanso = campo('routine_editor_rest_field');
+
+    String texto(WidgetTester tester, Finder campo) => tester
+        .widget<TextField>(
+          find.descendant(of: campo, matching: find.byType(TextField)),
+        )
+        .controller!
+        .text;
+
+    /// Escribe [valor] y devuelve lo que QUEDÓ en el campo.
+    Future<String> escribir(
+      WidgetTester tester,
+      Finder campo,
+      String valor,
+    ) async {
+      await tester.enterText(campo, valor);
+      await tester.pumpAndSettle();
+      return texto(tester, campo);
+    }
+
+    testWidgets('reps: el 4º dígito se rechaza, y 11 dígitos también', (
+      tester,
+    ) async {
+      await _pumpEditor(tester);
+      await agregarEjercicio(tester);
+
+      expect(await escribir(tester, reps, '999'), '999');
+      expect(await escribir(tester, reps, '9999'), '999');
+      expect(await escribir(tester, reps, '99999999999'), '999');
+    });
+
+    testWidgets('peso: sin negativos, sin letras, hasta 500 kg', (
+      tester,
+    ) async {
+      await _pumpEditor(tester);
+      await agregarEjercicio(tester);
+
+      expect(await escribir(tester, kg, '82,5'), '82,5');
+      expect(await escribir(tester, kg, '-50'), '82,5');
+      expect(await escribir(tester, kg, 'Infinity'), '82,5');
+      expect(await escribir(tester, kg, '501'), '82,5');
+      expect(await escribir(tester, kg, '500'), '500');
+    });
+
+    testWidgets('descanso: hasta 600 s, sin negativos', (tester) async {
+      await _pumpEditor(tester);
+      await agregarEjercicio(tester);
+
+      expect(await escribir(tester, descanso, '180'), '180');
+      expect(await escribir(tester, descanso, '601'), '180');
+      expect(await escribir(tester, descanso, '-30'), '180');
+      expect(await escribir(tester, descanso, '999999'), '180');
+      expect(await escribir(tester, descanso, '600'), '600');
+    });
+
+    testWidgets('duración hasta 5999 s y distancia hasta 100 000 m', (
+      tester,
+    ) async {
+      await _pumpEditor(tester);
+      await agregarEjercicio(tester);
+
+      await tester.tap(find.text('Tiempo'));
+      await tester.pumpAndSettle();
+      expect(await escribir(tester, seg, '5999'), '5999');
+      expect(await escribir(tester, seg, '6000'), '5999');
+
+      await tester.tap(find.text('Distancia'));
+      await tester.pumpAndSettle();
+      expect(await escribir(tester, metros, '100000'), '100000');
+      expect(await escribir(tester, metros, '100001'), '100000');
+    });
+
+    testWidgets('una tecla rechazada por el tope lo dice', (tester) async {
+      await _pumpEditor(tester);
+      await agregarEjercicio(tester);
+
+      await tester.enterText(reps, '9999');
+      await tester.pump();
+
+      expect(find.text('Máximo 999 reps'), findsOneWidget);
+      // Drenar el auto-dismiss del SnackBar (ver el test de la copia).
+      await tester.pump(const Duration(seconds: 6));
+    });
+
+    testWidgets('los topes exactos se guardan tal cual, sin recortar', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(
+        () => repo.createAssigned(any()),
+      ).thenAnswer((i) async => i.positionalArguments.first as Routine);
+      await _pumpEditor(tester, repo: repo);
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Topes',
+      );
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_split_field')),
+        'Full Body',
+      );
+      await agregarEjercicio(tester);
+      await escribir(tester, descanso, '600');
+      await escribir(tester, kg, '500');
+      await escribir(tester, reps, '999');
+
+      await _tapGuardar(tester);
+
+      final slot = (verify(() => repo.createAssigned(captureAny()))
+              .captured
+              .single as Routine)
+          .days
+          .single
+          .slots
+          .single;
+      expect(slot.restSeconds, 600);
+      expect(slot.sets.single.weightKg, 500);
+      expect(slot.sets.single.reps, 999);
+    });
+
+    testWidgets(
+        'un plan ya guardado con un valor fuera de tope no se re-guarda', (
+      tester,
+    ) async {
+      // Los topes nuevos no alcanzan a los documentos que ya los pasaban: el
+      // formulario los muestra y se niega a re-escribirlos hasta que el PF los
+      // corrija, en vez de recortarlos en silencio.
+      final repo = _MockRoutineRepository();
+      final base = _simpleRoutine();
+      final slot = base.days.single.slots.single;
+      when(() => repo.getById(any())).thenAnswer(
+        (_) async => base.copyWith(
+          days: [
+            base.days.single.copyWith(
+              slots: [
+                slot.copyWith(sets: const [SetSpec(reps: 5000, weightKg: 60)]),
+              ],
+            ),
+          ],
+        ),
+      );
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      await _tapGuardar(tester);
+
+      expect(find.textContaining('fuera de rango'), findsWidgets);
+      verifyNever(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      );
+    });
+
+    testWidgets('un descanso guardado por encima del tope tampoco', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      final base = _simpleRoutine();
+      when(() => repo.getById(any())).thenAnswer(
+        (_) async => base.copyWith(
+          days: [
+            base.days.single.copyWith(
+              slots: [base.days.single.slots.single.copyWith(restSeconds: 900)],
+            ),
+          ],
+        ),
+      );
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      await _tapGuardar(tester);
+
+      expect(find.textContaining('descanso'), findsWidgets);
+      verifyNever(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      );
+    });
+  });
+
   // -- Guardar con el editor abierto por URL (#1733) -------------------------
   //
   // Con el editor como única ruta no hay nada que sacar de la pila:
@@ -2600,6 +2817,128 @@ void main() {
         '/template-editor/:templateId',
       ]);
       expect(rutas.every((r) => r.onExit != null), isTrue);
+    });
+  });
+
+  // -- Recargar o cerrar la pestaña (#1732) -----------------------------------
+  //
+  // F5, cerrar la pestaña o pegar otra URL no pasan por el router: sólo el
+  // navegador puede preguntar, y sólo si la página se lo pidió ANTES. El
+  // listener real no existe en la VM; acá se prueba CUÁNDO la pantalla lo
+  // prende y lo apaga, contra un guard de mentira.
+  group('RoutineEditorWebScreen — aviso al recargar o cerrar la pestaña', () {
+    late _BeforeUnloadFalso aviso;
+    setUp(() => aviso = _BeforeUnloadFalso());
+
+    List<Override> conAviso() => [
+          beforeUnloadGuardProvider.overrideWithValue(aviso),
+        ];
+
+    Future<void> escribirNombre(WidgetTester tester) async {
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('un editor sin tocar NO lo prende', (tester) async {
+      await _pumpEditor(tester, extraOverrides: conAviso());
+
+      expect(aviso.prendido, isFalse);
+      expect(aviso.llamadasAPrender, 0);
+    });
+
+    testWidgets('editar un plan existente sin tocarlo tampoco', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        routineId: 'r1',
+        extraOverrides: conAviso(),
+      );
+
+      expect(aviso.prendido, isFalse);
+    });
+
+    testWidgets('la primera edición lo prende, una sola vez', (tester) async {
+      await _pumpEditor(tester, extraOverrides: conAviso());
+
+      await escribirNombre(tester);
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_split_field')),
+        'PPL',
+      );
+      await tester.pumpAndSettle();
+
+      expect(aviso.prendido, isTrue);
+      expect(aviso.llamadasAPrender, 1);
+    });
+
+    testWidgets('guardar lo apaga: ya no hay nada que perder', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(_creaConId('n1'));
+      await _pumpEditor(tester, repo: repo, extraOverrides: conAviso());
+      await _fillMinimalValidForm(tester);
+      expect(aviso.prendido, isTrue);
+
+      await _tapGuardar(tester);
+
+      expect(aviso.prendido, isFalse);
+    });
+
+    testWidgets('irse de la pantalla (Descartar) lo apaga', (tester) async {
+      final router = await _pumpEditor(
+        tester,
+        enElShell: true,
+        extraOverrides: conAviso(),
+      );
+      await escribirNombre(tester);
+      expect(aviso.prendido, isTrue);
+
+      router.go('/rutinas');
+      await tester.pumpAndSettle();
+      expect(
+        aviso.prendido,
+        isTrue,
+        reason: 'el diálogo todavía no se contestó',
+      );
+
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(aviso.prendido, isFalse);
+    });
+
+    testWidgets('lo tipeado MIENTRAS se guarda no lo apaga', (tester) async {
+      final escritura = Completer<Routine>();
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any()))
+          .thenAnswer((_) => escritura.future);
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        enElShell: true,
+        extraOverrides: conAviso(),
+      );
+      await _fillMinimalValidForm(tester);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza 5x semana',
+      );
+      final enviada = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      escritura.complete(enviada.copyWith(id: 'n1'));
+      await tester.pumpAndSettle();
+
+      // Eso no llegó a ningún lado: la salida pregunta y el aviso sigue.
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+      expect(aviso.prendido, isTrue);
     });
   });
 
@@ -2962,6 +3301,43 @@ void main() {
       // más abajo se ponía rojo por esto y pasaba en aislamiento, que es la
       // firma de una contaminación entre tests, no de un bug.
       await tester.pump(const Duration(seconds: 6));
+    });
+
+    // El test de arriba mira el cartel en el primer frame, con el editor
+    // todavía en pantalla: la transición de salida recién arranca. El editor se
+    // dispone cuando ésta termina, y `dispose()` hacía `clearSnackBars()` — el
+    // aviso de «dónde quedó la copia» se iba a los ~300 ms, justo cuando el PF
+    // lo estaba leyendo en la pantalla de atrás, que es para lo que se avisa
+    // «antes de que el editor se cierre».
+    testWidgets(
+        'el aviso de la copia SOBREVIVE al cierre del editor: se lee en la '
+        'pantalla de atrás', (tester) async {
+      await editando(tester);
+      await cambiarAlgo(tester);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guardar como copia'));
+      // Sin pumpAndSettle: llevaría el reloj más allá de los 4 s del cartel y
+      // lo desharía por su propio timer. Y en pasos CHICOS: la animación de
+      // salida del cartel (la que dispara `clearSnackBars`) necesita frames
+      // POSTERIORES al `dispose`; un solo pump de 800 ms lo dispone en su
+      // último frame y el test mira antes de que el cartel llegue a irse.
+      await tester.pump();
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      expect(find.text('AlumnoDetail'), findsOneWidget,
+          reason:
+              'el editor ya se cerró: se está mirando la pantalla de atrás');
+      expect(
+        find.textContaining('La original quedó como estaba'),
+        findsOneWidget,
+        reason: 'el aviso es lo único que le dice al PF dónde quedó la copia',
+      );
+
+      await tester.pump(const Duration(seconds: 6)); // drenar el SnackBar
     });
   });
 

@@ -11,6 +11,7 @@ import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
+import 'package:treino/features/coach/domain/trainer_public_profile.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/athlete_coach_view.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
@@ -18,16 +19,17 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/trainers_list_screen.dart';
 import 'package:treino/features/payments/application/mi_cuota_provider.dart';
+import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-List<Override> _baseOverrides(NutritionPlan? plan) => [
+List<Override> _baseOverrides(NutritionPlan? plan, {MiCuotaState? cuota}) => [
       // Keep Firestore out of these widget tests. The payments "Tu cuota"
       // section (miCuotaProvider) reads firestoreProvider, which has no
       // Firebase app in unit tests.
       miCuotaProvider.overrideWith(
-        (ref) => const AsyncValue<MiCuotaState?>.data(null),
+        (ref) => AsyncValue<MiCuotaState?>.data(cuota),
       ),
       // QA-COA-001: the view/harness now read currentAthleteLinkAnyStatusProvider
       // for the card-vs-discovery decision. Bridge it to whatever each test
@@ -35,6 +37,11 @@ List<Override> _baseOverrides(NutritionPlan? plan) => [
       // overrides keep driving the view unchanged.
       currentAthleteLinkAnyStatusProvider.overrideWith(
           (ref) => ref.watch(currentAthleteLinkProvider.future).asStream()),
+      // «TU CUOTA» busca el alias de cobro del PF; sin esto pegaría contra la
+      // instancia real.
+      trainerByIdProvider.overrideWith(
+        (ref, uid) async => const TrainerPublicProfile(uid: 'trainer-1'),
+      ),
       // #1517: la card lee el plan para decidir el peso de su CTA. Va acá y
       // no en `overrides` porque Riverpod no deja pisar un provider dos
       // veces en el mismo scope.
@@ -45,9 +52,10 @@ Widget _wrap(
   Widget child, {
   List<Override> overrides = const [],
   NutritionPlan? plan,
+  MiCuotaState? cuota,
 }) =>
     ProviderScope(
-      overrides: [..._baseOverrides(plan), ...overrides],
+      overrides: [..._baseOverrides(plan, cuota: cuota), ...overrides],
       child: MaterialApp(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
@@ -285,8 +293,9 @@ void main() {
     // SCEN-CHLM-018 — el estado pausado. La versión original (sólo TERMINAR
     // VÍNCULO) era el arreglo mínimo de un callejón sin salida y fijaba, de
     // paso, que MENSAJE no se cuela en paused. #1698 la reemplaza: pausar es
-    // un hold, no un corte (el chat sigue abierto en el servidor), y el
-    // diálogo del PF promete «El alumno verá el plan…».
+    // un hold, no un corte (el chat sigue abierto en el servidor). #1842 suma
+    // el plan nutricional, la agenda y la cuota: sus rutas y `miCuotaProvider`
+    // ya resuelven el vínculo vivo (`active|paused`).
     group('SCEN-CHLM-018 / #1698: vínculo PAUSADO', () {
       final pausado = _makeLink(status: TrainerLinkStatus.paused);
 
@@ -319,24 +328,51 @@ void main() {
       });
 
       testWidgets(
-          'NO ofrece lo que hoy abriría el cartel «vínculo activo»: plan '
-          'nutricional y agenda', (tester) async {
-        // Las reglas dejan leerlos, pero sus rutas (`_montarConPista`, en
-        // router.dart) resuelven el vínculo con `currentAthleteLinkProvider`,
-        // que es sólo `active`. Ofrecer el botón llevaría a «No encontramos un
-        // vínculo activo». Si esas rutas aprenden `paused`, este test es el
-        // que hay que dar vuelta.
+          'ofrece el plan nutricional, la agenda y la cuota: con el vínculo '
+          'pausado sus rutas y la cuota resuelven el vínculo VIVO (#1842)',
+          (tester) async {
         await tester.pumpWidget(
-          _wrap(const AthleteCoachView(), overrides: overridesPausado()),
+          _wrap(
+            const AthleteCoachView(),
+            overrides: overridesPausado(),
+            cuota: const MiCuotaState(items: [
+              MiCuotaItem(
+                amountArs: 15000,
+                cadence: BillingCadence.suelto,
+                concept: 'Cuota de noviembre',
+              ),
+            ]),
+          ),
         );
         await tester.pumpAndSettle();
         final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
 
-        expect(find.text(l10n.athleteNutritionPlanButtonLabel), findsNothing);
-        expect(find.text(l10n.agendaButtonLabel), findsNothing);
-        // Y el «Tu PF puede ver tu historial» es del vínculo activo.
+        expect(find.text(l10n.athleteNutritionPlanButtonLabel), findsOneWidget);
+        expect(find.text(l10n.agendaButtonLabel), findsOneWidget);
+        expect(find.text('TU CUOTA'), findsOneWidget);
+        expect(find.text('Cuota de noviembre · Suelto'), findsOneWidget);
+        // Y el «Tu PF puede ver tu historial» sigue siendo del vínculo activo:
+        // pausar le revoca al PF el acceso a las sesiones.
         expect(find.text('Tu PF puede ver tu historial de entrenamiento.'),
             findsNothing);
+      });
+
+      testWidgets(
+          'con plan cargado, el plan nutricional es el acceso relleno, igual '
+          'que con el vínculo activo (#1517)', (tester) async {
+        await tester.pumpWidget(
+          _wrap(
+            const AthleteCoachView(),
+            overrides: overridesPausado(),
+            plan: _makePlan(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        final relleno = _fondoDe(tester, l10n.athleteNutritionPlanButtonLabel);
+        final delineado = _fondoDe(tester, l10n.agendaButtonLabel);
+        expect(relleno, isNot(equals(delineado)));
       });
 
       testWidgets('pantalla chica y fuente grande: sin overflow',
@@ -397,6 +433,22 @@ void main() {
                   const Scaffold(body: Text('DESTINO:archivos')),
             ),
             GoRoute(
+              path: '/coach/nutricion',
+              builder: (_, state) => Scaffold(
+                body: Text(
+                  'DESTINO:nutricion:${state.uri.queryParameters['trainerId']}',
+                ),
+              ),
+            ),
+            GoRoute(
+              path: '/coach/agenda',
+              builder: (_, state) => Scaffold(
+                body: Text(
+                  'DESTINO:agenda:${state.uri.queryParameters['trainerId']}',
+                ),
+              ),
+            ),
+            GoRoute(
               path: '/coach/chat/:chatId',
               builder: (_, state) => Scaffold(
                 body: Text(
@@ -438,6 +490,29 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('DESTINO:workout'), findsOneWidget);
+      });
+
+      testWidgets('PLAN NUTRICIONAL → /coach/nutricion con el trainerId',
+          (tester) async {
+        await tester.pumpWidget(conRouter());
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        await tester.tap(find.text(l10n.athleteNutritionPlanButtonLabel));
+        await tester.pumpAndSettle();
+
+        expect(find.text('DESTINO:nutricion:trainer-1'), findsOneWidget);
+      });
+
+      testWidgets('AGENDA → /coach/agenda con el trainerId', (tester) async {
+        await tester.pumpWidget(conRouter());
+        await tester.pumpAndSettle();
+        final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+
+        await tester.tap(find.text(l10n.agendaButtonLabel));
+        await tester.pumpAndSettle();
+
+        expect(find.text('DESTINO:agenda:trainer-1'), findsOneWidget);
       });
 
       testWidgets('MIS ARCHIVOS → /coach/archivos', (tester) async {

@@ -553,7 +553,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get athleteLinkPausedNote =>
-      'Your trainer paused the link. What they already left you — routines and files — is still within reach, and you can message them. It resumes when your trainer reactivates it.';
+      'Your trainer paused the link. What they already left you — routines, files, nutrition plan and schedule — is still within reach, and you can message them. It resumes when your trainer reactivates it.';
 
   @override
   String get athleteNutritionPlanScreenTitle => 'NUTRITION PLAN';
@@ -3285,7 +3285,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachHubDashboardPauseLinkBody =>
-      'The athlete will still see the plan but won\'t be able to log new sessions until you resume the link.';
+      'The athlete keeps their routines, nutrition plan, schedule and chat. You stop seeing their sessions until you resume the link.';
 
   @override
   String get coachHubDashboardTerminateLinkTitle => 'End link';

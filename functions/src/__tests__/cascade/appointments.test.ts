@@ -144,6 +144,64 @@ describe("SCENARIO-544: future appointment cancelled, past appointment unchanged
   });
 });
 
+// ─── El marco de `startsAt` ──────────────────────────────────────────────────
+//
+// `startsAt` se guarda como hora de pared argentina etiquetada UTC (ADR-7): el
+// instante real MENOS 3 h. La cascada lo comparaba contra `Timestamp.now()`, y
+// un turno que empieza en 1 h (guardado «hace 2 h») figuraba como ya pasado: los
+// turnos de las próximas ~3 h quedaban `confirmed` con la cuenta borrada.
+//
+// Estos turnos se siembran COMO LOS GUARDA LA APP. Sembrarlos con el instante
+// real (como `futureDate()` de arriba, a 7 días) mide otra cosa y escondía el
+// desfase: a 7 días los dos marcos coinciden.
+const MIN = 60 * 1000;
+const HOUR = 60 * MIN;
+const storedLikeTheApp = (realOffsetMs: number): Timestamp =>
+  Timestamp.fromMillis(Date.now() + realOffsetMs - 3 * HOUR);
+
+describe("appointments: el marco de startsAt (wall-clock ART, ADR-7)", () => {
+  const uid = "appointments-cascade-frame";
+  const casos: Array<[string, number, string]> = [
+    ["empieza en 10 min", 10 * MIN, "cancelled"],
+    ["empieza en 1 h", HOUR, "cancelled"],
+    ["empieza en 2 h 50 min", 170 * MIN, "cancelled"],
+    ["empezó hace 10 min", -10 * MIN, "confirmed"],
+    ["empezó hace 1 h", -HOUR, "confirmed"],
+  ];
+  const ids = casos.map((_, i) => `appt-frame-${i}`);
+
+  afterEach(() => cleanupAppointments(ids));
+
+  it("premisa: guardado como lo guarda la app, un turno en 1 h queda ANTES de now() en instante real", () => {
+    // Si esto deja de valer, los casos de abajo ya no distinguen un marco del otro.
+    expect(storedLikeTheApp(HOUR).toMillis()).toBeLessThan(Date.now());
+  });
+
+  it.each(casos.map((c, i) => [...c, ids[i]] as [string, number, string, string]))(
+    "el turno que %s",
+    async (_nombre, offset, esperado, id) => {
+      await db().collection("appointments").doc(id).set({
+        athleteId: uid,
+        trainerId: "trainer-xyz",
+        startsAt: storedLikeTheApp(offset),
+        status: "confirmed",
+      });
+
+      const res = await cancelFutureAppointments(testApp, uid);
+
+      const d = (await db().collection("appointments").doc(id).get()).data()!;
+      expect(d.status).toBe(esperado);
+      expect(res.count).toBe(esperado === "cancelled" ? 1 : 0);
+      if (esperado === "cancelled") {
+        expect(d.reason).toBe("athlete-account-deleted");
+        expect(d.cancelledBy).toBe(uid);
+      } else {
+        expect(d.reason).toBeUndefined(); // lo que ya empezó no se toca
+      }
+    }
+  );
+});
+
 describe("appointments: no future appointments is a no-op", () => {
   const uid = "appointments-cascade-no-future";
 

@@ -12,6 +12,7 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_day_duration.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/set_spec.dart';
 
 RoutineSlot _slot() => const RoutineSlot(
       exerciseId: 'bench',
@@ -125,6 +126,56 @@ void main() {
         (minutes: 45, authored: true),
         reason: '0 is not a real duration — it must not shadow the days',
       );
+    });
+  });
+
+  // «~6666666672 MINUTOS» (#1796) salía de reps = 99999999999.
+  group('estimateRoutineDayMinutes — datos fuera de rango (#1796)', () {
+    int? minutos(List<SetSpec> sets, {int rest = 60}) =>
+        estimateRoutineDayMinutes(
+          RoutineDay(
+            dayNumber: 1,
+            name: 'Día 1',
+            slots: [
+              RoutineSlot(
+                exerciseId: 'bench',
+                exerciseName: 'Press de Banca',
+                muscleGroup: 'chest',
+                targetSets: sets.length,
+                targetRepsMin: 8,
+                targetRepsMax: 12,
+                restSeconds: rest,
+                sets: sets,
+              ),
+            ],
+          ),
+        ).minutes;
+
+    test('reps de 11 dígitos cuentan como el tope, no como miles de millones',
+        () {
+      final absurdo = minutos([const SetSpec(reps: 99999999999)]);
+
+      expect(absurdo, minutos([const SetSpec(reps: 999)]));
+      expect(absurdo, lessThan(120));
+    });
+
+    test('un descanso absurdo cuenta como el tope de 600 s', () {
+      final dos = [const SetSpec(reps: 10), const SetSpec(reps: 10)];
+
+      expect(minutos(dos, rest: 999999999), minutos(dos, rest: 600));
+    });
+
+    test('una duración absurda cuenta como el tope de 5999 s', () {
+      expect(
+        minutos([const SetSpec(durationSeconds: 99999999)]),
+        minutos([const SetSpec(durationSeconds: 5999)]),
+      );
+    });
+
+    test('un día nunca pasa de 24 horas', () {
+      final muchas = List.generate(400, (_) => const SetSpec(reps: 999));
+
+      expect(minutos(muchas), 24 * 60);
     });
   });
 }

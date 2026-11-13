@@ -3,7 +3,8 @@
  *
  * Queries `appointments` where:
  *   - `athleteId == uid`
- *   - `startsAt > now()`
+ *   - `startsAt` por venir — medido en el marco de `startsAt`, NO contra `Timestamp.now()`
+ *     (ver `startsAtFrameNow`)
  *   - `status != 'cancelled'`   (already-cancelled are left as-is)
  *
  * Updates each matching doc:
@@ -78,6 +79,7 @@
 
 import { App } from "firebase-admin/app";
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
+import { toArgentina } from "../notifications/weekly-streak";
 
 const BATCH_SIZE = 500;
 
@@ -99,6 +101,24 @@ const BATCH_SIZE = 500;
 export const ATHLETE_ACCOUNT_DELETED_REASON = "athlete-account-deleted";
 
 /**
+ * "Ahora" en el marco en que se guarda `startsAt`: hora de pared argentina
+ * etiquetada UTC (ADR-7), o sea el instante real MENOS 3 h. Es contra lo que
+ * mide el cliente (`nowWall()` en `wall_clock.dart`), las reglas (el gate de 24 h
+ * del Path 1) y `cancelAppointmentsOnUnlink`.
+ *
+ * Comparar `startsAt` contra `Timestamp.now()` corre el corte 3 h hacia
+ * adelante: un turno que empieza en 1 h se guarda como «hace 2 h» y las
+ * cascadas de borrado de cuenta lo daban por pasado. Justo los turnos más
+ * cercanos, que son los que el alumno no puede cancelar (>24 h) y los que más
+ * daño hacen colgados: quedaban `confirmed` con el nombre de una cuenta borrada.
+ *
+ * Lo comparten esta cascada y la del PF (`cascade/trainer-data.ts`).
+ */
+export function startsAtFrameNow(nowMs: number = Date.now()): Timestamp {
+  return Timestamp.fromMillis(toArgentina(nowMs));
+}
+
+/**
  * Cancels all future, non-cancelled appointments for the given athlete uid.
  * Returns the count of cancelled documents.
  */
@@ -107,7 +127,7 @@ export async function cancelFutureAppointments(
   uid: string
 ): Promise<{ count: number }> {
   const db = getFirestore(app);
-  const now = Timestamp.now();
+  const now = startsAtFrameNow();
 
   // Query future appointments for this athlete that are not already cancelled.
   // QA-API-001: the field is `startsAt` (what appointment_repository writes and

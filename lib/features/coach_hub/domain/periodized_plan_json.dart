@@ -16,8 +16,9 @@ import 'periodized_plan.dart';
 /// renglón en el día (base 1) y la ubicación va en el mensaje
 /// (`Día 1, renglón 2, …`); sólo los avisos del extractor traen página.
 
-/// Descanso máximo por renglón, en segundos.
-const int kMaxPdfRestSeconds = 600;
+/// Descanso máximo por renglón, en segundos. Es el techo de dominio de
+/// `set_limits.dart`: el editor web usa el mismo.
+const int kMaxPdfRestSeconds = kMaxRestSeconds;
 
 /// Descanso cuando el extractor no lo informa: el mismo default que la celda
 /// vacía del Excel (`kDefaultRestSeconds` de la gramática).

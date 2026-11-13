@@ -429,6 +429,48 @@ void main() {
     });
   });
 
+  // ── PAUSAR VÍNCULO (#1843) ────────────────────────────────────────────────
+  //
+  // El diálogo decía «Va a quedar en read-only hasta que reanudes», y el alumno
+  // pausado no queda en read-only: sigue viendo y usando lo suyo, y nada le
+  // bloquea registrar sesiones. Lo que sí cambia es que el PF deja de ver sus
+  // sesiones (se revoca `session_shares`).
+  group('TrainerCoachView — PAUSAR VÍNCULO dice lo que pausar hace', () {
+    testWidgets('el diálogo no promete un bloqueo que no existe',
+        (tester) async {
+      final repo = _MockLinkRepo();
+      when(() => repo.pause(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_wrap(
+        const TrainerCoachView(),
+        locale: const Locale('es', 'AR'),
+        overrides: [
+          ..._stubLinks([_link(id: 'l1', status: TrainerLinkStatus.active)]),
+          trainerLinkRepositoryProvider.overrideWithValue(repo),
+        ],
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ALUMNOS'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('PAUSAR VÍNCULO'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          'Conserva sus rutinas, su plan nutricional, la agenda y el chat, y '
+          'vos dejás de ver sus sesiones hasta que reanudes.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('read-only'), findsNothing);
+
+      await tester.tap(find.text('Pausar'));
+      await tester.pumpAndSettle();
+      verify(() => repo.pause('l1')).called(1);
+    });
+  });
+
   // ── Silent-failure guard (QA H5) ──────────────────────────────────────────
   //
   // TERMINAR/PAUSAR/REANUDAR corrían `await action()` sin try/catch: si el

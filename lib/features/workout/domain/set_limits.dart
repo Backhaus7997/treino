@@ -14,6 +14,16 @@ const int kMaxReps = 999;
 /// Max load in kg for a single set.
 const double kMaxWeightKg = 500.0;
 
+/// Max rest between sets, in seconds (10 min). Es el mismo techo que el import
+/// de PDF (`kMaxPdfRestSeconds`): lo más largo que un plan real le pide a un
+/// alumno entre series pesadas.
+const int kMaxRestSeconds = 600;
+
+/// Max duration of a timed set, in seconds. Es el 99:59 del campo mm:ss del
+/// teléfono (`DurationTextField`), así que lo que se arma en una pantalla entra
+/// en la otra.
+const int kMaxDurationSeconds = 99 * 60 + 59;
+
 /// Max distance of a distance set, in meters (100 km). Un tope de sanidad, no
 /// de entrenamiento: deja afuera `99999999999`, no una salida larga.
 const double kMaxDistanceMeters = 100000.0;

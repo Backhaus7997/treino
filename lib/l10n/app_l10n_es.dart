@@ -561,7 +561,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get athleteLinkPausedNote =>
-      'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas y archivos— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.';
+      'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas, archivos, plan nutricional y agenda— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.';
 
   @override
   String get athleteNutritionPlanScreenTitle => 'PLAN NUTRICIONAL';
@@ -3344,7 +3344,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get coachHubDashboardPauseLinkBody =>
-      'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.';
+      'El alumno conserva sus rutinas, su plan nutricional, la agenda y el chat. Vos dejás de ver sus sesiones hasta que reanudes el vínculo.';
 
   @override
   String get coachHubDashboardTerminateLinkTitle => 'Terminar vínculo';
@@ -6994,7 +6994,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get athleteLinkPausedNote =>
-      'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas y archivos— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.';
+      'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas, archivos, plan nutricional y agenda— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.';
 
   @override
   String get athleteNutritionPlanScreenTitle => 'PLAN NUTRICIONAL';
@@ -9778,7 +9778,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubDashboardPauseLinkBody =>
-      'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.';
+      'El alumno conserva sus rutinas, su plan nutricional, la agenda y el chat. Vos dejás de ver sus sesiones hasta que reanudes el vínculo.';
 
   @override
   String get coachHubDashboardTerminateLinkTitle => 'Terminar vínculo';

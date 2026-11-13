@@ -152,6 +152,33 @@ final currentAthleteLinkAnyStatusProvider =
   ).map(vinculoPrioritario);
 });
 
+/// Vínculo VIVO del atleta actual con su PF — `active` o `paused`
+/// ([kEstadosDeVinculoVivo]) — o null si no tiene ninguno.
+///
+/// Es lo que necesita lo que el alumno conserva mientras el PF tiene el vínculo
+/// en pausa (#1842): el plan nutricional, la agenda, la cuota y el chat. Pausar
+/// es un hold, no un corte, y las reglas leen esos datos por `athleteId` sin
+/// mirar el vínculo. Con [currentAthleteLinkProvider] (sólo `active`) esas
+/// pantallas le decían «no encontramos un vínculo activo» a un alumno cuyo PF
+/// sigue siendo su PF.
+///
+/// Se DERIVA de [currentAthleteLinkAnyStatusProvider] en vez de abrir otra
+/// query: una sola suscripción por alumno, y un `pending` suelto no cuenta
+/// (nunca se aceptó). Conserva el estado de carga y de error del original: un
+/// `AsyncLoading` sigue siendo «todavía no sé», nunca «no tenés vínculo».
+///
+/// NO reemplaza a [currentAthleteLinkProvider]: el entitlement del paywall, las
+/// reseñas y el player piden `active` a propósito (un `paused` no otorga el
+/// derecho que daba el PF).
+final currentAthleteLinkVivoProvider =
+    Provider.autoDispose<AsyncValue<TrainerLink?>>((ref) {
+  return ref.watch(currentAthleteLinkAnyStatusProvider).whenData(
+        (link) => link != null && kEstadosDeVinculoVivo.contains(link.status)
+            ? link
+            : null,
+      );
+});
+
 /// Ventana en la que el stream de vínculos SOBREVIVE a que lo suelten.
 ///
 /// Es navegación, no caché de datos: moverse entre secciones del Coach Hub no
