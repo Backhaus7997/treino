@@ -49,6 +49,30 @@ void main() {
     });
   });
 
+  // #1698: Analytics no tiene emulador y salía a PRODUCCIÓN con USE_EMULATOR
+  // (1068 requests en una pasada de QA). Sólo apaga: nunca prende de más.
+  group('analyticsEfectiva', () {
+    test('con USE_EMULATOR queda APAGADA aunque el usuario consienta', () {
+      expect(analyticsEfectiva(true, emulador: true), isFalse);
+      expect(analyticsEfectiva(false, emulador: true), isFalse);
+    });
+
+    test('sin USE_EMULATOR es el consentimiento, tal cual', () {
+      expect(analyticsEfectiva(true, emulador: false), isTrue);
+      expect(analyticsEfectiva(false, emulador: false), isFalse);
+    });
+
+    test(
+        'el default es el de este build: tests y builds normales, sin emulador',
+        () {
+      // Si esto da false con consentimiento, el `--dart-define=USE_EMULATOR`
+      // se coló en la corrida de tests y la analítica de los builds normales
+      // estaría apagada para todos.
+      expect(analyticsEfectiva(true), isTrue);
+      expect(analyticsEfectiva(false), isFalse);
+    });
+  });
+
   group('AnalyticsConsentNotifier — cuando algo falla', () {
     // Los tres lugares que tienen que quedar de acuerdo: lo que muestra el
     // switch, lo que hace Firebase y lo que queda guardado. Si uno falla, la
