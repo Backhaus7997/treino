@@ -201,11 +201,11 @@ class LinkStateCard extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.trainerId));
     final hasUnread = ref.watch(hasUnreadFromProvider(link.trainerId));
-    // Sólo con el vínculo activo: es el único estado que dibuja los accesos,
-    // y no hay por qué abrir el stream del plan para una solicitud pendiente.
-    // Mientras carga cuenta como "sin plan" — es el estado que no promete
-    // nada (#1517).
-    final tienePlan = link.status == TrainerLinkStatus.active &&
+    // Sólo con el vínculo vivo (`active|paused`): son los estados que dibujan
+    // los accesos, y no hay por qué abrir el stream del plan para una solicitud
+    // pendiente. Mientras carga cuenta como "sin plan" — es el estado que no
+    // promete nada (#1517).
+    final tienePlan = kEstadosDeVinculoVivo.contains(link.status) &&
         ref.watch(
           nutritionPlanProvider(
             (trainerId: link.trainerId, athleteId: link.athleteId),
@@ -253,6 +253,36 @@ class LinkStateCard extends ConsumerWidget {
               if (link.status == TrainerLinkStatus.active) ...[
                 const SizedBox(height: 14),
                 _ShareInfo(palette: palette),
+              ],
+              // PAUSADO (#1698): el PF puso el vínculo en espera, no lo cortó.
+              // Esta rama existía sólo para `active`, así que con el vínculo
+              // pausado el alumno veía el nombre del PF y un botón de TERMINAR.
+              //
+              // Lo que se suma acá es lo que sólo existe en este estado:
+              // el aviso y MIS RUTINAS. Los planes asignados no dependen del
+              // vínculo (la query es por `assignedTo`) y pausar no los archiva
+              // —eso lo hace `cleanupAssignedPlansOnUnlink`, sólo al terminar—,
+              // así que el alumno tiene que saber dónde están.
+              //
+              // El resto (plan nutricional, archivos, agenda y cuota) es el
+              // mismo bloque del vínculo activo, justo abajo: las reglas los
+              // leen por `athleteId`, y desde #1842 sus rutas y `miCuotaProvider`
+              // resuelven el vínculo VIVO (`active|paused`). MENSAJE queda en
+              // `_ActionRow`: el chat sigue abierto — `chatCreateOk` acepta
+              // `active|paused` y `syncChatOnTrainerLink` no lo cierra.
+              if (link.status == TrainerLinkStatus.paused) ...[
+                const SizedBox(height: 14),
+                _PausedInfo(
+                    palette: palette, texto: l10n.athleteLinkPausedNote),
+                const SizedBox(height: 12),
+                _AccesoDelAlumno(
+                  variante: TreinoButtonVariant.secondaryAccent,
+                  icono: TreinoIcon.tabWorkout,
+                  etiqueta: l10n.athleteRoutinesButtonLabel,
+                  onPressed: () => context.go('/workout'),
+                ),
+              ],
+              if (kEstadosDeVinculoVivo.contains(link.status)) ...[
                 const SizedBox(height: 12),
                 // Orden por importancia, no por historia. El plan nutricional
                 // es lo que el alumno viene a buscar, así que va primero y es
@@ -302,55 +332,13 @@ class LinkStateCard extends ConsumerWidget {
                   etiqueta: l10n.agendaButtonLabel,
                   // El trainerId viaja por la ruta para que el host NO tenga
                   // que volver a preguntar lo que esta pantalla ya sabe: estos
-                  // accesos sólo se dibujan si el vínculo está activo.
+                  // accesos sólo se dibujan si el vínculo está vivo.
                   onPressed: () => context.push(
                     '/coach/agenda?trainerId=${Uri.encodeComponent(link.trainerId)}',
                   ),
                 ),
                 const SizedBox(height: 16),
                 _CuotaSection(link: link),
-              ],
-              // PAUSADO (#1698): el PF puso el vínculo en espera, no lo cortó.
-              // Esta rama existía sólo para `active`, así que con el vínculo
-              // pausado el alumno veía el nombre del PF y un botón de TERMINAR,
-              // contra lo que el diálogo del PF le promete («El alumno verá el
-              // plan…», `coachHubDashboardPauseLinkBody`).
-              //
-              // Se ofrece SÓLO lo que se verificó que anda con el vínculo
-              // pausado, y por eso la lista es más corta que la del activo:
-              //   • MIS RUTINAS: los planes asignados no dependen del vínculo
-              //     (la query es por `assignedTo`) y pausar no los archiva —eso
-              //     lo hace `cleanupAssignedPlansOnUnlink`, sólo al terminar.
-              //   • MIS ARCHIVOS: la ruta no gatea por vínculo y las reglas de
-              //     `athlete_files` leen por `athleteId`.
-              //   • MENSAJE (abajo, en `_ActionRow`): el chat sigue abierto
-              //     — `chatCreateOk` acepta `active|paused` y
-              //     `syncChatOnTrainerLink` no lo cierra.
-              //
-              // NO están el plan nutricional, la agenda ni la cuota, aunque las
-              // reglas dejan leer los tres: sus rutas y `miCuotaProvider`
-              // resuelven el vínculo con `currentAthleteLinkProvider`
-              // (sólo `active`), así que abrirlos pausado daría «No encontramos
-              // un vínculo activo». Ofrecer un botón que lleva a ese cartel
-              // sería peor que no ofrecerlo.
-              if (link.status == TrainerLinkStatus.paused) ...[
-                const SizedBox(height: 14),
-                _PausedInfo(
-                    palette: palette, texto: l10n.athleteLinkPausedNote),
-                const SizedBox(height: 12),
-                _AccesoDelAlumno(
-                  variante: TreinoButtonVariant.secondaryAccent,
-                  icono: TreinoIcon.tabWorkout,
-                  etiqueta: l10n.athleteRoutinesButtonLabel,
-                  onPressed: () => context.go('/workout'),
-                ),
-                const SizedBox(height: 12),
-                _AccesoDelAlumno(
-                  variante: TreinoButtonVariant.secondaryAccent,
-                  icono: TreinoIcon.file,
-                  etiqueta: l10n.athleteFilesButtonLabel,
-                  onPressed: () => context.push('/coach/archivos'),
-                ),
               ],
               const SizedBox(height: 18),
               _ActionRow(link: link),

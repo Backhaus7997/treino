@@ -56,7 +56,12 @@ Appointment _appt(String id, DateTime startsAt) => Appointment(
       status: AppointmentStatus.confirmed,
     );
 
-Widget _wrap(Appointment appt, FakeFirebaseFirestore firestore) {
+Widget _wrap(
+  Appointment appt,
+  FakeFirebaseFirestore firestore, {
+  TrainerLink? link,
+}) {
+  final vinculo = link ?? _link;
   final router = GoRouter(
     routes: [
       GoRoute(
@@ -82,7 +87,16 @@ Widget _wrap(Appointment appt, FakeFirebaseFirestore firestore) {
         AppointmentRepository(firestore: firestore),
       ),
       userPublicProfileProvider.overrideWith((ref, uid) => Stream.value(null)),
-      currentAthleteLinkProvider.overrideWith((ref) => Stream.value(_link)),
+      // AVISAR A MI PF resuelve el vínculo VIVO (`active|paused`, #1842), que
+      // sale del AnyStatus: con el active-only suelto el test le pegaría a
+      // Firestore de verdad.
+      currentAthleteLinkProvider.overrideWith(
+        (ref) => Stream.value(
+          vinculo.status == TrainerLinkStatus.active ? vinculo : null,
+        ),
+      ),
+      currentAthleteLinkAnyStatusProvider
+          .overrideWith((ref) => Stream.value(vinculo)),
       chatForLinkProvider.overrideWith(
         (ref, link) async => Chat(
           chatId: 'chat-1515',
@@ -158,6 +172,55 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('chat chat-1515 con $_kTrainer'), findsOneWidget);
+  });
+
+  // #1842: pausar es un hold, el chat sigue abierto (`chatCreateOk` acepta
+  // `active|paused`). Antes este botón leía el vínculo activo y un alumno con el
+  // PF en pausa recibía «no pudimos abrir el chat».
+  testWidgets('con el vínculo PAUSADO, AVISAR A MI PF abre el chat igual',
+      (tester) async {
+    final appt = _appt('t-pausado', nowWall().add(const Duration(hours: 3)));
+
+    await tester.pumpWidget(
+      _wrap(
+        appt,
+        firestore,
+        link: _link.copyWith(
+          status: TrainerLinkStatus.paused,
+          acceptedAt: null,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('AVISAR A MI PF'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('chat chat-1515 con $_kTrainer'), findsOneWidget);
+  });
+
+  testWidgets(
+      'con un vínculo que no está vivo (pending) NO abre el chat: avisa del '
+      'error', (tester) async {
+    final appt = _appt('t-pending', nowWall().add(const Duration(hours: 3)));
+
+    await tester.pumpWidget(
+      _wrap(
+        appt,
+        firestore,
+        link: _link.copyWith(
+          status: TrainerLinkStatus.pending,
+          acceptedAt: null,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('AVISAR A MI PF'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('chat chat-1515 con $_kTrainer'), findsNothing);
+    expect(find.byType(SnackBar), findsOneWidget);
   });
 
   // El borde: CANCELAR aparece exactamente donde la regla deja cancelar.
