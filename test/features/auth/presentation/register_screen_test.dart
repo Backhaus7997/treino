@@ -257,6 +257,35 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // #1698: un espacio al borde (el teclado lo deja al autocompletar) daba «El
+  // email no es válido» porque se validaba antes del trim.
+  // ---------------------------------------------------------------------------
+  testWidgets('email con espacios al borde: valida y manda el valor recortado',
+      (tester) async {
+    String? emailEnviado;
+    final notifier = _TestAuthNotifier()
+      ..onSignUp = (email, password) async {
+        emailEnviado = email;
+      };
+    await tester.pumpWidget(_buildApp(notifier: notifier));
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), '  test@example.com ');
+    await tester.enterText(fields.at(1), 'Pass1234');
+    await tester.pump();
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    await tester.ensureVisible(find.byType(AuthPillButton));
+    await tester.tap(find.byType(AuthPillButton));
+    await tester.pump();
+
+    expect(find.text('El email no es válido'), findsNothing);
+    expect(emailEnviado, 'test@example.com');
+  });
+
+  // ---------------------------------------------------------------------------
   // Scenario 3.1: too short password
   // ---------------------------------------------------------------------------
   testWidgets('scenario 3.1 — short password shows validation message',

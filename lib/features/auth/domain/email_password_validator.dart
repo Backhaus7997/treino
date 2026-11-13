@@ -5,9 +5,16 @@ class EmailPasswordValidator {
   static const _emailRegex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$';
 
   /// Returns null if valid, error message if invalid.
+  ///
+  /// Valida el email YA recortado: los espacios de los bordes no son parte de la
+  /// dirección. El autocompletado del teclado suele dejar uno al final, y las
+  /// pantallas igual mandan `.trim()` a Firebase, así que rechazarlo acá
+  /// bloqueaba un mail que después se iba a enviar bien (#1698). Los espacios
+  /// de ADENTRO siguen siendo inválidos.
   static String? validateEmail(String? value) {
-    if (value == null || value.isEmpty) return 'El email no es válido';
-    if (!RegExp(_emailRegex).hasMatch(value)) return 'El email no es válido';
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) return 'El email no es válido';
+    if (!RegExp(_emailRegex).hasMatch(email)) return 'El email no es válido';
     return null;
   }
 
