@@ -666,6 +666,8 @@
   "coachHubAlumnoDetailArchivosShareError": "No pudimos cambiar quién ve el archivo.",
   "athleteNutritionPlanButtonLabel": "MI PLAN NUTRICIONAL",
   "athleteFilesButtonLabel": "MIS ARCHIVOS",
+  "athleteRoutinesButtonLabel": "MIS RUTINAS",
+  "athleteLinkPausedNote": "Tu PF pausó el vínculo. Lo que ya te dejó —rutinas y archivos— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.",
   "athleteNutritionPlanScreenTitle": "PLAN NUTRICIONAL",
   "athleteNutritionChooseOneHint": "Elegí una",
   "athleteNutritionEmptyGroup": "Tu PF todavía no cargó opciones acá.",

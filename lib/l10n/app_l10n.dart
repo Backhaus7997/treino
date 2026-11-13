@@ -1082,6 +1082,18 @@ abstract class AppL10n {
   /// **'MIS ARCHIVOS'**
   String get athleteFilesButtonLabel;
 
+  /// Botón de la tab Coach, con el vínculo pausado, que lleva a Entrenar donde sigue el plan que el PF le asignó.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS RUTINAS'**
+  String get athleteRoutinesButtonLabel;
+
+  /// Aviso de la card del PF en la tab Coach cuando el vínculo está pausado. Sólo afirma lo que la app y las reglas permiten con un vínculo pausado: ver las rutinas asignadas y los archivos compartidos, y escribirle al PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas y archivos— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.'**
+  String get athleteLinkPausedNote;
+
   /// Título de la pantalla read-only del plan nutricional del alumno.
   ///
   /// In es_AR, this message translates to:

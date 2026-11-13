@@ -310,6 +310,48 @@ class LinkStateCard extends ConsumerWidget {
                 const SizedBox(height: 16),
                 _CuotaSection(link: link),
               ],
+              // PAUSADO (#1698): el PF puso el vínculo en espera, no lo cortó.
+              // Esta rama existía sólo para `active`, así que con el vínculo
+              // pausado el alumno veía el nombre del PF y un botón de TERMINAR,
+              // contra lo que el diálogo del PF le promete («El alumno verá el
+              // plan…», `coachHubDashboardPauseLinkBody`).
+              //
+              // Se ofrece SÓLO lo que se verificó que anda con el vínculo
+              // pausado, y por eso la lista es más corta que la del activo:
+              //   • MIS RUTINAS: los planes asignados no dependen del vínculo
+              //     (la query es por `assignedTo`) y pausar no los archiva —eso
+              //     lo hace `cleanupAssignedPlansOnUnlink`, sólo al terminar.
+              //   • MIS ARCHIVOS: la ruta no gatea por vínculo y las reglas de
+              //     `athlete_files` leen por `athleteId`.
+              //   • MENSAJE (abajo, en `_ActionRow`): el chat sigue abierto
+              //     — `chatCreateOk` acepta `active|paused` y
+              //     `syncChatOnTrainerLink` no lo cierra.
+              //
+              // NO están el plan nutricional, la agenda ni la cuota, aunque las
+              // reglas dejan leer los tres: sus rutas y `miCuotaProvider`
+              // resuelven el vínculo con `currentAthleteLinkProvider`
+              // (sólo `active`), así que abrirlos pausado daría «No encontramos
+              // un vínculo activo». Ofrecer un botón que lleva a ese cartel
+              // sería peor que no ofrecerlo.
+              if (link.status == TrainerLinkStatus.paused) ...[
+                const SizedBox(height: 14),
+                _PausedInfo(
+                    palette: palette, texto: l10n.athleteLinkPausedNote),
+                const SizedBox(height: 12),
+                _AccesoDelAlumno(
+                  variante: TreinoButtonVariant.secondaryAccent,
+                  icono: TreinoIcon.tabWorkout,
+                  etiqueta: l10n.athleteRoutinesButtonLabel,
+                  onPressed: () => context.go('/workout'),
+                ),
+                const SizedBox(height: 12),
+                _AccesoDelAlumno(
+                  variante: TreinoButtonVariant.secondaryAccent,
+                  icono: TreinoIcon.file,
+                  etiqueta: l10n.athleteFilesButtonLabel,
+                  onPressed: () => context.push('/coach/archivos'),
+                ),
+              ],
               const SizedBox(height: 18),
               _ActionRow(link: link),
             ],
@@ -449,6 +491,28 @@ class _ShareInfo extends StatelessWidget {
   }
 }
 
+/// Qué sigue disponible mientras el PF tiene el vínculo pausado. El texto sale
+/// de l10n (`athleteLinkPausedNote`) y sólo afirma lo verificado: ver el
+/// comentario de [LinkStateCard].
+class _PausedInfo extends StatelessWidget {
+  const _PausedInfo({required this.palette, required this.texto});
+  final AppPalette palette;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      texto,
+      style: GoogleFonts.barlow(
+        fontStyle: FontStyle.italic,
+        fontWeight: FontWeight.w400,
+        fontSize: 13,
+        color: palette.textMuted,
+      ),
+    );
+  }
+}
+
 class _ActionRow extends ConsumerWidget {
   const _ActionRow({required this.link});
   final TrainerLink link;
@@ -553,7 +617,14 @@ class _ActionRow extends ConsumerWidget {
         ),
       );
     }
-    if (link.status == TrainerLinkStatus.active) {
+    // `active` y `paused` comparten MENSAJE + TERMINAR (#1698). Pausar es un
+    // hold, no un corte: el chat sigue abierto del lado del servidor
+    // (`chatCreateOk` acepta `active|paused`, `syncChatOnTrainerLink` lo deja
+    // abierto) y `ChatRepository` ya trata `paused` como vínculo vigente
+    // (QA H8), así que esconder MENSAJE era una restricción que sólo existía
+    // en esta pantalla. Reanudar sigue siendo una acción del PF.
+    if (link.status == TrainerLinkStatus.active ||
+        link.status == TrainerLinkStatus.paused) {
       return Column(
         children: [
           Stack(
@@ -629,35 +700,8 @@ class _ActionRow extends ConsumerWidget {
         ],
       );
     }
-    // Paused — the PF paused the link from Coach Hub. The athlete keeps
-    // read-only access to the plan; the only action available is to terminate
-    // the relationship (no resume from the athlete side — that's a PF action).
-    // Minimum-viable fix for the dead-end the explorer found at the previous
-    // SizedBox.shrink() below (REQ-CHLM-013, SCEN-CHLM-018, ADR-CHLM-07).
-    if (link.status == TrainerLinkStatus.paused) {
-      return SizedBox(
-        width: double.infinity,
-        child: OutlinedButton(
-          onPressed: () => _onTerminate(context, ref),
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: palette.highlight, width: 1),
-            foregroundColor: palette.highlight,
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.full),
-            ),
-          ),
-          child: Text(
-            'TERMINAR VÍNCULO',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-      );
-    }
+    // `terminated` no llega acá: `currentAthleteLinkAnyStatusProvider` sólo
+    // trae pending|active|paused.
     return const SizedBox.shrink();
   }
 
