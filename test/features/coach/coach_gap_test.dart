@@ -464,9 +464,9 @@ void main() {
     test(
       'price filter keeps trainers with a null rate and excludes out-of-range',
       () async {
-        final cheap = trainer(uid: 'cheap', displayName: 'Cheap', rate: 4000);
+        final cheap = trainer(uid: 'cheap', displayName: 'Cheap', rate: 30000);
         final pricey =
-            trainer(uid: 'pricey', displayName: 'Pricey', rate: 12000);
+            trainer(uid: 'pricey', displayName: 'Pricey', rate: 120000);
         final noRate =
             trainer(uid: 'norate', displayName: 'NoRate'); // null rate
 
@@ -476,7 +476,7 @@ void main() {
           ),
           selectedSpecialtyProvider
               .overrideWith((_) => const <TrainerSpecialty>{}),
-          selectedPriceFilterProvider.overrideWith((_) => PriceFilter.under5k),
+          selectedPriceFilterProvider.overrideWith((_) => PriceFilter.low),
           trainerPublicProfileRepositoryProvider.overrideWith(
             (_) => _FakeDiscoveryRepo(all: [cheap, pricey, noRate]),
           ),
@@ -485,7 +485,7 @@ void main() {
 
         final result = await container.read(trainerDiscoveryProvider.future);
         final ids = result.map((t) => t.uid).toSet();
-        // cheap (4000 < 5000) kept; noRate kept (null always passes); pricey out.
+        // cheap (30.000 < 40.000) kept; noRate kept (null always passes); pricey out.
         expect(ids, {'cheap', 'norate'});
       },
     );
@@ -545,17 +545,66 @@ void main() {
       }
       // any → everything passes.
       expect(PriceFilter.any.matches(99999), isTrue);
-      // under5k → strictly < 5000.
-      expect(PriceFilter.under5k.matches(4999), isTrue);
-      expect(PriceFilter.under5k.matches(5000), isFalse);
-      // k5to10k → inclusive [5000, 10000].
-      expect(PriceFilter.k5to10k.matches(5000), isTrue);
-      expect(PriceFilter.k5to10k.matches(10000), isTrue);
-      expect(PriceFilter.k5to10k.matches(4999), isFalse);
-      expect(PriceFilter.k5to10k.matches(10001), isFalse);
-      // over10k → strictly > 10000.
-      expect(PriceFilter.over10k.matches(10001), isTrue);
-      expect(PriceFilter.over10k.matches(10000), isFalse);
+      // low → strictly < 40.000.
+      expect(PriceFilter.low.matches(39999), isTrue);
+      expect(PriceFilter.low.matches(40000), isFalse);
+      // mid → inclusive [40.000, 100.000].
+      expect(PriceFilter.mid.matches(40000), isTrue);
+      expect(PriceFilter.mid.matches(100000), isTrue);
+      expect(PriceFilter.mid.matches(39999), isFalse);
+      expect(PriceFilter.mid.matches(100001), isFalse);
+      // high → strictly > 100.000.
+      expect(PriceFilter.high.matches(100001), isTrue);
+      expect(PriceFilter.high.matches(100000), isFalse);
+    });
+
+    // #1753: las bandas viejas (< $5k, $5-10k) no tenían NINGÚN resultado con
+    // las tarifas de hoy. Acá se prueba contra tarifas reales, pasando por el
+    // provider: cada banda tiene que devolver gente.
+    test('cada banda de precio devuelve PF con tarifas reales (#1753)',
+        () async {
+      // Online (20.000-40.000), seed del emulador (38.000 / 45.000 / 52.000),
+      // mensual presencial (90.000-155.000) y premium (hasta 455.000).
+      final tarifas = <String, int>{
+        'online-20': 20000,
+        'seed-38': 38000,
+        'seed-45': 45000,
+        'seed-52': 52000,
+        'presencial-90': 90000,
+        'presencial-155': 155000,
+        'premium-455': 455000,
+      };
+      final todos = [
+        for (final e in tarifas.entries)
+          trainer(uid: e.key, displayName: e.key, rate: e.value),
+        trainer(uid: 'sin-tarifa', displayName: 'sin-tarifa'),
+      ];
+
+      Future<Set<String>> uidsCon(PriceFilter filtro) async {
+        final container = ProviderContainer(overrides: [
+          athleteLocationProvider.overrideWith(
+            (_) => AthleteLocationNotifier()..setForTest(null),
+          ),
+          selectedSpecialtyProvider
+              .overrideWith((_) => const <TrainerSpecialty>{}),
+          selectedPriceFilterProvider.overrideWith((_) => filtro),
+          trainerPublicProfileRepositoryProvider.overrideWith(
+            (_) => _FakeDiscoveryRepo(all: todos),
+          ),
+        ]);
+        addTearDown(container.dispose);
+        final result = await container.read(trainerDiscoveryProvider.future);
+        return result.map((t) => t.uid).toSet();
+      }
+
+      // El PF sin tarifa pasa siempre (decisión ya documentada del filtro).
+      expect(await uidsCon(PriceFilter.low),
+          {'online-20', 'seed-38', 'sin-tarifa'});
+      expect(await uidsCon(PriceFilter.mid),
+          {'seed-45', 'seed-52', 'presencial-90', 'sin-tarifa'});
+      expect(await uidsCon(PriceFilter.high),
+          {'presencial-155', 'premium-455', 'sin-tarifa'});
+      expect((await uidsCon(PriceFilter.any)).length, todos.length);
     });
   });
 }
