@@ -63,6 +63,7 @@ import '../../shell/responsive.dart' as rsp;
 import '../../widgets/create_custom_exercise_dialog.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import '../../widgets/exercise_picker_dialog.dart';
+import '../../../infrastructure/before_unload_guard.dart';
 import 'routine_editor_exit_guard.dart';
 import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
@@ -338,6 +339,10 @@ class _RoutineEditorWebScreenState
   bool _preguntandoSalida = false;
 
   late final RoutineEditorExitGuard _exitGuard;
+
+  /// El aviso del navegador para recargar o cerrar la pestaña. Se prende con la
+  /// primera edición y se apaga al guardar o al irse de la pantalla.
+  late final BeforeUnloadGuard _beforeUnload;
   String? _errorMessage;
 
   /// True cuando [_errorMessage] describe una DENEGACIÓN de permiso y no un
@@ -409,6 +414,7 @@ class _RoutineEditorWebScreenState
     super.initState();
     _exitGuard = ref.read(routineEditorExitGuardProvider)
       ..registrar(this, _confirmarSalida);
+    _beforeUnload = ref.read(beforeUnloadGuardProvider);
     if (_isEditing) {
       _loading = true;
       _load();
@@ -604,6 +610,7 @@ class _RoutineEditorWebScreenState
     // del editor atrás.
     if (!_avisoDeSalida) _messenger?.clearSnackBars();
     _exitGuard.soltar(this);
+    _beforeUnload.disarm();
     _nameCtrl.dispose();
     _splitCtrl.dispose();
     _summaryCtrl.dispose();
@@ -851,6 +858,9 @@ class _RoutineEditorWebScreenState
     _ediciones++;
     if (_isDirty) return;
     setState(() => _isDirty = true);
+    // Recargar o cerrar la pestaña no pasa por el router: sólo el navegador
+    // puede preguntar, y sólo si se lo pedimos ANTES.
+    _beforeUnload.arm();
   }
 
   Future<void> _onTogglePublished() async {
@@ -2474,10 +2484,12 @@ class _RoutineEditorWebScreenState
       // todo lo que sigue, que es cosmético y puede fallar sin cambiar esto, y
       // es lo que deja volver a apretar Guardar si la pantalla sigue.
       if (mounted) {
+        final limpio = _ediciones == edicionesAlGuardar;
         setState(() {
           _submitting = false;
-          if (_ediciones == edicionesAlGuardar) _isDirty = false;
+          if (limpio) _isDirty = false;
         });
+        if (limpio) _beforeUnload.disarm();
       }
 
       // La grilla de la sección Rutinas. `routinesAuthoredByProvider` es un

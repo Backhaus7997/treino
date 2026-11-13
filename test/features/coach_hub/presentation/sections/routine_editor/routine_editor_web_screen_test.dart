@@ -22,6 +22,7 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart'
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/infrastructure/before_unload_guard.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/blocked_students_screen.dart'
     show kBlockedStudentsRoutePath;
@@ -158,6 +159,22 @@ Future<void> _agregarSemanaCopiandoLaAnterior(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('duplicate_week_confirm_button')));
   await tester.pumpAndSettle();
+}
+
+/// El `BeforeUnloadGuard` de los tests: el listener real habla con `window` y
+/// no existe en la VM.
+class _BeforeUnloadFalso implements BeforeUnloadGuard {
+  bool prendido = false;
+  int llamadasAPrender = 0;
+
+  @override
+  void arm() {
+    llamadasAPrender++;
+    prendido = true;
+  }
+
+  @override
+  void disarm() => prendido = false;
 }
 
 /// La respuesta de un `createAssigned`/`createTemplate` que devuelve la rutina
@@ -2600,6 +2617,128 @@ void main() {
         '/template-editor/:templateId',
       ]);
       expect(rutas.every((r) => r.onExit != null), isTrue);
+    });
+  });
+
+  // -- Recargar o cerrar la pestaña (#1732) -----------------------------------
+  //
+  // F5, cerrar la pestaña o pegar otra URL no pasan por el router: sólo el
+  // navegador puede preguntar, y sólo si la página se lo pidió ANTES. El
+  // listener real no existe en la VM; acá se prueba CUÁNDO la pantalla lo
+  // prende y lo apaga, contra un guard de mentira.
+  group('RoutineEditorWebScreen — aviso al recargar o cerrar la pestaña', () {
+    late _BeforeUnloadFalso aviso;
+    setUp(() => aviso = _BeforeUnloadFalso());
+
+    List<Override> conAviso() => [
+          beforeUnloadGuardProvider.overrideWithValue(aviso),
+        ];
+
+    Future<void> escribirNombre(WidgetTester tester) async {
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('un editor sin tocar NO lo prende', (tester) async {
+      await _pumpEditor(tester, extraOverrides: conAviso());
+
+      expect(aviso.prendido, isFalse);
+      expect(aviso.llamadasAPrender, 0);
+    });
+
+    testWidgets('editar un plan existente sin tocarlo tampoco', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        routineId: 'r1',
+        extraOverrides: conAviso(),
+      );
+
+      expect(aviso.prendido, isFalse);
+    });
+
+    testWidgets('la primera edición lo prende, una sola vez', (tester) async {
+      await _pumpEditor(tester, extraOverrides: conAviso());
+
+      await escribirNombre(tester);
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_split_field')),
+        'PPL',
+      );
+      await tester.pumpAndSettle();
+
+      expect(aviso.prendido, isTrue);
+      expect(aviso.llamadasAPrender, 1);
+    });
+
+    testWidgets('guardar lo apaga: ya no hay nada que perder', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(_creaConId('n1'));
+      await _pumpEditor(tester, repo: repo, extraOverrides: conAviso());
+      await _fillMinimalValidForm(tester);
+      expect(aviso.prendido, isTrue);
+
+      await _tapGuardar(tester);
+
+      expect(aviso.prendido, isFalse);
+    });
+
+    testWidgets('irse de la pantalla (Descartar) lo apaga', (tester) async {
+      final router = await _pumpEditor(
+        tester,
+        enElShell: true,
+        extraOverrides: conAviso(),
+      );
+      await escribirNombre(tester);
+      expect(aviso.prendido, isTrue);
+
+      router.go('/rutinas');
+      await tester.pumpAndSettle();
+      expect(
+        aviso.prendido,
+        isTrue,
+        reason: 'el diálogo todavía no se contestó',
+      );
+
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(aviso.prendido, isFalse);
+    });
+
+    testWidgets('lo tipeado MIENTRAS se guarda no lo apaga', (tester) async {
+      final escritura = Completer<Routine>();
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any()))
+          .thenAnswer((_) => escritura.future);
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        enElShell: true,
+        extraOverrides: conAviso(),
+      );
+      await _fillMinimalValidForm(tester);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza 5x semana',
+      );
+      final enviada = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      escritura.complete(enviada.copyWith(id: 'n1'));
+      await tester.pumpAndSettle();
+
+      // Eso no llegó a ningún lado: la salida pregunta y el aviso sigue.
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+      expect(aviso.prendido, isTrue);
     });
   });
 
