@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
 import 'package:flutter/foundation.dart' show listEquals;
 
 import '../domain/trainer_link.dart';
+import '../domain/trainer_link_priority.dart';
 import '../domain/trainer_link_status.dart';
 
 class TrainerLinkRepository {
@@ -18,6 +19,22 @@ class TrainerLinkRepository {
   //
   // Solo el atleta inicia el request (convención producto: el cliente busca
   // al PF, no al revés). Crea el doc con `status: pending`, `requestedAt: now`.
+  //
+  // NO duplica (#1735). Antes de crear mira, EN EL SERVIDOR, si el alumno ya
+  // tiene un vínculo `pending|active|paused` con ESE PF:
+  //  - `pending` → devuelve esa misma solicitud y no escribe nada. Es la
+  //    idempotencia que importa con dos dispositivos: el segundo toque encuentra
+  //    la solicitud del primero en vez de apilar otra.
+  //  - `active|paused` → StateError. Pedirle vínculo a quien ya es tu PF no es un
+  //    "reintento": es un error, y devolver el vínculo vivo como si fuera una
+  //    solicitud nueva le diría al alumno «Solicitud enviada» sin que se haya
+  //    enviado nada.
+  //
+  // Es un guard de CLIENTE, no una garantía: no hay transacción posible con una
+  // query, así que dos dispositivos que toquen en la misma ventana de red todavía
+  // pueden crear 2. Lo que cierra el caso real —el segundo toque llega segundos
+  // después, con el stream local viejo— es esta lectura al servidor. Del lado de
+  // las rules no se puede (ids autogenerados), ver el PR #1735.
 
   Future<TrainerLink> request({
     required String trainerId,
@@ -26,6 +43,17 @@ class TrainerLinkRepository {
     if (trainerId == athleteId) {
       throw ArgumentError.value(
           athleteId, 'athleteId', 'trainerId y athleteId no pueden coincidir');
+    }
+    final enCurso = await _vinculoEnCurso(
+      trainerId: trainerId,
+      athleteId: athleteId,
+    );
+    if (enCurso != null) {
+      if (enCurso.status == TrainerLinkStatus.pending) return enCurso;
+      throw StateError(
+        'Ya hay un vínculo ${enCurso.status.toJson()} con este entrenador '
+        '(${enCurso.id}); no se pide otro.',
+      );
     }
     final ref = _links.doc();
     final link = TrainerLink(
@@ -313,6 +341,28 @@ class TrainerLinkRepository {
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────
+
+  /// El vínculo NO terminado de [athleteId] con [trainerId], o null.
+  ///
+  /// Un `.get()` va al servidor y sólo cae a la caché si no hay red (ver
+  /// [tieneVinculoVivo]). Si por algún motivo hubiera varios, devuelve el de
+  /// mayor prioridad ([vinculoPrioritario]), así que un `active` le gana a un
+  /// `pending` suelto.
+  Future<TrainerLink?> _vinculoEnCurso({
+    required String trainerId,
+    required String athleteId,
+  }) async {
+    final snap = await _links
+        .where('athleteId', isEqualTo: athleteId)
+        .where('trainerId', isEqualTo: trainerId)
+        .get();
+    return vinculoPrioritario(
+      snap.docs
+          .map(_fromDoc)
+          .whereType<TrainerLink>()
+          .where((l) => l.status != TrainerLinkStatus.terminated),
+    );
+  }
 
   TrainerLink? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();

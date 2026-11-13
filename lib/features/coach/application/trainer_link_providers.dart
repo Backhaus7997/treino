@@ -11,6 +11,7 @@ import '../data/session_share_repository.dart';
 import '../data/trainer_link_promotion_service.dart';
 import '../data/trainer_link_repository.dart';
 import '../domain/trainer_link.dart';
+import '../domain/trainer_link_priority.dart';
 import '../domain/trainer_link_status.dart';
 
 final trainerLinkRepositoryProvider = Provider<TrainerLinkRepository>(
@@ -126,7 +127,11 @@ final currentAthleteLinkProvider =
 /// [currentAthleteLinkProvider].
 ///
 /// Si hubiera varios no-terminados (no debería — un atleta se vincula con UN PF
-/// a la vez), devuelve el más reciente (requestedAt DESC).
+/// a la vez, pero dos dispositivos pueden crear 2 solicitudes `pending` al mismo
+/// PF), devuelve el de mayor PRIORIDAD: `active` > `paused` > `pending`, y a
+/// igual estado el más reciente ([vinculoPrioritario]). Con `links.first` a
+/// secas ganaba el más NUEVO, y aceptar la solicitud vieja dejaba a la tab Coach
+/// mostrando «SOLICITUD ENVIADA» arriba de un vínculo activo (#1735).
 ///
 /// Stream por el mismo motivo que [currentAthleteLinkProvider]: éste es el que
 /// consume la vista que DIBUJA los botones de agenda/nutrición/archivos, así
@@ -144,7 +149,7 @@ final currentAthleteLinkAnyStatusProvider =
       TrainerLinkStatus.active,
       TrainerLinkStatus.paused,
     },
-  ).map((links) => links.isEmpty ? null : links.first);
+  ).map(vinculoPrioritario);
 });
 
 /// Ventana en la que el stream de vínculos SOBREVIVE a que lo suelten.

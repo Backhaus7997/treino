@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
@@ -114,6 +115,71 @@ void main() {
 
       expect(anyStatus?.status, TrainerLinkStatus.active);
       expect(activeOnly?.status, TrainerLinkStatus.active);
+    });
+
+    // #1735: dos dispositivos crean 2 solicitudes `pending` al MISMO PF, el PF
+    // acepta la VIEJA, y la lista (requestedAt DESC) queda
+    // `[pending nueva, active vieja]`. Con `links.first` la tab Coach dibujaba
+    // «SOLICITUD ENVIADA» arriba de un vínculo activo.
+    group('varios no terminados — gana el de mayor prioridad (#1735)', () {
+      Future<void> siembra(String id, TrainerLinkStatus status, int dia) =>
+          fakeFirestore.collection('trainer_links').doc(id).set(
+                TrainerLink(
+                  id: id,
+                  trainerId: trainerId,
+                  athleteId: athleteId,
+                  status: status,
+                  requestedAt: DateTime.utc(2026, 1, dia),
+                  acceptedAt: status == TrainerLinkStatus.active
+                      ? DateTime.utc(2026, 1, dia + 1)
+                      : null,
+                ).toJson(),
+              );
+
+      test('active VIEJA + pending NUEVA → el vínculo activo', () async {
+        await siembra('vieja', TrainerLinkStatus.active, 1);
+        await siembra('nueva', TrainerLinkStatus.pending, 2);
+        final container = makeContainer();
+
+        final link =
+            await container.read(currentAthleteLinkAnyStatusProvider.future);
+
+        expect(link?.id, 'vieja');
+        expect(link?.status, TrainerLinkStatus.active);
+      });
+
+      test('paused VIEJA + pending NUEVA → el pausado', () async {
+        await siembra('vieja', TrainerLinkStatus.paused, 1);
+        await siembra('nueva', TrainerLinkStatus.pending, 2);
+        final container = makeContainer();
+
+        final link =
+            await container.read(currentAthleteLinkAnyStatusProvider.future);
+
+        expect(link?.id, 'vieja');
+        expect(link?.status, TrainerLinkStatus.paused);
+      });
+
+      test('dos pending → la más reciente', () async {
+        await siembra('vieja', TrainerLinkStatus.pending, 1);
+        await siembra('nueva', TrainerLinkStatus.pending, 2);
+        final container = makeContainer();
+
+        final link =
+            await container.read(currentAthleteLinkAnyStatusProvider.future);
+
+        expect(link?.id, 'nueva');
+      });
+
+      test('el active-only sigue viendo SÓLO el activo', () async {
+        await siembra('vieja', TrainerLinkStatus.active, 1);
+        await siembra('nueva', TrainerLinkStatus.pending, 2);
+        final container = makeContainer();
+
+        final link = await container.read(currentAthleteLinkProvider.future);
+
+        expect(link?.id, 'vieja');
+      });
     });
 
     test('devuelve null si el único link está TERMINATED', () async {

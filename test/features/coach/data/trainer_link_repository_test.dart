@@ -53,11 +53,108 @@ void main() {
         trainerId: trainerId,
         athleteId: athleteId,
       );
+      // Otro PF: con el mismo ya no se crea un segundo doc (#1735, ver abajo).
       final l2 = await repo.request(
-        trainerId: trainerId,
+        trainerId: 'trainer-2',
         athleteId: athleteId,
       );
       expect(l1.id, isNot(equals(l2.id)));
+    });
+
+    // #1735: dos dispositivos del mismo alumno creaban 2 `pending` al MISMO PF.
+    group('no duplica un vínculo en curso con el mismo PF (#1735)', () {
+      Future<int> cuantos() async =>
+          (await firestore.collection('trainer_links').get()).docs.length;
+
+      test('con una solicitud pending devuelve ESA y no escribe nada',
+          () async {
+        final primera = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        final segunda = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+
+        expect(segunda.id, primera.id);
+        expect(segunda.status, TrainerLinkStatus.pending);
+        expect(await cuantos(), 1);
+      });
+
+      test('con un vínculo active tira StateError y no escribe nada', () async {
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        await activateLink(link.id);
+
+        await expectLater(
+          repo.request(trainerId: trainerId, athleteId: athleteId),
+          throwsA(isA<StateError>()),
+        );
+        expect(await cuantos(), 1);
+      });
+
+      test('con un vínculo paused tira StateError y no escribe nada', () async {
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        await activateLink(link.id);
+        await repo.pause(link.id);
+
+        await expectLater(
+          repo.request(trainerId: trainerId, athleteId: athleteId),
+          throwsA(isA<StateError>()),
+        );
+        expect(await cuantos(), 1);
+      });
+
+      test(
+          'si la anterior terminó (cancelada / rechazada / terminada) crea una NUEVA',
+          () async {
+        final vieja = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        await repo.cancel(vieja.id);
+
+        final nueva = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+
+        expect(nueva.id, isNot(vieja.id));
+        expect(nueva.status, TrainerLinkStatus.pending);
+        expect(await cuantos(), 2);
+      });
+
+      test('un vínculo en curso con OTRO PF no frena la solicitud a éste',
+          () async {
+        await repo.request(trainerId: 'trainer-2', athleteId: athleteId);
+
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+
+        expect(link.trainerId, trainerId);
+        expect(await cuantos(), 2);
+      });
+
+      test('el vínculo en curso de OTRO alumno con el mismo PF no cuenta',
+          () async {
+        await repo.request(trainerId: trainerId, athleteId: 'athlete-2');
+
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+
+        expect(link.athleteId, athleteId);
+        expect(await cuantos(), 2);
+      });
     });
 
     test('rechaza trainerId == athleteId', () async {
