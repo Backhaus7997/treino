@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../app/theme/tokens/primitives.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
@@ -18,9 +18,9 @@ import 'moderation_actions.dart';
 /// «Usuarios bloqueados»: a quién bloqueó el usuario, con «Desbloquear» en cada
 /// fila (#1698: bloquear no tenía vuelta).
 ///
-/// **Todavía no es una ruta de go_router** (`lib/app/router.dart` no se toca
-/// acá): se abre con [open], un `push` imperativo. Cuando exista
-/// `/profile/settings/bloqueados`, el call site pasa a `context.push`.
+/// Ruta de go_router `/profile/settings/bloqueados`, colgada de `/profile` junto
+/// a `settings/privacidad`. Abre para el atleta y para el PF —los dos llegan a
+/// Privacidad—, así que no está en la lista de rutas sólo-PF del router.
 ///
 /// **Vacío ≠ error**: una lista que no cargó no se muestra como «No bloqueaste
 /// a nadie» (el mismo agujero del feed sin red). Por eso mira
@@ -29,17 +29,18 @@ import 'moderation_actions.dart';
 class BlockedUsersScreen extends ConsumerWidget {
   const BlockedUsersScreen({super.key});
 
-  static Future<void> open(BuildContext context) {
-    return Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => const AppBackground(
-          child: Scaffold(
-            backgroundColor: Colors.transparent,
-            body: SafeArea(bottom: false, child: BlockedUsersScreen()),
-          ),
-        ),
-      ),
-    );
+  /// A dónde vuelve Atrás cuando esta pantalla es la única ruta del stack
+  /// (recarga en web, deep link): la pantalla desde la que se abre.
+  static const _parentPath = '/profile/settings/privacidad';
+
+  static void _volver(BuildContext context) {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    // Sin nada que sacar `pop` no hace nada y la pantalla queda sin salida.
+    GoRouter.maybeOf(context)?.go(_parentPath);
   }
 
   @override
@@ -110,7 +111,7 @@ class BlockedUsersScreen extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           child: TreinoTappable(
-            onTap: () => Navigator.of(context).maybePop(),
+            onTap: () => _volver(context),
             child: Row(
               children: [
                 Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),

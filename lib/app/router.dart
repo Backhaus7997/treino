@@ -56,6 +56,7 @@ import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/friend_requests_inbox_screen.dart';
 import '../features/feed/presentation/post_detail_screen.dart';
+import '../features/moderation/presentation/blocked_users_screen.dart';
 import '../features/notifications/presentation/notification_history_screen.dart';
 import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
@@ -1272,6 +1273,13 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'settings/privacidad',
                 builder: (_, __) => _withBg(const PrivacyScreen()),
+              ),
+              // «Usuarios bloqueados», con Desbloquear (#1698). Se abre desde
+              // la fila del final de Privacidad. Para los DOS roles (el PF
+              // también llega a Privacidad), así que NO va en `_rutasSoloPF`.
+              GoRoute(
+                path: 'settings/bloqueados',
+                builder: (_, __) => _withBg(const BlockedUsersScreen()),
               ),
               // Índice de documentos legales. Hasta acá los legales sólo se
               // alcanzaban desde el registro y el login, así que con la cuenta

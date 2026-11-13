@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:mock_exceptions/mock_exceptions.dart';
@@ -20,6 +21,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/moderation/application/moderation_providers.dart';
+import 'package:treino/features/moderation/presentation/blocked_users_screen.dart';
 import 'package:treino/features/profile/application/correos_promocionales_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
@@ -104,6 +106,41 @@ Future<void> _calentarFuentes(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Widget _app({
+  required GoRouter? router,
+  required Locale locale,
+  required double textScale,
+  required double insetInferior,
+  required Widget home,
+}) {
+  Widget builder(BuildContext context, Widget? child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(textScale),
+          padding:
+              insetInferior > 0 ? EdgeInsets.only(bottom: insetInferior) : null,
+        ),
+        child: child!,
+      );
+  if (router != null) {
+    return MaterialApp.router(
+      theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: locale,
+      builder: builder,
+      routerConfig: router,
+    );
+  }
+  return MaterialApp(
+    theme: AppTheme.dark(),
+    localizationsDelegates: AppL10n.localizationsDelegates,
+    supportedLocales: AppL10n.supportedLocales,
+    locale: locale,
+    builder: builder,
+    home: home,
+  );
+}
+
 Future<void> _montar(
   WidgetTester tester, {
   required UserRepository repo,
@@ -125,6 +162,10 @@ Future<void> _montar(
   // que corrían todos los tests anteriores a esa tarjeta.
   Stream<UserProfile?>? perfil,
   List<Override> extra = const [],
+  // Si viene, la app se monta con go_router (`MaterialApp.router`) y `home` se
+  // ignora: las rutas del router dicen qué se dibuja. Hace falta para lo que
+  // navega con `context.push`.
+  GoRouter? router,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -145,20 +186,11 @@ Future<void> _montar(
         if (perfil != null) userProfileProvider.overrideWith((_) => perfil),
         ...extra,
       ],
-      child: MaterialApp(
-        theme: AppTheme.dark(),
-        localizationsDelegates: AppL10n.localizationsDelegates,
-        supportedLocales: AppL10n.supportedLocales,
+      child: _app(
+        router: router,
         locale: locale,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(textScale),
-            padding: insetInferior > 0
-                ? EdgeInsets.only(bottom: insetInferior)
-                : null,
-          ),
-          child: child!,
-        ),
+        textScale: textScale,
+        insetInferior: insetInferior,
         home: Scaffold(
           extendBody: barraFlotante != null,
           bottomNavigationBar: barraFlotante,
@@ -710,18 +742,36 @@ void main() {
   // de racha no le llegan nunca: un interruptor que apaga algo que no recibe es
   // un control que miente. Falla CERRADO: sin rol conocido, no se dibuja.
   // ──────────────────────────────────────────────────────────────────────────
-  // #1698: la fila abre la lista de bloqueados, para los DOS roles.
+  // #1698: la fila abre la lista de bloqueados, para los DOS roles. Navega con
+  // `context.push('/profile/settings/bloqueados')` (#1830), así que se monta con
+  // un GoRouter mínimo: `/` es Privacidad y la ruta de bloqueados una pantalla
+  // marcada. Que el router REAL registre esa ruta lo fija `router_test.dart`.
   group('PrivacyScreen — usuarios bloqueados', () {
     for (final rol in UserRole.values) {
-      testWidgets('un ${rol.name} ve la fila y abre la lista', (tester) async {
+      testWidgets('un ${rol.name} ve la fila y la lista se abre con push',
+          (tester) async {
         final repo = _MockUserRepository();
         when(() => repo.watchCorreosPromocionales(any()))
             .thenAnswer((_) => Stream.value(true));
         when(() => repo.watchRecordatoriosEntrenamiento(any()))
             .thenAnswer((_) => Stream.value(true));
+        final router = GoRouter(
+          initialLocation: '/',
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (_, __) => const Scaffold(body: PrivacyScreen()),
+            ),
+            GoRoute(
+              path: '/profile/settings/bloqueados',
+              builder: (_, __) => const Scaffold(body: BlockedUsersScreen()),
+            ),
+          ],
+        );
         await _montar(
           tester,
           repo: repo,
+          router: router,
           perfil: Stream<UserProfile?>.value(_perfil(rol)),
           extra: [
             currentUidProvider.overrideWith((_) => _uid),
@@ -735,6 +785,12 @@ void main() {
         await tester.tap(find.byKey(fila));
         await tester.pumpAndSettle();
 
+        expect(
+          router.state.uri.path,
+          '/profile/settings/bloqueados',
+          reason: 'la fila tiene que navegar por la ruta, no con un push '
+              'imperativo que el router no ve',
+        );
         expect(find.text('USUARIOS BLOQUEADOS'), findsOneWidget);
         expect(find.text('No bloqueaste a nadie.'), findsOneWidget);
       });
