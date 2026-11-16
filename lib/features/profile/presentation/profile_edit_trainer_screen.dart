@@ -725,8 +725,17 @@ class _ProfileEditTrainerScreenState
                     ),
             ),
             const SizedBox(height: 8),
+            // #1738: el aviso nombraba una sección a la que el PF no llegaba
+            // (la fila vive ahora en su pestaña Perfil). En el onboarding
+            // tampoco llega todavía: el gate del router lo devuelve acá ante
+            // cualquier otra ruta, así que ahí se le dice que es para después.
             Text(
-              'El avatar y el nombre se editan desde "Datos personales".',
+              widget.mode == ProfileEditTrainerMode.onboarding
+                  ? 'Tu nombre y tu avatar los cambiás después, desde '
+                      'Perfil > "${l10n.profileCuentaDatosPersonalesTitle}".'
+                  : 'Tu nombre y tu avatar se cambian desde '
+                      'Perfil > "${l10n.profileCuentaDatosPersonalesTitle}".',
+              key: const Key('profile_edit_trainer_identity_notice'),
               textAlign: TextAlign.center,
               style: TextStyle(color: palette.textMuted, fontSize: 12),
             ),

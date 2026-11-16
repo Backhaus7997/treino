@@ -76,7 +76,8 @@ Widget _wrapWorkout(
         // only care about EXPLORAR / HISTORIAL don't need a full stack.
         authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
         currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
-        assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
+        assignedRoutinesProvider('test-uid')
+            .overrideWith((ref) => Stream.value([])),
         userCreatedRoutinesProvider('test-uid')
             .overrideWith((ref) => Stream.value(const <Routine>[])),
         ...overrides,
@@ -426,7 +427,8 @@ void main() {
           authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
           currentAthleteLinkProvider
               .overrideWith((ref) => Stream.value(makeLink())),
-          assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
+          assignedRoutinesProvider('test-uid')
+              .overrideWith((ref) => Stream.value([])),
           userCreatedRoutinesProvider('test-uid')
               .overrideWith((ref) => Stream.value(const <Routine>[])),
           routinesProvider.overrideWith((ref) async => []),

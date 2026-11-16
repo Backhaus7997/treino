@@ -16,6 +16,9 @@
  * projection predicate, the `resource-exhausted` payload the paywall parses,
  * and the `acceptedAt` stamp the old repository method used to write. This
  * file adds nothing but wiring — deliberately.
+ *
+ * La única cosa que agrega: una vez aceptada, cancela las OTRAS solicitudes
+ * `pending` del mismo alumno al mismo PF (`cancelDuplicatePendingLinks`, #1812).
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -23,6 +26,7 @@ import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
+import { cancelDuplicatePendingLinks } from "./cancel-duplicate-pending-links";
 import { SyncTrainerLoadResult, syncTrainerLoad } from "./promote-link";
 import {
   esTopeDeAlumnos,
@@ -94,6 +98,19 @@ export async function runAcceptTrainerLink(
       }
     }
     throw err;
+  }
+
+  // Las solicitudes duplicadas del par (dos dispositivos del alumno, #1739). Va
+  // DESPUÉS del gate y es best-effort: el accept ya se confirmó, y un fallo acá no
+  // puede devolverle un error al PF por algo que sí salió. Corre también en el
+  // `noop` a propósito: el reintento de un accept cuya limpieza falló la completa.
+  try {
+    await cancelDuplicatePendingLinks(app, linkId);
+  } catch (err) {
+    logger.error("acceptTrainerLink: no se pudieron cancelar las solicitudes duplicadas", {
+      linkId,
+      err,
+    });
   }
 
   // Adoption metric (M.4): counted against `link-promoted-observed` from the

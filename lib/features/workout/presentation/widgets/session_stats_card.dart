@@ -12,7 +12,13 @@ import 'stat_tile.dart';
 /// Usa los mismos tokens que el resto de las tarjetas del resumen post-entreno
 /// (`bgCard` + radio 16 + `border`) para que se lean como el mismo sistema.
 ///
-/// Espera exactamente 4 tiles: se disponen 2×2 en el orden recibido.
+/// Espera 4 tiles: se disponen 2×2 en el orden recibido.
+///
+/// También acepta 3 (#1701): una sesión sin carga —sólo series por tiempo o por
+/// distancia— no tiene volumen, y un «0 kg» ahí afirma un dato falso, así que
+/// el resumen directamente no pone ese tile. Con 3, el tercero ocupa su fila
+/// entera, alineado a la izquierda como los demás, en vez de dejar una celda
+/// vacía al lado que se leería como un tile que no cargó.
 class SessionStatsCard extends StatelessWidget {
   const SessionStatsCard({
     super.key,
@@ -20,8 +26,8 @@ class SessionStatsCard extends StatelessWidget {
     this.animateTiles = false,
     this.entryDelay = Duration.zero,
   }) : assert(
-          tiles.length == 4,
-          'SessionStatsCard espera exactamente 4 tiles',
+          tiles.length == 3 || tiles.length == 4,
+          'SessionStatsCard espera 3 o 4 tiles',
         );
 
   final List<StatTile> tiles;
@@ -52,7 +58,11 @@ class SessionStatsCard extends StatelessWidget {
         children: [
           _StatsRow(left: tileAt(0), right: tileAt(1), palette: palette),
           Divider(height: 1, thickness: 1, color: palette.border),
-          _StatsRow(left: tileAt(2), right: tileAt(3), palette: palette),
+          _StatsRow(
+            left: tileAt(2),
+            right: tiles.length > 3 ? tileAt(3) : null,
+            palette: palette,
+          ),
         ],
       ),
     );
@@ -67,11 +77,15 @@ class _StatsRow extends StatelessWidget {
   });
 
   final Widget left;
-  final Widget right;
+
+  /// `null` → fila de UNA sola celda: [left] ocupa el ancho entero y no hay
+  /// divisor vertical.
+  final Widget? right;
   final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
+    final right = this.right;
     // IntrinsicHeight para que el divisor vertical mida lo mismo que la fila:
     // sin altura fija, la tarjeta sigue funcionando con text scaling grande.
     return IntrinsicHeight(
@@ -79,8 +93,10 @@ class _StatsRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(child: Padding(padding: _cellPadding, child: left)),
-          VerticalDivider(width: 1, thickness: 1, color: palette.border),
-          Expanded(child: Padding(padding: _cellPadding, child: right)),
+          if (right != null) ...[
+            VerticalDivider(width: 1, thickness: 1, color: palette.border),
+            Expanded(child: Padding(padding: _cellPadding, child: right)),
+          ],
         ],
       ),
     );

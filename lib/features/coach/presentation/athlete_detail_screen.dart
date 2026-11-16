@@ -21,6 +21,8 @@ import '../../measurements/presentation/widgets/measurement_history_list.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
 import '../application/athlete_note_providers.dart';
 import '../application/follow_up_entry_providers.dart';
+import '../application/trainer_link_providers.dart'
+    show alumnoConVinculoVivoProvider;
 import '../domain/athlete_note.dart';
 import '../domain/follow_up_entry.dart';
 import '../../coach_hub/application/plan_pdf_import_providers.dart'
@@ -2268,8 +2270,11 @@ class _ProgressionSectionState extends State<_ProgressionSection> {
               oneRepMaxLabel: l10n.progressionMetricOneRepMax,
               bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
               bestSessionVolumeLabel: l10n.progressionMetricVolume,
+              longestDurationLabel: l10n.progressionMetricLongestDuration,
+              longestDistanceLabel: l10n.progressionMetricLongestDistance,
               volumeUnit: 'kg',
               weightUnit: 'kg',
+              distanceUnit: 'm',
               // #555: el count viene acotado al período activo del selector.
               frequencyLabel: (n) => l10n.progressionFrequencyPeriod(n),
               singlePointHint: l10n.progressionSinglePointHint,
@@ -2289,8 +2294,11 @@ class _ProgressionSectionState extends State<_ProgressionSection> {
               oneRepMaxLabel: l10n.progressionMetricOneRepMax,
               bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
               bestSessionVolumeLabel: l10n.progressionMetricVolume,
+              longestDurationLabel: l10n.progressionMetricLongestDuration,
+              longestDistanceLabel: l10n.progressionMetricLongestDistance,
               volumeUnit: 'kg',
               weightUnit: 'kg',
+              distanceUnit: 'm',
               emptyText: l10n.progressionEmptyExercise,
               localeName: l10n.localeName,
             ),
@@ -2735,6 +2743,10 @@ class _AthleteDetailActions extends ConsumerWidget {
 /// CREAR PLAN y, si el kill switch habilita al PF, IMPORTAR DE PDF al lado
 /// (docs/plan-import-pdf.md). Cargando o con error el gate da `loading` /
 /// `disabled` y queda sólo CREAR PLAN: el CTA nunca aparece y desaparece.
+///
+/// Los dos CREAN un plan, así que exigen vínculo VIVO (activo o pausado,
+/// #1695): a esta ficha se llega también desde un turno pasado, o sea de un
+/// ex-alumno. Sin saberlo todavía no se ofrece nada ni se dice «sin vínculo».
 class _PlanCtas extends ConsumerWidget {
   const _PlanCtas({required this.athleteId});
 
@@ -2744,6 +2756,17 @@ class _PlanCtas extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+    final vivo = ref.watch(alumnoConVinculoVivoProvider(athleteId)).valueOrNull;
+    if (vivo != true) {
+      return vivo == null
+          ? const SizedBox.shrink()
+          : Text(
+              l10n.coachAssignNoLink,
+              key: const Key('athlete_detail_sin_vinculo'),
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            );
+    }
     final showImport =
         ref.watch(pdfImportGateProvider) == PdfImportGate.enabled;
     final label = GoogleFonts.barlowCondensed(

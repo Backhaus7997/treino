@@ -1,4 +1,6 @@
 // ignore_for_file: avoid_redundant_argument_values
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/home/application/todays_routine_provider.dart';
@@ -99,7 +101,8 @@ ProviderContainer _container({
   final c = ProviderContainer(
     overrides: [
       currentUidProvider.overrideWith((ref) => 'u1'),
-      assignedRoutinesProvider('u1').overrideWith((ref) async => assigned),
+      assignedRoutinesProvider('u1')
+          .overrideWith((ref) => Stream.value(assigned)),
       userCreatedRoutinesProvider('u1')
           .overrideWith((ref) => Stream.value(selfCreated)),
       sessionsByUidProvider('u1').overrideWith((ref) async => sessions),
@@ -482,6 +485,55 @@ void main() {
       expect(today, isNotNull);
       expect(today!.dayNumber, equals(1));
       expect(today.weekNumber, equals(0));
+    });
+  });
+
+  // #1698: `assignedRoutinesProvider` es un stream. Lo que el PF asigna o
+  // archiva con la app del alumno abierta tiene que mover la card de Home sin
+  // recargar: `todaysRoutineProvider` hace `await ref.watch(...future)` y se
+  // recompone con cada emisión.
+  group('todaysRoutineProvider — EN VIVO con el PF', () {
+    test('asignar un plan cambia la rutina de hoy; archivarlo la devuelve',
+        () async {
+      final asignadas = StreamController<List<Routine>>();
+      addTearDown(asignadas.close);
+      final c = ProviderContainer(
+        overrides: [
+          currentUidProvider.overrideWith((ref) => 'u1'),
+          assignedRoutinesProvider('u1')
+              .overrideWith((ref) => asignadas.stream),
+          userCreatedRoutinesProvider('u1').overrideWith(
+            (ref) => Stream.value([_routine(id: 'propia-1')]),
+          ),
+          sessionsByUidProvider('u1').overrideWith((ref) async => const []),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_profile()),
+          ),
+          routinesProvider.overrideWith((ref) async => const <Routine>[]),
+        ],
+      );
+      addTearDown(c.dispose);
+      final vistas = <String?>[];
+      final sub = c.listen(
+        todaysRoutineProvider,
+        (_, next) => vistas.add(next.valueOrNull?.routine.id),
+      );
+      addTearDown(sub.close);
+
+      // Sin plan del PF: la única propia.
+      asignadas.add(const []);
+      await pumpEventQueue();
+      expect(c.read(todaysRoutineProvider).value?.routine.id, 'propia-1');
+
+      // El PF le asigna un plan: gana (tier 1) sin invalidar nada.
+      asignadas.add([_routine(id: 'plan-pf')]);
+      await pumpEventQueue();
+      expect(c.read(todaysRoutineProvider).value?.routine.id, 'plan-pf');
+
+      // El PF lo archiva (terminó el vínculo): vuelve la propia.
+      asignadas.add(const []);
+      await pumpEventQueue();
+      expect(c.read(todaysRoutineProvider).value?.routine.id, 'propia-1');
     });
   });
 }

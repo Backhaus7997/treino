@@ -247,6 +247,16 @@ describe("athlete_files — dossier del PF, con lo compartido abierto al alumno"
   });
 
   describe("create", () => {
+    // #1698: el create exige rol de PF (`tieneRolDePF`), así que el PF de los
+    // tests tiene que existir como tal en `users`.
+    beforeEach(async () => {
+      await seedDoc("users", TRAINER, { uid: TRAINER, role: "trainer" });
+      await seedDoc("users", OTHER_TRAINER, {
+        uid: OTHER_TRAINER,
+        role: "trainer",
+      });
+    });
+
     it("allows the trainer to create a file doc naming themselves", async () => {
       await assertSucceeds(
         ctxDb(TRAINER).collection(COL_FILES).doc(FILE_ID).set(fileDoc()),
@@ -267,6 +277,40 @@ describe("athlete_files — dossier del PF, con lo compartido abierto al alumno"
     it("DENIES the athlete forging a file doc about themselves", async () => {
       await assertFails(
         ctxDb(ATHLETE).collection(COL_FILES).doc(FILE_ID).set(fileDoc()),
+      );
+    });
+
+    // #1698: sin el gate de rol, cualquier cuenta se nombraba `trainerId` y
+    // plantaba un archivo COMPARTIDO (el default de `upload`) en la pantalla
+    // de Archivos de otro alumno, con el fileName y el downloadUrl que quisiera.
+    it("DENIES an athlete-role account naming ITSELF trainerId against a victim (#1698)", async () => {
+      const attacker = "attacker-coachpriv";
+      await seedDoc("users", attacker, { uid: attacker, role: "athlete" });
+      const id = `${attacker}_${ATHLETE}_1700000000002`;
+      await assertFails(
+        ctxDb(attacker)
+          .collection(COL_FILES)
+          .doc(id)
+          .set(
+            fileDoc({
+              id,
+              trainerId: attacker,
+              fileName: "Tu pago está vencido.pdf",
+              downloadUrl: "https://phishing.example.test/pagar",
+              sharedWithAthlete: true,
+            }),
+          ),
+      );
+    });
+
+    it("DENIES an account with no users doc at all (fails closed, #1698)", async () => {
+      const ghost = "ghost-coachpriv";
+      const id = `${ghost}_${ATHLETE}_1700000000003`;
+      await assertFails(
+        ctxDb(ghost)
+          .collection(COL_FILES)
+          .doc(id)
+          .set(fileDoc({ id, trainerId: ghost, sharedWithAthlete: true })),
       );
     });
 

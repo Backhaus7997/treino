@@ -26,6 +26,7 @@ import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../../helpers/trainer_links.dart';
 import 'periodized_draft_fixtures.dart';
 
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
@@ -87,6 +88,8 @@ List<Override> _overrides(RoutineRepository repo) => [
       userProfileProvider.overrideWith((ref) => Stream.value(_trainer())),
       currentUidProvider.overrideWithValue(_trainerUid),
       routineRepositoryProvider.overrideWithValue(repo),
+      trainerLinkRepositoryProvider
+          .overrideWithValue(repoConVivos(_atletas.keys)),
       trainerLinksStreamProvider.overrideWith(
         (ref) => Stream.value(_atletas.keys.map(_link).toList()),
       ),
@@ -99,10 +102,14 @@ List<Override> _overrides(RoutineRepository repo) => [
       periodizedImportProvider.overrideWith((ref) => _plan()),
     ];
 
-Future<void> _pumpPreview(WidgetTester tester, RoutineRepository repo) async {
+Future<void> _pumpPreview(
+  WidgetTester tester,
+  RoutineRepository repo, {
+  List<Override> extra = const [],
+}) async {
   await tester.pumpWidget(
     ProviderScope(
-      overrides: _overrides(repo),
+      overrides: [..._overrides(repo), ...extra],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
@@ -285,6 +292,50 @@ void main() {
       expect(find.text('No pudimos guardar el plan. Probá de nuevo.'),
           findsNothing);
       expect(find.textContaining('fallaron'), findsNothing);
+    });
+  });
+
+  // #1695: las rules validan el rol y no el vínculo. El picker ofrece a quien
+  // tiene vínculo VIVO (activo o pausado), y `assign` lo re-confirma contra el
+  // servidor antes de escribir.
+  group('Asignar un plan exige vínculo vivo', () {
+    testWidgets('el picker ofrece al pausado y no al terminado',
+        (tester) async {
+      await _pumpPreview(tester, _MockRoutineRepository(), extra: [
+        trainerLinksStreamProvider.overrideWith((ref) => Stream.value([
+              linkDe('ath-1'),
+              linkDe('ath-2', status: TrainerLinkStatus.paused),
+              linkDe('ath-3', status: TrainerLinkStatus.terminated),
+            ])),
+      ]);
+
+      expect(find.text('Ana'), findsOneWidget);
+      expect(find.text('Bruno'), findsOneWidget);
+      expect(find.text('Carla'), findsNothing);
+    });
+
+    testWidgets(
+        'el servidor ya no tiene vivo a uno: no se escribe a NADIE y se lo '
+        'saca de la selección', (tester) async {
+      final repo = _MockRoutineRepository();
+      await _pumpPreview(tester, repo, extra: [
+        trainerLinkRepositoryProvider.overrideWithValue(
+          await repoConVinculos([
+            linkDe('ath-1'),
+            linkDe('ath-2', status: TrainerLinkStatus.terminated),
+            linkDe('ath-3'),
+          ]),
+        ),
+      ]);
+
+      await _seleccionarTodosYAsignar(tester);
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repo.createAssigned(any()));
+      expect(find.text('DASHBOARD'), findsNothing);
+      expect(find.textContaining('ya no tenés un vínculo vigente con 1 de'),
+          findsOneWidget);
+      expect(find.text('ASIGNAR PLAN A 2 ATLETAS'), findsOneWidget);
     });
   });
 }

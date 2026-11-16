@@ -272,7 +272,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   void _sincronizarAviso() {
     final completa = ref
             .read(sessionNotifierProvider(widget.init))
-            .value
+            .valueOrNull
             ?.isFullyCompleted ??
         false;
     _avisos.update(completa ? null : _descansoHasta);
@@ -437,7 +437,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       // es asíncrono): ahí el aviso del descanso ya no tiene sentido.
       ref.listenManual<bool>(
         sessionNotifierProvider(widget.init).select(
-          (s) => s.value?.isFullyCompleted ?? false,
+          (s) => s.valueOrNull?.isFullyCompleted ?? false,
         ),
         (_, __) => _sincronizarAviso(),
       );
@@ -492,7 +492,16 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
 
     final slot = _slotDe(cuenta.exerciseId);
     if (slot == null) return;
-    _logSet(slot, cuenta.setNumber, 0, 0.0);
+    // El tiempo de la serie es lo que corrió la cuenta (#1701). No hay pausa ni
+    // «terminar antes» —sólo Iniciar y Cancelar—, así que lo hecho es siempre
+    // lo prescripto, y `totalSeconds` es la única fuente que lo tiene.
+    _logSet(
+      slot,
+      cuenta.setNumber,
+      0,
+      0.0,
+      durationSeconds: cuenta.totalSeconds,
+    );
   }
 
   /// Saca de la sesión la anotación del cronómetro que acaba de terminar.
@@ -555,7 +564,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
 
   /// El slot de un ejercicio del día, o null si ya no está.
   RoutineSlot? _slotDe(String exerciseId) {
-    final day = ref.read(sessionNotifierProvider(widget.init)).value?.day;
+    final day = ref.read(sessionNotifierProvider(widget.init)).valueOrNull?.day;
     if (day == null) return null;
     for (final slot in day.slots) {
       if (slot.exerciseId == exerciseId) return slot;
@@ -729,10 +738,30 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// ejercicio por tiempo jamás puede terminarse. Idem DISTANCIA
   /// (`_DistanceSetRow` llama `onSetCheck(n, 0, 0)`): `effectiveExerciseMode`
   /// la infiere de los metros aunque el doc diga `exerciseMode: reps`.
-  void _logSet(RoutineSlot slot, int setNumber, int reps, double weightKg) {
+  ///
+  /// #1701: una serie por tiempo o por distancia guarda `reps: 0, weightKg: 0`,
+  /// y sin más datos el historial no sabe qué hizo el atleta. Por eso la serie
+  /// lleva además su métrica propia:
+  /// - [durationSeconds]: lo pasa quien marca una serie por TIEMPO, que es el
+  ///   único que lo sabe (`_revisarCronometro`, con lo que corrió la cuenta).
+  /// - los metros NO se pasan: la fila de distancia es un check sin valor
+  ///   editable, así que lo hecho es lo prescripto y se lee del spec de ESTA
+  ///   serie ([_metrosPrescriptos]). Resolverlo acá evita cambiar los cuatro
+  ///   typedefs de `onSetCheck` que atraviesan los bloques.
+  ///
+  /// Un valor nulo o `<= 0` se guarda como `null`: un «0 s» o «0 m» afirmaría
+  /// una medición que no ocurrió. Las series por reps no llevan ninguno.
+  void _logSet(
+    RoutineSlot slot,
+    int setNumber,
+    int reps,
+    double weightKg, {
+    int? durationSeconds,
+  }) {
     if (slot.effectiveExerciseMode == ExerciseMode.reps && reps <= 0) {
       return;
     }
+    final meters = _metrosPrescriptos(slot, setNumber);
     // #1510: el descanso configurado en la rutina arranca solo al marcar la
     // serie. Una serie nueva reinicia la cuenta (no se apilan).
     //
@@ -751,8 +780,32 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             reps: reps,
             weightKg: weightKg,
             completedAt: DateTime.now(),
+            durationSeconds: durationSeconds != null && durationSeconds > 0
+                ? durationSeconds
+                : null,
+            distanceMeters: meters != null && meters > 0 ? meters : null,
           ),
         );
+  }
+
+  /// Los metros que prescribe el spec de la serie [setNumber] (1-based) de un
+  /// slot por DISTANCIA, o `null` si no es de distancia o no hay spec.
+  ///
+  /// Lee el MISMO spec que dibuja la fila (`effectiveSetsForWeek` con la semana
+  /// de la sesión), así lo que se guarda es lo que el atleta vio en pantalla.
+  /// Una fila agregada más allá del plan no tiene spec (AD-4) y da `null`.
+  double? _metrosPrescriptos(RoutineSlot slot, int setNumber) {
+    if (slot.effectiveExerciseMode != ExerciseMode.distance) return null;
+    final week = ref
+            .read(sessionNotifierProvider(widget.init))
+            .valueOrNull
+            ?.session
+            .weekNumber ??
+        0;
+    final specs = slot.effectiveSetsForWeek(week);
+    final idx = setNumber - 1;
+    if (idx < 0 || idx >= specs.length) return null;
+    return specs[idx].distanceMeters;
   }
 
   /// Actualiza un set ya logueado con nuevos valores de reps y/o peso.
@@ -984,29 +1037,21 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
 
     final routineId = switch (widget.init) {
       FreshSession(routineId: final rid) => rid,
-      ResumeSession() => sessionAsync.value?.session.routineId,
+      ResumeSession() => sessionAsync.valueOrNull?.session.routineId,
     };
     final routineAsync = routineId != null
         ? ref.watch(routineByIdProvider(routineId))
         : const AsyncLoading<Routine?>();
     final routineSplit = routineAsync.valueOrNull?.split ?? '';
+    final cargando = sessionAsync.isLoading;
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: palette.bg,
       body: sessionAsync.when(
         loading: () => Center(
           child: CircularProgressIndicator(color: palette.accent),
         ),
-        error: (_, __) => Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'No pudimos iniciar la sesión.',
-              style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
+        error: (_, __) => const _SessionLoadError(),
         // El subarbol que dibuja ESTA sesion sabe cual es.
         //
         // Sin esto, la fila por tiempo tenia que deducirla —y la deducia con
@@ -1040,6 +1085,25 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           ),
         ),
       ),
+    );
+
+    // El PopScope de [_cuerpoDelPlayer] sólo existe con la sesión resuelta. Con
+    // la sesión CARGANDO —la ventana de «recién toqué EMPEZAR»— el Atrás del
+    // sistema (botón o swipe desde el borde) no encontraba ninguno y sacaba
+    // del player sin diálogo (#1755). Éste cubre ese estado con LA MISMA
+    // confirmación; con la sesión cargada le deja el turno al de adentro.
+    //
+    // Con dos PopScope en la misma ruta, Flutter avisa a TODOS cuando el pop se
+    // bloquea —también al que tiene `canPop: true`—. Por eso éste chequea
+    // `cargando` y no hace nada con la sesión cargada: si no, el diálogo
+    // saldría dos veces. En error no hay nada que proteger y Atrás sale.
+    return PopScope(
+      canPop: !cargando,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _isFinalizing || !cargando) return;
+        _showAbandonConfirm();
+      },
+      child: scaffold,
     );
   }
 
@@ -1092,11 +1156,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                   physics: const ClampingScrollPhysics(),
                   children: [
                     const SizedBox(height: 12),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: _AttendanceCard(),
-                    ),
-                    const SizedBox(height: 14),
+                    // Lleva su propio margen de abajo: si no se dibuja, no deja
+                    // un hueco entre el header y las estadísticas.
+                    const _SessionGymCard(),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: _SessionStatsCard(state: state),
@@ -1252,69 +1314,60 @@ class _SessionHeader extends StatelessWidget {
   }
 }
 
-// ── _AttendanceCard ───────────────────────────────────────────────────────────
+// ── _SessionGymCard ───────────────────────────────────────────────────────────
 
-class _AttendanceCard extends ConsumerWidget {
-  const _AttendanceCard();
+/// El gimnasio del atleta, arriba del player. Es información, NO una asistencia.
+///
+/// Antes era `_AttendanceCard`: decía «Asistencia marcada» con un tilde y una
+/// hora (`DateTime.now()`) y no había nada detrás (#1768). No existe ningún
+/// registro de asistencia ni de check-in a un gimnasio: `Session` no tiene ese
+/// campo, la «asistencia» del código es la de un TURNO con el PF
+/// (`AppointmentAttendance`), y `gymId` es autodeclarado —las reglas lo dicen—,
+/// así que ni siquiera sería una prueba de que el atleta está en el gimnasio.
+/// El spec original (REQ-SESSION-SCREEN-003) la dejó como placeholder visual
+/// hasta una «Etapa 6» que nunca existió.
+///
+/// Se dibuja SÓLO con un gimnasio real y su nombre ya resuelto. Sin gimnasio, o
+/// mientras el nombre carga, no hay nada verdadero que decir y no se dibuja
+/// nada: el «Sin gimnasio asignado» de antes era falso mientras el nombre
+/// cargaba. Y sin ninguna hora: la de antes era la del momento de dibujar.
+class _SessionGymCard extends ConsumerWidget {
+  const _SessionGymCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final profileAsync = ref.watch(userProfileProvider);
-    final gymId = profileAsync.valueOrNull?.gymId;
+    final gymId =
+        ref.watch(userProfileProvider.select((p) => p.valueOrNull?.gymId));
+    if (!hasRealGym(gymId)) return const SizedBox.shrink();
     // DETAIL context (self): `gymDisplayNameProvider` (Google en vivo).
-    final gymName = !hasRealGym(gymId)
-        ? ''
-        : ref.watch(gymDisplayNameProvider(gymId)).valueOrNull ?? '';
-    final now = DateTime.now().toLocal();
-    final hh = now.hour.toString().padLeft(2, '0');
-    final mm = now.minute.toString().padLeft(2, '0');
-    final timeStr = '$hh:$mm';
+    final gymName = ref.watch(gymDisplayNameProvider(gymId)).valueOrNull ?? '';
+    if (gymName.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Icon(TreinoIcon.gym, color: palette.accent, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Asistencia marcada',
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: palette.textPrimary,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.gym, color: palette.accent, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                gymName,
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: palette.textPrimary,
                 ),
-                Text(
-                  gymName.isEmpty ? 'Sin gimnasio asignado' : gymName,
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 12,
-                    color: palette.textMuted,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-          Text(
-            timeStr,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: palette.textMuted,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1336,6 +1389,15 @@ class _SessionStatsCard extends StatelessWidget {
     // hasta cerrar el ejercicio entero. El texto sigue contando ejercicios.
     final setsTotal = state.totalPlannedSets;
     final progress = setsTotal > 0 ? state.completedSetCount / setsTotal : 0.0;
+    // #1701: «0 kg vol.» sólo se esconde cuando la sesión NO puede juntar carga:
+    // todos los slots del día son por tiempo o por distancia (sus series se
+    // guardan con `reps: 0, weightKg: 0`). NO alcanza con `totalVolumeKg == 0`:
+    // toda sesión por reps arranca en 0, y el dato aparecería de golpe recién
+    // al marcar la primera serie. Si por algún camino ya hay volumen, se muestra.
+    final slots = state.day.slots;
+    final sinCarga = slots.isNotEmpty &&
+        slots.every((s) => s.effectiveExerciseMode != ExerciseMode.reps);
+    final mostrarVolumen = !sinCarga || state.totalVolumeKg > 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -1360,8 +1422,10 @@ class _SessionStatsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '$completed / $total ejercicios · '
-                  '${formatVolumeKg(state.totalVolumeKg, AppL10n.of(context).localeName)} kg vol.',
+                  mostrarVolumen
+                      ? '$completed / $total ejercicios · '
+                          '${formatVolumeKg(state.totalVolumeKg, AppL10n.of(context).localeName)} kg vol.'
+                      : '$completed / $total ejercicios',
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
@@ -3385,6 +3449,64 @@ class _FinishEarlyDialog extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── _SessionLoadError ─────────────────────────────────────────────────────────
+
+/// La sesión no se pudo armar: retomar una ajena, inexistente o ya cerrada
+/// (`_buildResume` tira `StateError`), un timeout de lectura, una rutina o un
+/// día que ya no están, o el rechazo del servidor al crear (#1728).
+///
+/// Tiene que traer SU PROPIA salida. Esta pantalla no tiene AppBar, y cuando el
+/// player es la única ruta del stack —recarga en web, deep link— Atrás no tiene
+/// a dónde volver: el texto solo era un callejón sin salida. Va a Inicio con
+/// `go` y no con `pop` por esa misma razón.
+///
+/// No hay «Reintentar» a propósito: para una sesión ajena o inexistente no
+/// cambia nada, y para una sesión nueva volvería a crear otra.
+class _SessionLoadError extends StatelessWidget {
+  const _SessionLoadError();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                l10n.sessionLoadErrorTitle,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.barlowCondensed(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: palette.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.sessionLoadErrorBody,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.barlow(
+                  fontSize: 14,
+                  color: palette.textMuted,
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () => context.go('/home'),
+                child: Text(l10n.sessionLoadErrorCta),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

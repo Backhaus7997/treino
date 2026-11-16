@@ -26,15 +26,19 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/athlete_file.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach/presentation/athlete_agenda_screen.dart';
 import 'package:treino/features/coach/presentation/athlete_files_screen.dart';
 import 'package:treino/features/coach/presentation/athlete_nutrition_plan_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -83,13 +87,15 @@ UserProfile _athleteProfile() => UserProfile(
       onboardingSeen: allSurfacesSeen(),
     );
 
-TrainerLink _activeLink() => TrainerLink(
+TrainerLink _activeLink() => _linkConEstado(TrainerLinkStatus.active);
+
+TrainerLink _linkConEstado(TrainerLinkStatus status) => TrainerLink(
       id: '${_trainerUid}_$_athleteUid',
       trainerId: _trainerUid,
       athleteId: _athleteUid,
-      status: TrainerLinkStatus.active,
+      status: status,
       requestedAt: _kDate,
-      acceptedAt: _kDate,
+      acceptedAt: status == TrainerLinkStatus.active ? _kDate : null,
     );
 
 Future<void> _pumpRoute(
@@ -107,11 +113,21 @@ Future<void> _pumpRoute(
       ),
       authStateChangesProvider.overrideWith((_) => Stream.value(null)),
       currentUidProvider.overrideWithValue(_athleteUid),
-      currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
-      // AthleteCoachView watchea el AnyStatus, no el active-only: sin este
-      // override el test le pega a la instancia real igual que los de abajo.
+      currentAthleteLinkProvider.overrideWith(
+        (ref) => Stream.value(
+          link?.status == TrainerLinkStatus.active ? link : null,
+        ),
+      ),
+      // Las rutas del alumno resuelven el vínculo VIVO (`active|paused`, #1842)
+      // y ese sale del AnyStatus, igual que la tab Coach. Es el stream que el
+      // repo real llena con TODOS los no terminados.
       currentAthleteLinkAnyStatusProvider
           .overrideWith((ref) => Stream.value(link)),
+      // La agenda del alumno lee sus turnos y el perfil público de su PF.
+      appointmentsForAthleteStreamProvider.overrideWith(
+        (ref, id) => Stream.value(const <Appointment>[]),
+      ),
+      userPublicProfileProvider.overrideWith((ref, uid) => Stream.value(null)),
       // Las dos pantallas watchean Firestore apenas montan: sin estos
       // overrides el test pegaría contra la instancia real.
       nutritionPlanProvider.overrideWith((ref, key) => Stream.value(null)),
@@ -180,6 +196,62 @@ void main() {
       findsOneWidget,
     );
   });
+
+  // #1842: pausar es un hold, no un corte. Las reglas leen `nutrition_plans` y
+  // `appointments` por `athleteId`, así que el alumno pausado tiene que poder
+  // abrirlos; antes caía en «No encontramos un vínculo activo».
+  testWidgets('/coach/nutricion con el vínculo PAUSADO monta la pantalla',
+      (tester) async {
+    await _pumpRoute(
+      tester,
+      location: '/coach/nutricion',
+      link: _linkConEstado(TrainerLinkStatus.paused),
+    );
+
+    final screen = tester.widget<AthleteNutritionPlanScreen>(
+      find.byType(AthleteNutritionPlanScreen),
+    );
+    expect(screen.trainerId, _trainerUid);
+    expect(screen.athleteId, _athleteUid);
+    expect(
+        find.text('No encontramos un vínculo activo con un PF.'), findsNothing);
+  });
+
+  testWidgets('/coach/agenda con el vínculo PAUSADO monta la agenda',
+      (tester) async {
+    await _pumpRoute(
+      tester,
+      location: '/coach/agenda',
+      link: _linkConEstado(TrainerLinkStatus.paused),
+    );
+
+    final screen = tester.widget<AthleteAgendaScreen>(
+      find.byType(AthleteAgendaScreen),
+    );
+    expect(screen.trainerId, _trainerUid);
+    expect(screen.athleteId, _athleteUid);
+    expect(
+        find.text('No encontramos un vínculo activo con un PF.'), findsNothing);
+  });
+
+  // Y lo que NO es vivo sigue sin pasar: una solicitud que nadie aceptó no es
+  // un PF, y la ruta no puede montar la pantalla de un PF con el que no hay
+  // vínculo.
+  for (final location in ['/coach/nutricion', '/coach/agenda']) {
+    testWidgets('$location con una solicitud pending no monta la pantalla',
+        (tester) async {
+      await _pumpRoute(
+        tester,
+        location: location,
+        link: _linkConEstado(TrainerLinkStatus.pending),
+      );
+
+      expect(find.byType(AthleteNutritionPlanScreen), findsNothing);
+      expect(find.byType(AthleteAgendaScreen), findsNothing);
+      expect(find.text('No encontramos un vínculo activo con un PF.'),
+          findsOneWidget);
+    });
+  }
 
   testWidgets('/coach/archivos monta la pantalla aun sin vínculo activo',
       (tester) async {

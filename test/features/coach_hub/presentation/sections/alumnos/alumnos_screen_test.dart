@@ -9,6 +9,7 @@
 
 import 'dart:async';
 
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,10 +21,14 @@ import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
+import 'package:treino/features/coach/application/agenda_providers.dart'
+    show appointmentRepositoryProvider;
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/data/nutrition_plan_repository.dart';
+import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -161,6 +166,9 @@ Future<void> _pump(
   // Pagos del trainer (columna «Vencimiento», vía `pagosBucketsProvider`).
   List<Payment> payments = const [],
   TrainerLinkRepository? repo,
+  // Firestore (fake) con los turnos del PF: «Terminar vínculo» cuenta y
+  // cancela los turnos futuros del alumno (#1792). Por default, vacío.
+  FakeFirebaseFirestore? appointmentsDb,
   // Repo de pagos — usado por el botón «Registrar pago» del roster (reusa
   // `registrarPago` de la sección Pagos).
   PaymentRepository? paymentRepo,
@@ -268,6 +276,11 @@ Future<void> _pump(
                 : Stream.value(plansByAthleteId[athleteId]),
           ),
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
+        appointmentRepositoryProvider.overrideWithValue(
+          AppointmentRepository(
+            firestore: appointmentsDb ?? FakeFirebaseFirestore(),
+          ),
+        ),
         // Va al final: gana sobre el override genérico del batch de perfiles.
         if (profilesOverride != null) profilesOverride,
       ],
@@ -704,6 +717,52 @@ void main() {
       expect(find.text('Sin entrenos'), findsOneWidget);
     });
 
+    // #1761 — la vista Cards sólo sabía «¿entrenó hoy?» y decía «—» para quien
+    // había entrenado hace 6 días, mientras la tabla decía «Hace 6 días».
+    testWidgets(
+        'Cards: «Último entreno» dice lo MISMO que la tabla '
+        '(Hoy / Ayer / Hace N días / Sin entrenos)', (tester) async {
+      final ahora = DateTime.now().toUtc();
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a2', TrainerLinkStatus.active),
+          _link('a3', TrainerLinkStatus.active),
+          _link('a4', TrainerLinkStatus.active),
+        ],
+        profiles: [
+          _prof('a1', 'Sofía'),
+          _prof('a2', 'Diego'),
+          _prof('a3', 'Lucía'),
+          _prof('a4', 'Mateo'),
+        ],
+        sessionsInWindowByAthleteId: {
+          'a1': [_sessionAt('a1', ahora)],
+          'a2': [_sessionAt('a2', ahora.subtract(const Duration(days: 1)))],
+          'a3': [_sessionAt('a3', ahora.subtract(const Duration(days: 6)))],
+        },
+      );
+
+      void expectEtiquetas() {
+        expect(find.text('Hoy'), findsOneWidget);
+        expect(find.text('Ayer'), findsOneWidget);
+        expect(find.text('Hace 6 días'), findsOneWidget);
+        expect(find.text('Sin entrenos'), findsOneWidget);
+      }
+
+      // Tabla (vista por defecto).
+      expectEtiquetas();
+
+      await tester.tap(find.text('Cards'));
+      await tester.pumpAndSettle();
+
+      // Cards: las mismas cuatro etiquetas, y ninguna «—» de relleno.
+      expect(find.byType(CoachHubDataTable), findsNothing);
+      expectEtiquetas();
+      expect(find.text('—'), findsNothing);
+    });
+
     testWidgets('terminar abre diálogo y al confirmar llama repo.terminate',
         (tester) async {
       final repo = _MockRepo();
@@ -733,6 +792,112 @@ void main() {
           .called(1);
     });
 
+    // #1792 — terminar el vínculo cancela los turnos futuros, y lo avisa.
+    group('turnos futuros al terminar el vínculo (#1792)', () {
+      Future<void> seedTurno(
+        FakeFirebaseFirestore db,
+        String id,
+        DateTime at, {
+        String athlete = 'a1',
+      }) =>
+          db.collection('appointments').doc(id).set(Appointment(
+                id: id,
+                trainerId: _trainerId,
+                athleteId: athlete,
+                athleteDisplayName: 'Sofía',
+                startsAt: at,
+                durationMin: 60,
+                status: AppointmentStatus.confirmed,
+              ).toJson());
+
+      Future<String> statusOf(FakeFirebaseFirestore db, String id) async =>
+          (await db.collection('appointments').doc(id).get()).data()!['status']
+              as String;
+
+      Future<void> abrirDialogoDeTerminar(WidgetTester tester) async {
+        await tester.tap(find.byTooltip('Opciones del alumno'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Terminar').last);
+        await tester.pumpAndSettle();
+      }
+
+      final futuro = DateTime.utc(2099, 1, 1, 10);
+
+      testWidgets('el diálogo avisa cuántos turnos se cancelan',
+          (tester) async {
+        final db = FakeFirebaseFirestore();
+        await seedTurno(db, 't1', futuro);
+        await seedTurno(db, 't2', futuro.add(const Duration(days: 1)));
+        // Pasado y de otro alumno: no cuentan.
+        await seedTurno(db, 'viejo', DateTime.utc(2020, 1, 1, 10));
+        await seedTurno(db, 'ajeno', futuro, athlete: 'otro');
+
+        await _pump(
+          tester,
+          links: [_link('a1', TrainerLinkStatus.active)],
+          profiles: [_prof('a1', 'Sofía')],
+          appointmentsDb: db,
+        );
+        await abrirDialogoDeTerminar(tester);
+
+        expect(
+          find.textContaining(
+            'También se cancelan 2 sesiones agendadas con este alumno',
+          ),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets(
+          'al confirmar cancela los turnos futuros del alumno Y termina el '
+          'vínculo', (tester) async {
+        final db = FakeFirebaseFirestore();
+        await seedTurno(db, 't1', futuro);
+        await seedTurno(db, 'viejo', DateTime.utc(2020, 1, 1, 10));
+        await seedTurno(db, 'ajeno', futuro, athlete: 'otro');
+        final repo = _MockRepo();
+        when(() => repo.terminate(any(), reason: any(named: 'reason')))
+            .thenAnswer((_) async {});
+
+        await _pump(
+          tester,
+          links: [_link('a1', TrainerLinkStatus.active)],
+          profiles: [_prof('a1', 'Sofía')],
+          repo: repo,
+          appointmentsDb: db,
+        );
+        await abrirDialogoDeTerminar(tester);
+        await tester.tap(find.text('Terminar')); // botón confirmar
+        await tester.pumpAndSettle();
+
+        expect(await statusOf(db, 't1'), 'cancelled');
+        expect(await statusOf(db, 'viejo'), 'confirmed');
+        expect(await statusOf(db, 'ajeno'), 'confirmed');
+        verify(() => repo.terminate('l_a1', reason: 'trainer-terminated'))
+            .called(1);
+      });
+
+      testWidgets(
+          'si terminar falla, avisa con un toast en vez de tirar una '
+          'excepción sin capturar', (tester) async {
+        final repo = _MockRepo();
+        when(() => repo.terminate(any(), reason: any(named: 'reason')))
+            .thenThrow(Exception('permission-denied'));
+
+        await _pump(
+          tester,
+          links: [_link('a1', TrainerLinkStatus.active)],
+          profiles: [_prof('a1', 'Sofía')],
+          repo: repo,
+        );
+        await abrirDialogoDeTerminar(tester);
+        await tester.tap(find.text('Terminar'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('No pudimos terminar el vínculo.'), findsOneWidget);
+      });
+    });
+
     testWidgets('cancelar el diálogo NO llama al repo', (tester) async {
       final repo = _MockRepo();
       when(() => repo.terminate(any(), reason: any(named: 'reason')))
@@ -755,6 +920,44 @@ void main() {
       await tester.pumpAndSettle();
 
       verifyNever(() => repo.terminate(any(), reason: any(named: 'reason')));
+    });
+
+    // #1843 — el diálogo prometía «no podrá registrar sesiones nuevas», y nada
+    // lo aplica: el alumno pausado sigue pudiendo registrar. El texto dice lo
+    // que pausar hace de verdad.
+    testWidgets(
+        'pausar abre un diálogo que dice lo que pausar hace, sin prometer un '
+        'bloqueo que no existe', (tester) async {
+      final repo = _MockRepo();
+      when(() => repo.pause(any())).thenAnswer((_) async {});
+
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        repo: repo,
+      );
+
+      await tester.tap(find.byTooltip('Opciones del alumno'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pausar').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pausar vínculo'), findsOneWidget);
+      expect(
+        find.text(
+          'El alumno conserva sus rutinas, su plan nutricional, la agenda y '
+          'el chat. Vos dejás de ver sus sesiones hasta que reanudes el '
+          'vínculo.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('no podrá registrar'), findsNothing);
+
+      await tester.tap(find.text('Pausar').last); // botón confirmar
+      await tester.pumpAndSettle();
+
+      verify(() => repo.pause('l_a1')).called(1);
     });
 
     testWidgets('alumno re-vinculado (terminado + activo) → una sola fila',

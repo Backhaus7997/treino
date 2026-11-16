@@ -19,6 +19,8 @@ import '../../coach_hub/application/plan_import_providers.dart';
 import '../../coach_hub/application/plan_pdf_import_providers.dart';
 import '../../coach_hub/data/plan_pdf_import_service.dart';
 import '../../coach_hub/presentation/widgets/pdf_import_failure_copy.dart';
+import '../application/trainer_link_providers.dart'
+    show alumnoConVinculoVivoProvider;
 import 'plan_pdf_import_preview_screen.dart' show planPdfImportPreviewPath;
 import '../../coach_hub/presentation/widgets/pdf_import_quota_copy.dart';
 
@@ -155,6 +157,13 @@ class _PlanPdfImportUploadScreenState
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
+    // Importar crea un plan para el alumno y descuenta del cupo del PF, así
+    // que se exige vínculo VIVO (activo o pausado) ANTES de aceptar el archivo
+    // (#1695). Procesando ya no se mira: el cupo está gastado y la vista previa
+    // vuelve a verificarlo al asignar. «Todavía no sé» es carga, no «sin vínculo».
+    final enVivo = ref.watch(alumnoConVinculoVivoProvider(widget.athleteId));
+    final vinculo = _processing ? const AsyncData(true) : enVivo;
+
     final Widget state;
     final Key stateKey;
     if (_processing) {
@@ -215,18 +224,35 @@ class _PlanPdfImportUploadScreenState
                   ),
                 ),
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.s20,
-                        AppSpacing.s12, AppSpacing.s20, AppSpacing.s20),
-                    children: [
-                      _Notice(text: l10n.pdfImportPrivacyNotice),
-                      _QuotaLine(
-                          exhaustedBannerShown:
-                              _failure is PdfImportQuotaExhausted),
-                      const SizedBox(height: AppSpacing.s18),
-                      TreinoStateSwitcher(childKey: stateKey, child: state),
-                    ],
-                  ),
+                  child: vinculo.valueOrNull == true
+                      ? ListView(
+                          padding: const EdgeInsets.fromLTRB(AppSpacing.s20,
+                              AppSpacing.s12, AppSpacing.s20, AppSpacing.s20),
+                          children: [
+                            _Notice(text: l10n.pdfImportPrivacyNotice),
+                            _QuotaLine(
+                                exhaustedBannerShown:
+                                    _failure is PdfImportQuotaExhausted),
+                            const SizedBox(height: AppSpacing.s18),
+                            TreinoStateSwitcher(
+                                childKey: stateKey, child: state),
+                          ],
+                        )
+                      : Center(
+                          child: vinculo.isLoading
+                              ? CircularProgressIndicator(color: palette.accent)
+                              : Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.s20),
+                                  child: Text(
+                                    vinculo.hasError
+                                        ? l10n.coachAssignLinkUnverified
+                                        : l10n.coachAssignNoLink,
+                                    key: const Key('pdf_import_sin_vinculo'),
+                                    textAlign: TextAlign.center,
+                                    style: _body(palette.textMuted),
+                                  ),
+                                ),
+                        ),
                 ),
               ],
             ),

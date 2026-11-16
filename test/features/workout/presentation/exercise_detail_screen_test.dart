@@ -366,6 +366,8 @@ void main() {
         setCount: 4,
         bestWeightKg: 80.0,
         bestSetReps: 8,
+        bestDurationSeconds: null,
+        bestDistanceMeters: null,
         sessionVolume: 2400.0,
       ),
       (
@@ -373,9 +375,29 @@ void main() {
         setCount: 1,
         bestWeightKg: 0.0,
         bestSetReps: 12,
+        bestDurationSeconds: null,
+        bestDistanceMeters: null,
         sessionVolume: 0.0,
       ),
     ];
+
+    // #1716: una fila de HISTORIAL de un ejercicio por tiempo o por distancia.
+    // Con los dos nulos es una serie vieja (de antes de #1702), sin métrica ni
+    // reps.
+    ExerciseSessionHistoryEntry timedOrDistanceRow({
+      required int setCount,
+      int? bestDurationSeconds,
+      double? bestDistanceMeters,
+    }) =>
+        (
+          date: DateTime.utc(2026, 7, 22, 12),
+          setCount: setCount,
+          bestWeightKg: 0.0,
+          bestSetReps: 0,
+          bestDurationSeconds: bestDurationSeconds,
+          bestDistanceMeters: bestDistanceMeters,
+          sessionVolume: 0.0,
+        );
 
     List<Override> statsOverrides({
       required ExerciseProgression progression,
@@ -496,6 +518,171 @@ void main() {
       expect(find.text('1 serie'), findsOneWidget);
       // Real rows replace the HISTORIAL empty state.
       expect(find.text('Aún no entrenaste este ejercicio'), findsNothing);
+    });
+
+    // #1715: la progresión de una plancha tiene gráfico y récord, no «sin datos».
+    testWidgets('#1715: a timed exercise charts its time and lists its record',
+        (tester) async {
+      _useTallViewport(tester);
+      final timed = ExerciseProgression(
+        exerciseId: 'bench-press',
+        exerciseName: 'Plancha',
+        heaviestWeightSeries: const [],
+        oneRepMaxSeries: const [],
+        bestSetVolumeSeries: const [],
+        bestSessionVolumeSeries: const [],
+        bestDurationSeries: [pt(d1, 60), pt(d2, 90)],
+        personalRecords: [
+          PersonalRecord(
+            recordType: ProgressionRecordType.longestDuration,
+            value: 90,
+            achievedAt: d2,
+          ),
+        ],
+        frequencySessionCount: 2,
+      );
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        statsOverrides(progression: timed),
+        uid: 'user-1',
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // El chip de tiempo, y el mismo label en la fila del récord con su valor
+      // (que el tile de arriba repite: 01:30 en el récord y en el tile).
+      expect(find.text('Tiempo máximo'), findsNWidgets(2));
+      expect(find.text('01:30'), findsNWidgets(2));
+      expect(find.text('Peso máximo'), findsNothing);
+      expect(find.text('Sin datos para este ejercicio.'), findsNothing);
+    });
+
+    // #1715: sin carga no hay 1RM. El tile estrella pasa a ser la mejor marca
+    // del período y PROGRESO sigue esa misma serie, en vez de dos «—».
+    for (final c in [
+      (
+        name: 'tiempo',
+        durations: [60.0, 90.0],
+        distances: <double>[],
+        label: 'TIEMPO MÁXIMO',
+        best: '01:30',
+        progress: '+50%',
+      ),
+      (
+        name: 'distancia',
+        durations: <double>[],
+        distances: [40.0, 50.0],
+        label: 'DISTANCIA MÁXIMA',
+        best: '50 m',
+        progress: '+25%',
+      ),
+    ]) {
+      testWidgets(
+          '#1715: un ejercicio por ${c.name} reemplaza el 1RM por su mejor marca',
+          (tester) async {
+        _useTallViewport(tester);
+        final progression = ExerciseProgression(
+          exerciseId: 'bench-press',
+          exerciseName: 'Ejercicio',
+          heaviestWeightSeries: const [],
+          oneRepMaxSeries: const [],
+          bestSetVolumeSeries: const [],
+          bestSessionVolumeSeries: const [],
+          bestDurationSeries: [
+            for (final (i, v) in c.durations.indexed) pt(i == 0 ? d1 : d2, v),
+          ],
+          bestDistanceSeries: [
+            for (final (i, v) in c.distances.indexed) pt(i == 0 ? d1 : d2, v),
+          ],
+          personalRecords: const [],
+          frequencySessionCount: 2,
+        );
+        await tester.pumpWidget(_wrapWithOverrides(
+          const ExerciseDetailScreen(exerciseId: 'bench-press'),
+          statsOverrides(progression: progression),
+          uid: 'user-1',
+        ));
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(find.text(c.label), findsOneWidget);
+        expect(find.text(c.best), findsOneWidget);
+        expect(find.text(c.progress), findsOneWidget);
+        expect(find.text('1RM'), findsNothing);
+      });
+    }
+
+    testWidgets('#1716: a timed exercise shows its best time, not «0 reps»',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        statsOverrides(
+          progression: makeProgression(),
+          history: [timedOrDistanceRow(setCount: 3, bestDurationSeconds: 60)],
+        ),
+        uid: 'user-1',
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.scrollUntilVisible(
+        find.text('01:00'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('01:00'), findsOneWidget);
+      expect(find.text('3 series'), findsOneWidget);
+      expect(find.textContaining('0 reps'), findsNothing);
+    });
+
+    testWidgets(
+        '#1716: a distance exercise shows its best distance in meters, not '
+        '«0 reps»', (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        statsOverrides(
+          progression: makeProgression(),
+          history: [timedOrDistanceRow(setCount: 2, bestDistanceMeters: 40)],
+        ),
+        uid: 'user-1',
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.scrollUntilVisible(
+        find.text('40 m'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('40 m'), findsOneWidget);
+      expect(find.text('2 series'), findsOneWidget);
+      expect(find.textContaining('0 reps'), findsNothing);
+    });
+
+    testWidgets(
+        '#1716: an old timed/distance set with no metric has no best set — '
+        'the row keeps only the set count and no «0 reps»', (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        statsOverrides(
+          progression: makeProgression(),
+          history: [timedOrDistanceRow(setCount: 2)],
+        ),
+        uid: 'user-1',
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.scrollUntilVisible(
+        find.text('2 series'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('2 series'), findsOneWidget);
+      expect(find.textContaining('reps'), findsNothing);
     });
 
     testWidgets(

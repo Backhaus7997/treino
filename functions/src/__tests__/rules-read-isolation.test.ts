@@ -490,11 +490,13 @@ describe("rules scanner sanity", () => {
   });
 
   it("actually removes the prose mentions that would be false positives", () => {
-    // firestore.rules explains in comments that several rules are role checks
-    // and "NOT a trainer_links relationship check". Unstripped, each of those
-    // sentences would land in the inventory as a phantom clause.
-    expect(RAW_RULES).toContain("NOT a trainer_links relationship check");
-    expect(MODEL.stripped).not.toContain("NOT a trainer_links relationship check");
+    // firestore.rules explains in comments where a rule does NOT read
+    // trainer_links (e.g. `senderMayPost`). Unstripped, each of those
+    // sentences would land in the inventory as a phantom clause. (Was "NOT a
+    // trainer_links relationship check", the role-only comments that #1806
+    // rewrote when those creates started asking for a live pair.)
+    expect(RAW_RULES).toContain("Esta regla NO lee `trainer_links` a propósito");
+    expect(MODEL.stripped).not.toContain("Esta regla NO lee `trainer_links` a propósito");
 
     const count = (text: string): number => (text.match(/trainer_links/g) ?? []).length;
     expect(count(MODEL.stripped)).toBeLessThan(count(RAW_RULES));
@@ -557,9 +559,14 @@ const FROZEN_PAYWALL_AWARE_CLAUSES: Readonly<Record<string, readonly string[]>> 
   // chatCreateOk() reads the named link to prove a coach relationship before
   // a chat may be opened. Reaches trainer_links through the helper.
   "/chats/{chatId} :: create": ["trainer_links"],
-  // A review may only be written against a real, non-terminated link
-  // (rules-hardening Slice B, AD-1).
-  "/reviews/{reviewId} :: create": ["trainer_links"],
+  // A review may only be written against a real link (rules-hardening Slice
+  // B, AD-1): live, or terminated WITH `acceptedAt` (#1840, the athlete who
+  // ends the link is offered the review). `acceptedAt` ADDED deliberately: a
+  // write clause READS it to tell a past relationship from a declined
+  // request. It is the link's own field, pinned by the two trainer_links
+  // entries above, so the athlete cannot plant it; and no read verb is
+  // involved, so §6 holds on its own.
+  "/reviews/{reviewId} :: create": ["acceptedAt", "trainer_links"],
 };
 
 describe("firestore.rules — frozen inventory of paywall-aware clauses", () => {

@@ -20,7 +20,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/stale_async.dart'
 ///
 /// Boundary (ADR-PGW-002, updated REQ-VENC-11):
 ///   Vencido = pending && (
-///     dueAt != null  → dueAt.toUtc().isBefore(now)
+///     dueAt != null  → toArgentina(dueAt.toUtc()).isBefore(now)  [`now` = ART, #1824]
 ///     dueAt == null  → createdAt.toUtc().isBefore(periodStart) [legacy fallback]
 ///   )
 /// Por vencer = pending && NOT vencido.
@@ -66,8 +66,14 @@ PagosBuckets _computeBuckets(List<Payment> payments) {
   for (final p in payments) {
     if (p.status == PaymentStatus.pending) {
       // REQ-VENC-11: dueAt-based vencido check with legacy null-dueAt fallback.
+      //
+      // `dueAt` es un instante real y `now` ya está corrido a ART, así que se
+      // lleva al mismo marco antes de comparar (#1824). Con `dueAt.toUtc()` a
+      // secas el pago pasaba a Vencidos 3 h DESPUÉS de que terminara su día de
+      // vencimiento, y la fila decía «Vencido 1d» mientras seguía en Por vencer
+      // (el badge sale de `pagoEstadoOf`, que compara en ART).
       final isVencido = p.dueAt != null
-          ? p.dueAt!.toUtc().isBefore(now)
+          ? toArgentina(p.dueAt!.toUtc()).isBefore(now)
           : p.createdAt.toUtc().isBefore(periodStart);
       if (isVencido) {
         vencidos.add(p);

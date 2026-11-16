@@ -37,6 +37,8 @@ Session _makeSession({
 Future<void> _pumpHistoryScreen(
   WidgetTester tester, {
   required List<Session> sessions,
+  // Vista del PF sobre el historial de un alumno (misma fila, otra ruta).
+  String? coachAthleteId,
 }) async {
   final router = GoRouter(
     initialLocation: '/workout/historial',
@@ -47,7 +49,8 @@ Future<void> _pumpHistoryScreen(
       ),
       GoRoute(
         path: '/workout/historial',
-        builder: (_, __) => const SessionHistoryScreen(),
+        builder: (_, __) =>
+            SessionHistoryScreen(coachAthleteId: coachAthleteId),
       ),
       GoRoute(
         path: '/workout/historial/:sessionId',
@@ -103,6 +106,79 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('1.234,5 kg'), findsOneWidget);
+    });
+  });
+
+  // #1701: una sesión sólo de series por tiempo o por distancia tiene
+  // `totalVolumeKg == 0`, y «0 kg» afirma un dato que no existe.
+  group('SessionHistoryScreen — sesión sin carga (#1701)', () {
+    /// Distancia horizontal entre el borde derecho del bloque expandido (título
+    /// + fecha) y el borde izquierdo de [metric].
+    double gapBeforeMetric(WidgetTester tester, Finder metric) {
+      final expanded = find
+          .ancestor(of: find.text('Push A'), matching: find.byType(Expanded))
+          .first;
+      return tester.getTopLeft(metric).dx - tester.getTopRight(expanded).dx;
+    }
+
+    testWidgets('sin volumen no muestra "0 kg": queda sólo la duración',
+        (tester) async {
+      await _pumpHistoryScreen(
+        tester,
+        sessions: [_makeSession(totalVolumeKg: 0, durationMin: 18)],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Push A'), findsOneWidget);
+      expect(find.textContaining('kg'), findsNothing);
+      expect(find.text('18 min'), findsOneWidget);
+      // Sin el volumen tampoco queda su separador: un solo hueco de 8px.
+      expect(gapBeforeMetric(tester, find.text('18 min')), 8);
+    });
+
+    testWidgets('con volumen sigue mostrando volumen y duración',
+        (tester) async {
+      await _pumpHistoryScreen(
+        tester,
+        sessions: [_makeSession(totalVolumeKg: 600, durationMin: 18)],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('600 kg'), findsOneWidget);
+      expect(find.text('18 min'), findsOneWidget);
+      expect(gapBeforeMetric(tester, find.text('600 kg')), 8);
+      expect(
+        tester.getTopLeft(find.text('18 min')).dx -
+            tester.getTopRight(find.text('600 kg')).dx,
+        8,
+      );
+    });
+
+    testWidgets('vista del PF (coachAthleteId): sin volumen no muestra "0 kg"',
+        (tester) async {
+      await _pumpHistoryScreen(
+        tester,
+        coachAthleteId: 'athlete-1',
+        sessions: [_makeSession(totalVolumeKg: 0, durationMin: 18)],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Push A'), findsOneWidget);
+      expect(find.textContaining('kg'), findsNothing);
+      expect(find.text('18 min'), findsOneWidget);
+    });
+
+    testWidgets('vista del PF (coachAthleteId): con volumen lo sigue mostrando',
+        (tester) async {
+      await _pumpHistoryScreen(
+        tester,
+        coachAthleteId: 'athlete-1',
+        sessions: [_makeSession(totalVolumeKg: 600, durationMin: 18)],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('600 kg'), findsOneWidget);
+      expect(find.text('18 min'), findsOneWidget);
     });
   });
 }

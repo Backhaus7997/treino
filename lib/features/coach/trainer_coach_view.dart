@@ -8,9 +8,12 @@ import 'package:treino/core/widgets/treino_toast.dart';
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
+import 'application/agenda_providers.dart' show appointmentRepositoryProvider;
 import 'application/limite_de_alumnos_provider.dart';
+import 'application/terminar_vinculo.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
@@ -410,6 +413,41 @@ class _ActiveAlumnoCard extends ConsumerWidget {
     }
   }
 
+  /// Terminar también cancela los turnos futuros con el alumno, ANTES de
+  /// terminar (#1792). Ver `application/terminar_vinculo.dart`.
+  Future<void> _terminarVinculo(BuildContext context, WidgetRef ref) async {
+    final l10n = AppL10n.of(context);
+    final palette = AppPalette.of(context);
+    final appointments = ref.read(appointmentRepositoryProvider);
+    final turnos = await contarTurnosFuturos(appointments, link);
+    if (!context.mounted) return;
+    final aviso = avisoDeTurnosAlTerminar(l10n, turnos);
+    await _confirmAndRun(
+      context,
+      ref,
+      title: 'Terminar vínculo',
+      body: '¿Seguro que querés terminar el vínculo con este alumno?'
+          '${aviso.isEmpty ? '' : '\n\n$aviso'}',
+      confirmLabel: 'Terminar',
+      confirmBg: palette.highlight,
+      action: () => terminarVinculoLiberandoTurnos(
+        links: ref.read(trainerLinkRepositoryProvider),
+        appointments: appointments,
+        link: link,
+      ),
+      // Si falló la cancelación de los turnos, el vínculo NO se terminó.
+      onFailure: (ctx, error) async {
+        showTreinoToast(
+          ctx,
+          error is TurnosFuturosSinCancelar
+              ? l10n.coachHubTerminateLinkAppointmentsError
+              : 'No pudimos actualizar el vínculo. Probá de nuevo.',
+          type: TreinoToastType.error,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
@@ -529,8 +567,11 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                         context,
                         ref,
                         title: 'Pausar vínculo',
+                        // Lo que pausar hace de verdad (#1843): el alumno sigue
+                        // viendo lo suyo y vos dejás de ver sus sesiones. NO es
+                        // un «read-only»: nada le bloquea al alumno registrar.
                         body:
-                            '¿Querés pausar el vínculo con este alumno? Va a quedar en read-only hasta que reanudes.',
+                            '¿Querés pausar el vínculo con este alumno? Conserva sus rutinas, su plan nutricional, la agenda y el chat, y vos dejás de ver sus sesiones hasta que reanudes.',
                         confirmLabel: 'Pausar',
                         confirmBg: palette.accent,
                         action: () => ref
@@ -559,18 +600,7 @@ class _ActiveAlumnoCard extends ConsumerWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: () => _confirmAndRun(
-                  context,
-                  ref,
-                  title: 'Terminar vínculo',
-                  body:
-                      '¿Seguro que querés terminar el vínculo con este alumno?',
-                  confirmLabel: 'Terminar',
-                  confirmBg: palette.highlight,
-                  action: () => ref
-                      .read(trainerLinkRepositoryProvider)
-                      .terminate(link.id, reason: 'trainer-terminated'),
-                ),
+                onPressed: () => _terminarVinculo(context, ref),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: palette.border, width: 1),
                   foregroundColor: palette.textMuted,

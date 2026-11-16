@@ -31,6 +31,7 @@ import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../helpers/trainer_links.dart';
 import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -108,7 +109,7 @@ Future<void> _pumpEditorWithMode(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: overrides,
+      overrides: [...alumnosVivosOverrides(), ...overrides],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
@@ -362,6 +363,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            ...alumnosVivosOverrides(),
             currentUidProvider.overrideWithValue('trainer-1'),
             routineRepositoryProvider.overrideWithValue(repo),
             exercisesProvider.overrideWith((ref) async => _kExercises),

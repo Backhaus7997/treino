@@ -16,6 +16,7 @@ import '../application/recordatorios_entrenamiento_providers.dart';
 import '../application/user_providers.dart';
 import '../data/user_repository.dart' show UserRepository;
 import '../domain/user_role.dart';
+import 'widgets/profile_section_tile.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Los controles de privacidad del usuario: la analítica (por dispositivo), los
@@ -57,6 +58,12 @@ import 'package:treino/core/widgets/treino_toast.dart';
 ///
 /// Los interruptores aplican en el acto, no al próximo arranque: «en cualquier
 /// momento» quiere decir ahora.
+///
+/// Al final, para los dos roles, una fila abre «Usuarios bloqueados» (#1698:
+/// bloquear no tenía vuelta). Es una navegación, no una preferencia. El rótulo
+/// de la fila de Perfil que llega hasta acá (`privacyEntryTitle`) no la nombra
+/// —los tests fijan su texto—, así que «Desbloquear» se encuentra primero desde
+/// el menú ⋮ de un perfil o post y desde el aviso del chat.
 class PrivacyScreen extends ConsumerWidget {
   const PrivacyScreen({super.key});
 
@@ -281,6 +288,22 @@ class PrivacyScreen extends ConsumerWidget {
                     ),
                   ),
                 ],
+
+                // Última, y para los dos roles: ver el dartdoc de la clase.
+                const SizedBox(height: 20),
+                TreinoFadeSlideIn(
+                  child: Semantics(
+                    button: true,
+                    label: l10n.blockedUsersTitle,
+                    excludeSemantics: true,
+                    child: ProfileSectionTile(
+                      key: const ValueKey('privacy-blocked-users-entry'),
+                      icon: TreinoIcon.block,
+                      title: l10n.blockedUsersTitle,
+                      onTap: () => context.push('/profile/settings/bloqueados'),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

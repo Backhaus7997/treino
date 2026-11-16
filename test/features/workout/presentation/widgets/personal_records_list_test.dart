@@ -14,8 +14,11 @@ PersonalRecordsListLabels _labels() => const PersonalRecordsListLabels(
       oneRepMaxLabel: '1RM',
       bestSetVolumeLabel: 'Mejor serie',
       bestSessionVolumeLabel: 'Volumen',
+      longestDurationLabel: 'Tiempo máximo',
+      longestDistanceLabel: 'Distancia máxima',
       volumeUnit: 'kg·reps',
       weightUnit: 'kg',
+      distanceUnit: 'm',
       emptyText: 'Sin datos suficientes para este ejercicio.',
       localeName: 'es_AR',
     );
@@ -113,6 +116,37 @@ void main() {
 
   setUpAll(() async {
     await initializeDateFormatting('es_AR');
+  });
+
+  // #1715: una plancha no tiene kg. Su récord es un tiempo («01:30»), el de un
+  // carry son metros, y ninguno se lee como una carga.
+  testWidgets('#1715: el récord de tiempo se lee mm:ss y el de distancia en m',
+      (tester) async {
+    await tester.pumpWidget(_wrap(
+      PersonalRecordsList(
+        labels: _labels(),
+        records: [
+          PersonalRecord(
+            recordType: ProgressionRecordType.longestDuration,
+            value: 90,
+            achievedAt: DateTime(2025, 3, 10),
+          ),
+          PersonalRecord(
+            recordType: ProgressionRecordType.longestDistance,
+            value: 1250.5,
+            achievedAt: DateTime(2025, 4, 1),
+          ),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tiempo máximo'), findsOneWidget);
+    expect(find.text('01:30'), findsOneWidget);
+    expect(find.text('Distancia máxima'), findsOneWidget);
+    expect(find.text('1.250,5'), findsOneWidget);
+    expect(find.text('m'), findsOneWidget);
+    expect(find.textContaining('kg'), findsNothing);
   });
 
   testWidgets(

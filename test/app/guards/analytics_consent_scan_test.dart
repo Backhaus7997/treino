@@ -46,6 +46,33 @@ void main() {
     );
   });
 
+  test('los dos entry points y el interruptor pasan por analyticsEfectiva', () {
+    // #1698: con USE_EMULATOR la analítica queda apagada (no tiene emulador y
+    // salía a producción). Tiene que pasar por `analyticsEfectiva` y no por un
+    // `false` literal —el test de arriba los prohíbe—, así que lo que se mira
+    // es que ninguno de los tres sitios le pase a Firebase el consentimiento
+    // pelado.
+    final conEfectiva = RegExp(
+      r'setAnalyticsCollectionEnabled\(\s*analyticsEfectiva\(',
+    );
+    for (final archivo in [
+      'lib/main.dart',
+      'lib/main_coach_hub.dart',
+      'lib/core/analytics/analytics_consent.dart',
+    ]) {
+      final src = File(archivo)
+          .readAsStringSync()
+          .replaceAll(RegExp(r'^\s*//.*$', multiLine: true), '');
+      expect(
+        conEfectiva.hasMatch(src),
+        isTrue,
+        reason: '$archivo le pasa a setAnalyticsCollectionEnabled algo que no '
+            'es analyticsEfectiva(...): con USE_EMULATOR la analítica saldría '
+            'a PRODUCCIÓN (#1698)',
+      );
+    }
+  });
+
   test('las DOS vistas de perfil llevan al interruptor', () {
     // `ProfileScreen` reparte por rol: el atleta ve `_AthleteProfile` y el
     // entrenador ve `TrainerProfileView`, que son dos arboles distintos. Poner

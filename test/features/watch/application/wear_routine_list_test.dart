@@ -70,11 +70,11 @@ void main() {
           currentUidProvider.overrideWithValue(uid),
           assignedRoutinesProvider(uid)
               .overrideWith((ref) => switch (asignadas) {
-                    AsyncData(:final value) => Future.value(value),
+                    AsyncData(:final value) => Stream.value(value),
                     AsyncError(:final error) =>
-                      Future<List<Routine>>.error(error),
-                    // Nunca completa: simula "todavia cargando".
-                    _ => Completer<List<Routine>>().future,
+                      Stream<List<Routine>>.error(error),
+                    // Nunca emite: simula "todavia cargando".
+                    _ => const Stream<List<Routine>>.empty(),
                   }),
           userCreatedRoutinesProvider(uid)
               .overrideWith((ref) => switch (propias) {

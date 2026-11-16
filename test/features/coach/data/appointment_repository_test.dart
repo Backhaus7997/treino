@@ -386,6 +386,79 @@ void main() {
     });
   });
 
+  // #1792 — terminar un vínculo libera los turnos futuros del par.
+  group('#1792 — cancelFutureForPair() / listFutureConfirmedForPair()', () {
+    final now = DateTime.utc(2026, 7, 1, 12, 0);
+
+    Future<void> seed(
+      String id,
+      DateTime at, {
+      String trainer = trainerId,
+      String athlete = athleteId,
+      AppointmentStatus status = AppointmentStatus.confirmed,
+    }) =>
+        firestore.collection('appointments').doc(id).set(Appointment(
+              id: id,
+              trainerId: trainer,
+              athleteId: athlete,
+              athleteDisplayName: athleteDisplayName,
+              startsAt: at,
+              durationMin: durationMin,
+              status: status,
+            ).toJson());
+
+    Future<Map<String, Object?>> docOf(String id) async =>
+        (await firestore.collection('appointments').doc(id).get()).data()!;
+
+    setUp(() async {
+      await seed('empezada', now.subtract(const Duration(hours: 1)));
+      await seed('en-3-horas', now.add(const Duration(hours: 3)));
+      await seed('en-3-dias', now.add(const Duration(days: 3)));
+      await seed('ya-cancelado', now.add(const Duration(days: 2)),
+          status: AppointmentStatus.cancelled);
+      await seed('otro-alumno', now.add(const Duration(days: 2)),
+          athlete: 'otro-athlete');
+    });
+
+    test('cancela los confirmados y futuros del par (<24h incluido) y nada más',
+        () async {
+      final n = await repo.cancelFutureForPair(
+        trainerId: trainerId,
+        athleteId: athleteId,
+        actorUid: trainerId,
+        reason: 'Vínculo terminado por el entrenador.',
+        now: now,
+      );
+
+      expect(n, 2);
+      for (final id in ['en-3-horas', 'en-3-dias']) {
+        final d = await docOf(id);
+        expect(d['status'], 'cancelled', reason: id);
+        expect(d['cancelledBy'], trainerId, reason: id);
+        final log = (d['cancellationLog']! as List).single as Map;
+        expect(log['reason'], 'Vínculo terminado por el entrenador.');
+      }
+      expect((await docOf('empezada'))['status'], 'confirmed');
+      expect((await docOf('otro-alumno'))['status'], 'confirmed');
+    });
+
+    test('más de 500 turnos: los cancela todos (lotes de 500)', () async {
+      for (var i = 0; i < 520; i++) {
+        await seed('masivo-$i', now.add(Duration(days: 10, minutes: i)),
+            athlete: 'masivo');
+      }
+
+      final n = await repo.cancelFutureForPair(
+        trainerId: trainerId,
+        athleteId: 'masivo',
+        actorUid: trainerId,
+        now: now,
+      );
+
+      expect(n, 520);
+    });
+  });
+
   group('#1492 — setAttendance()', () {
     late Appointment appt;
 
@@ -640,6 +713,83 @@ void main() {
         expect(results.single.trainerId, equals(trainerId));
       },
     );
+  });
+
+  // #1729: `watchForTrainer` filtra `confirmed` a propósito, así que el
+  // «Resumen del día» nunca veía un cancelado y CANCELADAS daba 0 siempre.
+  group('watchCancelledForTrainer()', () {
+    Appointment appt({
+      required DateTime at,
+      String trainer = trainerId,
+      AppointmentStatus status = AppointmentStatus.confirmed,
+    }) =>
+        Appointment.create(
+          trainerId: trainer,
+          athleteId: athleteId,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: at,
+          durationMin: durationMin,
+          status: status,
+        );
+
+    Future<void> seed(Appointment a) =>
+        firestore.collection('appointments').doc(a.id).set(a.toJson());
+
+    test(
+      'devuelve sólo los cancelados del PF dentro del rango: no los '
+      'confirmados, ni los de otro PF, ni los de afuera de la ventana',
+      () async {
+        final cancelled = appt(
+          at: DateTime.utc(2026, 7, 5, 10, 0),
+          status: AppointmentStatus.cancelled,
+        );
+        await seed(cancelled);
+        // Confirmado en el mismo día: lo sigue trayendo `watchForTrainer`, no
+        // este.
+        await seed(appt(at: DateTime.utc(2026, 7, 5, 12, 0)));
+        // Cancelado de OTRO PF.
+        await seed(appt(
+          at: DateTime.utc(2026, 7, 5, 14, 0),
+          trainer: 'otroPf',
+          status: AppointmentStatus.cancelled,
+        ));
+        // Cancelado fuera del rango.
+        await seed(appt(
+          at: DateTime.utc(2026, 8, 1, 10, 0),
+          status: AppointmentStatus.cancelled,
+        ));
+
+        final results = await repo
+            .watchCancelledForTrainer(
+              trainerId,
+              fromDate: DateTime.utc(2026, 7, 1),
+              toDate: DateTime.utc(2026, 7, 31),
+            )
+            .first;
+
+        expect(results.map((a) => a.id), [cancelled.id]);
+        expect(results.single.status, AppointmentStatus.cancelled);
+      },
+    );
+
+    test(
+        '`watchForTrainer` sigue sin traer los cancelados (la agenda y los '
+        'slots libres dependen de eso)', () async {
+      await seed(appt(
+        at: DateTime.utc(2026, 7, 5, 10, 0),
+        status: AppointmentStatus.cancelled,
+      ));
+
+      final results = await repo
+          .watchForTrainer(
+            trainerId,
+            fromDate: DateTime.utc(2026, 7, 1),
+            toDate: DateTime.utc(2026, 7, 31),
+          )
+          .first;
+
+      expect(results, isEmpty);
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────

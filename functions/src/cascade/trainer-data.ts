@@ -26,9 +26,9 @@ import {
   FieldValue,
   Firestore,
   Query,
-  Timestamp,
   getFirestore,
 } from "firebase-admin/firestore";
+import { startsAtFrameNow } from "./appointments";
 
 /** Page size for paged deletes: below the 500-ops batch ceiling. */
 const PAGE_SIZE = 400;
@@ -112,6 +112,10 @@ export async function terminateLinksAsTrainer(
  *
  * Query: `trainerId == uid AND status in [requested, confirmed] AND
  * startsAt > now` — the existing (trainerId, status, startsAt) composite.
+ * `now` is measured in the frame `startsAt` is stored in (wall-clock ART
+ * labelled UTC, ADR-7: real time minus 3 h), see `startsAtFrameNow`. Against
+ * `Timestamp.now()` the appointments of the next ~3 h read as already past
+ * and stayed `confirmed` under a deleted account.
  * `requested` is not in the Dart enum (`confirmed|cancelled`) but
  * `notify-appointment` handles it, so it is cancelled too if it exists.
  *
@@ -130,7 +134,7 @@ export async function cancelFutureAppointmentsAsTrainer(
     .collection("appointments")
     .where("trainerId", "==", uid)
     .where("status", "in", ["requested", "confirmed"])
-    .where("startsAt", ">", Timestamp.now())
+    .where("startsAt", ">", startsAtFrameNow())
     .get();
 
   const atMs = Date.now();

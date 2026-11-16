@@ -355,15 +355,21 @@ enum HistorySync {
         exerciseName: String,
         set: LoggedSet
     ) async throws {
-        let fields: [String: Any] = [
-            "id": ["stringValue": docId],
-            "exerciseId": ["stringValue": set.exerciseId],
-            "exerciseName": ["stringValue": exerciseName],
-            "setNumber": ["integerValue": String(set.setNumber)],
-            "reps": ["integerValue": String(set.reps ?? 0)],
-            "weightKg": ["doubleValue": set.weightKg ?? 0],
-            "completedAt": ["timestampValue": iso(set.completedAt)],
-        ]
+        // El payload se arma en `setLogFirestoreFields` (SetLogIdentity.swift),
+        // que se compila y se mide en el host. Este PATCH no lleva `updateMask`,
+        // asi que lo que ese diccionario no trae no queda en el documento:
+        // `durationSeconds` y `distanceMeters` (#1701) van solo si hay valor.
+        let fields = setLogFirestoreFields(
+            docId: docId,
+            exerciseId: set.exerciseId,
+            exerciseName: exerciseName,
+            setNumber: set.setNumber,
+            reps: set.reps,
+            weightKg: set.weightKg,
+            completedAtISO: iso(set.completedAt),
+            durationSeconds: set.durationSeconds,
+            distanceMeters: set.distanceMeters
+        )
         try await client.setDocument(
             path: "users/\(uid)/sessions/\(sessionId)/setLogs/\(docId)",
             fields: fields

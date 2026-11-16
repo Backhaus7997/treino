@@ -16,6 +16,8 @@ SetLog _log({
   int setNumber = 1,
   int reps = 10,
   double weightKg = 80.0,
+  int? durationSeconds,
+  double? distanceMeters,
 }) =>
     SetLog(
       id: id,
@@ -25,6 +27,8 @@ SetLog _log({
       reps: reps,
       weightKg: weightKg,
       completedAt: DateTime.utc(2026, 6, 1),
+      durationSeconds: durationSeconds,
+      distanceMeters: distanceMeters,
     );
 
 Widget _wrap(Widget child) => ProviderScope(
@@ -122,6 +126,104 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Peso Muerto'), findsOneWidget);
+    });
+  });
+
+  // #1701: una serie por tiempo o por distancia se guarda con reps 0 y peso 0,
+  // y la fila decía «0 reps · 0 kg». Ahora muestra lo que el atleta hizo.
+  group('SessionExerciseBlock — series por tiempo / distancia (#1701)', () {
+    Future<void> pump(WidgetTester tester, List<SetLog> sets) async {
+      await tester.pumpWidget(_wrap(
+        SessionExerciseBlock(exerciseName: 'Ejercicio', sets: sets),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('serie por tiempo: muestra mm:ss y ni reps ni kg',
+        (tester) async {
+      await pump(tester, [_log(reps: 0, weightKg: 0, durationSeconds: 90)]);
+
+      expect(find.text('01:30'), findsOneWidget);
+      expect(find.textContaining('reps'), findsNothing);
+      expect(find.textContaining('kg'), findsNothing);
+    });
+
+    testWidgets('serie por distancia: muestra los metros y ni reps ni kg',
+        (tester) async {
+      await pump(tester, [_log(reps: 0, weightKg: 0, distanceMeters: 40)]);
+
+      expect(find.text('40 m'), findsOneWidget);
+      expect(find.textContaining('reps'), findsNothing);
+      expect(find.textContaining('kg'), findsNothing);
+    });
+
+    testWidgets(
+        'los metros salen con el separador de miles y decimal del locale',
+        (tester) async {
+      await pump(tester, [
+        _log(setNumber: 1, reps: 0, weightKg: 0, distanceMeters: 1500),
+        _log(
+            id: 'sl2',
+            setNumber: 2,
+            reps: 0,
+            weightKg: 0,
+            distanceMeters: 37.5),
+      ]);
+
+      expect(find.text('1.500 m'), findsOneWidget);
+      expect(find.text('37,5 m'), findsOneWidget);
+    });
+
+    testWidgets(
+        'serie vieja por tiempo/distancia (0 reps, 0 kg, sin métrica): '
+        'un guion, nunca «0 reps 0 kg»', (tester) async {
+      await pump(tester, [_log(reps: 0, weightKg: 0)]);
+
+      expect(find.text('—'), findsOneWidget);
+      expect(find.textContaining('reps'), findsNothing);
+      expect(find.textContaining('kg'), findsNothing);
+    });
+
+    testWidgets('serie con peso: «N reps» y «N kg», igual que antes',
+        (tester) async {
+      await pump(tester, [_log(reps: 8, weightKg: 82.5)]);
+
+      expect(find.text('8 reps'), findsOneWidget);
+      expect(find.text('82,5 kg'), findsOneWidget);
+      expect(find.text('—'), findsNothing);
+    });
+
+    testWidgets('serie de peso corporal (reps > 0, 0 kg): igual que antes',
+        (tester) async {
+      await pump(tester, [_log(reps: 12, weightKg: 0)]);
+
+      expect(find.text('12 reps'), findsOneWidget);
+      expect(find.text('0 kg'), findsOneWidget);
+      expect(find.text('—'), findsNothing);
+    });
+
+    testWidgets('con métrica Y carga, la carga también se muestra',
+        (tester) async {
+      await pump(tester, [
+        _log(reps: 0, weightKg: 20, distanceMeters: 30),
+      ]);
+
+      expect(find.text('30 m'), findsOneWidget);
+      expect(find.text('20 kg'), findsOneWidget);
+    });
+
+    testWidgets('un bloque mezcla filas de cada tipo sin pisarse',
+        (tester) async {
+      await pump(tester, [
+        _log(setNumber: 1, reps: 0, weightKg: 0, durationSeconds: 45),
+        _log(id: 'sl2', setNumber: 2, reps: 0, weightKg: 0),
+        _log(id: 'sl3', setNumber: 3, reps: 10, weightKg: 50),
+      ]);
+
+      expect(find.text('00:45'), findsOneWidget);
+      expect(find.text('—'), findsOneWidget);
+      expect(find.text('10 reps'), findsOneWidget);
+      expect(find.text('50 kg'), findsOneWidget);
     });
   });
 }

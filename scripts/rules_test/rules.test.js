@@ -56,6 +56,11 @@ test('SCENARIO-130: non-owner cannot create a post with a different authorUid', 
 
 // Owner can create their own post — sanity check
 test('SCENARIO-130 inverse: owner can create a post with matching authorUid', async () => {
+  // #1698: el create ata la autoría del post al doc privado del autor, así que
+  // el autor tiene que existir (en la app, el doc se crea en el alta).
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('users').doc('u1').set({ uid: 'u1', role: 'athlete' });
+  });
   const u1 = testEnv.authenticatedContext('u1');
   await assertSucceeds(
     u1.firestore().collection('posts').doc('p1').set({

@@ -226,11 +226,17 @@ class _HistorialCard extends StatelessWidget {
     // startedAt is a real UTC instant — localize before formatting (#380).
     final formattedDate = formatSessionDate(session.startedAt.toLocal());
     final useStackedLayout = MediaQuery.textScalerOf(context).scale(1) > 1.3;
-    final volume = Text(
-      '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)}'
-      '${AppL10n.of(context).workoutHistorialCardKgSuffix}',
-      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
-    );
+    // #1701: sin carga no hay volumen. Una sesión sólo de series por tiempo o
+    // por distancia tiene `totalVolumeKg == 0`, y «0 kg» afirma un dato que no
+    // existe. `null` = no se dibuja, ni él ni su separador (ver los dos layouts).
+    final volume = session.totalVolumeKg > 0
+        ? Text(
+            '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)}'
+            '${AppL10n.of(context).workoutHistorialCardKgSuffix}',
+            style:
+                theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+          )
+        : null;
     final duration = Text(
       '${session.durationMin}'
       '${AppL10n.of(context).workoutHistorialCardMinSuffix}',
@@ -275,15 +281,17 @@ class _HistorialCard extends StatelessWidget {
                         Wrap(
                           spacing: 12,
                           runSpacing: 8,
-                          children: [volume, duration],
+                          children: [if (volume != null) volume, duration],
                         ),
                       ],
                     ],
                   ),
                 ),
                 if (!useStackedLayout) ...[
-                  const SizedBox(width: 8),
-                  volume,
+                  if (volume != null) ...[
+                    const SizedBox(width: 8),
+                    volume,
+                  ],
                   const SizedBox(width: 8),
                   duration,
                 ],

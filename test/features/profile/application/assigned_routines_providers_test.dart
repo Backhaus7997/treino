@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/application/assigned_routines_providers.dart';
@@ -58,7 +60,8 @@ ProviderContainer _container({
 }) {
   final c = ProviderContainer(
     overrides: [
-      assignedRoutinesProvider(_myUid).overrideWith((_) async => assigned),
+      assignedRoutinesProvider(_myUid)
+          .overrideWith((_) => Stream.value(assigned)),
       userCreatedRoutinesProvider(_myUid)
           .overrideWith((_) => Stream.value(own)),
       userProfileProvider.overrideWith((_) => Stream.value(_profile())),
@@ -110,11 +113,9 @@ void main() {
     test('devuelve 0 mientras carga', () {
       final c = ProviderContainer(
         overrides: [
+          // Un stream que nunca emite: el provider queda en `loading`.
           assignedRoutinesProvider(_myUid).overrideWith(
-            (_) => Future<List<Routine>>.delayed(
-              const Duration(seconds: 60),
-              () => const [],
-            ),
+            (_) => StreamController<List<Routine>>().stream,
           ),
           userCreatedRoutinesProvider(_myUid)
               .overrideWith((_) => Stream.value(const [])),
@@ -129,7 +130,7 @@ void main() {
       final c = ProviderContainer(
         overrides: [
           assignedRoutinesProvider(_myUid).overrideWith(
-            (_) => Future<List<Routine>>.error(Exception('sin red')),
+            (_) => Stream<List<Routine>>.error(Exception('sin red')),
           ),
           userCreatedRoutinesProvider(_myUid)
               .overrideWith((_) => Stream.value(const [])),

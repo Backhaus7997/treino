@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
@@ -61,6 +62,8 @@ void main() {
     container.listen(currentAthleteLinkProvider, (_, __) {},
         fireImmediately: true);
     container.listen(currentAthleteLinkAnyStatusProvider, (_, __) {},
+        fireImmediately: true);
+    container.listen(currentAthleteLinkVivoProvider, (_, __) {},
         fireImmediately: true);
     return container;
   }
@@ -116,6 +119,71 @@ void main() {
       expect(activeOnly?.status, TrainerLinkStatus.active);
     });
 
+    // #1735: dos dispositivos crean 2 solicitudes `pending` al MISMO PF, el PF
+    // acepta la VIEJA, y la lista (requestedAt DESC) queda
+    // `[pending nueva, active vieja]`. Con `links.first` la tab Coach dibujaba
+    // «SOLICITUD ENVIADA» arriba de un vínculo activo.
+    group('varios no terminados — gana el de mayor prioridad (#1735)', () {
+      Future<void> siembra(String id, TrainerLinkStatus status, int dia) =>
+          fakeFirestore.collection('trainer_links').doc(id).set(
+                TrainerLink(
+                  id: id,
+                  trainerId: trainerId,
+                  athleteId: athleteId,
+                  status: status,
+                  requestedAt: DateTime.utc(2026, 1, dia),
+                  acceptedAt: status == TrainerLinkStatus.active
+                      ? DateTime.utc(2026, 1, dia + 1)
+                      : null,
+                ).toJson(),
+              );
+
+      test('active VIEJA + pending NUEVA → el vínculo activo', () async {
+        await siembra('vieja', TrainerLinkStatus.active, 1);
+        await siembra('nueva', TrainerLinkStatus.pending, 2);
+        final container = makeContainer();
+
+        final link =
+            await container.read(currentAthleteLinkAnyStatusProvider.future);
+
+        expect(link?.id, 'vieja');
+        expect(link?.status, TrainerLinkStatus.active);
+      });
+
+      test('paused VIEJA + pending NUEVA → el pausado', () async {
+        await siembra('vieja', TrainerLinkStatus.paused, 1);
+        await siembra('nueva', TrainerLinkStatus.pending, 2);
+        final container = makeContainer();
+
+        final link =
+            await container.read(currentAthleteLinkAnyStatusProvider.future);
+
+        expect(link?.id, 'vieja');
+        expect(link?.status, TrainerLinkStatus.paused);
+      });
+
+      test('dos pending → la más reciente', () async {
+        await siembra('vieja', TrainerLinkStatus.pending, 1);
+        await siembra('nueva', TrainerLinkStatus.pending, 2);
+        final container = makeContainer();
+
+        final link =
+            await container.read(currentAthleteLinkAnyStatusProvider.future);
+
+        expect(link?.id, 'nueva');
+      });
+
+      test('el active-only sigue viendo SÓLO el activo', () async {
+        await siembra('vieja', TrainerLinkStatus.active, 1);
+        await siembra('nueva', TrainerLinkStatus.pending, 2);
+        final container = makeContainer();
+
+        final link = await container.read(currentAthleteLinkProvider.future);
+
+        expect(link?.id, 'vieja');
+      });
+    });
+
     test('devuelve null si el único link está TERMINATED', () async {
       final link =
           await seedRepo.request(trainerId: trainerId, athleteId: athleteId);
@@ -126,6 +194,105 @@ void main() {
           await container.read(currentAthleteLinkAnyStatusProvider.future);
       expect(anyStatus, isNull,
           reason: 'terminated no es un vínculo vivo → no se muestra card');
+    });
+  });
+
+  // #1842: el vínculo VIVO (`active|paused`) es lo que necesitan el plan
+  // nutricional, la agenda y la cuota del alumno. Pausar es un hold, no un
+  // corte, y las reglas leen esas colecciones por `athleteId`. Se deriva del
+  // AnyStatus (una sola suscripción) y descarta lo que no es vivo.
+  group('currentAthleteLinkVivoProvider — #1842', () {
+    Future<TrainerLink?> vivo(ProviderContainer container) async {
+      // Esperar al stream de abajo: el derivado se recalcula con él.
+      await container.read(currentAthleteLinkAnyStatusProvider.future);
+      return container.read(currentAthleteLinkVivoProvider).valueOrNull;
+    }
+
+    test('un link PAUSED es vivo (el active-only lo pierde)', () async {
+      final link =
+          await seedRepo.request(trainerId: trainerId, athleteId: athleteId);
+      await seedAccept(link.id);
+      await seedRepo.pause(link.id);
+      final container = makeContainer();
+
+      final resultado = await vivo(container);
+
+      expect(resultado?.status, TrainerLinkStatus.paused);
+      expect(resultado?.trainerId, trainerId);
+      expect(await container.read(currentAthleteLinkProvider.future), isNull,
+          reason: 'el active-only conserva su semántica: lo piden el '
+              'paywall, las reseñas y el player');
+    });
+
+    test('un link ACTIVE es vivo', () async {
+      final link =
+          await seedRepo.request(trainerId: trainerId, athleteId: athleteId);
+      await seedAccept(link.id);
+      final container = makeContainer();
+
+      expect((await vivo(container))?.status, TrainerLinkStatus.active);
+    });
+
+    test('una solicitud PENDING NO es vivo: nunca se aceptó', () async {
+      await seedRepo.request(trainerId: trainerId, athleteId: athleteId);
+      final container = makeContainer();
+
+      expect(await vivo(container), isNull);
+      // El AnyStatus sí la ve: es la que dibuja «SOLICITUD ENVIADA».
+      expect(
+        (await container.read(currentAthleteLinkAnyStatusProvider.future))
+            ?.status,
+        TrainerLinkStatus.pending,
+      );
+    });
+
+    test('un link TERMINATED NO es vivo', () async {
+      final link =
+          await seedRepo.request(trainerId: trainerId, athleteId: athleteId);
+      await seedRepo.cancel(link.id);
+      final container = makeContainer();
+
+      expect(await vivo(container), isNull);
+    });
+
+    test('active VIEJA + pending NUEVA → el activo (no queda tapado, #1735)',
+        () async {
+      for (final (id, status, dia) in [
+        ('vieja', TrainerLinkStatus.active, 1),
+        ('nueva', TrainerLinkStatus.pending, 2),
+      ]) {
+        await fakeFirestore.collection('trainer_links').doc(id).set(
+              TrainerLink(
+                id: id,
+                trainerId: trainerId,
+                athleteId: athleteId,
+                status: status,
+                requestedAt: DateTime.utc(2026, 1, dia),
+                acceptedAt: status == TrainerLinkStatus.active
+                    ? DateTime.utc(2026, 1, dia + 1)
+                    : null,
+              ).toJson(),
+            );
+      }
+      final container = makeContainer();
+
+      expect((await vivo(container))?.id, 'vieja');
+    });
+
+    test('mientras el stream no contesta es AsyncLoading, nunca «sin vínculo»',
+        () async {
+      final link =
+          await seedRepo.request(trainerId: trainerId, athleteId: athleteId);
+      await seedAccept(link.id);
+      final container = makeContainer();
+
+      // Antes de que llegue la primera snapshot.
+      final inicial = container.read(currentAthleteLinkVivoProvider);
+      expect(inicial.isLoading, isTrue);
+      expect(inicial.hasValue, isFalse,
+          reason: 'null significaría «el servidor dijo que no tenés vínculo»');
+
+      expect((await vivo(container))?.id, link.id);
     });
   });
 }

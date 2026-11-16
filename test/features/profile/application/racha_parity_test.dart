@@ -137,7 +137,16 @@ void main() {
   test(
       '#552 parity: racha viva (cumplió esta semana y la pasada) — PERFIL y '
       'RANKINGS muestran el mismo valor', () async {
-    await _seedPublicProfile(firestore, 'u1');
+    // El doc como lo dejó el finish() de la semana pasada: racha 1 con su
+    // sello. Desde #1698 las reglas sólo dejan subir +1 por semana sobre el
+    // último sello, así que el +1 de esta semana (1 → 2) es el flujo real; un
+    // doc virgen con DOS semanas de historia sin escribir arrancaría en 1.
+    await _seedPublicProfile(
+      firestore,
+      'u1',
+      rachaSemanas: 1,
+      rachaSemanasUpdatedAt: Timestamp.fromDate(_artNoonWeeksAgo(1)),
+    );
     await trainOn(weeksAgo: 1);
     await trainOn(weeksAgo: 0);
 
@@ -147,6 +156,24 @@ void main() {
     expect(perfil, 2);
     expect(rankings, perfil,
         reason: 'la misma racha debe verse igual en ambas pantallas');
+  });
+
+  test(
+      '#1698 tradeoff: un doc virgen con historia sin escribir arranca en 1 y '
+      'converge una semana por vez (el board nunca queda ARRIBA del perfil)',
+      () async {
+    await _seedPublicProfile(firestore, 'u1');
+    await trainOn(weeksAgo: 1);
+    await trainOn(weeksAgo: 0);
+
+    final perfil = await profileRacha();
+    final rankings = await boardRachaOf('u1');
+
+    expect(perfil, 2);
+    expect(rankings, 1,
+        reason: 'sin sello previo las reglas dejan escribir 1 como mucho; la '
+            'diferencia se cierra sola, +1 por semana');
+    expect(rankings, lessThanOrEqualTo(perfil));
   });
 
   test(

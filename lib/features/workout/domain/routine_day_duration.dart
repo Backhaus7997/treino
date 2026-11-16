@@ -4,6 +4,7 @@ import 'routine.dart';
 import 'routine_day.dart';
 import 'routine_slot.dart';
 import 'set_enums.dart';
+import 'set_limits.dart';
 import 'set_spec.dart';
 import 'superset_blocks.dart';
 
@@ -36,6 +37,10 @@ const int kExerciseTransitionSeconds = 120;
 /// `null`, never "~5 min".
 const int kDayWarmUpSeconds = 300;
 
+/// Techo de la estimación de un día, en minutos: un día no dura más de 24 h.
+/// Los topes por campo frenan UN valor absurdo; esto, la suma de muchos válidos.
+const int kMaxEstimatedDayMinutes = 24 * 60;
+
 /// Estimated total minutes to complete [day] in the given 0-based [week].
 ///
 /// Priority:
@@ -46,16 +51,19 @@ const int kDayWarmUpSeconds = 300;
 ///      contiguous slots sharing `supersetGroup`):
 ///      - work per set: the set's `durationSeconds` when positive, else
 ///        `max(reps × [kSecondsPerRep], [kMinSetWorkSeconds])` using
-///        `reps ?? repsMax ?? repsMin ?? 12`;
+///        `reps ?? repsMax ?? repsMin ?? 12`. Duración y reps se clampean a
+///        [kMaxDurationSeconds] y [kMaxReps]: un documento fuera de rango
+///        (escrito antes de que hubiera topes) no puede inventar horas;
 ///      - rest: one per ROUND of the block — `rounds - 1` rests, where rounds
 ///        is the longest member's set count — of the LAST slot's
-///        `restSeconds` (or [kDefaultRestSeconds] when 0). No rest after the
-///        last round. For a lone exercise a round is a set, so this is the
+///        `restSeconds` (or [kDefaultRestSeconds] when 0; capped at
+///        [kMaxRestSeconds]). No rest after the last round. For a lone exercise a round is a set, so this is the
 ///        usual "rest between sets";
 ///      - a round made only of [SetType.warmup] sets rests half;
 ///      - [kExerciseTransitionSeconds] between consecutive blocks;
 ///      - [kDayWarmUpSeconds] once.
-///      Rounded to the nearest minute → `authored: false`.
+///      Rounded to the nearest minute, capped at [kMaxEstimatedDayMinutes] →
+///      `authored: false`.
 ///   3. Returns `minutes: null` when nothing measurable is on the day.
 ///
 /// Pure function — no Flutter imports, no providers, safe to use from both
@@ -94,7 +102,9 @@ RoutineDayDuration estimateRoutineDayMinutes(RoutineDay day, {int week = 0}) {
       }
     }
     final last = block.last.slot;
-    final rest = last.restSeconds > 0 ? last.restSeconds : kDefaultRestSeconds;
+    final rest = last.restSeconds > 0
+        ? math.min(last.restSeconds, kMaxRestSeconds)
+        : kDefaultRestSeconds;
     final rounds = block.map((m) => m.sets.length).reduce(math.max);
     for (var round = 0; round < rounds - 1; round++) {
       final warmUpOnly = block.every(
@@ -103,14 +113,19 @@ RoutineDayDuration estimateRoutineDayMinutes(RoutineDay day, {int week = 0}) {
       seconds += warmUpOnly ? rest ~/ 2 : rest;
     }
   }
-  return (minutes: (seconds / 60).round(), authored: false);
+  return (
+    minutes: math.min((seconds / 60).round(), kMaxEstimatedDayMinutes),
+    authored: false,
+  );
 }
 
 int _workSeconds(SetSpec s) {
   final duration = s.durationSeconds;
-  if (duration != null && duration > 0) return duration;
+  if (duration != null && duration > 0) {
+    return math.min(duration, kMaxDurationSeconds);
+  }
   return math.max(
-    (s.reps ?? s.repsMax ?? s.repsMin ?? 12) * kSecondsPerRep,
+    clampReps(s.reps ?? s.repsMax ?? s.repsMin ?? 12) * kSecondsPerRep,
     kMinSetWorkSeconds,
   );
 }

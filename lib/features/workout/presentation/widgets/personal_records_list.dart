@@ -13,6 +13,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../application/exercise_progression_aggregator.dart';
 import '../../domain/exercise_progression.dart';
+import 'mmss.dart';
 
 /// e.g. '10 mar 2025' (es_AR) / '10 Mar 2025' (en). Uses [DateTime]'s own
 /// calendar fields directly — no toLocal() — matching the same convention as
@@ -41,8 +42,11 @@ class PersonalRecordsListLabels {
     required this.oneRepMaxLabel,
     required this.bestSetVolumeLabel,
     required this.bestSessionVolumeLabel,
+    required this.longestDurationLabel,
+    required this.longestDistanceLabel,
     required this.volumeUnit,
     required this.weightUnit,
+    required this.distanceUnit,
     required this.emptyText,
     required this.localeName,
   });
@@ -62,11 +66,21 @@ class PersonalRecordsListLabels {
   /// E.g. 'Volumen'.
   final String bestSessionVolumeLabel;
 
+  /// E.g. 'Tiempo máximo' — the longest timed set (#1715).
+  final String longestDurationLabel;
+
+  /// E.g. 'Distancia máxima' — the longest distance set (#1715).
+  final String longestDistanceLabel;
+
   /// E.g. 'kg·reps' — RD5, used by both volume record types.
   final String volumeUnit;
 
   /// E.g. 'kg' — used by both weight record types.
   final String weightUnit;
+
+  /// E.g. 'm' — used by the distance record (#1715). The duration record has
+  /// no unit: it reads as «01:30».
+  final String distanceUnit;
 
   /// Shown when [PersonalRecordsList.records] is empty.
   final String emptyText;
@@ -84,6 +98,10 @@ class PersonalRecordsListLabels {
         return bestSetVolumeLabel;
       case ProgressionRecordType.bestSessionVolume:
         return bestSessionVolumeLabel;
+      case ProgressionRecordType.longestDuration:
+        return longestDurationLabel;
+      case ProgressionRecordType.longestDistance:
+        return longestDistanceLabel;
     }
   }
 
@@ -95,6 +113,10 @@ class PersonalRecordsListLabels {
       case ProgressionRecordType.bestSetVolume:
       case ProgressionRecordType.bestSessionVolume:
         return volumeUnit;
+      case ProgressionRecordType.longestDuration:
+        return '';
+      case ProgressionRecordType.longestDistance:
+        return distanceUnit;
     }
   }
 }
@@ -185,11 +207,15 @@ class _PersonalRecordRow extends StatelessWidget {
     final showsSet = record.recordType == ProgressionRecordType.bestSetVolume &&
         setWeight != null &&
         setReps != null;
+    // #1715: el récord de tiempo se lee «01:30» y el de distancia «40 m»; los
+    // dos son enteros o casi, sin el redondeo de 0.5 kg del 1RM.
     final valStr = showsSet
         ? '${formatWeightDisplay(setWeight, labels.localeName)} '
             '${labels.weightUnit} × $setReps'
-        : _formatValue(record.value,
-            isOneRepMax: isOneRepMax, localeName: labels.localeName);
+        : record.recordType == ProgressionRecordType.longestDuration
+            ? formatMMSS(record.value.round())
+            : _formatValue(record.value,
+                isOneRepMax: isOneRepMax, localeName: labels.localeName);
     final unit = showsSet ? '' : labels.unitFor(record.recordType);
 
     // El bloque valor+unidad tiene ancho INTRÍNSECO, y un hijo no flexible de un

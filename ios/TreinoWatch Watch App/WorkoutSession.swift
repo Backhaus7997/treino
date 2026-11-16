@@ -39,6 +39,26 @@ struct LoggedSet: Codable, Equatable {
     /// en vez de crear uno paralelo. Nil = la serie todavia no esta en
     /// Firestore, asi que se crea con el id deterministico.
     var remoteDocId: String?
+
+    /// Segundos de una serie por TIEMPO (#1701). Nil en las series por reps y
+    /// en las que se guardaron antes de que existiera el campo.
+    ///
+    /// Es lo PRESCRIPTO y no lo medido: la cuenta solo carga la serie cuando
+    /// llega a cero, asi que lo que hizo el atleta es lo que decia el plan.
+    ///
+    /// `var … = nil` y no `let` a proposito, y al FINAL de la lista: el init
+    /// memberwise conserva el orden de declaracion, y asi los dos sitios que
+    /// arman un `LoggedSet` (el coordinator y la lectura del historial) siguen
+    /// compilando. Tampoco rompe el `workout-session.json` que ya esta en
+    /// disco: un `Optional` sintetizado se decodifica con `decodeIfPresent`, y
+    /// `WorkoutSessionStore.load` traga el error con `try?`, asi que un decode
+    /// fallido se veria como una sesion perdida y no como un error.
+    var durationSeconds: Int? = nil
+
+    /// Metros de una serie por DISTANCIA (#1701). Mismo criterio que
+    /// `durationSeconds`: la fila es un check sin valor editable, asi que lo
+    /// hecho es lo prescripto.
+    var distanceMeters: Double? = nil
 }
 
 /// La sesión de entrenamiento que el reloj mantiene por su cuenta.

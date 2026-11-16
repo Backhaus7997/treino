@@ -25,6 +25,7 @@ import '../application/user_providers.dart';
 import '../domain/experience_level.dart';
 import '../domain/gender.dart';
 import '../domain/user_profile.dart';
+import '../domain/user_role.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
 
 // ---------------------------------------------------------------------------
@@ -539,6 +540,11 @@ class _ProfileEditPersonalScreenState
       );
     }
 
+    // El rol es inmutable post-creación, así que alcanza con leerlo del perfil
+    // que alimenta el form. Acá `profileAsync` ya tiene valor: sin él se
+    // devolvió el spinner o el error más arriba.
+    final esPf = profileAsync.valueOrNull?.role == UserRole.trainer;
+
     final content = Column(
       children: [
         // ── Header ──────────────────────────────────────────────────────────
@@ -650,62 +656,69 @@ class _ProfileEditPersonalScreenState
                     onChanged: (g) => setState(() => _selectedGender = g),
                     palette: palette,
                   ),
-                  const SizedBox(height: 18),
+                  SizedBox(height: esPf ? 20 : 18),
 
-                  // Body weight
-                  _FieldLabel(
-                      label: 'PESO (KG)',
-                      palette: palette), // i18n: Fase 6 Etapa 3
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    key: const Key('edit_personal_weight_field'),
-                    controller: _weightCtrl,
-                    validator: _validateBodyWeightKg,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    style: GoogleFonts.barlow(
-                      color: palette.textPrimary,
-                      fontSize: 14,
+                  // Peso, altura y experiencia son datos del ATLETA (el peso
+                  // escala sus rangos de levantamiento). Un PF llega a esta
+                  // pantalla desde «Datos personales» de su Perfil (#1738) y se
+                  // los pedía igual (#1813). Nombre, avatar, teléfono, fecha de
+                  // nacimiento y género son de cualquiera y se quedan.
+                  if (!esPf) ...[
+                    // Body weight
+                    _FieldLabel(
+                        label: 'PESO (KG)',
+                        palette: palette), // i18n: Fase 6 Etapa 3
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      key: const Key('edit_personal_weight_field'),
+                      controller: _weightCtrl,
+                      validator: _validateBodyWeightKg,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      style: GoogleFonts.barlow(
+                        color: palette.textPrimary,
+                        fontSize: 14,
+                      ),
+                      decoration: _inputDecoration(
+                        palette: palette,
+                        hint: '80',
+                      ),
                     ),
-                    decoration: _inputDecoration(
+                    const SizedBox(height: 18),
+
+                    // Height
+                    _FieldLabel(
+                        label: 'ALTURA (CM)',
+                        palette: palette), // i18n: Fase 6 Etapa 3
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      key: const Key('edit_personal_height_field'),
+                      controller: _heightCtrl,
+                      validator: _validateHeightCm,
+                      keyboardType: TextInputType.number,
+                      style: GoogleFonts.barlow(
+                        color: palette.textPrimary,
+                        fontSize: 14,
+                      ),
+                      decoration: _inputDecoration(
+                        palette: palette,
+                        hint: '175',
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Experience level
+                    _FieldLabel(
+                        label: 'EXPERIENCIA',
+                        palette: palette), // i18n: Fase 6 Etapa 3
+                    const SizedBox(height: 8),
+                    _ExperienceLevelSelector(
+                      selected: _selectedExperience,
+                      onChanged: (e) => setState(() => _selectedExperience = e),
                       palette: palette,
-                      hint: '80',
                     ),
-                  ),
-                  const SizedBox(height: 18),
-
-                  // Height
-                  _FieldLabel(
-                      label: 'ALTURA (CM)',
-                      palette: palette), // i18n: Fase 6 Etapa 3
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    key: const Key('edit_personal_height_field'),
-                    controller: _heightCtrl,
-                    validator: _validateHeightCm,
-                    keyboardType: TextInputType.number,
-                    style: GoogleFonts.barlow(
-                      color: palette.textPrimary,
-                      fontSize: 14,
-                    ),
-                    decoration: _inputDecoration(
-                      palette: palette,
-                      hint: '175',
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-
-                  // Experience level
-                  _FieldLabel(
-                      label: 'EXPERIENCIA',
-                      palette: palette), // i18n: Fase 6 Etapa 3
-                  const SizedBox(height: 8),
-                  _ExperienceLevelSelector(
-                    selected: _selectedExperience,
-                    onChanged: (e) => setState(() => _selectedExperience = e),
-                    palette: palette,
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Action row
                   ValueListenableBuilder<_SaveState>(

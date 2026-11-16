@@ -1,5 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
+    show
+        CollectionReference,
+        DocumentSnapshot,
+        FirebaseException,
+        FirebaseFirestore,
+        QuerySnapshot,
+        Timestamp;
 
 import '../../../core/moderation/moderation_guard.dart';
 import '../domain/post.dart';
@@ -22,8 +28,14 @@ class PostRepository {
   /// doc under this same id.
   String newPostId() => _posts.doc().id;
 
-  /// Creates a post doc. Reads `users/{uid}.gymId` once to denormalize
-  /// `authorGymId`. Returns the persisted post with its assigned id.
+  /// Creates a post doc. Reads `users/{uid}` once to denormalize the author's
+  /// gym, name and avatar. Returns the persisted post with its assigned id.
+  ///
+  /// #1698 — las reglas exigen que `authorGymId`, `authorDisplayName` y
+  /// `authorAvatarUrl` coincidan con `users/{uid}` del autor. Lo que trae
+  /// [input] viene del perfil en memoria, que puede ir un paso atrás del doc
+  /// (un cambio de nombre o de gym desde otro dispositivo), así que cuando el
+  /// doc existe manda él, y [input] sólo rellena lo que el doc no tiene.
   Future<Post> create(Post input) async {
     // Guideline 1.2 de App Review: el contenido con terminos vetados no llega
     // a postearse. Va antes de la lectura del user doc para no gastar un round
@@ -33,18 +45,27 @@ class PostRepository {
     // Read gymId from the user doc for denormalization (ADR: authorGymId)
     final userSnap =
         await _firestore.collection('users').doc(input.authorUid).get();
-    final rawGymId = userSnap.data()?['gymId'] as String?;
+    final userData = userSnap.data();
+    final rawGymId = userData?['gymId'] as String?;
     // "SIN GYM" no es un gym: un post no se denormaliza con el sentinel.
     final gymId = hasRealGym(rawGymId) ? rawGymId : null;
+    final displayName = userData?['displayName'];
+    final avatarUrl = userData?['avatarUrl'];
 
-    // If input already has an explicit authorGymId (e.g., from tests), keep it;
-    // otherwise use the value from the user doc.
-    final resolvedGymId = input.authorGymId ?? gymId;
+    // Sin doc de usuario (un test, o una cuenta a medio alta) no hay nada que
+    // pisar: queda lo que trae [input] y las reglas deciden.
+    final resolvedGymId = userSnap.exists ? gymId : input.authorGymId;
 
     final ref = _posts.doc(input.id.isEmpty ? null : input.id);
     final post = input.copyWith(
       id: ref.id,
       authorGymId: resolvedGymId,
+      authorDisplayName: displayName is String && displayName.isNotEmpty
+          ? displayName
+          : input.authorDisplayName,
+      authorAvatarUrl: userSnap.exists
+          ? (avatarUrl is String ? avatarUrl : null)
+          : input.authorAvatarUrl,
     );
     await ref.set(post.toJson());
     return post;
@@ -130,6 +151,7 @@ class PostRepository {
     }
     final snap =
         await query.orderBy('createdAt', descending: true).limit(limit).get();
+    _exigirRespuestaConfirmada([snap]);
     return _pageFromSnapshot(
       posts: snap.docs.map(_fromDoc).whereType<Post>().toList(),
       fetchedDocumentCount: snap.docs.length,
@@ -154,6 +176,7 @@ class PostRepository {
 
     const chunkSize = 10;
     final results = <Post>[];
+    final snaps = <QuerySnapshot<Map<String, Object?>>>[];
     var chunkReachedLimit = false;
 
     for (var i = 0; i < friendUids.length; i += chunkSize) {
@@ -172,9 +195,11 @@ class PostRepository {
       }
       final snap =
           await query.orderBy('createdAt', descending: true).limit(limit).get();
+      snaps.add(snap);
       chunkReachedLimit = chunkReachedLimit || snap.docs.length == limit;
       results.addAll(snap.docs.map(_fromDoc).whereType<Post>());
     }
+    _exigirRespuestaConfirmada(snaps, hayPosts: results.isNotEmpty);
 
     // Each chunk is sorted server-side, but the merged list across chunks is
     // not globally ordered — re-sort newest-first client-side.
@@ -208,10 +233,43 @@ class PostRepository {
     }
     final snap =
         await query.orderBy('createdAt', descending: true).limit(limit).get();
+    _exigirRespuestaConfirmada([snap]);
     return _pageFromSnapshot(
       posts: snap.docs.map(_fromDoc).whereType<Post>().toList(),
       fetchedDocumentCount: snap.docs.length,
       limit: limit,
+    );
+  }
+
+  /// Un feed que vuelve vacío DESDE LA CACHÉ no dice «no hay posts»: dice «no
+  /// pude preguntar».
+  ///
+  /// Sin red, un `.get()` de una query no falla: con la caché fría devuelve un
+  /// `QuerySnapshot` vacío con `isFromCache == true`, y las tres pestañas
+  /// pintaban el estado vacío en vez del error con Reintentar que ya tiene
+  /// `_FeedAsyncBody` (QA E2E 2026-11-06). Mismo agujero que
+  /// `TrainerLinkRepository.watchForAthlete` documenta para los vínculos.
+  ///
+  /// Se tira `unavailable` —el código de Firestore para «sin conexión»— y el
+  /// provider termina en `AsyncError`. Sólo si NO hay ningún post para mostrar:
+  /// los cacheados se muestran (datos viejos pero reales). Con varios chunks
+  /// (`whereIn` de a 10) basta que alguno vuelva vacío-de-caché y el total esté
+  /// vacío. Un vacío confirmado por el servidor SÍ es un vacío real y pasa.
+  /// En `loadMore` el throw también sirve: su `catch` conserva lo cargado y
+  /// deja `hasMore` en true.
+  void _exigirRespuestaConfirmada(
+    List<QuerySnapshot<Map<String, Object?>>> snaps, {
+    bool hayPosts = false,
+  }) {
+    if (hayPosts) return;
+    final sinConfirmar = snaps.any(
+      (snap) => snap.docs.isEmpty && snap.metadata.isFromCache,
+    );
+    if (!sinConfirmar) return;
+    throw FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'unavailable',
+      message: 'No se pudo confirmar el feed con el servidor (sin conexión).',
     );
   }
 

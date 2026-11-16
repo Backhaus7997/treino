@@ -11,9 +11,11 @@ import 'session_recognition.dart';
 
 /// Un récord personal logrado EN esta sesión: el valor de hoy superó
 /// estrictamente al mejor histórico ([previousBest]) de ese [recordType].
-/// Solo los 3 tipos por-set del detalle de ejercicio (peso máximo, 1RM
-/// estimado, mejor volumen de set) — `bestSessionVolume` queda afuera a
-/// propósito: el volumen de la sesión ya tiene su tile en el grid 2×2.
+/// Solo los tipos por-set del detalle de ejercicio (peso máximo, 1RM
+/// estimado, mejor volumen de set y, en un ejercicio por tiempo o distancia,
+/// el tiempo / los metros más largos — #1715, en segundos y metros) —
+/// `bestSessionVolume` queda afuera a propósito: el volumen de la sesión ya
+/// tiene su tile en el grid 2×2.
 ///
 /// [set]/[previousSet]: sólo en `bestSetVolume`, la serie que dio [value] y
 /// la que dio [previousBest]. El resumen muestra «80 kg × 7», no el producto
@@ -34,12 +36,20 @@ typedef SessionExerciseRecord = ({
 /// [sessionVolumeKg] suma SOLO sets con peso (#368). [isFirstTime]: primera
 /// vez que el atleta registra este ejercicio (ver reglas en
 /// [aggregateSessionHighlights]).
+///
+/// [bestDurationSeconds]/[bestDistanceMeters] (#1701): la mejor serie de un
+/// ejercicio por TIEMPO o por DISTANCIA —el mayor tiempo / los mayores metros
+/// de la sesión—. Estas series se guardan con peso y reps en 0, así que
+/// [bestWeightKg]/[bestSetReps] no dicen nada de ellas. `null` cuando ninguna
+/// serie del ejercicio trae esa métrica (reps/peso, o series viejas sin dato).
 typedef SessionExerciseSummary = ({
   String exerciseId,
   String exerciseName,
   int setCount,
   double bestWeightKg,
   int bestSetReps,
+  int? bestDurationSeconds,
+  double? bestDistanceMeters,
   double sessionVolumeKg,
   bool isFirstTime,
   List<SessionExerciseRecord> records,
@@ -141,6 +151,10 @@ SessionHighlights aggregateSessionHighlights({
         best = log;
       }
     }
+    // La misma regla que las series históricas del agregador (#1715): así el
+    // récord de hoy y el de Insights no pueden divergir.
+    final bestDuration = bestDurationSecondsOf(logs);
+    final bestDistance = bestDistanceMetersOf(logs);
 
     final hadExerciseBefore = prior.any((s) =>
         (priorLogsBySession[s.id] ?? const []).any((l) => l.exerciseId == id));
@@ -219,6 +233,11 @@ SessionHighlights aggregateSessionHighlights({
       checkRecord(ProgressionRecordType.heaviestWeight, todayMaxWeight);
       checkRecord(ProgressionRecordType.oneRepMax, todayOneRepMax);
       checkRecord(ProgressionRecordType.bestSetVolume, todayBestSetVolume);
+      // #1715: lo guardado es lo que el atleta completó, así que el récord de
+      // una plancha sube cuando el plan sube. Igualar la marca no cuenta.
+      checkRecord(
+          ProgressionRecordType.longestDuration, bestDuration?.toDouble());
+      checkRecord(ProgressionRecordType.longestDistance, bestDistance);
       recordCount += records.length;
     }
 
@@ -228,6 +247,8 @@ SessionHighlights aggregateSessionHighlights({
       setCount: logs.length,
       bestWeightKg: best!.weightKg,
       bestSetReps: best.reps,
+      bestDurationSeconds: bestDuration,
+      bestDistanceMeters: bestDistance,
       sessionVolumeKg: volume,
       isFirstTime:
           counts && hasHistory && canDetectFirstTime && !hadExerciseBefore,

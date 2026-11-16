@@ -8,6 +8,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +27,7 @@ import 'package:treino/features/chat/domain/message.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
@@ -1508,6 +1510,44 @@ void main() {
       );
     });
 
+    // #1695: «Asignar rutina» exige vínculo VIVO (activo o pausado). Sobre un
+    // ex-alumno creaba una rutina que él veía como «DE TU COACH · ACTIVA» y no
+    // podía borrar. Son DOS puertas (el aviso del Resumen y el botón de la
+    // sub-vista Rutina).
+    for (final (status, ofrece) in [
+      (TrainerLinkStatus.active, true),
+      (TrainerLinkStatus.paused, true), // hold, no corte
+      (TrainerLinkStatus.terminated, false),
+      (TrainerLinkStatus.pending, false),
+    ]) {
+      testWidgets(
+          'con el vínculo ${status.name} '
+          '${ofrece ? 'ofrece' : 'NO ofrece'} asignar rutina', (tester) async {
+        await _pump(tester, profile: _prof(), link: _link(status));
+
+        // Puerta 1: el aviso de «Sin rutina asignada» del Resumen. El aviso
+        // en sí se queda: explica por qué faltan las métricas.
+        expect(find.text('Sin rutina asignada'), findsOneWidget);
+        expect(find.text('Asignar rutina'),
+            ofrece ? findsOneWidget : findsNothing);
+
+        // Puerta 2: el botón de la sub-vista Rutina.
+        await navigateAlumnoDetail(tester, group: 'Entrenamiento');
+        expect(find.text('RUTINA ACTIVA'), findsOneWidget);
+        expect(find.text('Asignar rutina'),
+            ofrece ? findsOneWidget : findsNothing);
+      });
+    }
+
+    testWidgets('SIN vínculo con el alumno (uid cualquiera) tampoco asigna',
+        (tester) async {
+      await _pump(tester, profile: _prof()); // roster vacío
+
+      expect(find.text('Asignar rutina'), findsNothing);
+      await navigateAlumnoDetail(tester, group: 'Entrenamiento');
+      expect(find.text('Asignar rutina'), findsNothing);
+    });
+
     testWidgets(
         'tab Entrenamientos: rutina activa + historial con datos (W2 PR3)',
         (tester) async {
@@ -1643,6 +1683,29 @@ void main() {
       expect(find.text('INCOMPLETA'), findsOneWidget);
     });
 
+    // #1701: una sesión sólo de series por tiempo o por distancia tiene
+    // `totalVolumeKg == 0`. En una tabla la columna no puede faltar en una sola
+    // fila: va «—» y no «0 kg». El caso con carga es el test de «7840 kg».
+    testWidgets('Sesiones: una sesión sin carga muestra «—» y no «0 kg»',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [_session(routineName: 'Plancha', totalVolumeKg: 0)],
+      );
+
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
+
+      expect(find.text('Plancha'), findsOneWidget);
+      expect(find.text('0 kg'), findsNothing);
+      expect(find.text('—'), findsOneWidget);
+    });
+
     testWidgets('Sesiones usa startedAt cuando finishedAt falta',
         (tester) async {
       await _pump(
@@ -1740,6 +1803,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            // «Terminar» cuenta los turnos futuros del alumno (#1792).
+            appointmentRepositoryProvider.overrideWithValue(
+                AppointmentRepository(firestore: FakeFirebaseFirestore())),
             trainerLinksStreamProvider.overrideWith(
                 (ref) => Stream.value([_link(TrainerLinkStatus.active)])),
             userPublicProfilesBatchProvider
@@ -1932,6 +1998,35 @@ void main() {
 
     test('diciembre (tope del array de meses)', () {
       expect(fmtDayMonth(DateTime(2026, 12, 1)), '1 diciembre');
+    });
+
+    // #1773 — `dueAt` se guarda como el FIN del día ART elegido, como instante
+    // UTC. Leerle `.day` en UTC lo muestra un día después. Estos casos son
+    // UTC explícito, así que dan lo mismo en un dispositivo en ART que en un
+    // CI en UTC.
+    group('instante UTC → día de calendario en ART (#1773)', () {
+      test('fin del día ART (23:59:59 ART = 02:59:59 UTC del día siguiente)',
+          () {
+        expect(
+            fmtDayMonth(DateTime.utc(2026, 11, 5, 2, 59, 59)), '4 noviembre');
+      });
+
+      test('21:00 ART (00:00 UTC): el día UTC ya cambió, el de ART no', () {
+        expect(fmtDayMonth(DateTime.utc(2026, 11, 5, 0, 0)), '4 noviembre');
+      });
+
+      test('00:00 ART (03:00 UTC): ya es el día siguiente en ART', () {
+        expect(fmtDayMonth(DateTime.utc(2026, 11, 5, 3, 0)), '5 noviembre');
+      });
+
+      test('cruza el mes: 1º de diciembre 01:00 UTC es 30 de noviembre en ART',
+          () {
+        expect(fmtDayMonth(DateTime.utc(2026, 12, 1, 1, 0)), '30 noviembre');
+      });
+
+      test('cruza el año: 1º de enero 02:00 UTC es 31 de diciembre en ART', () {
+        expect(fmtDayMonth(DateTime.utc(2027, 1, 1, 2, 0)), '31 diciembre');
+      });
     });
   });
 

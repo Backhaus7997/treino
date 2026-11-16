@@ -1091,6 +1091,16 @@ class _ResumenDelDiaCard extends ConsumerWidget {
         : ref.watch(
             trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)),
           );
+    // #1729: el stream de arriba trae SÓLO `confirmed` (lo necesita la agenda),
+    // así que CANCELADAS daba 0 siempre. Los cancelados del día vienen de un
+    // stream hermano, acotado a hoy: son pocos y sólo este resumen los lee.
+    final cancelledAsync = trainerId.isEmpty
+        ? const AsyncValue<List<Appointment>>.data(<Appointment>[])
+        : ref.watch(
+            trainerCancelledAppointmentsStreamProvider(
+              _todayAppointmentsKey(trainerId),
+            ),
+          );
 
     // Distinguir loading/error de un día genuinamente en cero (QA H3): antes
     // `apptAsync.valueOrNull ?? []` colapsaba AMBOS a 0/0/0, así que un
@@ -1099,8 +1109,14 @@ class _ResumenDelDiaCard extends ConsumerWidget {
     // El hermano _ProximasSesionesList ya distinguía los estados con el mismo
     // provider; esto lo empareja. Loading muestra "—"; error, un mensaje.
     final Widget body = apptAsync.when(
-      loading: () =>
-          _statsRow(context, palette, pending: '—', done: '—', cancelled: '—'),
+      loading: () => _statsRow(
+        context,
+        palette,
+        pending: '—',
+        done: '—',
+        absent: '—',
+        cancelled: '—',
+      ),
       error: (_, __) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Text(
@@ -1110,13 +1126,22 @@ class _ResumenDelDiaCard extends ConsumerWidget {
       ),
       data: (all) {
         // QA-HOME-001: startsAt is Argentina wall-clock, so "now" must be too.
-        final counts = dashboardDayCounts(all, argentinaNow());
+        //
+        // Loading o error del stream de cancelados NO es "0 canceladas" (la
+        // misma lógica de QA H3): esa columna muestra "—" y las otras dos, que
+        // no dependen de él, siguen mostrando sus números.
+        final cancelledToday = cancelledAsync.valueOrNull;
+        final counts = dashboardDayCounts(
+          [...all, ...?cancelledToday],
+          argentinaNow(),
+        );
         return _statsRow(
           context,
           palette,
           pending: '${counts.pending}',
+          absent: '${counts.absent}',
           done: '${counts.done}',
-          cancelled: '${counts.cancelled}',
+          cancelled: cancelledToday == null ? '—' : '${counts.cancelled}',
         );
       },
     );
@@ -1152,6 +1177,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
     AppPalette palette, {
     required String pending,
     required String done,
+    required String absent,
     required String cancelled,
   }) {
     final l10n = AppL10n.of(context);
@@ -1168,6 +1194,16 @@ class _ResumenDelDiaCard extends ConsumerWidget {
           value: done,
           label: l10n.dashboardStatCompletadas,
           color: palette.textPrimary,
+          palette: palette,
+        ),
+        _Divider(palette: palette),
+        // #1737: el alumno faltó. Neutro (textMuted) a propósito: no es un
+        // problema como CANCELADAS ni un logro como COMPLETADAS, y el ámbar de
+        // `warning` no tiene variante legible como texto sobre bgCard claro.
+        _StatColumn(
+          value: absent,
+          label: l10n.dashboardStatAusentes,
+          color: palette.textMuted,
           palette: palette,
         ),
         _Divider(palette: palette),
@@ -1209,13 +1245,20 @@ class _StatColumn extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
-              letterSpacing: 1.2,
-              color: palette.textMuted,
+          // Con 4 columnas cada una queda en ~58 px a 360 de ancho, y
+          // «COMPLETADAS» (11 letras con tracking) no entra siempre: sin
+          // `scaleDown` el label se parte a mitad de palabra.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 10,
+                letterSpacing: 1.2,
+                color: palette.textMuted,
+              ),
             ),
           ),
         ],
@@ -1233,7 +1276,9 @@ class _Divider extends StatelessWidget {
     return Container(
       width: 1,
       height: 36,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
+      // Gutter interno del componente: con 4 columnas (#1737) los 8 de antes
+      // le sacaban ~6 px a cada una y «COMPLETADAS» dejaba de entrar a 360.
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.hairline),
       color: palette.border,
     );
   }
@@ -1579,15 +1624,21 @@ class _EntrenaronHoyRow extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)} kg',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: palette.textMuted,
+            // #1701: sin carga no hay volumen. Una sesión sólo de series por
+            // tiempo o por distancia tiene `totalVolumeKg == 0`, y «0 kg»
+            // afirma un dato que no existe. El separador va adentro del `if`:
+            // afuera quedaría un hueco de 8px a la derecha del nombre.
+            if (session.totalVolumeKg > 0) ...[
+              const SizedBox(width: 8),
+              Text(
+                '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)} kg',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: palette.textMuted,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -1865,15 +1916,21 @@ class _ActividadRecienteRow extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)} kg',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: palette.textMuted,
+            // #1701: sin carga no hay volumen. Una sesión sólo de series por
+            // tiempo o por distancia tiene `totalVolumeKg == 0`, y «0 kg»
+            // afirma un dato que no existe. El separador va adentro del `if`:
+            // afuera quedaría un hueco de 8px a la derecha del nombre.
+            if (session.totalVolumeKg > 0) ...[
+              const SizedBox(width: 8),
+              Text(
+                '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)} kg',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: palette.textMuted,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -2779,5 +2836,18 @@ TrainerAppointmentsKey _appointmentsKey(String trainerId) {
     trainerId: trainerId,
     fromDate: window.from,
     toDate: window.to,
+  );
+}
+
+/// Hoy en el calendario ART, para el stream de cancelados del resumen (#1729).
+/// `startsAt` es hora de pared argentina (QA-HOME-001), así que el día sale de
+/// [argentinaNow] igual que en el hero del Hub — no de `DateTime.now().toUtc()`.
+TrainerAppointmentsKey _todayAppointmentsKey(String trainerId) {
+  final now = argentinaNow();
+  final todayStart = DateTime.utc(now.year, now.month, now.day);
+  return TrainerAppointmentsKey(
+    trainerId: trainerId,
+    fromDate: todayStart,
+    toDate: todayStart.add(const Duration(days: 1)),
   );
 }

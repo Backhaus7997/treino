@@ -136,4 +136,76 @@ void main() {
       0,
     );
   });
+
+  // [#1698] El techo que `firestore.rules` le pone a la racha que escribe el
+  // dueño (`rachaTopeDelDueno`): lo guardado + una semana por semana ART
+  // transcurrida desde el sello. Si este espejo diverge de la regla, el write
+  // de la racha rebota. La regla lo fija en `user-public-profiles-rules.test.ts`.
+  group('rachaSemanasCeiling (#1698)', () {
+    test('sello de esta semana → no hay cupo: el techo es lo guardado', () {
+      expect(
+        rachaSemanasCeiling(
+          stored: 3,
+          stamp: artNoon(2026, 7, 22), // miércoles, misma semana
+          now: now,
+        ),
+        3,
+      );
+    });
+
+    test('sello de la semana pasada → una semana de cupo (+1)', () {
+      expect(
+        rachaSemanasCeiling(
+          stored: 3,
+          stamp: artNoon(2026, 7, 15), // miércoles anterior
+          now: now,
+        ),
+        4,
+      );
+    });
+
+    test('escrituras perdidas → una semana de cupo por semana transcurrida',
+        () {
+      expect(
+        rachaSemanasCeiling(
+          stored: 5,
+          stamp: artNoon(2026, 7, 1), // 3 semanas antes del 20/07
+          now: now,
+        ),
+        8,
+      );
+    });
+
+    test('nunca hubo sello (doc sembrado en 0 o sin racha) → +1', () {
+      expect(rachaSemanasCeiling(stored: 0, stamp: null, now: now), 1);
+      expect(rachaSemanasCeiling(stored: null, stamp: null, now: now), 1);
+    });
+
+    test('sello en el futuro (reloj atrasado) → sin cupo, nunca negativo', () {
+      expect(
+        rachaSemanasCeiling(
+          stored: 2,
+          stamp: artNoon(2026, 8, 5),
+          now: now,
+        ),
+        2,
+      );
+    });
+
+    test('el borde de semana es el lunes 00:00 ART (frame ART, no UTC)', () {
+      // 02:30Z del lunes 20/07 es domingo 23:30 ART: todavía la semana
+      // anterior, o sea que de "ahora" (viernes 24/07) hay UNA semana de cupo.
+      final lateSundayArt = DateTime.utc(2026, 7, 20, 2, 30);
+      expect(
+        rachaSemanasCeiling(stored: 4, stamp: lateSundayArt, now: now),
+        5,
+      );
+      // 03:00Z del lunes es 00:00 ART: ya es esta semana.
+      final mondayArt = DateTime.utc(2026, 7, 20, 3);
+      expect(
+        rachaSemanasCeiling(stored: 4, stamp: mondayArt, now: now),
+        4,
+      );
+    });
+  });
 }

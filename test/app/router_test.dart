@@ -8,6 +8,7 @@ import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/presentation/friend_requests_inbox_screen.dart';
 import 'package:treino/features/feed/presentation/post_detail_screen.dart';
+import 'package:treino/features/moderation/presentation/blocked_users_screen.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -172,6 +173,34 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(ProfileEditPersonalScreen), findsOneWidget);
+    });
+
+    // #1830: «Usuarios bloqueados» era un push imperativo; ahora es una ruta.
+    testWidgets(
+        '#1830: /profile/settings/bloqueados resolves to BlockedUsersScreen',
+        (tester) async {
+      final container = ProviderContainer(overrides: _baseOverrides());
+      addTearDown(container.dispose);
+      final router = buildRouter(
+        refreshListenable: ValueNotifier<int>(0),
+        read: container.read,
+      );
+      router.go('/profile/settings/bloqueados');
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(BlockedUsersScreen), findsOneWidget);
+      expect(find.text('USUARIOS BLOQUEADOS'), findsOneWidget);
     });
 
     testWidgets('SCENARIO-507b: /profile/gym resolves to ProfileGymScreen',

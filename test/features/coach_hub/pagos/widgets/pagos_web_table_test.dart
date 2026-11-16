@@ -234,6 +234,42 @@ void main() {
     });
 
     testWidgets(
+        'SCENARIO 6b — VENCIMIENTO muestra el día de calendario ART del dueAt, '
+        'no el día UTC (#1773)', (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      // `dueAt` se guarda como el FIN del día ART elegido, como instante UTC:
+      // «4 de marzo» a las 23:59:59 ART es el 5 a las 02:59:59 UTC. Fecha
+      // futura y fija para que el estado («En N días») no entre en juego.
+      final pago = Payment(
+        id: 'pay-due',
+        trainerId: 'trainer-1',
+        athleteId: 'uid-ana',
+        amountArs: 15000,
+        concept: 'Cuota',
+        status: PaymentStatus.pending,
+        createdAt: DateTime.utc(2040, 2, 1),
+        dueAt: DateTime.utc(2040, 3, 5, 2, 59, 59),
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: [pago],
+            profiles: const {},
+            emptyMessage: 'Sin pagos',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('4 marzo'), findsOneWidget);
+      expect(find.text('5 marzo'), findsNothing);
+    });
+
+    testWidgets(
         'SCENARIO 7 — errorMessage + onRetry renders the kit error state',
         (tester) async {
       tester.view.physicalSize = _kDesktopSize;

@@ -124,7 +124,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 child: CircularProgressIndicator(color: palette.accent),
               ),
               error: (_, __) => _ErrorState(
-                onRetry: () => _retryWeek(ref, uid, _shownWeekStart),
+                onRetry: () => retryWeekInsights(ref, uid, _shownWeekStart),
               ),
               data: (insights) {
                 // Bug fix (abandoned-session-streak-reports): el CTA de
@@ -209,6 +209,7 @@ class _InsightsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 20, 8),
       child: Row(
@@ -219,7 +220,7 @@ class _InsightsHeader extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            'INSIGHTS',
+            l10n.insightsScreenTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 24,
@@ -243,17 +244,25 @@ void _safePopOrHome(BuildContext context) {
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
+/// Cuenta nueva (nunca completó un entrenamiento): no hay nada que reportar de
+/// entrenos, pero MEDIDAS sí es alcanzable (#1696) — es la única puerta para
+/// que una cuenta nueva cargue su primera medición. Los demás tiles del hub
+/// (distribución muscular, ejercicios, volumen…) quedan afuera a propósito:
+/// abrirían pantallas vacías.
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Center(
-      child: Padding(
+      // Scroll por si el texto escala (accesibilidad) o la pantalla es baja:
+      // ahora la columna tiene un tile más que el ícono + el mensaje de antes.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               TreinoIcon.chartBar,
@@ -262,7 +271,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              'Empezá a entrenar para ver tus insights.',
+              l10n.insightsEmptyState,
               textAlign: TextAlign.center,
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w400,
@@ -270,6 +279,8 @@ class _EmptyState extends StatelessWidget {
                 color: palette.textMuted,
               ),
             ),
+            const SizedBox(height: 20),
+            const SizedBox(width: double.infinity, child: _MeasurementsTile()),
           ],
         ),
       ),
@@ -279,20 +290,10 @@ class _EmptyState extends StatelessWidget {
 
 // ── Retry ─────────────────────────────────────────────────────────────────────
 
-/// QA-498: `ref.invalidate` NO cascada a las dependencias, y [exercisesProvider]
-/// NO es autoDispose — cachea su `AsyncError` para toda la vida del container.
-/// Invalidar solo el provider de la card lo rebuildeaba, re-leía el MISMO error
-/// cacheado del catálogo y re-renderizaba el mismo estado de error: un botón de
-/// reintentar que no podía recuperar nunca, justo en el caso que trae al usuario
-/// acá (offline / fallo al cargar el catálogo en frío). Mismo criterio que el
-/// `_retry` de MuscleDistributionScreen y FrequentExercisesScreen (#376).
-void _retryWeek(WidgetRef ref, String uid, DateTime weekStart) {
-  ref.invalidate(exercisesProvider);
-  ref.invalidate(athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)));
-}
-
-/// Ver [_retryWeek] — [athleteDayInsightsProvider] también lee
-/// `exercisesProvider.future`.
+/// La semana se reintenta con [retryWeekInsights] (compartido con la card «Esta
+/// semana» de Inicio; ahí está el porqué de invalidar también el catálogo).
+/// [athleteDayInsightsProvider] también lee `exercisesProvider.future`, así que
+/// el día invalida igual los dos.
 void _retryDay(WidgetRef ref, String uid, DateTime day) {
   ref.invalidate(exercisesProvider);
   ref.invalidate(athleteDayInsightsProvider((uid: uid, day: day)));
@@ -363,7 +364,8 @@ class _WeekStripCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final localeName = AppL10n.of(context).localeName;
+    final l10n = AppL10n.of(context);
+    final localeName = l10n.localeName;
     final dayLabels = weekdayInitials(localeName);
     final today = argentinaNow();
     final todayOnly = DateTime.utc(today.year, today.month, today.day);
@@ -389,12 +391,11 @@ class _WeekStripCard extends StatelessWidget {
                 key: const Key('week-strip-previous-week'),
                 icon: Icon(TreinoIcon.chevronLeft, color: palette.textMuted),
                 onPressed: onPreviousWeek,
-                tooltip: 'Semana anterior',
+                tooltip: l10n.insightsPreviousWeekTooltip,
               ),
               Expanded(
                 child: Text(
-                  _formatRange(
-                      insights.weekStart, insights.weekEnd, localeName),
+                  _formatRange(l10n, insights.weekStart, insights.weekEnd),
                   textAlign: TextAlign.center,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
@@ -413,7 +414,7 @@ class _WeekStripCard extends StatelessWidget {
                         ? palette.textMuted.withValues(alpha: 0.3)
                         : palette.textMuted),
                 onPressed: isCurrentWeek ? null : onNextWeek,
-                tooltip: 'Semana siguiente',
+                tooltip: l10n.insightsNextWeekTooltip,
               ),
               Text(
                 '${insights.sessionsCount} / ${insights.plannedSessionsCount}',
@@ -630,7 +631,7 @@ class _DailyMusclesCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'MÚSCULOS DEL DÍA',
+            l10n.insightsDayMusclesHeading,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 12,
@@ -696,6 +697,7 @@ class _MuscleSetsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final hasSets = sets > 0;
     final dotColor = hasSets ? palette.accent : palette.textMuted;
     final labelColor = hasSets ? palette.textPrimary : palette.textMuted;
@@ -729,7 +731,7 @@ class _MuscleSetsRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Text(
-          'SETS',
+          l10n.insightsDaySetsUnit,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w600,
             fontSize: 11,
@@ -817,17 +819,7 @@ class _StatsHubTileList extends StatelessWidget {
           onTap: () => context.push('/home/insights/volume-by-group'),
         ),
         const SizedBox(height: 12),
-        // MEDIDAS: el PF carga peso y circunferencias de su alumno y era el
-        // ÚNICO que las veía. El alumno no tenía dónde mirarlas. (Rendimiento
-        // NO se surfacea al alumno: son evaluaciones profesionales —CMJ,
-        // sprints, VO2máx— que toma el coach con equipo específico; siguen
-        // viviendo sólo en el detalle de alumno del PF.)
-        _StatTile(
-          icon: TreinoIcon.ruler,
-          title: l10n.insightsTileMeasurementsTitle,
-          subtitle: l10n.insightsTileMeasurementsSubtitle,
-          onTap: () => context.push('/home/insights/measurements'),
-        ),
+        const _MeasurementsTile(),
         const SizedBox(height: 12),
         // Séptima entrada del hub, y la única que no mide kilos ni volumen.
         // Va al final a propósito: suma una dimensión al hub, no reordena la
@@ -839,6 +831,31 @@ class _StatsHubTileList extends StatelessWidget {
           onTap: () => context.push('/home/insights/wellbeing'),
         ),
       ],
+    );
+  }
+}
+
+/// MEDIDAS: el PF carga peso y circunferencias de su alumno y era el ÚNICO que
+/// las veía. El alumno no tenía dónde mirarlas. (Rendimiento NO se surfacea al
+/// alumno: son evaluaciones profesionales —CMJ, sprints, VO2máx— que toma el
+/// coach con equipo específico; siguen viviendo sólo en el detalle de alumno
+/// del PF.)
+///
+/// Su propio widget porque vive en DOS lugares: la lista del hub y el
+/// [_EmptyState] de la cuenta nueva (#1696). Las medidas no dependen de haber
+/// entrenado — el alumno las carga desde la pantalla de destino ("+") —, así
+/// que no tienen por qué quedar detrás del «Empezá a entrenar».
+class _MeasurementsTile extends StatelessWidget {
+  const _MeasurementsTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return _StatTile(
+      icon: TreinoIcon.ruler,
+      title: l10n.insightsTileMeasurementsTitle,
+      subtitle: l10n.insightsTileMeasurementsSubtitle,
+      onTap: () => context.push('/home/insights/measurements'),
     );
   }
 }
@@ -915,6 +932,7 @@ class _VolverButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton(
@@ -927,7 +945,7 @@ class _VolverButton extends StatelessWidget {
           ),
         ),
         child: Text(
-          'VOLVER',
+          l10n.insightsBackButton,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 14,
@@ -942,8 +960,9 @@ class _VolverButton extends StatelessWidget {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-String _formatRange(DateTime start, DateTime end, String localeName) {
+String _formatRange(AppL10n l10n, DateTime start, DateTime end) {
+  final localeName = l10n.localeName;
   final s = '${start.day} ${monthAbbrev(start, localeName, upperCase: true)}';
   final e = '${end.day} ${monthAbbrev(end, localeName, upperCase: true)}';
-  return 'SEMANA · $s – $e';
+  return l10n.insightsWeekRange(s, e);
 }

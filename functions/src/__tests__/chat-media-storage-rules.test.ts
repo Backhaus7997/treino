@@ -2,10 +2,15 @@
  * Storage rules tests del TOPE DE COSTO de `chatMedia/{chatId}/{userId}/{file=**}`
  * (#chat-media-quota).
  *
- * Este archivo cubre el `write`: caps por archivo, tier, y el tope de BYTES
- * TOTALES. El gate de MEMBRESÍA del `get`/`list` —que es otra cosa y es
- * anterior— lo cubre `scripts/rules_test/chat-media-storage.test.js`, y no se
- * duplica acá.
+ * Este archivo cubre el `write`: caps por archivo, tier, el tope de BYTES
+ * TOTALES, y que el chat exista, sea del que sube y no esté CERRADO (#1721).
+ * El gate de MEMBRESÍA del `get`/`list` —que es otra cosa y es anterior— lo
+ * cubre `scripts/rules_test/chat-media-storage.test.js`, y no se duplica acá.
+ *
+ * Como el `write` lee `chats/{chatId}`, TODA subida de esta suite necesita ese
+ * doc: el `beforeEach` siembra uno ABIERTO con `ATHLETE` y `TRAINER`, que es lo
+ * que deja la app (`ChatRepository.getOrCreate`) antes de que el composer
+ * exista. Los tests de #1721 lo pisan.
  *
  * ⚠️ EL PROJECT ID NO PUEDE SER UNO ARBITRARIO. `firebase.json` tiene
  * `emulators.singleProjectMode: true`, que pinea las llamadas cross-service
@@ -81,10 +86,33 @@ afterAll(async () => {
   await testEnv.cleanup();
 });
 
+beforeEach(async () => {
+  await seedChat();
+});
+
 afterEach(async () => {
   await testEnv.clearStorage();
   await testEnv.clearFirestore();
 });
+
+/**
+ * Siembra `chats/{CHAT_ID}` con las reglas APAGADAS, como lo deja
+ * `ChatRepository.getOrCreate`. `closedAt` es CF-write-only (#1697): lo pone la
+ * Cloud Function cuando el vínculo termina, y las reglas de Firestore impiden
+ * que un miembro lo toque, así que sembrarlo con las reglas encendidas es
+ * imposible a propósito. `setDoc` REEMPLAZA el doc: sembrar de nuevo pisa el
+ * del `beforeEach`.
+ */
+async function seedChat(extra: Record<string, unknown> = {}): Promise<void> {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "chats", CHAT_ID), {
+      chatId: CHAT_ID,
+      members: [ATHLETE, TRAINER],
+      createdAt: new Date(),
+      ...extra,
+    });
+  });
+}
 
 /**
  * Siembra `users/{uid}` con las reglas APAGADAS.
@@ -144,9 +172,11 @@ describe("chatMedia — el gate de dueño y de contentType sigue en pie", () => 
   });
 
   it("DENIEGA subir a la carpeta de OTRO usuario del mismo chat", async () => {
+    // TRAINER es miembro del chat: lo que lo frena es `uid == userId`, no la
+    // membresía (esa es la del describe de #1721, más abajo).
     await assertFails(
       upload(
-        OTHER,
+        TRAINER,
         `chatMedia/${CHAT_ID}/${ATHLETE}/hijack.jpg`,
         1024,
         "image/jpeg",
@@ -282,11 +312,84 @@ describe("chatMedia — fail-open sin doc de perfil", () => {
   // igual que `paywallEnforcedFor` en `firestore.rules`. Pero el TECHO
   // ESTRUCTURAL se aplica siempre: el fail-open afloja el tope del PAYWALL,
   // nunca el del PRODUCTO.
+  //
+  // ATHLETE es miembro del chat del `beforeEach` y en estos tests NO se le
+  // siembra `users/{uid}`: el doc que falta es el de PERFIL, no el del chat.
   it("deja pasar un video de 30 MB sin doc de perfil (cae en el techo, no en el free)", async () => {
-    await assertSucceeds(videoOf(OTHER, "sindoc.mp4", 30 * MB));
+    await assertSucceeds(videoOf(ATHLETE, "sindoc.mp4", 30 * MB));
   });
 
   it("DENIEGA un video de 51 MB sin doc de perfil — el techo sigue valiendo", async () => {
-    await assertFails(videoOf(OTHER, "sindoc-enorme.mp4", 51 * MB));
+    await assertFails(videoOf(ATHLETE, "sindoc-enorme.mp4", 51 * MB));
+  });
+});
+
+describe("chatMedia — membresía y chat cerrado (#1721)", () => {
+  // Antes el `write` sólo miraba `uid == userId` y el tope: no leía
+  // `chats/{chatId}`, así que ni la membresía ni `closedAt` (#1697) cortaban
+  // una subida. `senderMayPost` (firestore.rules) ya cortaba el MENSAJE de un
+  // chat cerrado; esto corta los bytes que lo acompañarían.
+
+  it("deja subir a CADA miembro de un chat abierto, en su propia carpeta", async () => {
+    await assertSucceeds(imageOf(ATHLETE, "a.jpg", 1024));
+    await assertSucceeds(imageOf(TRAINER, "t.jpg", 1024));
+  });
+
+  it("deja subir si `closedAt` está presente pero en null (un chat abierto)", async () => {
+    await seedChat({ closedAt: null });
+    await assertSucceeds(imageOf(ATHLETE, "ok.jpg", 1024));
+  });
+
+  it("DENIEGA subir a quien NO es miembro, aunque sea su PROPIA carpeta", async () => {
+    // El caso del issue: `chatId` es determinístico y los uids son
+    // enumerables, así que cualquier cuenta puede armar un path de `chatMedia/`
+    // ajeno. `uid == userId` se cumple, y sólo la membresía lo frena.
+    await assertFails(imageOf(OTHER, "intruso.jpg", 1024));
+  });
+
+  it("DENIEGA subir a un chat que NO existe (el doc se crea antes que el composer)", async () => {
+    // `getOrCreate` corre antes de que el composer se monte y `sendMessage`
+    // hace `update` sobre el chat, así que ningún flujo legítimo sube a un chat
+    // sin doc: esa subida sería un huérfano seguro.
+    await testEnv.clearFirestore();
+    await assertFails(imageOf(ATHLETE, "sin-chat.jpg", 1024));
+  });
+
+  it("DENIEGA a un miembro subir a un chat CERRADO — a los dos lados del par", async () => {
+    await seedChat({ closedAt: new Date() });
+    await assertFails(imageOf(ATHLETE, "a.jpg", 1024));
+    await assertFails(videoOf(TRAINER, "t.mp4", 1024));
+  });
+
+  it("DENIEGA sobrescribir un objeto YA subido cuando el chat se cerró", async () => {
+    // `write` cubre create y update: sin el gate también valdría sobrescribir.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(
+        ref(ctx.storage(), `chatMedia/${CHAT_ID}/${TRAINER}/previo.jpg`),
+        new Uint8Array(1024),
+        { contentType: "image/jpeg" },
+      );
+    });
+    await seedChat({ closedAt: new Date() });
+    await assertFails(imageOf(TRAINER, "previo.jpg", 2048));
+  });
+
+  it("deja al miembro BORRAR su media de un chat cerrado (limpieza del huérfano)", async () => {
+    // Si el vínculo termina en medio de un envío, el upload ya aterrizó y el
+    // `sendMessage` falla: `ChatMediaSendController._deleteOrphan` tiene que
+    // poder borrarlo. Por eso el gate va en el `write` y NO en el `delete`.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(
+        ref(ctx.storage(), `chatMedia/${CHAT_ID}/${TRAINER}/huerfano.jpg`),
+        new Uint8Array(1024),
+        { contentType: "image/jpeg" },
+      );
+    });
+    await seedChat({ closedAt: new Date() });
+    await assertSucceeds(
+      deleteObject(
+        ref(storageAs(TRAINER), `chatMedia/${CHAT_ID}/${TRAINER}/huerfano.jpg`),
+      ),
+    );
   });
 });

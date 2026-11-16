@@ -1,29 +1,35 @@
 // Tests para SessionPlayerScreen — SCENARIO-274..276 (_SessionHeader, TASK-202a)
-// + SCENARIO-277..278 (_AttendanceCard, TASK-203a).
-// TASK-203a: _AttendanceCard fue incluida en el commit 202b junto con el esqueleto
-// de la pantalla — los tests 277-278 son GREEN desde el primer run (desviación
-// documentada en apply-progress.md).
+// + _SessionGymCard (#1768). Antes era _AttendanceCard (SCENARIO-277..278), que
+// afirmaba una «Asistencia marcada» que no existe: esos dos escenarios se
+// reemplazaron por los de abajo, que fijan lo contrario.
 //
 // Updated for the 5-change redesign (per-set model, duration timer, weight
 // keyboard, reps non-editable, block gating).
 // SCENARIO-037: player renders correct week's set count via effectiveSetsForWeek.
 
+import 'dart:async';
+
 import 'package:clock/clock.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/gyms/application/gym_display_name_provider.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_state.dart';
+import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
+import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/application/weekly_streak_providers.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/workout/presentation/exercise_detail_screen.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
@@ -223,9 +229,109 @@ UserProfile _makeProfile({String? gymId}) => UserProfile(
       gymId: gymId,
     );
 
-// ── _SessionHeader + _AttendanceCard tests ───────────────────────────────────
+// ── _SessionHeader + _SessionGymCard tests ───────────────────────────────────
 
 void main() {
+  // ── #1728: si la sesión no se puede abrir, la pantalla trae su salida ──────
+  group('#1728: retomar una sesión que no se puede abrir', () {
+    const uid = 'u1';
+    late FakeFirebaseFirestore firestore;
+
+    setUp(() => firestore = FakeFirebaseFirestore());
+
+    /// Monta el player como lo hace el deep link / la recarga en web: ES LA
+    /// ÚNICA ruta del stack, así que Atrás no tiene a dónde volver.
+    Future<void> montarRetomar(WidgetTester tester, String sessionId) async {
+      final router = GoRouter(
+        initialLocation: '/workout/session/resume/$sessionId',
+        routes: [
+          GoRoute(
+            path: '/workout/session/resume/:sessionId',
+            builder: (_, state) => SessionPlayerScreen(
+              init: ResumeSession(
+                sessionId: state.pathParameters['sessionId']!,
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/home',
+            builder: (_, __) =>
+                const Scaffold(body: Center(child: Text('home-stub'))),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            // El notifier REAL: lo que se prueba es que `_buildResume` tire
+            // con una sesión que no es la del atleta y que la pantalla lo
+            // muestre con salida, no un stub que ya devuelva error.
+            sessionRepositoryProvider.overrideWithValue(
+              SessionRepository(firestore: firestore),
+            ),
+            currentUidProvider.overrideWithValue(uid),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            routerConfig: router,
+          ),
+        ),
+      );
+      // Un frame por cada `await` del build (getActive → StateError).
+      for (var i = 0; i < 4; i++) {
+        await tester.pump();
+      }
+    }
+
+    Future<void> sembrarActiva(String ownerUid, String id) => firestore
+        .collection('users')
+        .doc(ownerUid)
+        .collection('sessions')
+        .doc(id)
+        .set(makeSession(id: id, uid: ownerUid, startedAt: DateTime.now())
+            .toJson());
+
+    void expectEstadoDeErrorConSalida() {
+      expect(find.text('No pudimos abrir el entrenamiento'), findsOneWidget);
+      expect(find.text('Volver al inicio'), findsOneWidget);
+      // El texto viejo, sin botón, era el callejón sin salida.
+      expect(find.text('No pudimos iniciar la sesión.'), findsNothing);
+    }
+
+    testWidgets('un id inexistente muestra el error con «Volver al inicio»',
+        (tester) async {
+      await montarRetomar(tester, 'no-existe');
+      expectEstadoDeErrorConSalida();
+    });
+
+    testWidgets('la sesión activa de OTRO usuario no se puede retomar',
+        (tester) async {
+      await sembrarActiva('otro-uid', 'ajena');
+      await montarRetomar(tester, 'ajena');
+      expectEstadoDeErrorConSalida();
+    });
+
+    testWidgets('un id que no es el de la sesión activa propia tampoco',
+        (tester) async {
+      await sembrarActiva(uid, 'la-activa');
+      await montarRetomar(tester, 'otra-vieja');
+      expectEstadoDeErrorConSalida();
+    });
+
+    testWidgets(
+        '«Volver al inicio» lleva a Inicio aunque no haya a dónde '
+        'hacer pop', (tester) async {
+      await montarRetomar(tester, 'no-existe');
+      await tester.tap(find.text('Volver al inicio'));
+      await tester.pumpAndSettle();
+      expect(find.text('home-stub'), findsOneWidget);
+      expect(find.byType(SessionPlayerScreen), findsNothing);
+    });
+  });
+
   group('_SessionHeader', () {
     // SCENARIO-274: título en formato correcto
     testWidgets('SCENARIO-274: renderiza el número de día en el título',
@@ -309,40 +415,109 @@ void main() {
     });
   });
 
-  // ── _AttendanceCard (TASK-203a) ───────────────────────────────────────────
+  // ── _SessionGymCard (#1768) ───────────────────────────────────────────────
+  //
+  // No existe ningún registro de asistencia: la tarjeta no puede afirmar una.
+  // Sólo muestra el gimnasio del atleta, y sólo cuando es real y ya resolvió.
 
-  group('_AttendanceCard', () {
-    List<Override> attendanceOverrides(UserProfile profile) => [
+  group('_SessionGymCard', () {
+    List<Override> gymOverrides(
+      UserProfile profile, {
+      Future<String> Function()? gymName,
+    }) =>
+        [
           ...(_stateOverride(_defaultState())),
           userProfileProvider.overrideWith(
             (ref) => Stream.value(profile),
           ),
+          if (gymName != null)
+            gymDisplayNameProvider(profile.gymId).overrideWith(
+              (ref) => gymName(),
+            ),
         ];
 
-    // SCENARIO-277: 'Asistencia marcada' aparece
-    testWidgets('SCENARIO-277: renderiza "Asistencia marcada"', (tester) async {
+    Future<void> montar(WidgetTester tester, List<Override> overrides) async {
       await tester.pumpWidget(
-        _wrapProvider(
-          const SessionPlayerScreen(init: _kInit),
-          attendanceOverrides(_makeProfile()),
+        _wrapProvider(const SessionPlayerScreen(init: _kInit), overrides),
+      );
+      // El perfil llega por un stream y el nombre por un future: un frame cada
+      // uno.
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+    }
+
+    void expectSinAfirmaciones() {
+      expect(find.text('Asistencia marcada'), findsNothing);
+      expect(find.text('Sin gimnasio asignado'), findsNothing);
+    }
+
+    testWidgets('con gimnasio real y su nombre resuelto lo muestra, y nada más',
+        (tester) async {
+      await montar(
+        tester,
+        gymOverrides(
+          _makeProfile(gymId: 'g1'),
+          gymName: () async => 'Smart Fit Centro',
         ),
       );
-      await tester.pump();
-      expect(find.text('Asistencia marcada'), findsOneWidget);
+      expect(find.text('Smart Fit Centro'), findsOneWidget);
+      expectSinAfirmaciones();
+
+      // La tarjeta es el ícono y el nombre: ni tilde ni hora.
+      final fila = find.ancestor(
+        of: find.text('Smart Fit Centro'),
+        matching: find.byType(Row),
+      );
+      expect(
+        find.descendant(of: fila.first, matching: find.byType(Text)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+            of: fila.first, matching: find.byIcon(TreinoIcon.checkCircleFill)),
+        findsNothing,
+      );
     });
 
-    // SCENARIO-278: 'Sin gimnasio asignado' cuando gymId es null
-    testWidgets(
-        'SCENARIO-278: renderiza "Sin gimnasio asignado" cuando gymId es null',
+    testWidgets('sin gimnasio no hay tarjeta ni «Sin gimnasio asignado»',
         (tester) async {
-      await tester.pumpWidget(
-        _wrapProvider(
-          const SessionPlayerScreen(init: _kInit),
-          attendanceOverrides(_makeProfile(gymId: null)),
-        ),
+      await montar(tester, gymOverrides(_makeProfile(gymId: null)));
+      expectSinAfirmaciones();
+      expect(find.byIcon(TreinoIcon.gym), findsNothing);
+    });
+
+    testWidgets('el marcador legacy «no-gym» cuenta como sin gimnasio',
+        (tester) async {
+      await montar(tester, gymOverrides(_makeProfile(gymId: 'no-gym')));
+      expectSinAfirmaciones();
+      expect(find.byIcon(TreinoIcon.gym), findsNothing);
+    });
+
+    testWidgets(
+        'con gimnasio real pero el nombre sin resolver no se dibuja nada '
+        '(antes decía «Sin gimnasio asignado», que era falso)', (tester) async {
+      final pendiente = Completer<String>();
+      await montar(
+        tester,
+        gymOverrides(_makeProfile(gymId: 'g1'),
+            gymName: () => pendiente.future),
       );
+      expectSinAfirmaciones();
+      expect(find.byIcon(TreinoIcon.gym), findsNothing);
+
+      pendiente.complete('');
       await tester.pump();
-      expect(find.text('Sin gimnasio asignado'), findsOneWidget);
+    });
+
+    testWidgets('un gimnasio cuyo nombre queda vacío tampoco dibuja la tarjeta',
+        (tester) async {
+      await montar(
+        tester,
+        gymOverrides(_makeProfile(gymId: 'g1'), gymName: () async => ''),
+      );
+      expectSinAfirmaciones();
+      expect(find.byIcon(TreinoIcon.gym), findsNothing);
     });
   });
 
@@ -470,6 +645,173 @@ void main() {
       await tester.tap(find.text('SQUAT'));
       await tester.pumpAndSettle();
       expect(find.byType(ExerciseDetailScreen), findsOneWidget);
+    });
+  });
+
+  // ── #1755: el Atrás del sistema en una sesión nueva ──────────────────────
+  //
+  // El swipe desde el borde izquierdo y el botón Atrás del sistema llegan al
+  // player como `handlePopRoute`, no como un tap en la flecha del header. Estos
+  // tests simulan eso, sobre el `SessionNotifier` REAL y un repositorio sobre
+  // `FakeFirebaseFirestore`: lo que importa es qué queda en Firestore.
+  group('#1755: Atrás del sistema en una sesión nueva', () {
+    const uid = 'u1';
+    const confirmacion = '¿Seguro que querés abandonar?';
+    late FakeFirebaseFirestore firestore;
+
+    /// La rutina que lee el player al arrancar. Mientras no se completa, el
+    /// player está en `loading`: es la ventana de «recién tocó EMPEZAR».
+    late Completer<Routine?> rutina;
+
+    /// `_kInit` pide el día 4: la rutina tiene que tenerlo.
+    Routine rutinaDelDia4() => makeRoutine(days: [makeDay(dayNumber: 4)]);
+
+    /// Monta el player ENCIMA de otra ruta (como lo deja EMPEZAR), para que el
+    /// pop sea observable: si sale, queda 'base-stub'.
+    Future<void> abrirElPlayer(WidgetTester tester) async {
+      // Se crean ACÁ y no en un `setUp`: un `Completer` nacido fuera de la zona
+      // del test agenda sus callbacks en la zona real, y el reloj falso de
+      // `testWidgets` nunca los corre.
+      firestore = FakeFirebaseFirestore();
+      rutina = Completer<Routine?>();
+      final router = GoRouter(routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) =>
+              const Scaffold(body: Center(child: Text('base-stub'))),
+        ),
+        GoRoute(
+          path: '/player',
+          builder: (_, __) => const SessionPlayerScreen(init: _kInit),
+        ),
+        GoRoute(
+          path: '/workout',
+          builder: (_, __) =>
+              const Scaffold(body: Center(child: Text('workout-stub'))),
+        ),
+      ]);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sessionRepositoryProvider.overrideWithValue(
+              SessionRepository(firestore: firestore),
+            ),
+            currentUidProvider.overrideWithValue(uid),
+            routineByIdProvider('r1').overrideWith((_) => rutina.future),
+            weeklyStreakTargetProvider.overrideWithValue(3),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            routerConfig: router,
+          ),
+        ),
+      );
+      unawaited(router.push<void>('/player'));
+      await tester.pump();
+      // Termina la transición de entrada (el ticker arranca en el primer
+      // frame, de ahí los dos pasos): con la ruta de abajo ya fuera de
+      // escena, «base-stub» sólo se ve si el player se fue.
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    /// Deja correr los `await` del build y las escrituras del Firestore falso.
+    Future<void> asentar(WidgetTester tester) async {
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    Future<List<Map<String, dynamic>>> sesiones() async {
+      final snap = await firestore
+          .collection('users')
+          .doc(uid)
+          .collection('sessions')
+          .get();
+      return [for (final d in snap.docs) d.data()];
+    }
+
+    testWidgets('cargando: Atrás pide confirmación y NO saca del player',
+        (tester) async {
+      await abrirElPlayer(tester);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(find.textContaining(confirmacion), findsOneWidget);
+      expect(find.byType(SessionPlayerScreen), findsOneWidget);
+      expect(find.text('base-stub'), findsNothing);
+
+      rutina.complete(rutinaDelDia4());
+      await asentar(tester);
+    });
+
+    testWidgets(
+        'cargando: abandonar antes de que exista la sesión sale SIN dejar una '
+        'sesión activa huérfana', (tester) async {
+      await abrirElPlayer(tester);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.tap(find.text('Abandonar'));
+      await tester.pumpAndSettle();
+      expect(find.text('workout-stub'), findsOneWidget);
+      expect(find.byType(SessionPlayerScreen), findsNothing);
+
+      // La rutina llega DESPUÉS de que el atleta se fue: el build del notifier
+      // sigue corriendo, y no puede crear la sesión.
+      rutina.complete(rutinaDelDia4());
+      await asentar(tester);
+
+      expect(await sesiones(), isEmpty,
+          reason: 'sin pantalla no hay sesión: crearla la deja `active` y '
+              'Inicio ofrece retomar un entreno que nadie vio');
+    });
+
+    testWidgets('cargando: «Cancelar» se queda y la sesión arranca normal',
+        (tester) async {
+      await abrirElPlayer(tester);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.tap(find.text('Cancelar'));
+      // Sin `pumpAndSettle`: el spinner anima para siempre.
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.textContaining(confirmacion), findsNothing);
+      expect(find.byType(SessionPlayerScreen), findsOneWidget);
+
+      rutina.complete(rutinaDelDia4());
+      await asentar(tester);
+
+      expect(find.text('ABANDONAR'), findsOneWidget);
+      final creadas = await sesiones();
+      expect(creadas, hasLength(1));
+      expect(creadas.single['status'], 'active');
+    });
+
+    testWidgets('sesión ya cargada: Atrás pide confirmación y abandona',
+        (tester) async {
+      await abrirElPlayer(tester);
+      rutina.complete(rutinaDelDia4());
+      await asentar(tester);
+      expect(find.text('ABANDONAR'), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(find.textContaining(confirmacion), findsOneWidget);
+      expect(find.text('base-stub'), findsNothing);
+
+      await tester.tap(find.text('Abandonar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('workout-stub'), findsOneWidget);
+      final cerradas = await sesiones();
+      expect(cerradas, hasLength(1));
+      expect(cerradas.single['status'], 'finished');
     });
   });
 
@@ -1271,6 +1613,180 @@ void main() {
       expect(find.text('1/1'), findsOneWidget,
           reason: 'el bloque colapsa a completo');
     });
+
+    // ── #1701: la serie por distancia guarda sus metros ──────────────────
+    //
+    // La fila es un check sin valor editable: la distancia hecha es la
+    // prescripta. Antes la serie quedaba en `reps: 0, weightKg: 0` y los
+    // metros —que el atleta tenía en pantalla— se perdían.
+
+    testWidgets('marcar la serie guarda los metros del spec, y no tiempo',
+        (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'sled',
+        exerciseName: 'Trineo',
+        muscleGroup: 'legs',
+        targetSets: 1,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 60,
+        exerciseMode: ExerciseMode.distance,
+        sets: [SetSpec(distanceMeters: 40)],
+      );
+      final notifier = _LoggingNotifier(SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: const [slot]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      ));
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      final log = notifier.loggedSets.single;
+      expect(log.distanceMeters, 40);
+      expect(log.durationSeconds, isNull);
+      expect(log.reps, 0);
+      expect(log.weightKg, 0);
+    });
+
+    testWidgets(
+        'cada serie guarda SUS metros: con metros distintos por serie no se '
+        'copian los de la primera', (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'sled',
+        exerciseName: 'Trineo',
+        muscleGroup: 'legs',
+        targetSets: 2,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 0,
+        exerciseMode: ExerciseMode.distance,
+        sets: [SetSpec(distanceMeters: 40), SetSpec(distanceMeters: 25.5)],
+      );
+      final notifier = _LoggingNotifier(SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: const [slot]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      ));
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(
+        notifier.loggedSets.map((l) => (l.setNumber, l.distanceMeters)),
+        [(1, 40.0), (2, 25.5)],
+      );
+    });
+
+    testWidgets(
+        'periodizado: los metros salen de la semana de la sesión, no de la '
+        'primera', (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'sled',
+        exerciseName: 'Trineo',
+        muscleGroup: 'legs',
+        targetSets: 1,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 60,
+        exerciseMode: ExerciseMode.distance,
+        weeklySets: [
+          [SetSpec(distanceMeters: 20)],
+          [SetSpec(distanceMeters: 60)],
+        ],
+      );
+      final notifier = _LoggingNotifier(SessionState(
+        session: makeSession(weekNumber: 1),
+        day: makeDay(dayNumber: 1, slots: const [slot]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      ));
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+
+      expect(find.text('60 m'), findsOneWidget,
+          reason: 'la fila dibuja la semana 2');
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets.single.distanceMeters, 60);
+    });
+
+    testWidgets(
+        'slot con exerciseMode reps + metros en sets (modo inferido): también '
+        'guarda los metros', (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'sprint-3',
+        exerciseName: 'Sprint',
+        muscleGroup: 'legs',
+        targetSets: 1,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 60,
+        sets: [SetSpec(distanceMeters: 6)],
+      );
+      final notifier = _LoggingNotifier(SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: const [slot]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      ));
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets.single.distanceMeters, 6);
+    });
+
+    testWidgets(
+        'una serie por REPS no lleva ni tiempo ni metros, y su documento no '
+        'escribe esas claves', (tester) async {
+      final notifier = _LoggingNotifier(_defaultState());
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      final log = notifier.loggedSets.single;
+      expect(log.reps, greaterThan(0));
+      expect(log.durationSeconds, isNull);
+      expect(log.distanceMeters, isNull);
+      final json = log.toJson();
+      expect(json.containsKey('durationSeconds'), isFalse);
+      expect(json.containsKey('distanceMeters'), isFalse);
+    });
   });
 
   // #1510: el descanso configurado en la rutina sólo corría en el reloj. Al
@@ -1720,6 +2236,110 @@ void main() {
       await tester.pump();
       expect(find.textContaining('600 kg vol.'), findsOneWidget);
       expect(find.textContaining('600.0'), findsNothing);
+    });
+
+    // ── #1701: «0 kg vol.» en una sesión que no puede juntar carga ─────────
+    //
+    // Se esconde sólo cuando TODOS los slots son por tiempo o por distancia.
+    // Con `totalVolumeKg == 0` a secas, toda sesión por reps arrancaría sin el
+    // dato y lo vería aparecer recién al marcar la primera serie.
+
+    const distanceSlot = RoutineSlot(
+      exerciseId: 'sled',
+      exerciseName: 'Trineo',
+      muscleGroup: 'legs',
+      targetSets: 1,
+      targetRepsMin: 0,
+      targetRepsMax: 0,
+      restSeconds: 60,
+      exerciseMode: ExerciseMode.distance,
+      sets: [SetSpec(distanceMeters: 40)],
+    );
+    const durationSlot = RoutineSlot(
+      exerciseId: 'plank',
+      exerciseName: 'Plancha',
+      muscleGroup: 'core',
+      targetSets: 1,
+      targetRepsMin: 0,
+      targetRepsMax: 0,
+      restSeconds: 60,
+      exerciseMode: ExerciseMode.duration,
+      sets: [SetSpec(durationSeconds: 30)],
+    );
+
+    SessionState stateOf(List<RoutineSlot> slots, {List<SetLog>? setLogs}) =>
+        SessionState(
+          session: makeSession(),
+          day: makeDay(dayNumber: 1, slots: slots),
+          setLogs: setLogs ?? const [],
+          currentExerciseIndex: 0,
+          elapsedSeconds: 0,
+        );
+
+    testWidgets(
+        '#1701: sesión por reps en 0 sigue mostrando "0 kg vol." (no aparece '
+        'de golpe con la primera serie)', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(_defaultState()),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+          find.textContaining('0 / 2 ejercicios · 0 kg vol.'), findsOneWidget);
+    });
+
+    testWidgets(
+        '#1701: todos los slots por tiempo o distancia → sin "kg vol.", queda '
+        'el conteo de ejercicios', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(stateOf(const [distanceSlot, durationSlot])),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('0 / 2 ejercicios'), findsOneWidget);
+      expect(find.textContaining('kg vol.'), findsNothing);
+    });
+
+    testWidgets(
+        '#1701: un slot por reps entre los de tiempo/distancia alcanza para '
+        'mantener "kg vol."', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(
+            stateOf([makeSlot(exerciseId: 'e1'), distanceSlot]),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+          find.textContaining('0 / 2 ejercicios · 0 kg vol.'), findsOneWidget);
+    });
+
+    testWidgets(
+        '#1701: si una sesión sin slots por reps ya tiene volumen, se muestra',
+        (tester) async {
+      // No debería pasar —las series por tiempo/distancia guardan 0×0—, pero
+      // esconder un número real sería peor que mostrar un 0.
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(stateOf(
+            const [distanceSlot],
+            setLogs: [makeSetLog(exerciseId: 'sled', reps: 10, weightKg: 60.0)],
+          )),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('600 kg vol.'), findsOneWidget);
     });
   });
 

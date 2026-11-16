@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../../l10n/app_l10n.dart';
 import '../auth/application/auth_providers.dart';
 import '../coach/application/limite_de_alumnos_provider.dart';
 import '../coach/application/trainer_discovery_providers.dart';
@@ -29,8 +30,8 @@ import 'package:treino/core/widgets/treino_toast.dart';
 ///
 /// Layout: TU CUENTA / YO header → identity card (avatar + name + ALUMNOS /
 /// RATING) → PERFIL PÚBLICO card with visibility badge and VER PREVIEW /
-/// EDITAR CTAs → menu list (Solicitudes / Disponibilidad / Planes / Configu-
-/// ración / Cerrar sesión).
+/// EDITAR CTAs → menu list (Solicitudes / Datos personales / Disponibilidad /
+/// Planes / Configuración / Cerrar sesión).
 ///
 /// Wired sections:
 ///   - Avatar + display name (userProfileProvider)
@@ -44,7 +45,9 @@ import 'package:treino/core/widgets/treino_toast.dart';
 ///   - Public profile visibility, location summary, online flag (trainerById)
 ///   - VER PREVIEW → /profile/trainer-preview/:uid (gemela de
 ///     /coach/trainer/:uid: PERFIL sigue resaltado — #1498)
-///   - EDITAR → /profile/edit-personal (shared form; full trainer fields TBD)
+///   - EDITAR → /profile/edit-trainer (perfil PÚBLICO: bio, tarifa, lugares)
+///   - Datos personales → /profile/edit-personal (nombre y avatar; el mismo
+///     form que el atleta, #1738)
 ///   - Disponibilidad → /profile/availability-editor (mirror of the /coach
 ///     route so the PERFIL tab stays highlighted — issue #387)
 ///   - Configuración por defecto → /profile/settings
@@ -166,6 +169,20 @@ class TrainerProfileView extends ConsumerWidget {
           // INICIO). `push` y no `go`: esa pantalla vuelve con `context.pop()`,
           // y con `go` no quedaría nada a donde volver.
           onTap: () => context.push(_solicitudesPath),
+          palette: palette,
+        ),
+        const SizedBox(height: 10),
+        // Datos personales — la MISMA pantalla y la MISMA etiqueta que la fila
+        // de CUENTA del atleta (`ProfileCuentaSection`), que el PF nunca ve
+        // porque `ProfileScreen` reparte por rol. Es el único lugar desde el
+        // que se cambian el nombre y el avatar (#1738): el EDITAR de arriba
+        // abre el perfil PÚBLICO, que no los trae, y su aviso manda justo acá.
+        // Cambiarlos espeja a `trainerPublicProfiles` (`UserRepository.update`,
+        // #1336 / #1706).
+        _MenuRow(
+          icon: TreinoIcon.edit,
+          label: AppL10n.of(context).profileCuentaDatosPersonalesTitle,
+          onTap: () => context.push('/profile/edit-personal'),
           palette: palette,
         ),
         const SizedBox(height: 10),
@@ -561,9 +578,9 @@ class _PerfilPublicoCard extends StatelessWidget {
                   // Edit the trainer's PUBLIC profile (bio, specialty,
                   // multi-location, monthly price, online toggle). Wires the
                   // new ProfileEditTrainerScreen merged from main PR #102.
-                  // The basic name/avatar form remains at /profile/edit-
-                  // personal — accessible to the trainer if they go through
-                  // the athlete-shared cuenta section, not from this CTA.
+                  // The basic name/avatar form lives at /profile/edit-personal,
+                  // reached from the «Datos personales» row of the menu below
+                  // — not from this CTA (#1738).
                   onPressed: () => context.push('/profile/edit-trainer'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,

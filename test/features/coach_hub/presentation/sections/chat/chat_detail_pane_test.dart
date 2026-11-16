@@ -207,9 +207,11 @@ void main() {
 
     testWidgets(
       'shows "Usuario eliminado" while chatsForCurrentUserProvider is still '
-      'loading (documented original behavior, preserved for the '
-      'peer-unknown path: otherUid stays null → pubAsync is `data(null)`, '
-      'NOT `loading` → falls into the data branch with p == null)',
+      'loading AND the chat doc does not exist (documented original '
+      'behavior, preserved for the peer-unknown path: otherUid stays null → '
+      'pubAsync is `data(null)`, NOT `loading` → falls into the data branch '
+      'with p == null). Con el doc del chat cargando o presente el header '
+      'resuelve al peer: ver el group de #1758.',
       (tester) async {
         final chatsController = StreamController<List<Chat>>();
         addTearDown(chatsController.close);
@@ -217,6 +219,9 @@ void main() {
         final container = _buildContainer(overrides: [
           chatsForCurrentUserProvider.overrideWith(
             (ref) => chatsController.stream,
+          ),
+          chatByIdProvider(_chatId).overrideWith(
+            (ref) => Stream<Chat?>.value(null),
           ),
         ]);
         addTearDown(container.dispose);
@@ -269,6 +274,94 @@ void main() {
           ),
           userPublicProfileProvider(_athleteUid).overrideWith(
             (ref) => Stream<UserPublicProfile?>.value(null),
+          ),
+        ]);
+        addTearDown(container.dispose);
+
+        await _pumpPane(
+          tester,
+          container,
+          const ChatDetailPane(chatId: _chatId),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Usuario eliminado'), findsOneWidget);
+      },
+    );
+  });
+
+  // #1758 — un chat recién creado desde la ficha del alumno no está en
+  // `chatsForCurrentUserProvider` (la query ordena por `lastMessageAt` y
+  // Firestore excluye los docs sin el campo). El header tiene que resolver al
+  // interlocutor leyendo el doc del chat, no caer en «Usuario eliminado».
+  group(
+      'ChatDetailPane header — chat sin mensajes, fuera de '
+      'chatsForCurrentUserProvider', () {
+    testWidgets(
+      'resuelve el nombre por el doc del chat (no dice «Usuario eliminado»)',
+      (tester) async {
+        final container = _buildContainer(overrides: [
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.value(const []),
+          ),
+          chatByIdProvider(_chatId).overrideWith(
+            (ref) => Stream<Chat?>.value(_stubChat()),
+          ),
+          userPublicProfileProvider(_athleteUid).overrideWith(
+            (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+          ),
+        ]);
+        addTearDown(container.dispose);
+
+        await _pumpPane(
+          tester,
+          container,
+          const ChatDetailPane(chatId: _chatId),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Agustín'), findsOneWidget);
+        expect(find.text('Usuario eliminado'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'mientras el doc del chat carga muestra «…», no «Usuario eliminado»',
+      (tester) async {
+        final chatController = StreamController<Chat?>();
+        addTearDown(chatController.close);
+
+        final container = _buildContainer(overrides: [
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.value(const []),
+          ),
+          chatByIdProvider(_chatId)
+              .overrideWith((ref) => chatController.stream),
+        ]);
+        addTearDown(container.dispose);
+
+        await _pumpPane(
+          tester,
+          container,
+          const ChatDetailPane(chatId: _chatId),
+        );
+        await tester.pump();
+
+        expect(find.text('…'), findsOneWidget);
+        expect(find.text('Usuario eliminado'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'si el doc del chat no existe, el header sigue diciendo «Usuario '
+      'eliminado» (no inventa un nombre)',
+      (tester) async {
+        final container = _buildContainer(overrides: [
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.value(const []),
+          ),
+          chatByIdProvider(_chatId).overrideWith(
+            (ref) => Stream<Chat?>.value(null),
           ),
         ]);
         addTearDown(container.dispose);
@@ -493,5 +586,93 @@ void main() {
         expect(avatarInitialFinder, findsNothing);
       },
     );
+  });
+
+  // Chat CERRADO (#1697): el vínculo del par terminó (`Chat.closedAt`) y las
+  // rules rechazan el mensaje. El aviso reemplaza al composer; el historial
+  // queda a la vista.
+  group('ChatDetailPane — chat cerrado', () {
+    const closedCopy =
+        'El vínculo terminó. Ya no se pueden enviar mensajes en este chat.';
+    final closedChat =
+        _stubChat().copyWith(closedAt: DateTime.utc(2026, 11, 12));
+
+    Future<void> pumpWithChat(WidgetTester tester, Stream<Chat?> chat) async {
+      final container = _buildContainer(overrides: [
+        chatByIdProvider(_chatId).overrideWith((ref) => chat),
+        messagesProvider(_chatId).overrideWith(
+          (ref) => Stream<List<Message>>.value([
+            Message(
+              id: 'm1',
+              senderId: _athleteUid,
+              text: 'mensaje previo',
+              createdAt: DateTime(2026, 7, 1),
+            ),
+          ]),
+        ),
+        userPublicProfileProvider(_athleteUid).overrideWith(
+          (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+        ),
+      ]);
+      addTearDown(container.dispose);
+      await _pumpPane(
+        tester,
+        container,
+        const ChatDetailPane(chatId: _chatId, peerUid: _athleteUid),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    final composerKeys = [
+      const Key('chat_composer_field'),
+      const Key('chat_send_button'),
+      const Key('chat_composer_attach_button'),
+    ];
+
+    testWidgets(
+        'cerrado → aviso SIN campo, enviar ni adjuntar; historial a la '
+        'vista', (tester) async {
+      await pumpWithChat(tester, Stream.value(closedChat));
+
+      expect(find.byKey(const Key('chat_closed_notice')), findsOneWidget);
+      expect(find.text(closedCopy), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+      for (final key in composerKeys) {
+        expect(find.byKey(key), findsNothing);
+      }
+      expect(find.text('mensaje previo'), findsOneWidget);
+    });
+
+    testWidgets('abierto → composer completo y sin aviso', (tester) async {
+      await pumpWithChat(tester, Stream.value(_stubChat()));
+
+      expect(find.byKey(const Key('chat_closed_notice')), findsNothing);
+      expect(find.text(closedCopy), findsNothing);
+      for (final key in composerKeys) {
+        expect(find.byKey(key), findsOneWidget);
+      }
+    });
+
+    testWidgets(
+        'sin doc todavía → abierto; llega closedAt → cierra; se borra '
+        '(re-vínculo) → reabre', (tester) async {
+      final chat = StreamController<Chat?>();
+      // Sin await: si nadie escucha, `close()` nunca completa y el tearDown
+      // colgaba el test 10 minutos en vez de fallar la aserción.
+      addTearDown(() => unawaited(chat.close()));
+      await pumpWithChat(tester, chat.stream);
+      expect(find.byKey(const Key('chat_closed_notice')), findsNothing);
+      expect(find.byKey(const Key('chat_composer_field')), findsOneWidget);
+
+      chat.add(closedChat);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat_closed_notice')), findsOneWidget);
+      expect(find.byKey(const Key('chat_composer_field')), findsNothing);
+
+      chat.add(_stubChat());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat_closed_notice')), findsNothing);
+      expect(find.byKey(const Key('chat_composer_field')), findsOneWidget);
+    });
   });
 }

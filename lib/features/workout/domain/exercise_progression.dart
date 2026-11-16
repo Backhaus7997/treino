@@ -7,7 +7,8 @@ part 'exercise_progression.freezed.dart';
 /// A single time-series data point for progression charts.
 /// [date] is set from [Session.startedAt] — rendered as-is, no toLocal().
 /// [value] is the metric value (kg for Heaviest Weight / 1RM,
-/// kg·reps for Best Set Volume / Best Session Volume).
+/// kg·reps for Best Set Volume / Best Session Volume, seconds for Longest
+/// Duration, meters for Longest Distance).
 @freezed
 class ProgressionPoint with _$ProgressionPoint {
   const factory ProgressionPoint({
@@ -16,8 +17,8 @@ class ProgressionPoint with _$ProgressionPoint {
   }) = _ProgressionPoint;
 }
 
-/// [AD3] Identifies which of the 4 client-computed metrics a
-/// [PersonalRecord] belongs to.
+/// [AD3] Identifies which of the client-computed metrics a [PersonalRecord]
+/// belongs to.
 enum ProgressionRecordType {
   /// Heaviest single-set weight lifted (was mislabeled "PR").
   heaviestWeight,
@@ -30,6 +31,13 @@ enum ProgressionRecordType {
 
   /// Σ(reps × weightKg) across all sets of a session (was `volumeSeries`).
   bestSessionVolume,
+
+  /// #1715: la serie por TIEMPO más larga (segundos) — «plancha 90 s». Es lo
+  /// que el atleta completó: la serie se guarda al terminar la cuenta regresiva.
+  longestDuration,
+
+  /// #1715: la serie por DISTANCIA más larga (metros) — «farmer's carry 60 m».
+  longestDistance,
 }
 
 /// [AD3] The first-achieved date + value for a given [ProgressionRecordType],
@@ -60,6 +68,10 @@ class PersonalRecord with _$PersonalRecord {
 /// - [bestSessionVolumeSeries]: Σ(reps×weightKg) per session (renamed from
 ///   the old `volumeSeries` — same semantics, new name for clarity now that
 ///   Best Set Volume also exists).
+/// - [bestDurationSeries] / [bestDistanceSeries] (#1715): the longest timed
+///   set (seconds) / the longest distance set (meters) per session. Empty for
+///   reps/weight exercises, and the 4 series above are empty for a timed or
+///   distance exercise (its sets carry no weight).
 ///
 /// [personalRecords] is the first-achieved-date list derived by
 /// [derivePersonalRecords], one entry per record type that has data.
@@ -78,6 +90,8 @@ class ExerciseProgression with _$ExerciseProgression {
     required List<ProgressionPoint> bestSessionVolumeSeries,
     required List<PersonalRecord> personalRecords,
     required int frequencySessionCount,
+    @Default(<ProgressionPoint>[]) List<ProgressionPoint> bestDurationSeries,
+    @Default(<ProgressionPoint>[]) List<ProgressionPoint> bestDistanceSeries,
   }) = _ExerciseProgression;
 
   factory ExerciseProgression.empty({
@@ -107,7 +121,8 @@ class ExerciseListEntry with _$ExerciseListEntry {
 
     /// [#377] Periods whose CURRENT window holds at least one chartable set
     /// for this exercise — same predicate the aggregator uses to build the
-    /// series (countsAsWorkout session, weightKg > 0). The section widget
+    /// series (countsAsWorkout session, `isChartableSet`: weightKg > 0, or a
+    /// timed / distance set #1715). The section widget
     /// bounds the default preselection to the active period with this, so
     /// the screen never opens on the chart's empty state by itself.
     @Default(<ChartPeriod>{}) Set<ChartPeriod> periodsWithData,

@@ -11,6 +11,7 @@ import '../data/session_share_repository.dart';
 import '../data/trainer_link_promotion_service.dart';
 import '../data/trainer_link_repository.dart';
 import '../domain/trainer_link.dart';
+import '../domain/trainer_link_priority.dart';
 import '../domain/trainer_link_status.dart';
 
 final trainerLinkRepositoryProvider = Provider<TrainerLinkRepository>(
@@ -126,7 +127,11 @@ final currentAthleteLinkProvider =
 /// [currentAthleteLinkProvider].
 ///
 /// Si hubiera varios no-terminados (no debería — un atleta se vincula con UN PF
-/// a la vez), devuelve el más reciente (requestedAt DESC).
+/// a la vez, pero dos dispositivos pueden crear 2 solicitudes `pending` al mismo
+/// PF), devuelve el de mayor PRIORIDAD: `active` > `paused` > `pending`, y a
+/// igual estado el más reciente ([vinculoPrioritario]). Con `links.first` a
+/// secas ganaba el más NUEVO, y aceptar la solicitud vieja dejaba a la tab Coach
+/// mostrando «SOLICITUD ENVIADA» arriba de un vínculo activo (#1735).
 ///
 /// Stream por el mismo motivo que [currentAthleteLinkProvider]: éste es el que
 /// consume la vista que DIBUJA los botones de agenda/nutrición/archivos, así
@@ -144,7 +149,34 @@ final currentAthleteLinkAnyStatusProvider =
       TrainerLinkStatus.active,
       TrainerLinkStatus.paused,
     },
-  ).map((links) => links.isEmpty ? null : links.first);
+  ).map(vinculoPrioritario);
+});
+
+/// Vínculo VIVO del atleta actual con su PF — `active` o `paused`
+/// ([kEstadosDeVinculoVivo]) — o null si no tiene ninguno.
+///
+/// Es lo que necesita lo que el alumno conserva mientras el PF tiene el vínculo
+/// en pausa (#1842): el plan nutricional, la agenda, la cuota y el chat. Pausar
+/// es un hold, no un corte, y las reglas leen esos datos por `athleteId` sin
+/// mirar el vínculo. Con [currentAthleteLinkProvider] (sólo `active`) esas
+/// pantallas le decían «no encontramos un vínculo activo» a un alumno cuyo PF
+/// sigue siendo su PF.
+///
+/// Se DERIVA de [currentAthleteLinkAnyStatusProvider] en vez de abrir otra
+/// query: una sola suscripción por alumno, y un `pending` suelto no cuenta
+/// (nunca se aceptó). Conserva el estado de carga y de error del original: un
+/// `AsyncLoading` sigue siendo «todavía no sé», nunca «no tenés vínculo».
+///
+/// NO reemplaza a [currentAthleteLinkProvider]: el entitlement del paywall, las
+/// reseñas y el player piden `active` a propósito (un `paused` no otorga el
+/// derecho que daba el PF).
+final currentAthleteLinkVivoProvider =
+    Provider.autoDispose<AsyncValue<TrainerLink?>>((ref) {
+  return ref.watch(currentAthleteLinkAnyStatusProvider).whenData(
+        (link) => link != null && kEstadosDeVinculoVivo.contains(link.status)
+            ? link
+            : null,
+      );
 });
 
 /// Ventana en la que el stream de vínculos SOBREVIVE a que lo suelten.
@@ -180,6 +212,46 @@ final trainerLinksStreamProvider =
   final timer = Timer(_kVentanaDeGracia, link.close);
   ref.onDispose(timer.cancel);
   return ref.read(trainerLinkRepositoryProvider).watchForTrainer(uid);
+});
+
+/// ¿El PF actual tiene un vínculo VIVO con [athleteId]? — el gate de toda
+/// superficie que ofrece ASIGNARLE o CREARLE una rutina (#1695).
+///
+/// Las rules sólo validan el ROL de quien escribe, no el vínculo (`trainer_links`
+/// tiene ids autogenerados y una regla no puede buscarlo). Sin este gate la UI
+/// convertía ese residuo en un flujo: un ex-alumno recibía la rutina como «DE TU
+/// COACH · ACTIVA» y no podía borrarla.
+///
+/// Vivo = [kEstadosDeVinculoVivo]: `active` Y `paused` (pausar es un hold, el
+/// alumno sigue siendo tuyo). `pending`, `terminated` y la ausencia de vínculo
+/// bloquean.
+///
+/// Devuelve un [AsyncValue] y NO un `bool` a propósito. «Todavía no sé» no es
+/// «no tiene vínculo»: `currentUidProvider` sale de un stream y arranca en
+/// null, y el roster arranca en loading. Contestar `false` ahí le mostraría
+/// «este alumno ya no es tuyo» a un PF con el vínculo vivo — el mismo fallo de
+/// `assignedRoutinesByTrainerProvider`. Quien lo consume decide qué dibujar
+/// mientras no hay respuesta; ninguno debería ofrecer la acción.
+///
+/// Si el stream ya tuvo datos y después falla, se conserva el último valor: un
+/// error transitorio no tiene que apagar la acción en medio de una edición.
+final alumnoConVinculoVivoProvider =
+    Provider.autoDispose.family<AsyncValue<bool>, String>((ref, athleteId) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null || uid.isEmpty) return const AsyncLoading();
+  final links = ref.watch(trainerLinksStreamProvider);
+  final data = links.valueOrNull;
+  if (data == null) {
+    return links.hasError
+        ? AsyncError(links.error!, links.stackTrace ?? StackTrace.empty)
+        : const AsyncLoading();
+  }
+  return AsyncData(
+    data.any(
+      (l) =>
+          l.athleteId == athleteId && kEstadosDeVinculoVivo.contains(l.status),
+    ),
+  );
 });
 
 /// Privacy-grant repository — wraps the `session_shares/{athleteId}` doc.

@@ -119,6 +119,40 @@ class _AthleteProfile extends ConsumerWidget {
                     onTap: () => context.push('/profile/my-exercises'),
                   ),
                 ),
+                // #1719: Perfil es donde el alumno busca «mis stats» y «mis
+                // medidas», y hasta acá sólo se llegaba desde la card «Esta
+                // semana» de Inicio. Va en ENTRENAMIENTO y no en un grupo nuevo:
+                // Medidas es corporal más que de entrenamiento, pero Insights
+                // la enlaza y un grupo de una fila por cada una era más ruido
+                // que ayuda. Los dos son fullscreen (`/home/insights`, sin
+                // barra de navegación) y se vuelve con la flecha. Sólo alumno:
+                // el PF no entrena en la app y su Inicio no tiene Insights.
+                Semantics(
+                  button: true,
+                  label: l10n.profileInsightsTileTitle,
+                  excludeSemantics: true,
+                  child: ProfileSectionTile(
+                    icon: TreinoIcon.chartBar,
+                    title: l10n.profileInsightsTileTitle,
+                    subtitle: l10n.profileInsightsTileSubtitle,
+                    inGroup: true,
+                    onTap: () => context.push('/home/insights'),
+                  ),
+                ),
+                // Medidas se abre directo: entrar a registrar una medición sin
+                // pasar por Insights es el caso de la cuenta nueva.
+                Semantics(
+                  button: true,
+                  label: l10n.insightsTileMeasurementsTitle,
+                  excludeSemantics: true,
+                  child: ProfileSectionTile(
+                    icon: TreinoIcon.ruler,
+                    title: l10n.insightsTileMeasurementsTitle,
+                    subtitle: l10n.insightsTileMeasurementsSubtitle,
+                    inGroup: true,
+                    onTap: () => context.push('/home/insights/measurements'),
+                  ),
+                ),
                 // Rankings entry point REMOVED (rankings-v2 Phase 3, task 3.2)
                 // — rankings relocated to the second page of the athlete
                 // Entrenar tab (design `sdd/rankings-v2/design` AD-1/AD-3).

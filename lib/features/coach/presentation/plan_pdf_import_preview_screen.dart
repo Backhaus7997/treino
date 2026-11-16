@@ -310,6 +310,8 @@ class _PlanPdfImportPreviewScreenState
       case PlanAssignBlockedUnresolved(:final pendingSuggestions):
         _error = l10n.pdfImportPending(
             _controller.draft?.unresolved.length ?? pendingSuggestions);
+      case PlanAssignSinVinculo():
+        _error = l10n.coachAssignNoLink;
       case PlanAssignNoAthletes() ||
             PlanAssignAllFailed() ||
             PlanAssignPartial():

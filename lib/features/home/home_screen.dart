@@ -27,12 +27,14 @@ import '../workout/application/session_duration.dart';
 import '../workout/application/session_providers.dart';
 import '../workout/application/weekly_streak_providers.dart';
 import '../workout/application/user_routines_providers.dart';
+import '../workout/domain/routine.dart';
 import '../workout/domain/session.dart';
 import '../watch/application/watch_credential_providers.dart'
     show watchNudgeServiceProvider;
 import '../watch/data/watch_nudge_service.dart';
 import '../workout/domain/set_log.dart';
 import '../workout/presentation/widgets/resume_session_modal.dart';
+import 'application/followed_template_provider.dart';
 import 'widgets/daily_check_in_card.dart';
 import 'widgets/empezar_entrenamiento_card.dart';
 import 'widgets/esta_semana_card.dart';
@@ -158,11 +160,21 @@ class _AthleteHome extends ConsumerWidget {
     // their trainer-assigned plans have resolved to empty. While either is
     // loading or errors, fall back to the existing card (no spinner flash,
     // and we never hide a real workout behind a transient empty read).
+    //
+    // Una plantilla del catálogo que el atleta SIGUE sin copiarla también es
+    // una rutina: no crea ningún doc suyo, así que las dos listas vienen
+    // vacías y sin esta tercera condición Home le daba la bienvenida de «no
+    // tenés rutina» a quien ya la estaba siguiendo (#1698). Se mira DESPUÉS de
+    // las otras dos y sólo si ambas resolvieron vacías: el `&&` corta antes, y
+    // quien tiene rutina propia o plan de un PF no paga la lectura del
+    // catálogo. Como las otras, sólo cuenta cuando CONFIRMÓ que no sigue
+    // ninguna — `_isEmptyData` no aplica porque acá el dato es un `Routine?`.
     final uid = ref.watch(currentUidProvider) ?? '';
     final hasNoRoutine = uid.isEmpty
         ? false
         : _isEmptyData(ref.watch(userCreatedRoutinesProvider(uid))) &&
-            _isEmptyData(ref.watch(assignedRoutinesProvider(uid)));
+            _isEmptyData(ref.watch(assignedRoutinesProvider(uid))) &&
+            _confirmedNoFollowedTemplate(ref.watch(followedTemplateProvider));
 
     // El tercer camino ("Buscar entrenador") sólo se ofrece cuando el servidor
     // CONFIRMÓ que el atleta no tiene PF activo — mismo criterio que
@@ -250,6 +262,18 @@ class _AthleteHome extends ConsumerWidget {
 /// instead of a premature first-run empty state (finding 5).
 bool _isEmptyData(AsyncValue<List<Object?>> async) =>
     async.valueOrNull?.isEmpty ?? false;
+
+/// True only when [async] confirmed the athlete follows NO catalog template.
+/// Loading and error return false, same reason as [_isEmptyData]. `hasValue`
+/// y no `valueOrNull == null`: un `null` de dato es justamente la respuesta
+/// «no sigue ninguna», y es indistinguible del «todavía no sé» si se mira sólo
+/// el valor. Y `hasError` primero, porque Riverpod retiene el último valor al
+/// entrar en error (mismo cuidado que `_estadoDelVinculo`).
+bool _confirmedNoFollowedTemplate(AsyncValue<Routine?> async) =>
+    !async.isLoading &&
+    !async.hasError &&
+    async.hasValue &&
+    async.value == null;
 
 /// Lo que la card de primer arranque sabe sobre el vínculo del atleta con un
 /// PF. Son TRES estados y no dos, y la diferencia no es teórica.
@@ -530,9 +554,7 @@ void _maybeShowResumePrompt(
               if (next.isLoading) return;
               final vigente = next.valueOrNull?.session.id;
               if (vigente == session.id) return;
-              if (dialogCtx.mounted) {
-                Navigator.of(dialogCtx, rootNavigator: true).pop();
-              }
+              _cerrarDialogo(dialogCtx);
             },
           );
           return _resumeModal(context, ref, dialogCtx, session, record);
@@ -540,6 +562,24 @@ void _maybeShowResumePrompt(
       ),
     );
   });
+}
+
+/// Cierra el diálogo de «Entrenamiento en curso» una sola vez.
+///
+/// ⚠️ Lo cierran dos caminos que se pisan: el `listen` de arriba, cuando la
+/// sesión deja de estar activa, y los botones del modal. DESCARTAR dispara los
+/// dos: `finish()` hace re-emitir el provider, el `listen` cierra, y después el
+/// botón vuelve a cerrar.
+///
+/// `dialogCtx.mounted` no alcanza como guard: el diálogo sigue montado durante
+/// su transición de salida. Y `pop()` saca la ruta de arriba, no "este
+/// diálogo", así que el segundo `pop` se llevaba la página de abajo y dejaba la
+/// pantalla vacía (#1693). `isCurrent` pasa a false en cuanto se pide el `pop`.
+void _cerrarDialogo(BuildContext dialogCtx) {
+  if (!dialogCtx.mounted) return;
+  final route = ModalRoute.of(dialogCtx);
+  if (route == null || !route.isCurrent) return;
+  Navigator.of(dialogCtx, rootNavigator: true).pop();
 }
 
 /// El modal en sí, extraído para que el `Consumer` de arriba quede legible.
@@ -553,7 +593,7 @@ Widget _resumeModal(
   return ResumeSessionModal(
     session: session,
     onContinue: () {
-      Navigator.of(dialogCtx, rootNavigator: true).pop();
+      _cerrarDialogo(dialogCtx);
       context.push('/workout/session/resume/${session.id}');
     },
     onDiscard: () async {
@@ -566,9 +606,9 @@ Widget _resumeModal(
             (_) => null,
           );
       if (vigente == null || vigente.id != session.id) {
-        if (dialogCtx.mounted) {
-          Navigator.of(dialogCtx, rootNavigator: true).pop();
-        }
+        // `_cerrarDialogo` chequea `mounted` y `isCurrent` ella misma.
+        // ignore: use_build_context_synchronously
+        _cerrarDialogo(dialogCtx);
         return;
       }
       // QA-WKT-011: clamp the discarded session's duration with the same
@@ -598,9 +638,9 @@ Widget _resumeModal(
         // QA-WKT-011: the write can throw or (offline) stall indefinitely.
         // Don't leave the barrierDismissible:false dialog stuck with an
         // unhandled exception — close it and surface a retryable error.
-        if (dialogCtx.mounted) {
-          Navigator.of(dialogCtx, rootNavigator: true).pop();
-        }
+        // `_cerrarDialogo` chequea `mounted` y `isCurrent` ella misma.
+        // ignore: use_build_context_synchronously
+        _cerrarDialogo(dialogCtx);
         if (context.mounted) {
           showTreinoToast(
             context,
@@ -614,9 +654,7 @@ Widget _resumeModal(
       // (user navigated away). Invalidating through a torn-down ref throws,
       // so guard on the host context before touching ref again.
       if (!context.mounted) return;
-      if (dialogCtx.mounted) {
-        Navigator.of(dialogCtx, rootNavigator: true).pop();
-      }
+      _cerrarDialogo(dialogCtx);
       ref.invalidate(activeSessionForUidProvider);
       // El reloj no tiene listeners: sin este aviso descartar acá cerraba
       // la sesión en Firestore y en el teléfono, pero la muñeca se quedaba

@@ -9,6 +9,7 @@ Appointment _appt({
   required DateTime startsAt,
   required int durationMin,
   AppointmentStatus status = AppointmentStatus.confirmed,
+  AppointmentAttendance? attendance,
 }) {
   return Appointment(
     id: 't_${startsAt.millisecondsSinceEpoch}',
@@ -18,6 +19,7 @@ Appointment _appt({
     startsAt: startsAt,
     durationMin: durationMin,
     status: status,
+    attendance: attendance,
   );
 }
 
@@ -86,6 +88,107 @@ void main() {
       );
       final counts = dashboardDayCounts([earlyToday, yesterday], now);
       expect(counts.cancelled, 1); // only the 01:00 Jun 16 session is "today"
+    });
+  });
+
+  // #1737: «ausente» (#1492) es un `attendance` sobre un turno `confirmed`, no
+  // un status, y el conteo lo leía como COMPLETADO.
+  group('dashboard_day_counts — AUSENTE (#1737)', () {
+    final now = DateTime.utc(2026, 6, 16, 12, 0); // 12:00 ART
+
+    test('un turno terminado y marcado ausente NO cuenta como completado', () {
+      final absent = _appt(
+        startsAt: DateTime.utc(2026, 6, 16, 9, 0), // terminó 10:00 < 12:00
+        durationMin: 60,
+        attendance: AppointmentAttendance.absent,
+      );
+      final given = _appt(
+        startsAt: DateTime.utc(2026, 6, 16, 10, 0), // terminó 11:00 < 12:00
+        durationMin: 60,
+      );
+
+      final counts = dashboardDayCounts([absent, given], now);
+
+      expect(counts.done, 1, reason: 'sólo el que se dio');
+      expect(counts.absent, 1);
+      expect(counts.pending, 0);
+      expect(counts.cancelled, 0);
+    });
+
+    test('un turno EN CURSO marcado ausente tampoco queda pendiente', () {
+      // El PF puede marcarlo apenas empieza la sesión (#1492): ya no hay nada
+      // por hacer con ella.
+      final inProgress = _appt(
+        startsAt: DateTime.utc(2026, 6, 16, 11, 30), // 11:30–12:30, sigue
+        durationMin: 60,
+        attendance: AppointmentAttendance.absent,
+      );
+
+      final counts = dashboardDayCounts([inProgress], now);
+
+      expect(counts.absent, 1);
+      expect(counts.pending, 0);
+      expect(counts.done, 0);
+    });
+
+    test('el día cierra: pendiente + completado + ausente + cancelado = turnos',
+        () {
+      final appts = [
+        _appt(startsAt: DateTime.utc(2026, 6, 16, 8, 0), durationMin: 60),
+        _appt(
+          startsAt: DateTime.utc(2026, 6, 16, 9, 0),
+          durationMin: 60,
+          attendance: AppointmentAttendance.absent,
+        ),
+        _appt(
+          startsAt: DateTime.utc(2026, 6, 16, 10, 0),
+          durationMin: 60,
+          status: AppointmentStatus.cancelled,
+        ),
+        _appt(startsAt: DateTime.utc(2026, 6, 16, 18, 0), durationMin: 60),
+      ];
+
+      final counts = dashboardDayCounts(appts, now);
+
+      expect(counts.done, 1);
+      expect(counts.absent, 1);
+      expect(counts.cancelled, 1);
+      expect(counts.pending, 1);
+      expect(
+        counts.done + counts.absent + counts.cancelled + counts.pending,
+        appts.length,
+      );
+    });
+
+    test(
+        'un turno cancelado nunca cuenta como ausente, aunque arrastre '
+        'attendance', () {
+      final cancelled = _appt(
+        startsAt: DateTime.utc(2026, 6, 16, 9, 0),
+        durationMin: 60,
+        status: AppointmentStatus.cancelled,
+        attendance: AppointmentAttendance.absent,
+      );
+
+      final counts = dashboardDayCounts([cancelled], now);
+
+      expect(counts.cancelled, 1);
+      expect(counts.absent, 0);
+    });
+
+    test('un ausente de AYER no entra al resumen de hoy', () {
+      final yesterday = _appt(
+        startsAt: DateTime.utc(2026, 6, 15, 9, 0),
+        durationMin: 60,
+        attendance: AppointmentAttendance.absent,
+      );
+
+      expect(dashboardDayCounts([yesterday], now).absent, 0);
+    });
+
+    test('`absent` es opcional en el constructor (default 0)', () {
+      const counts = DashboardDayCounts(pending: 1, done: 2, cancelled: 3);
+      expect(counts.absent, 0);
     });
   });
 }

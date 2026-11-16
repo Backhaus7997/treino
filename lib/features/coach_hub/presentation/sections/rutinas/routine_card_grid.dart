@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/tokens.dart';
 import '../../../../../l10n/app_l10n.dart';
+import '../../../../coach/application/trainer_link_providers.dart'
+    show trainerLinkRepositoryProvider;
 import '../../../../coach/presentation/template_limit_gate.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../workout/domain/routine.dart';
@@ -596,7 +598,17 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
       case ResultadoDeRestaurar.topeDePlantillas:
         // El contador local se adelantó o hubo una carrera: el mismo aviso
         // que el embudo, no el mensaje genérico de abajo.
-        await mostrarAvisoTopeDePlantillasPorRebote(context, ref);
+        //
+        // Pero ese aviso necesita un tope concreto en mano: sin él devuelve
+        // `false` y no muestra NADA. Ignorar el `false` dejaba al PF con el
+        // spinner apagado y ninguna explicación (#1784): cae al toast.
+        if (!await mostrarAvisoTopeDePlantillasPorRebote(context, ref)) {
+          if (!mounted) return;
+          _avisar(
+              'No se pudo recuperar la plantilla. Es probable que hayas '
+              'llegado al tope de plantillas de tu plan.', // i18n
+              type: TreinoToastType.error);
+        }
       case ResultadoDeRestaurar.falloAlRestaurar:
         _avisar('No se pudo. Probá de nuevo.',
             type: TreinoToastType.error); // i18n
@@ -645,7 +657,16 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
     // El tope de plantillas se maneja aparte: es el único caso que muestra el
     // aviso del embudo (con VER PLANES) y no un snackbar de texto.
     if (resultado == ResultadoDePublicar.topeDePlantillas) {
-      await mostrarAvisoTopeDePlantillasPorRebote(context, ref);
+      // Ese aviso necesita un tope concreto en mano: si la cuota local no lo
+      // resolvió devuelve `false` y no muestra nada, y el PF se quedaba sin
+      // saber por qué no pasó nada (#1784). Cae al toast de error.
+      if (!await mostrarAvisoTopeDePlantillasPorRebote(context, ref)) {
+        if (!mounted) return;
+        _avisar(
+            'No se pudo crear la plantilla. Es probable que hayas llegado al '
+            'tope de plantillas de tu plan.', // i18n
+            type: TreinoToastType.error);
+      }
       return;
     }
     final (mensaje, tipo) = switch (resultado) {
@@ -691,18 +712,37 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
   /// que antes, y sin decirlo el PF creería que no pasó nada y volvería a
   /// apretar.
   Future<void> _asignar(Routine r) async {
+    // El diálogo lista a quien tiene vínculo vivo (activo o pausado), y abajo se
+    // re-confirma contra el servidor antes de escribir (#1695).
     final athleteId = await pickAthlete(context, ref);
     if (athleteId == null || !mounted) return;
 
     setState(() => _ocupado = true);
     final trainerId = ref.read(currentUidProvider) ?? '';
-    final ok = trainerId.isEmpty
-        ? false
-        : await ref.read(routineActionsProvider.notifier).assignTemplate(
-              template: r,
-              athleteId: athleteId,
-              trainerId: trainerId,
-            );
+    // El diálogo pudo quedar abierto mientras el alumno cortaba el vínculo, y
+    // las rules no lo frenan (validan el rol, no el vínculo). Va ANTES de
+    // `assignTemplate`: si fallara adentro, el aviso diría «probá de nuevo» y
+    // reintentar no lo arregla.
+    final vigente = await _vinculoVivoCon(trainerId, athleteId);
+    if (!mounted) return;
+    if (vigente != true) {
+      setState(() => _ocupado = false);
+      _avisar(
+          vigente == false
+              // i18n
+              ? 'No se asignó nada: ese alumno ya no tiene un vínculo vigente '
+                  'con vos.'
+              : 'No pudimos verificar tu vínculo con ese alumno. Probá de '
+                  'nuevo.', // i18n
+          type: TreinoToastType.error);
+      return;
+    }
+
+    final ok = await ref.read(routineActionsProvider.notifier).assignTemplate(
+          template: r,
+          athleteId: athleteId,
+          trainerId: trainerId,
+        );
 
     if (!mounted) return;
     setState(() => _ocupado = false);
@@ -713,6 +753,20 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
                 'volver a usarla.'
             : 'No se pudo asignar. Probá de nuevo.', // i18n
         type: ok ? TreinoToastType.success : TreinoToastType.error);
+  }
+
+  /// `true`/`false` si el servidor contestó; `null` si no se pudo preguntar
+  /// (sin uid, sin red). «No pude confirmarlo» no es «no tiene vínculo», y el
+  /// aviso al PF tiene que distinguirlos.
+  Future<bool?> _vinculoVivoCon(String trainerId, String athleteId) async {
+    if (trainerId.isEmpty) return null;
+    try {
+      return await ref
+          .read(trainerLinkRepositoryProvider)
+          .tieneVinculoVivo(trainerId: trainerId, athleteId: athleteId);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Publica o despublica la plantilla en la comunidad.

@@ -179,6 +179,38 @@ const _durationRoutine = Routine(
   visibility: RoutineVisibility.private,
 );
 
+/// Slot por distancia (remo, trineo, una carrera): el campo es de METROS.
+const _distanceRoutine = Routine(
+  id: 'r-dist',
+  name: 'Rutina Distancia',
+  split: 'PPL',
+  level: ExperienceLevel.beginner,
+  days: [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día 1',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'rowing',
+          exerciseName: 'Remo',
+          muscleGroup: 'back',
+          targetSets: 1,
+          targetRepsMin: 0,
+          targetRepsMax: 0,
+          restSeconds: 60,
+          exerciseMode: ExerciseMode.distance,
+          repMode: RepMode.single,
+          sets: [
+            SetSpec(type: SetType.normal, distanceMeters: 99999),
+          ],
+        ),
+      ],
+    ),
+  ],
+  source: RoutineSource.userCreated,
+  visibility: RoutineVisibility.private,
+);
+
 // ── Widget harness ────────────────────────────────────────────────────────────
 
 List<Override> _overrides(RoutineRepository repo, String uid) => [
@@ -484,6 +516,73 @@ void main() {
       await _tapVisible(tester, find.byType(TextField).last);
 
       expect(_anyStepper, findsNothing);
+    });
+  });
+
+  // ── Widget: distancia (#1846) ──────────────────────────────────────────────
+  //
+  // El campo de metros reusaba el tope del peso (`kMaxWeightKg` = 500), así que
+  // el teléfono no dejaba prescribir una salida de 2 km mientras la web
+  // aceptaba hasta `kMaxDistanceMeters`. Estos tests miran el editor REAL.
+
+  group('distancia: el tope es el de la web, no el del peso', () {
+    Finder distanciaField() => find.descendant(
+          of: find.byKey(const Key('distance_meters_field_0')),
+          matching: find.byType(TextField),
+        );
+
+    Future<void> abrir(WidgetTester tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r-dist'))
+          .thenAnswer((_) async => _distanceRoutine);
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'r-dist'),
+        repo: repo,
+      );
+    }
+
+    String texto(WidgetTester tester) =>
+        tester.widget<TextField>(distanciaField()).controller!.text;
+
+    testWidgets('tipear más de 500 m entra, hasta 100000', (tester) async {
+      await abrir(tester);
+
+      await tester.enterText(distanciaField(), '2000');
+      await tester.pump();
+      expect(texto(tester), '2000');
+
+      await tester.enterText(distanciaField(), '100000');
+      await tester.pump();
+      expect(texto(tester), '100000');
+    });
+
+    testWidgets('pasarse de 100000 m se rechaza y el aviso habla de metros',
+        (tester) async {
+      await abrir(tester);
+
+      await tester.enterText(distanciaField(), '100000');
+      await tester.pump();
+      await tester.enterText(distanciaField(), '100001');
+      await tester.pump();
+
+      expect(texto(tester), '100000');
+      expect(find.text('Máximo 100000 m'), findsOneWidget);
+      expect(find.textContaining('kg'), findsNothing,
+          reason: 'un campo de metros no puede avisar en kilos');
+    });
+
+    testWidgets('el stepper sube pasados los 500 y frena en el tope',
+        (tester) async {
+      await abrir(tester);
+      expect(texto(tester), '99999');
+
+      await _tapVisible(tester, distanciaField());
+      await _tapVisible(tester, _plus25);
+      expect(texto(tester), '100000', reason: 'antes frenaba en 500');
+
+      await _tapVisible(tester, _plus25);
+      expect(texto(tester), '100000', reason: 'el tope es de dominio');
     });
   });
 

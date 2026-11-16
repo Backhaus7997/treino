@@ -429,3 +429,26 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
     expect(callArg.notification?.body).toBe("");
   });
 });
+
+// #1697 — chat cerrado (el vínculo terminó): sin push.
+describe("#1697: un chat con closedAt no genera push", () => {
+  const [chatId, sender, recipient] = ["chat-1697", "sender-1697", "recipient-1697"];
+  afterEach(async () => {
+    await cleanup(recipient);
+    await cleanupChat(chatId);
+  });
+
+  it.each([
+    ["con closedAt: no avisa", { closedAt: Timestamp.now() }, 0],
+    ["control, sin closedAt: avisa", {}, 1],
+  ])("%s", async (_name, extra, calls) => {
+    await seedUser(recipient, ["recipient-token"]);
+    await db().collection("chats").doc(chatId).set({ members: [sender, recipient], ...extra });
+    const mock = makeMockMessaging();
+    const message = { senderId: sender, text: "¿Cómo vas?", createdAt: Timestamp.now() };
+
+    await notifyOnChatMessageHandler(testApp, chatId, message, mock);
+
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(calls);
+  });
+});

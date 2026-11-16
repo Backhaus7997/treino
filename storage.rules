@@ -219,6 +219,21 @@ service firebase.storage {
     // `match /databases/{database}/documents` header, which does not exist
     // in this rules file).
     //
+    // La SUBIDA (`write`) tiene la misma compuerta que el `get` y una más
+    // (#1721): el chat tiene que existir, quien sube tiene que estar en
+    // `members` y el chat no puede estar cerrado (`closedAt`, que escribe sólo
+    // la Cloud Function cuando el vínculo PF↔alumno termina, #1697). Antes el
+    // `write` no leía `chats/{chatId}`: cualquier cuenta autenticada podía
+    // subir a la carpeta `chatMedia/<cualquier chatId>/<su uid>/`, y un
+    // ex-miembro de un chat cerrado seguía subiendo bytes que ningún mensaje
+    // podía referenciar (`senderMayPost` en `firestore.rules` lo rechaza).
+    // Ver `chatOpenForUpload()` abajo.
+    //
+    // La LECTURA de un chat cerrado sigue abierta a los miembros: el historial
+    // no se borra al terminar el vínculo. Y el `delete` NO mira el chat, para
+    // que el cliente pueda limpiar el huérfano si el vínculo termina en medio
+    // de un envío.
+    //
     // Size limits: images < 15 MB, videos < 25 MB (free) / 50 MB (techo), y un
     // tope de BYTES TOTALES por usuario. Ver `chatMediaWriteAllowed()` abajo.
     match /chatMedia/{chatId}/{userId}/{file=**} {
@@ -321,8 +336,10 @@ service firebase.storage {
       //
       // UNA sola función y UNA sola lectura de Firestore, por el mismo motivo
       // que en `customExerciseVideos`: cada `firestore.get()` es una lectura
-      // facturada. Este bloque ya paga una en el `get` (la membresía); ésta es
-      // la del `write`, y son caminos distintos, así que no se suman.
+      // facturada. El `get` del bloque paga una (la membresía). El `write`
+      // paga DOS: la del chat (`chatOpenForUpload`, #1721) y la de
+      // `users/{uid}` de ésta. Son caminos distintos, así que las del `get` no
+      // se suman a las del `write`.
       function chatMediaWriteAllowed(userId) {
         let u = firestore.get(/databases/(default)/documents/users/$(userId));
         let d = u == null ? {} : u.data;
@@ -341,9 +358,35 @@ service firebase.storage {
                                  : 5 * 1024 * 1024 * 1024);
       }
 
-      // Only the owner can upload; content type and size are allowlisted.
+      // El chat existe, no está cerrado y quien sube es miembro (#1721).
+      //
+      // `firestore.get()` devuelve null si el doc no existe: `!= null` lo
+      // convierte en un rechazo explícito. Eso es a propósito y NO es el
+      // fail-open de `users/{uid}` de más arriba: ese afloja un TOPE, éste es
+      // una compuerta de ACCESO, y un chat sin doc no tiene miembros. Ningún
+      // flujo legítimo sube antes de que el doc exista: ambos clientes (mobile
+      // y Coach Hub) resuelven el chat con `ChatRepository.getOrCreate` antes
+      // de montar el composer, y el `sendMessage` posterior hace `update`
+      // sobre ese doc.
+      //
+      // `closedAt` ausente = abierto, igual que en `senderMayPost`
+      // (`firestore.rules`): los chats anteriores a #1697 y los builds viejos
+      // siguen funcionando sin migración. NO mira `notBlocked`: un bloqueo
+      // corta el mensaje (`senderMayPost`), no la subida.
+      function chatOpenForUpload(chatId, uid) {
+        let chat = firestore.get(/databases/(default)/documents/chats/$(chatId));
+        return chat != null
+               && uid in chat.data.members
+               && chat.data.get('closedAt', null) == null;
+      }
+
+      // Sólo el dueño sube, y sólo a un chat abierto del que es miembro; el
+      // tipo y el tamaño están en la allowlist. La lectura del chat va ANTES
+      // de `chatMediaWriteAllowed` (que lee `users/{uid}`) para que el gate de
+      // acceso se evalúe primero.
       allow write: if request.auth != null
                   && request.auth.uid == userId
+                  && chatOpenForUpload(chatId, request.auth.uid)
                   && chatMediaWriteAllowed(userId);
 
       // Only the owner can delete (cleanup on send failure or exercise removal).

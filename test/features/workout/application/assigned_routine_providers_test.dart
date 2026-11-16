@@ -87,7 +87,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           assignedRoutinesProvider.overrideWith(
-            (ref, athleteId) => Future.error(
+            (ref, athleteId) => Stream<List<Routine>>.error(
               Exception('Firestore unavailable'),
             ),
           ),
@@ -105,6 +105,52 @@ void main() {
       });
 
       expect(caughtError, isA<Exception>());
+    });
+
+    // #1698: antes era un `FutureProvider` de un solo disparo, y la app del
+    // alumno no reflejaba lo que el PF asignaba o archivaba hasta recargar.
+    test(
+        'EN VIVO: un plan asignado DESPUÉS, y uno archivado, llegan sin recargar',
+        () async {
+      final firestore = FakeFirebaseFirestore();
+      Future<void> plan(String id, int millis, [String status = 'active']) =>
+          firestore.collection('routines').doc(id).set({
+            'id': id,
+            'name': 'Plan $id',
+            'split': 'Full Body',
+            'level': 'beginner',
+            'days': <dynamic>[],
+            'source': 'trainer-assigned',
+            'assignedBy': 'trainer-1',
+            'assignedTo': 'athlete-a',
+            'visibility': 'private',
+            'status': status,
+            'createdAt': Timestamp.fromMillisecondsSinceEpoch(millis),
+          });
+      await plan('r-1', 1000);
+
+      final container = makeContainer(RoutineRepository(firestore: firestore));
+      addTearDown(container.dispose);
+      final sub = container.listen(
+        assignedRoutinesProvider('athlete-a'),
+        (_, __) {},
+      );
+      addTearDown(sub.close);
+      List<String> ids() => container
+          .read(assignedRoutinesProvider('athlete-a'))
+          .requireValue
+          .map((r) => r.id)
+          .toList();
+      await pumpEventQueue();
+      expect(ids(), ['r-1']);
+
+      await plan('r-2', 2000); // el PF asigna
+      await pumpEventQueue();
+      expect(ids(), ['r-2', 'r-1']);
+
+      await plan('r-2', 2000, 'archived'); // el PF archiva
+      await pumpEventQueue();
+      expect(ids(), ['r-1']);
     });
 
     test(

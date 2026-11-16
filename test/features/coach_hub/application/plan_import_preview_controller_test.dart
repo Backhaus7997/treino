@@ -7,6 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/moderation/moderation_guard.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinkRepositoryProvider;
+import 'package:treino/features/coach/data/trainer_link_repository.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/application/plan_import_preview_controller.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
@@ -23,7 +27,11 @@ import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
+import '../../../helpers/trainer_links.dart';
+
 class _MockRoutineRepo extends Mock implements RoutineRepository {}
+
+class _MockLinkRepo extends Mock implements TrainerLinkRepository {}
 
 class _MockCustomRepo extends Mock implements CustomExerciseRepository {}
 
@@ -87,6 +95,9 @@ void main() {
   late _MockCallable addAlias;
   late List<Map<String, dynamic>> aliases;
 
+  /// Vivos en el servidor (#1695): deja pasar a los tests que no hablan de eso.
+  late TrainerLinkRepository vivos;
+
   setUpAll(() {
     registerFallbackValue(buildAssignedRoutine(
       _draft(['x'], assignments: {_k(1): _press}),
@@ -97,7 +108,10 @@ void main() {
     ));
   });
 
-  setUp(() {
+  setUp(() async {
+    vivos = await repoConVinculos([
+      for (final id in ['a1', 'a2', 'a3']) linkDe(id, trainerId: _trainer),
+    ]);
     routines = _MockRoutineRepo();
     functions = _MockFunctions();
     addAlias = _MockCallable();
@@ -113,8 +127,10 @@ void main() {
   ProviderContainer container(
     PeriodizedImportDraft draft, {
     List<Override> extra = const [],
+    TrainerLinkRepository? links,
   }) {
     final c = ProviderContainer(overrides: [
+      trainerLinkRepositoryProvider.overrideWithValue(links ?? vivos),
       ...extra,
       periodizedImportProvider.overrideWith((_) => draft),
       routineRepositoryProvider.overrideWithValue(routines),
@@ -378,6 +394,47 @@ void main() {
     test('sin alumnos no escribe nada', () async {
       expect(await assign(container(resolved()), const []),
           isA<PlanAssignNoAthletes>());
+      verifyNever(() => routines.createAssigned(any()));
+    });
+
+    // #1695: las rules validan el rol y no el vínculo, así que `assign` lo
+    // re-confirma contra el servidor ANTES de escribir. Pausado cuenta como vivo.
+    for (final (status, asigna) in [
+      (TrainerLinkStatus.active, true),
+      (TrainerLinkStatus.paused, true),
+      (TrainerLinkStatus.terminated, false),
+      (null, false), // sin vínculo
+    ]) {
+      test(
+          'vínculo ${status?.name ?? 'inexistente'}: '
+          '${asigna ? 'asigna' : 'no escribe nada'}', () async {
+        when(() => routines.createAssigned(any())).thenAnswer(
+            (inv) async => inv.positionalArguments.single as Routine);
+        final c = container(resolved(),
+            links: await repoConVinculos([
+              if (status != null)
+                linkDe('a1', trainerId: _trainer, status: status),
+            ]));
+
+        final outcome = await assign(c, const ['a1']);
+
+        if (asigna) {
+          expect(outcome, isA<PlanAssignSuccess>());
+        } else {
+          expect((outcome as PlanAssignSinVinculo).athleteIds, ['a1']);
+          verifyNever(() => routines.createAssigned(any()));
+        }
+      });
+    }
+
+    test('si no se puede preguntar al servidor, tampoco escribe', () async {
+      final links = _MockLinkRepo();
+      when(() => links.alumnosConVinculoVivo(any()))
+          .thenThrow(Exception('sin red'));
+
+      final outcome = await assign(container(resolved(), links: links));
+
+      expect(outcome, isA<PlanAssignAllFailed>());
       verifyNever(() => routines.createAssigned(any()));
     });
   });

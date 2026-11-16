@@ -53,6 +53,8 @@ SetLog _makeSetLog({
   // reportes), y un fixture con dos ejercicios DISTINTOS compartiendo id no
   // existe en datos reales — el nombre está denormalizado desde el id.
   String? exerciseId,
+  // #1701 — serie por tiempo: guarda `reps: 0, weightKg: 0` y su duración.
+  int? durationSeconds,
 }) =>
     SetLog(
       id: 'sl-$exerciseName-$setNumber',
@@ -62,6 +64,7 @@ SetLog _makeSetLog({
       reps: reps,
       weightKg: weightKg,
       completedAt: DateTime.utc(2026, 5, 19, 10, 35),
+      durationSeconds: durationSeconds,
     );
 
 /// Un reporte del alumno sobre esta sesión (#628).
@@ -237,6 +240,73 @@ void main() {
     // Exercise group headings
     expect(find.text('Bench Press'), findsOneWidget);
     expect(find.text('Squat'), findsOneWidget);
+  });
+
+  // ── #1701: sesión sin carga (series por tiempo / distancia) ───────────────
+  //
+  // Mismo criterio que el resumen post-entreno: sin volumen no hay tile
+  // VOLUMEN, y la tarjeta se reparte en 3. El SCENARIO-373 de arriba sigue
+  // fijando los 4 tiles cuando sí hubo carga.
+
+  testWidgets(
+      '#1701: sin volumen (totalVolumeKg 0) no hay tile VOLUMEN ni "0 kg"; '
+      'quedan los otros 3', (tester) async {
+    await tester.pumpWidget(_pumpDetailScreen(
+      summaryOverride: () => (
+        session: _makeSession(durationMin: 18, totalVolumeKg: 0),
+        setLogs: [
+          _makeSetLog(
+              exerciseName: 'Plancha',
+              reps: 0,
+              weightKg: 0,
+              durationSeconds: 60),
+          _makeSetLog(
+              exerciseName: 'Plancha',
+              setNumber: 2,
+              reps: 0,
+              weightKg: 0,
+              durationSeconds: 45),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final statsCard = tester.widget<SessionStatsCard>(
+      find.byType(SessionStatsCard),
+    );
+    expect(
+      statsCard.tiles.map((tile) => tile.icon),
+      [TreinoIcon.clock, TreinoIcon.statSets, TreinoIcon.statPr],
+    );
+    expect(find.text('VOLUMEN'), findsNothing);
+    expect(find.text('kg'), findsNothing);
+    expect(find.text('0 kg'), findsNothing);
+    // Los demás siguen, con sus valores.
+    expect(find.text('DURACIÓN'), findsOneWidget);
+    expect(find.text('18'), findsOneWidget);
+    expect(find.text('SETS'), findsOneWidget);
+    expect(find.text('2'), findsWidgets);
+    expect(find.text('PRS HOY'), findsOneWidget);
+  });
+
+  testWidgets(
+      '#1701: un volumen chico pero positivo (0,5 kg) mantiene el tile VOLUMEN',
+      (tester) async {
+    await tester.pumpWidget(_pumpDetailScreen(
+      summaryOverride: () => (
+        session: _makeSession(totalVolumeKg: 0.5),
+        setLogs: [_makeSetLog(reps: 1, weightKg: 0.5)],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final statsCard = tester.widget<SessionStatsCard>(
+      find.byType(SessionStatsCard),
+    );
+    expect(statsCard.tiles, hasLength(4));
+    expect(find.text('VOLUMEN'), findsOneWidget);
+    expect(find.text('kg'), findsOneWidget);
+    expect(find.text('0,5'), findsOneWidget);
   });
 
   // SCENARIO-374: setLogs grouped by exerciseName preserving first-appearance order

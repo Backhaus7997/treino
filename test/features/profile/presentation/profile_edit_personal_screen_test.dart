@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -318,6 +319,150 @@ void main() {
       expect(captured[0], equals('uid-test'));
       final partial = captured[1] as Map<String, Object?>;
       expect(partial['displayName'], equals('Carlos R.'));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // #1738: el PF llega a esta pantalla desde la fila «Datos personales» de su
+  // pestaña Perfil. Guardar el nombre desde acá tiene que seguir llegando a la
+  // tarjeta de Discovery (`trainerPublicProfiles`, #1336 / #1706). Va con el
+  // repositorio REAL sobre un Firestore falso: con un mock no se vería si el
+  // espejo se rompe.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('#1738: un PF cambia su nombre desde Datos personales', () {
+    testWidgets('el nombre nuevo queda en users/ Y en la tarjeta pública',
+        (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      final pf = _profile(displayName: 'Viejo Nombre')
+          .copyWith(role: UserRole.trainer);
+      await firestore.collection('users').doc('uid-test').set(pf.toJson());
+      await firestore.collection('trainerPublicProfiles').doc('uid-test').set({
+        'uid': 'uid-test',
+        'displayName': 'Viejo Nombre',
+        'displayNameLowercase': 'viejo nombre',
+        'trainerBio': 'Bio original',
+      });
+
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: pf,
+          userRepository: UserRepository(firestore: firestore),
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('edit_personal_display_name')),
+        'Ana Coach',
+      );
+      await tester.pump();
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+
+      final user = await firestore.collection('users').doc('uid-test').get();
+      expect(user.data()!['displayName'], 'Ana Coach');
+
+      final card = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('uid-test')
+          .get();
+      expect(card.data()!['displayName'], 'Ana Coach');
+      expect(card.data()!['displayNameLowercase'], 'ana coach');
+      // El resto de la tarjeta no se toca.
+      expect(card.data()!['trainerBio'], 'Bio original');
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // #1813: peso, altura y experiencia son datos del ATLETA. Un PF llega acá
+  // desde su Perfil (#1738) y no tiene que verlos ni mandarlos.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('#1813: los datos de atleta no se le piden a un PF', () {
+    const camposDeAtleta = [
+      Key('edit_personal_weight_field'),
+      Key('edit_personal_height_field'),
+    ];
+
+    testWidgets('un PF no ve peso, altura ni experiencia, y sí lo demás',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile().copyWith(role: UserRole.trainer),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final k in camposDeAtleta) {
+        expect(find.byKey(k), findsNothing, reason: '$k es de atleta');
+      }
+      for (final etiqueta in ['PESO (KG)', 'ALTURA (CM)', 'EXPERIENCIA']) {
+        expect(find.text(etiqueta), findsNothing);
+      }
+      expect(find.text('PRINCIPIANTE'), findsNothing);
+
+      // Lo que el PF vino a cambiar, y lo que es de cualquiera, sigue.
+      expect(
+        find.byKey(const Key('edit_personal_avatar_editor')),
+        findsOneWidget,
+      );
+      expect(
+          find.byKey(const Key('edit_personal_display_name')), findsOneWidget);
+      expect(
+          find.byKey(const Key('edit_personal_phone_field')), findsOneWidget);
+      expect(
+          find.byKey(const Key('edit_personal_born_at_field')), findsOneWidget);
+      expect(find.text('GÉNERO'), findsOneWidget);
+    });
+
+    testWidgets('un atleta sigue viendo peso, altura y experiencia',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen(profile: _profile()));
+      await tester.pumpAndSettle();
+
+      for (final k in camposDeAtleta) {
+        expect(find.byKey(k), findsOneWidget);
+      }
+      expect(find.text('EXPERIENCIA'), findsOneWidget);
+      expect(find.text('PRINCIPIANTE'), findsOneWidget);
+    });
+
+    testWidgets(
+        'guardar el nombre manda SOLO el nombre, y un peso viejo fuera de '
+        'rango no bloquea el guardado', (tester) async {
+      final repo = MockUserRepository();
+      when(() => repo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        _buildScreen(
+          // 20 kg está fuera del rango 30-300 que valida el campo: si el campo
+          // siguiera en el árbol, el guardado se frenaría en el validador.
+          profile: _profile(bodyWeightKg: 20).copyWith(role: UserRole.trainer),
+          userRepository: repo,
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('edit_personal_display_name')),
+        'Ana Coach',
+      );
+      await tester.pump();
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+
+      final captured =
+          verify(() => repo.update(captureAny(), captureAny())).captured;
+      final partial = captured[1] as Map<String, Object?>;
+      expect(partial.keys, ['displayName']);
+      expect(partial['displayName'], 'Ana Coach');
     });
   });
 

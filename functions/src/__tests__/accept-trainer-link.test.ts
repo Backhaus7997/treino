@@ -16,6 +16,11 @@ jest.mock("../subscriptions/promote-link", () => ({
   syncTrainerLoad: jest.fn(),
 }));
 
+jest.mock("../subscriptions/cancel-duplicate-pending-links", () => ({
+  ...jest.requireActual("../subscriptions/cancel-duplicate-pending-links"),
+  cancelDuplicatePendingLinks: jest.fn(async () => 0),
+}));
+
 jest.mock("../subscriptions/trainer-limit-mail", () => ({
   ...jest.requireActual("../subscriptions/trainer-limit-mail"),
   registrarTopeDeAlumnos: jest.fn(async () => undefined),
@@ -40,6 +45,7 @@ jest.mock("firebase-admin/app", () => (
     >
 ).app());
 
+import { cancelDuplicatePendingLinks } from "../subscriptions/cancel-duplicate-pending-links";
 import { syncTrainerLoad } from "../subscriptions/promote-link";
 import { registrarTopeDeAlumnos } from "../subscriptions/trainer-limit-mail";
 import { runAcceptTrainerLink } from "../subscriptions/accept-trainer-link";
@@ -48,12 +54,17 @@ const mockSync = syncTrainerLoad as jest.MockedFunction<typeof syncTrainerLoad>;
 const mockRegistrar = registrarTopeDeAlumnos as jest.MockedFunction<
   typeof registrarTopeDeAlumnos
 >;
+const mockCancelDuplicadas = cancelDuplicatePendingLinks as jest.MockedFunction<
+  typeof cancelDuplicatePendingLinks
+>;
 
 describe("runAcceptTrainerLink", () => {
   beforeEach(() => {
     mockSync.mockReset();
     mockRegistrar.mockReset();
     mockRegistrar.mockResolvedValue(undefined);
+    mockCancelDuplicadas.mockReset();
+    mockCancelDuplicadas.mockResolvedValue(0);
   });
 
   it("delegates to syncTrainerLoad with expectedFromStatus 'pending'", async () => {
@@ -121,6 +132,37 @@ describe("runAcceptTrainerLink", () => {
       runAcceptTrainerLink({} as never, "trainer-1", ""),
     ).rejects.toMatchObject({ code: "invalid-argument" });
     expect(mockSync).not.toHaveBeenCalled();
+  });
+
+  // ── Las solicitudes duplicadas del par (#1812) ──────────────────────────
+  describe("cancela las solicitudes duplicadas", () => {
+    const sync = (promoted: boolean) =>
+      mockSync.mockResolvedValue({ trainerId: "trainer-1", weightedLoad: 7, limit: 7, promoted });
+
+    it.each([[true, "ok"], [false, "noop"]])(
+      "después del gate (promoted=%s → %s), con el linkId aceptado; el noop completa una limpieza que falló",
+      async (promoted, status) => {
+        sync(promoted);
+
+        await expect(runAcceptTrainerLink({} as never, "trainer-1", "L1")).resolves.toMatchObject({ status });
+        expect(mockCancelDuplicadas).toHaveBeenCalledTimes(1);
+        expect(mockCancelDuplicadas).toHaveBeenCalledWith(expect.anything(), "L1");
+      },
+    );
+
+    it("NO si el accept se rechazó: no hay vínculo vivo que proteger", async () => {
+      mockSync.mockRejectedValue(new HttpsError("failed-precondition", "wrong-status"));
+
+      await expect(runAcceptTrainerLink({} as never, "trainer-1", "L1")).rejects.toBeDefined();
+      expect(mockCancelDuplicadas).not.toHaveBeenCalled();
+    });
+
+    it("si la limpieza falla, el accept igual sale bien: ya se confirmó", async () => {
+      sync(true);
+      mockCancelDuplicadas.mockRejectedValueOnce(new Error("firestore se cayó"));
+
+      await expect(runAcceptTrainerLink({} as never, "trainer-1", "L1")).resolves.toMatchObject({ status: "ok" });
+    });
   });
 
   // ── El tope de alumnos: la anotación server-side ────────────────────────

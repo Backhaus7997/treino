@@ -512,6 +512,27 @@ void main() {
       expect(find.text('— kg'), findsNothing);
     });
 
+    // #1701: un entreno sólo de series por tiempo o por distancia comparte
+    // `volumeKg == 0` (y los posts ya publicados también). «0 kg» afirma un
+    // dato que no existe: se va el volumen, no la duración ni los ejercicios.
+    // El caso con carga es el test de arriba (`3,2 kg`).
+    testWidgets('#1701: volumeKg == 0 no muestra «0 kg» y conserva min y ej.',
+        (tester) async {
+      final post = makePost(
+        workoutStats: const WorkoutStats(
+          volumeKg: 0,
+          durationMin: 52,
+          exerciseCount: 6,
+        ),
+      );
+      await tester.pumpWidget(_wrap(PostCard(post: post)));
+      await tester.pump();
+
+      expect(find.textContaining('kg'), findsNothing);
+      expect(find.text('52 min'), findsOneWidget);
+      expect(find.text('6 ej.'), findsOneWidget);
+    });
+
     // SCENARIO-175: card container decoration — borderRadius, bgCard color, border
     testWidgets('SCENARIO-175: card has correct decoration', (tester) async {
       final post = makePost();
@@ -897,6 +918,29 @@ void main() {
 
         expect(find.byType(MuscleDistributionBars), findsNothing);
         expect(find.text('Ejercicio 0'), findsOneWidget);
+      });
+
+      // #1701: un eje sin carga (series por tiempo o por distancia, o un
+      // snapshot viejo sin `volumeKgByAxis`) llega con 0 y queda sólo con el
+      // conteo; el eje con carga conserva su kg.
+      testWidgets('un eje sin volumen muestra sólo los sets, sin «0 kg»',
+          (tester) async {
+        await tester.pumpWidget(_wrap(
+          PostCard(
+            post: makePost().copyWith(
+              workoutSnapshot: snapshot().copyWith(
+                volumeKgByAxis: const {'chest': 1000, 'legs': 0},
+              ),
+            ),
+          ),
+        ));
+        await tester.pump();
+        await tester.tap(find.text('VER DETALLE'));
+        await tester.pump();
+
+        expect(find.text('2 sets · 1.000 kg'), findsOneWidget);
+        expect(find.text('1 sets'), findsOneWidget);
+        expect(find.text('1 sets · 0 kg'), findsNothing);
       });
     });
 

@@ -171,9 +171,24 @@ class RutinasSection extends ConsumerWidget {
                   ),
                 );
                 final linkAsync = ref.watch(currentAthleteLinkProvider);
-                // El toggle solo aporta cuando hay algo que elegir — con una
-                // sola rutina la adopción perezosa ya la dejó activa.
-                final canToggleActive = entries.length > 1;
+                // El toggle solo aporta cuando hay algo que elegir. Con una sola
+                // rutina la adopción perezosa ya la dejó activa… salvo que la
+                // activa NO esté en esta lista: una plantilla del catálogo que
+                // el atleta SIGUE sin copiarla vive sólo en `activeRoutineId`
+                // y no es una card. Entonces la única rutina de la lista no
+                // está activa, y sin el toggle no había forma de volver a ella
+                // (#1698). Se mira `activeId` y no «hay una plantilla seguida»
+                // a propósito: cubre también el marcador obsoleto, donde
+                // tampoco hay ninguna card activa y la adopción no repara
+                // (sólo se dispara con el marcador null).
+                final activeEstaEnLista = entries.any(
+                  (e) => e.routine.id == activeId,
+                );
+                final hayActivaFueraDeLaLista = activeId != null &&
+                    activeId.isNotEmpty &&
+                    !activeEstaEnLista;
+                final canToggleActive =
+                    entries.length > 1 || hayActivaFueraDeLaLista;
                 return Column(
                   key: const ValueKey('rutinas_data'),
                   crossAxisAlignment: CrossAxisAlignment.stretch,

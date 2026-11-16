@@ -87,6 +87,111 @@ void main() {
     }
   });
 
+  // --- #1692: Auth en web volvía a PRODUCCIÓN después de recargar -----------
+  //
+  // `firebase_auth_web` restaura la sesión persistida por red dentro de
+  // `Firebase.initializeApp`, antes de que `useAuthEmulator` pueda correr, y
+  // desde ese request el emulador ya no se puede conectar (el plugin traga el
+  // error). Se defiende en dos capas, y lo que se puede probar en la VM es QUÉ
+  // se llama y EN QUÉ ORDEN: el borrado en el navegador (`dart:js_interop`) no
+  // corre acá.
+  //
+  // Sin los comentarios: los dartdocs y los comentarios de los entry points
+  // nombran `Firebase.initializeApp` y estas funciones a propósito.
+  String sinComentarios(String src) =>
+      src.replaceAll(RegExp(r'^\s*//.*$', multiLine: true), '');
+
+  test('los dos entry points borran la sesión de Auth ANTES de initializeApp',
+      () {
+    for (final entry in _entryPoints) {
+      final src = sinComentarios(File(entry).readAsStringSync());
+      final borrar = src.indexOf('limpiarSesionDeAuthParaEmulador()');
+      final init = src.indexOf('Firebase.initializeApp(');
+      expect(borrar, isNonNegative,
+          reason: '$entry no llama a limpiarSesionDeAuthParaEmulador(): en '
+              'web, con USE_EMULATOR, Auth restaura la sesión contra '
+              'PRODUCCIÓN y el login manda la contraseña ahí (#1692)');
+      expect(init, isNonNegative, reason: '$entry no inicializa Firebase');
+      expect(
+        borrar,
+        lessThan(init),
+        reason: '$entry borra la sesión DESPUÉS de Firebase.initializeApp: '
+            'tarde, el plugin ya la restauró por red (#1692)',
+      );
+    }
+  });
+
+  test('el borrado y la conexión de emuladores corren sólo con USE_EMULATOR',
+      () {
+    // `kUsaEmuladores` es const: con el `if` pegado a la llamada, el compilador
+    // la poda y un build normal no lleva nada de esto (ni el borrado de
+    // IndexedDB, ni la verificación). Una llamada suelta corre siempre.
+    for (final entry in _entryPoints) {
+      final src = sinComentarios(File(entry).readAsStringSync());
+      for (final llamada in [
+        'limpiarSesionDeAuthParaEmulador',
+        'conectarEmuladores',
+      ]) {
+        final guardada = RegExp(
+          r'if\s*\(\s*kUsaEmuladores\s*\)\s*\{\s*await\s+'
+          '$llamada'
+          r'\(\)\s*;\s*\}',
+        );
+        expect(
+          guardada.hasMatch(src),
+          isTrue,
+          reason: '$entry: $llamada() tiene que ir sola dentro de '
+              'if (kUsaEmuladores) { … }. Si corre sin USE_EMULATOR, un '
+              'build normal borra la sesión o toca los emuladores',
+        );
+        expect(
+          RegExp('$llamada\\(').allMatches(src).length,
+          1,
+          reason: '$entry llama a $llamada() más de una vez: alguna puede '
+              'estar fuera del if (kUsaEmuladores)',
+        );
+      }
+    }
+  });
+
+  test('conectarEmuladores() verifica Auth DESPUÉS de useAuthEmulator', () {
+    // `await useAuthEmulator(...)` vuelve bien aunque haya fallado: el plugin
+    // web traga `auth/emulator-config-failed`. Sin esta verificación Auth se
+    // queda en PRODUCCIÓN sin que nada lo diga.
+    final src = sinComentarios(File(_emuladores).readAsStringSync());
+    final inicio = src.indexOf('Future<void> conectarEmuladores()');
+    expect(inicio, isNonNegative);
+    final cuerpo = src.substring(inicio, src.indexOf('\n}', inicio));
+    final conecta = cuerpo.indexOf('useAuthEmulator(');
+    final verifica = cuerpo.indexOf('verificarAuthEnElEmulador(');
+    expect(conecta, isNonNegative);
+    expect(verifica, isNonNegative,
+        reason: 'conectarEmuladores() no verifica que Auth quedó en el '
+            'emulador (#1692)');
+    expect(verifica, greaterThan(conecta));
+  });
+
+  test('el stub y la implementación web declaran la misma API', () {
+    // `emuladores.dart` los elige con un conditional import: el analyzer y los
+    // tests de la VM sólo ven el stub, así que una firma que diverge en el
+    // archivo web rompería recién `flutter build web`.
+    for (final archivo in [
+      'lib/core/firebase/auth_emulador_stub.dart',
+      'lib/core/firebase/auth_emulador_web.dart',
+    ]) {
+      final src = File(archivo).readAsStringSync();
+      expect(src, contains('Future<void> borrarSesionPersistidaDeAuth()'),
+          reason: archivo);
+      expect(src,
+          contains('void verificarAuthEnElEmulador(String host, int port)'),
+          reason: archivo);
+    }
+    expect(
+      File(_emuladores).readAsStringSync(),
+      contains("if (dart.library.js_interop) 'auth_emulador_web.dart'"),
+    );
+  });
+
   test('todo callable usa la región que conectarEmuladores() redirige', () {
     final redirigida = RegExp(r"kFunctionsRegion\s*=\s*'([^']+)'")
         .firstMatch(File(_emuladores).readAsStringSync())

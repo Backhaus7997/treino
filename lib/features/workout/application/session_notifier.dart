@@ -57,6 +57,21 @@ class SessionNotifier
   /// La UI llama esto al mostrar el feedback para no re-emitir el mismo error.
   void clearLogSetError() => _logSetError.value = null;
 
+  /// ¿La sesión está en error? Hoy sólo pasa con un `create` que el servidor
+  /// rechazó DESPUÉS de armar el estado (`onServerRejected`, #1805).
+  ///
+  /// El chequeo es `hasError` y no `value`/`valueOrNull`: `state =
+  /// AsyncError(...)` CONSERVA el dato anterior (`hasValue` sigue en true), así
+  /// que leer `state.value` no tira y devuelve la sesión vieja. Toda mutación
+  /// que lea ese dato y escriba `AsyncData` sin mirar esto BORRA el aviso de
+  /// «el servidor rechazó tu entreno» y deja entrenar contra una sesión que no
+  /// existe. #1810 lo arregló para el reloj; acá van las mutaciones de series y
+  /// el reconciliador del stream.
+  ///
+  /// `abandonSession` y `finishSession` NO miran esto: son la SALIDA, y con el
+  /// entreno en error el atleta tiene que poder irse.
+  bool get _enError => state.hasError;
+
   /// Suscripciones vivas a la sesión mientras el player está abierto.
   ///
   /// El RELOJ escribe en la MISMA sesión: series nuevas y el cierre del
@@ -79,15 +94,33 @@ class SessionNotifier
 
   @override
   Future<SessionState> build(SessionInit arg) async {
+    // Este provider es autoDispose y Riverpod 2.6 NO cancela un `build` en
+    // vuelo: si el atleta sale del player mientras se leen la rutina o la
+    // sesión, el build sigue corriendo contra un provider ya descartado. Sin
+    // este aviso `_buildFresh` creaba igual una sesión `active` que ninguna
+    // pantalla iba a mostrar ni cerrar (#1755).
+    //
+    // Es una variable de ESTE build y no el campo `_disposed`: ése se registra
+    // recién al final, y un campo compartido no distingue un build viejo de uno
+    // nuevo si el provider se invalida.
+    var descartado = false;
+    ref.onDispose(() => descartado = true);
+
     final state = switch (arg) {
       FreshSession(
         routineId: final rid,
         dayNumber: final dn,
         weekNumber: final wn,
       ) =>
-        await _buildFresh(rid, dn, wn),
+        await _buildFresh(rid, dn, wn, seDescarto: () => descartado),
       ResumeSession(sessionId: final sid) => await _buildResume(sid),
     };
+
+    // Sin pantalla no hay quién cierre el timer ni los streams: no se arman.
+    if (descartado) {
+      throw StateError(
+          'El player se cerró antes de terminar de armar la sesión');
+    }
 
     // El timer empieza DESPUÉS de armar el estado para que ambos paths
     // compartan el mismo punto de inicio. Diseño §7.
@@ -188,6 +221,10 @@ class SessionNotifier
   /// `_watchRemoteChanges`), no queda ningún reconciliador y el estado local se
   /// congela en su versión optimista por el resto del entreno.
   void _applyRemoteSetLogs(List<SetLog> remote) {
+    // En error el estado es lo que ve el atleta («el servidor rechazó tu
+    // entreno»): un snapshot no lo pisa con un `AsyncData` (#1810). Ver
+    // [_enError].
+    if (_enError) return;
     final current = state.valueOrNull;
     if (current == null) return;
     // Sin cambios reales no se emite: cada emisión reconstruye la pantalla del
@@ -205,8 +242,9 @@ class SessionNotifier
   Future<SessionState> _buildFresh(
     String routineId,
     int dayNumber,
-    int weekNumber,
-  ) async {
+    int weekNumber, {
+    required bool Function() seDescarto,
+  }) async {
     // Misma cota que en `_buildResume`: empezar un entreno tampoco puede quedar
     // colgado sin salida.
     final routine = await ref
@@ -233,6 +271,12 @@ class SessionNotifier
     final uid = ref.read(currentUidProvider);
     if (uid == null) {
       throw StateError('SessionNotifier construido sin usuario autenticado');
+    }
+    // Último punto antes de ESCRIBIR: el atleta pudo irse mientras se leía la
+    // rutina (#1755). Entre este chequeo y `create` no hay ningún `await`, así
+    // que no queda ventana. Escribir acá dejaría una sesión `active` huérfana.
+    if (seDescarto()) {
+      throw StateError('El player se cerró antes de crear la sesión');
     }
     final session = await repo.create(
       uid: uid,
@@ -446,6 +490,9 @@ class SessionNotifier
   bool _disposed = false;
 
   Future<void> logSet(SetLog setLog) async {
+    // Con la sesión en error no hay contra qué loguear: no se escribe ni se
+    // pisa el aviso. Ver [_enError].
+    if (_enError) return;
     final current = state.value;
     if (current == null || _finalized || _isLoggingSet) return;
 
@@ -488,6 +535,9 @@ class SessionNotifier
       );
       final persisted = logged.setLog;
 
+      // El servidor pudo rechazar el `create` MIENTRAS esperábamos: el estado
+      // pasó a error y escribir `AsyncData` lo borraría. Ver [_enError].
+      if (_enError) return;
       // Re-leemos el estado: pudo cambiar durante el await.
       final latest = state.value ?? current;
       // ⚠️ Y ahora puede cambiar por el STREAM, no solo por otra operación
@@ -598,6 +648,7 @@ class SessionNotifier
   /// `logSet` (línea ~207) ya cubre un doble-tap sobre esa fila nueva — no se
   /// necesita un guard nuevo.
   Future<void> addSet(RoutineSlot slot) async {
+    if (_enError) return;
     final current = state.value;
     if (current == null || _finalized) return;
 
@@ -614,6 +665,7 @@ class SessionNotifier
   /// flow de edición inline cuando el usuario corrige una fila done.
   /// [updated] debe traer el id existente en Firestore.
   Future<void> updateSet(SetLog updated) async {
+    if (_enError) return;
     final current = state.value;
     if (current == null || _finalized) return;
     if (updated.id.isEmpty) {
@@ -634,6 +686,7 @@ class SessionNotifier
       // Re-leemos el estado: pudo cambiar durante el await (p.ej. un logSet
       // concurrente). Sin esto, sobrescribiríamos con el snapshot viejo y
       // perderíamos el set recién logueado. Mismo patrón que logSet.
+      if (_enError) return; // ver [_enError]
       final latest = state.value ?? current;
       final newLogs = latest.setLogs
           .map((l) => l.id == updated.id ? updated : l)
@@ -674,6 +727,7 @@ class SessionNotifier
   /// se puede esconder una fila ya logueada bajando el override por debajo de
   /// lo que ya existe.
   Future<void> removeSet(RoutineSlot slot, SetLog? target) async {
+    if (_enError) return;
     final current = state.value;
     if (current == null || _finalized) return;
 
@@ -712,6 +766,7 @@ class SessionNotifier
       // Re-leemos el estado DESPUÉS de todos los awaits: pudo cambiar durante
       // el delete/renumber (p.ej. un logSet concurrente). Mismo patrón que
       // logSet/updateSet.
+      if (_enError) return; // ver [_enError]
       final latest = state.value ?? current;
 
       // El setNumber nuevo se aplica como valor ABSOLUTO, no como un `-1`.
@@ -957,7 +1012,20 @@ class SessionNotifier
   // ── Helpers privados ─────────────────────────────────────────────────────
 
   void _onTick(Timer _) {
-    final current = state.value;
+    // En error no hay nada que cronometrar, y tocar el estado lo BORRARÍA: un
+    // `state = AsyncError(...)` conserva el dato anterior (`hasValue` sigue en
+    // true), así que `state.value` no tira y devuelve la sesión vieja, y el
+    // `AsyncData` de abajo pisaba el aviso de «el servidor rechazó tu entreno»
+    // un segundo después de mostrarlo (#1805). Por eso el chequeo es
+    // `hasError` y no `valueOrNull`: éste devuelve el mismo dato viejo.
+    //
+    // Un reintento hace rebuild del provider, y `build` arma otro reloj.
+    if (_enError) {
+      _timer?.cancel();
+      _timer = null;
+      return;
+    }
+    final current = state.valueOrNull;
     if (current == null || _finalized) return;
     final elapsed = _elapsedSecondsNow();
     state = AsyncData(current.copyWith(elapsedSeconds: elapsed));

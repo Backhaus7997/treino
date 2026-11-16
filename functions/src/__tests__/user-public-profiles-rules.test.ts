@@ -31,7 +31,14 @@ import {
   initializeTestEnvironment,
   RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { setLogLevel } from "firebase/firestore";
+import {
+  deleteField,
+  doc,
+  serverTimestamp,
+  setDoc,
+  setLogLevel,
+  updateDoc,
+} from "firebase/firestore";
 
 const PROJECT_ID = "treino-rules-test";
 const RULES_PATH = path.resolve(__dirname, "../../../firestore.rules");
@@ -308,9 +315,11 @@ describe("userPublicProfiles rules — isProfilePublic privacy flag", () => {
     const alice = testEnv.authenticatedContext(uid);
     const ref = alice.firestore().collection(COL_PROFILES).doc(uid);
 
-    // Exact updateCounters shape of FriendshipRepository.accept — a real
-    // prod merge with no other paired field.
-    await assertSucceeds(ref.set({ followersCount: 4 }, { merge: true }));
+    // updateCounters shape of SessionRepository.finish — a real prod merge
+    // with no other paired field. (Era `followersCount: 4`, el shape de
+    // FriendshipRepository.accept, retirado en PR3d: desde #1835 ese
+    // contador es CF-only.)
+    await assertSucceeds(ref.set({ workoutsCount: 4 }, { merge: true }));
   });
 
   it("allows a first-ever write (create) carrying isProfilePublic", async () => {
@@ -495,5 +504,321 @@ describe("userPublicProfiles rules — lift ranks (CF-write-only)", () => {
     const ref = attacker.firestore().collection(COL_PROFILES).doc(uid);
 
     await assertFails(ref.update({ benchRank: 8 }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. rachaSemanas — acotada, no forjable (#1698).
+//
+// `rachaSemanas` ordena el ranking de racha del gym y la escribe el CLIENTE
+// (SessionRepository.finish → updateCounters, un set(merge) con el valor y el
+// sello `rachaSemanasUpdatedAt: serverTimestamp()`). No hay CF que la derive,
+// así que la regla no puede hacerla "sólo del servidor": la ACOTA. Lo que el
+// dueño puede dejar escrito es, como mucho, lo que una racha honesta pudo
+// alcanzar desde el último sello: el valor guardado + una semana por cada
+// semana ART transcurrida (una sola si nunca hubo sello). Bajar es libre. El
+// sello sólo puede ser el del servidor (`request.time`) o el que ya estaba.
+//
+// Las semanas son lunes–domingo en ART (UTC-3 fijo), igual que el cliente
+// (`mondayOfWeekArt`) y que `weekly-streak.ts`.
+// ---------------------------------------------------------------------------
+describe("userPublicProfiles rules — rachaSemanas acotada (#1698)", () => {
+  const uid = "athlete-racha";
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  // Lunes 1970-01-05 00:00 ART (= 03:00Z), en ms desde epoch. Es el mismo
+  // ancla que usa `artWeekIndex` en firestore.rules.
+  const MONDAY_ANCHOR_MS = 356400000;
+
+  /** Lunes 00:00 ART de la semana que contiene `ms`. */
+  function mondayArt(ms: number): number {
+    return (
+      Math.floor((ms - MONDAY_ANCHOR_MS) / WEEK_MS) * WEEK_MS + MONDAY_ANCHOR_MS
+    );
+  }
+
+  /** Un instante a mitad de la semana ART que está `weeks` semanas atrás. */
+  function weeksAgo(weeks: number): Date {
+    return new Date(mondayArt(Date.now()) - weeks * WEEK_MS + 3 * DAY_MS);
+  }
+
+  function profileRef(as: string, target = uid) {
+    return doc(
+      testEnv.authenticatedContext(as).firestore(),
+      COL_PROFILES,
+      target,
+    );
+  }
+
+  async function seedRacha(racha: Record<string, unknown>): Promise<void> {
+    await seed(uid, {
+      userGymId: "gym-a",
+      profile: { displayName: "Alice", ...racha },
+    });
+  }
+
+  // El payload exacto de UserPublicProfileRepository.updateCounters: un
+  // set(merge:true) con el contador, la racha y el sello del servidor.
+  function finishWrite(racha: number) {
+    return {
+      workoutsCount: 20,
+      rachaSemanas: racha,
+      rachaSemanasUpdatedAt: serverTimestamp(),
+    };
+  }
+
+  describe("DENY — lo que el dueño no puede forjar", () => {
+    it("un valor inventado sobre una racha real (el hallazgo: 9999)", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(1) });
+      await assertFails(
+        setDoc(profileRef(uid), finishWrite(9999), { merge: true }),
+      );
+      await assertFails(updateDoc(profileRef(uid), { rachaSemanas: 9999 }));
+    });
+
+    it("sembrar una racha en un doc que nunca la tuvo", async () => {
+      await seedRacha({});
+      await assertFails(updateDoc(profileRef(uid), { rachaSemanas: 50 }));
+    });
+
+    it("subir más de +1 cuando el último sello es de la semana pasada", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(1) });
+      await assertFails(
+        setDoc(profileRef(uid), finishWrite(5), { merge: true }),
+      );
+    });
+
+    it("subir dentro de la semana del último sello (ya se contó esta semana)", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(0) });
+      await assertFails(
+        setDoc(profileRef(uid), finishWrite(4), { merge: true }),
+      );
+    });
+
+    it("subir sin estampar el sello del servidor (reusaría el cupo en cada escritura)", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(1) });
+      await assertFails(updateDoc(profileRef(uid), { rachaSemanas: 4 }));
+    });
+
+    it("un sello inventado: en el futuro, en el pasado, o sacado", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(1) });
+      await assertFails(
+        updateDoc(profileRef(uid), {
+          rachaSemanas: 4,
+          rachaSemanasUpdatedAt: new Date(Date.now() + 52 * WEEK_MS),
+        }),
+      );
+      // Un sello viejo reabriría el cupo semanal.
+      await assertFails(
+        updateDoc(profileRef(uid), {
+          rachaSemanas: 4,
+          rachaSemanasUpdatedAt: weeksAgo(8),
+        }),
+      );
+      // Sacarlo haría que el próximo +1 se evalúe como "nunca hubo sello".
+      await assertFails(
+        updateDoc(profileRef(uid), { rachaSemanasUpdatedAt: deleteField() }),
+      );
+    });
+
+    it("el sello del servidor y nada más, aunque el valor no cambie", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(1) });
+      await assertFails(
+        updateDoc(profileRef(uid), {
+          rachaSemanasUpdatedAt: new Date(Date.now() + 10 * WEEK_MS),
+        }),
+      );
+    });
+
+    it("valores que no son un entero >= 0", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(1) });
+      await assertFails(
+        setDoc(profileRef(uid), finishWrite(3.5), { merge: true }),
+      );
+      await assertFails(
+        setDoc(profileRef(uid), finishWrite(-1), { merge: true }),
+      );
+      await assertFails(updateDoc(profileRef(uid), { rachaSemanas: "4" }));
+      await assertFails(updateDoc(profileRef(uid), { rachaSemanas: null }));
+    });
+
+    it("una racha vieja no admite más que el cupo de las semanas que pasaron", async () => {
+      // Sello de hace 3 semanas → como mucho +3; +4 ya es inventado.
+      await seedRacha({ rachaSemanas: 5, rachaSemanasUpdatedAt: weeksAgo(3) });
+      await assertFails(
+        setDoc(profileRef(uid), finishWrite(9), { merge: true }),
+      );
+    });
+
+    it("un tercero no escribe la racha de otro", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(1) });
+      await assertFails(
+        setDoc(profileRef("athlete-racha-attacker"), finishWrite(4), {
+          merge: true,
+        }),
+      );
+    });
+
+    it("un create no puede sembrar una racha ni un sello inventado", async () => {
+      const fresh = "athlete-racha-create";
+      await seed(fresh, { userGymId: "gym-a" });
+      const ref = profileRef(fresh, fresh);
+      await assertFails(setDoc(ref, { uid: fresh, rachaSemanas: 40 }));
+      await assertFails(
+        setDoc(ref, {
+          uid: fresh,
+          rachaSemanas: 0,
+          rachaSemanasUpdatedAt: new Date(Date.now() + 52 * WEEK_MS),
+        }),
+      );
+    });
+  });
+
+  describe("ALLOW — el flujo real de SessionRepository.finish", () => {
+    it("la semana siguiente suma +1 con el sello del servidor (racha que continúa)", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(1) });
+      await assertSucceeds(
+        setDoc(profileRef(uid), finishWrite(4), { merge: true }),
+      );
+    });
+
+    it("la primera racha de un doc sembrado en 0 sin sello (seed_racha_semanas.js)", async () => {
+      await seedRacha({ rachaSemanas: 0 });
+      await assertSucceeds(
+        setDoc(profileRef(uid), finishWrite(1), { merge: true }),
+      );
+    });
+
+    it("otra sesión la misma semana: mismo valor, sello renovado", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(0) });
+      await assertSucceeds(
+        setDoc(profileRef(uid), finishWrite(3), { merge: true }),
+      );
+    });
+
+    it("racha cortada: baja a 1 (o a 0) sin límite", async () => {
+      await seedRacha({ rachaSemanas: 7, rachaSemanasUpdatedAt: weeksAgo(4) });
+      await assertSucceeds(
+        setDoc(profileRef(uid), finishWrite(1), { merge: true }),
+      );
+      await assertSucceeds(
+        setDoc(profileRef(uid), finishWrite(0), { merge: true }),
+      );
+    });
+
+    it("escrituras perdidas: el cupo es de una semana por semana transcurrida", async () => {
+      // Se perdió el write de las últimas semanas (app matada antes del ACK,
+      // sesiones del reloj): el próximo finish recalcula +3 de una vez.
+      await seedRacha({ rachaSemanas: 5, rachaSemanasUpdatedAt: weeksAgo(3) });
+      await assertSucceeds(
+        setDoc(profileRef(uid), finishWrite(8), { merge: true }),
+      );
+    });
+
+    it("el borde de semana es el lunes 00:00 ART, al milisegundo", async () => {
+      const lunes = mondayArt(Date.now());
+      // Sello EXACTO en el lunes de esta semana → misma semana: no sube.
+      await seedRacha({
+        rachaSemanas: 3,
+        rachaSemanasUpdatedAt: new Date(lunes),
+      });
+      await assertFails(
+        setDoc(profileRef(uid), finishWrite(4), { merge: true }),
+      );
+      // Un milisegundo antes → semana pasada: sube.
+      await seedRacha({
+        rachaSemanas: 3,
+        rachaSemanasUpdatedAt: new Date(lunes - 1),
+      });
+      await assertSucceeds(
+        setDoc(profileRef(uid), finishWrite(4), { merge: true }),
+      );
+    });
+
+    it("un doc con una racha legacy ya inflada sigue editable (sin congelación, #849)", async () => {
+      // El valor guardado no se puede forjar de nuevo, pero tampoco hay que
+      // inmovilizar al dueño que lo arrastra: re-presentarlo es `unchanged`.
+      await seedRacha({ rachaSemanas: 99, rachaSemanasUpdatedAt: weeksAgo(0) });
+      await assertSucceeds(
+        updateDoc(profileRef(uid), { displayName: "Alicia" }),
+      );
+      await assertSucceeds(updateDoc(profileRef(uid), { rachaSemanas: 99 }));
+    });
+
+    it("un create con la racha en 0 (o null) sigue pasando", async () => {
+      const fresh = "athlete-racha-create-ok";
+      await seed(fresh, { userGymId: "gym-a" });
+      await assertSucceeds(
+        setDoc(profileRef(fresh, fresh), { uid: fresh, rachaSemanas: 0 }),
+      );
+      const fresh2 = "athlete-racha-create-null";
+      await seed(fresh2, { userGymId: "gym-a" });
+      await assertSucceeds(
+        setDoc(profileRef(fresh2, fresh2), {
+          uid: fresh2,
+          rachaSemanas: null,
+        }),
+      );
+    });
+
+    it("el Admin SDK (seed/backfill/CF) escribe cualquier valor: saltea las reglas", async () => {
+      await seedRacha({ rachaSemanas: 3, rachaSemanasUpdatedAt: weeksAgo(1) });
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await assertSucceeds(
+          ctx
+            .firestore()
+            .collection(COL_PROFILES)
+            .doc(uid)
+            .update({ rachaSemanas: 12 }),
+        );
+      });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9. followersCount / followingCount — CF-write-only (auditoría QA 2026-11-06).
+//
+// Los mantiene SÓLO `maintainFollowCounters` (Admin SDK) desde #315; el
+// cliente no los escribe en ningún camino (`rg followersCount lib/` da sólo
+// lectura). Antes el dueño se ponía `{followersCount: 999999}` por REST y su
+// perfil público lo mostraba. Re-presentar el valor guardado sigue andando:
+// es lo que trae el doc mergeado en cualquier escritura parcial.
+// ---------------------------------------------------------------------------
+describe("userPublicProfiles rules — contadores de follow (CF-write-only)", () => {
+  const uid = "athlete-follow-counters";
+  const ref = () => testEnv.authenticatedContext(uid).firestore().collection(COL_PROFILES).doc(uid);
+
+  it.each([
+    ["inflar followersCount", { followersCount: 999999 }],
+    ["inflar followingCount", { followingCount: 999999 }],
+    ["un +1 sin follow detrás", { followersCount: 4 }],
+    ["bajarlo a 0", { followersCount: 0 }],
+    ["borrarlo", { followersCount: deleteField() }],
+  ])("deniega al dueño %s", async (_name, write) => {
+    await seed(uid, { userGymId: "gym-a", profile: { followersCount: 3, followingCount: 2 } });
+    await assertFails(ref().update(write));
+  });
+
+  it("deniega un create que siembra un contador; acepta ausente, null o 0", async () => {
+    await seed(uid, { userGymId: "gym-a" });
+    await assertFails(setDoc(doc(testEnv.authenticatedContext(uid).firestore(), COL_PROFILES, uid), {
+      uid, followersCount: 50,
+    }));
+    await assertSucceeds(setDoc(doc(testEnv.authenticatedContext(uid).firestore(), COL_PROFILES, uid), {
+      uid, followersCount: null, followingCount: 0,
+    }));
+  });
+
+  it("deja pasar escrituras que no tocan los contadores (los re-presenta el merge)", async () => {
+    await seed(uid, { userGymId: "gym-a", profile: { followersCount: 3, followingCount: 2 } });
+    await assertSucceeds(ref().set({ workoutsCount: 7, followersCount: 3 }, { merge: true }));
+  });
+
+  it("la CF (Admin SDK) los sigue escribiendo", async () => {
+    await seed(uid, { userGymId: "gym-a", profile: { followersCount: 3 } });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await assertSucceeds(ctx.firestore().collection(COL_PROFILES).doc(uid).update({ followersCount: 4 }));
+    });
   });
 });

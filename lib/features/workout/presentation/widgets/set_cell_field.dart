@@ -31,6 +31,8 @@ class SetCellField extends StatefulWidget {
     this.hint,
     this.hasError = false,
     this.focusNode,
+    this.max,
+    this.unit,
   }) : assert(
           decimal ? onDecimalChanged != null : onChanged != null,
           'decimal fields need onDecimalChanged; integer fields need onChanged',
@@ -56,6 +58,14 @@ class SetCellField extends StatefulWidget {
   /// Cuando es true el borde y el texto pasan a `danger`.
   final bool hasError;
 
+  /// Tope del campo [decimal], si NO es el del peso. Sin él, un campo decimal
+  /// es peso y topa en [kMaxWeightKg]: la distancia lo heredaba y no dejaba
+  /// pasar de 500 m (#1846). Los enteros (reps) topan siempre en [kMaxReps].
+  final double? max;
+
+  /// Unidad del aviso de tope («Máximo 500 kg»). Va con [max]; default `kg`.
+  final String? unit;
+
   @override
   State<SetCellField> createState() => _SetCellFieldState();
 }
@@ -69,6 +79,11 @@ class _SetCellFieldState extends State<SetCellField> {
   FocusNode? _propio;
 
   FocusNode get _foco => widget.focusNode ?? (_propio ??= FocusNode());
+
+  /// El tope vigente: reps, el de [SetCellField.max] o, en un decimal sin él,
+  /// el del peso.
+  double get _tope =>
+      widget.decimal ? (widget.max ?? kMaxWeightKg) : kMaxReps.toDouble();
 
   @override
   void initState() {
@@ -116,14 +131,14 @@ class _SetCellFieldState extends State<SetCellField> {
           // autorear un set imposible y que ese set fluya sin tocar hasta un
           // SetLog.
           BoundedNumberFormatter(
-            max: widget.decimal ? kMaxWeightKg : kMaxReps.toDouble(),
+            max: _tope,
             decimal: widget.decimal,
             // #1510: el tope no se traga la tecla en silencio.
             onOverMax: () => avisarTopeAlcanzado(
               context,
-              max: widget.decimal ? kMaxWeightKg : kMaxReps.toDouble(),
+              max: _tope,
               unit: widget.decimal
-                  ? 'kg'
+                  ? (widget.unit ?? 'kg')
                   : AppL10n.of(context).routineEditorFieldReps,
             ),
           ),

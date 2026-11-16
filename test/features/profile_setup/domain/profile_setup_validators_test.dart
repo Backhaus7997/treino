@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/profile_setup/domain/profile_setup_draft.dart';
 import 'package:treino/features/profile_setup/domain/profile_setup_validators.dart';
 
 /// Gate de edad mínima. Todos los casos inyectan [now]: sin eso, el test del
@@ -167,6 +168,82 @@ void main() {
         ),
         contains('${ProfileSetupValidators.kMinAgeYears} años'),
       );
+    });
+  });
+
+  // #1698: estos mensajes son la ÚNICA explicación de por qué SIGUIENTE queda
+  // apagado en el paso 5. Si el borrador rechaza un valor que el validador
+  // acepta, el botón vuelve a quedar apagado sin decir por qué.
+  group('peso y altura: el mensaje explica lo que el borrador rechaza', () {
+    test('peso: mensajes por rango y formato', () {
+      expect(
+          ProfileSetupValidators.validateBodyWeightKg(''), 'Ingresá tu peso');
+      expect(
+        ProfileSetupValidators.validateBodyWeightKg('   '),
+        'Ingresá tu peso',
+      );
+      expect(
+        ProfileSetupValidators.validateBodyWeightKg('abc'),
+        'Número inválido',
+      );
+      expect(
+        ProfileSetupValidators.validateBodyWeightKg('20'),
+        'Mínimo 20 kg',
+      );
+      expect(
+        ProfileSetupValidators.validateBodyWeightKg('300'),
+        'Máximo 300 kg',
+      );
+      expect(ProfileSetupValidators.validateBodyWeightKg('82,5'), isNull);
+    });
+
+    test('altura: mensajes por rango y formato', () {
+      expect(ProfileSetupValidators.validateHeightCm(''), 'Ingresá tu altura');
+      expect(
+        ProfileSetupValidators.validateHeightCm('1.5'),
+        'Número entero inválido',
+      );
+      expect(ProfileSetupValidators.validateHeightCm('100'), 'Mínimo 100 cm');
+      expect(ProfileSetupValidators.validateHeightCm('250'), 'Máximo 250 cm');
+      expect(ProfileSetupValidators.validateHeightCm('168'), isNull);
+    });
+
+    // `double.tryParse('NaN')` devuelve NaN, que no es ni <= 20 ni >= 300. El
+    // campo de peso no tiene `inputFormatters`: no filtra lo que recibe.
+    test('peso NaN es inválido', () {
+      expect(
+        ProfileSetupValidators.validateBodyWeightKg('NaN'),
+        'Número inválido',
+      );
+    });
+
+    // La misma conversión que hace `Step5WeightHeight._syncWeight` /
+    // `_syncHeight`: si el validador dice null, el borrador tiene que aceptarlo,
+    // y al revés.
+    test('validador y borrador coinciden en qué valores sirven', () {
+      const pesos = [
+        '', '19', '20', '20.5', '82', '82,5', '299', '299.9', '300', 'abc', //
+        'NaN', 'Infinity', '-5', '1e2',
+      ];
+      const alturas = ['', '99', '100', '101', '168', '249', '250', '999'];
+      for (final peso in pesos) {
+        final w = double.tryParse(peso.replaceAll(',', '.'));
+        final draft = ProfileSetupDraft(bodyWeightKg: w, heightCm: 168);
+        expect(
+          ProfileSetupValidators.validateBodyWeightKg(peso) == null,
+          draft.isStep5Valid,
+          reason: 'peso "$peso"',
+        );
+      }
+      for (final altura in alturas) {
+        final h = int.tryParse(altura.trim());
+        final draft = ProfileSetupDraft(bodyWeightKg: 82, heightCm: h);
+        expect(
+          ProfileSetupValidators.validateHeightCm(altura) == null,
+          draft.isStep5Valid,
+          reason: 'altura "$altura"',
+        );
+      }
     });
   });
 }

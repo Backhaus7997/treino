@@ -69,6 +69,9 @@ import '../../../core/utils/argentina_time.dart';
 /// [now] es un instante REAL (cualquier flag) — se normaliza con `.toUtc()`
 /// adentro, mismo contrato que `computeWeeklyStreak`. NO le pases
 /// `argentinaNow()`.
+///
+/// Y el techo de ESCRITURA —lo que `firestore.rules` le deja guardar al
+/// dueño— está en [rachaSemanasCeiling], justo abajo.
 int effectiveRachaSemanas({
   required int? rachaSemanas,
   required DateTime? rachaSemanasUpdatedAt,
@@ -85,4 +88,30 @@ int effectiveRachaSemanas({
   // server timestamp que lo escribió) — se acaba de escribir, así que es
   // fresco por construcción.
   return weeksOld <= 1 ? rachaSemanas : 0;
+}
+
+/// El techo de `rachaSemanas` que las reglas aceptan sobre un doc que guarda
+/// [stored] con el sello [stamp] (#1698). Es el ESPEJO de `rachaTopeDelDueno`
+/// en `firestore.rules`: si diverge, el write de la racha rebota con
+/// permission-denied y el board vuelve a decaer a 0 (#552).
+///
+/// El valor guardado más UNA semana por cada semana ART transcurrida desde el
+/// sello; una sola si nunca hubo sello. Una racha honesta crece justo así, y
+/// las escrituras que se perdieron suman las semanas que se saltearon. Lo que
+/// lo supera —un objetivo semanal que baja y estira la racha hacia atrás, o
+/// sesiones del reloj que no pasaron por `finish`— converge una semana por
+/// vez en lugar de quedar rechazado para siempre.
+///
+/// [now] es un instante REAL, mismo contrato que [effectiveRachaSemanas].
+int rachaSemanasCeiling({
+  required int? stored,
+  required DateTime? stamp,
+  required DateTime now,
+}) {
+  final base = stored ?? 0;
+  if (stamp == null) return base + 1;
+  final currentWeek = mondayOfWeekArt(toArgentina(now.toUtc()));
+  final stampWeek = mondayOfWeekArt(toArgentina(stamp.toUtc()));
+  final weeks = currentWeek.difference(stampWeek).inDays ~/ 7;
+  return base + (weeks > 0 ? weeks : 0);
 }

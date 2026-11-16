@@ -164,6 +164,10 @@ test('SCENARIO-CHATMEDIA-05b: a chat member can getDownloadURL on their own chat
 // Pure regression guard proving Slice A does not touch write/delete.
 // ---------------------------------------------------------------------------
 test('SCENARIO-CHATMEDIA-06: the owning uploader can write their own chat media', async () => {
+  // Since #1721 the `write` reads `chats/{chatId}` (member + not closed), so
+  // the chat doc has to exist — `getOrCreate` guarantees that in the app.
+  await seedChatAndMedia();
+
   const uploader = testEnv.authenticatedContext(MEMBER_A);
   await assertSucceeds(
     uploader
@@ -178,4 +182,23 @@ test('SCENARIO-CHATMEDIA-07: the owning uploader can delete their own chat media
 
   const uploader = testEnv.authenticatedContext(MEMBER_A);
   await assertSucceeds(uploader.storage().ref(MEDIA_PATH).delete());
+});
+
+// ---------------------------------------------------------------------------
+// #1721 — a CLOSED chat (`closedAt`, #1697) stops accepting uploads, but its
+// history stays readable: `get` checks membership and nothing else.
+// ---------------------------------------------------------------------------
+test('SCENARIO-CHATMEDIA-08: a member can still read the media of a CLOSED chat', async () => {
+  await seedChatAndMedia();
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection('chats')
+      .doc(CHAT_ID)
+      .update({ closedAt: new Date() });
+  });
+
+  const member = testEnv.authenticatedContext(MEMBER_B);
+  await assertSucceeds(member.storage().ref(MEDIA_PATH).getMetadata());
+  await assertSucceeds(member.storage().ref(MEDIA_PATH).getDownloadURL());
 });

@@ -1082,6 +1082,18 @@ abstract class AppL10n {
   /// **'MIS ARCHIVOS'**
   String get athleteFilesButtonLabel;
 
+  /// Botón de la tab Coach, con el vínculo pausado, que lleva a Entrenar donde sigue el plan que el PF le asignó.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS RUTINAS'**
+  String get athleteRoutinesButtonLabel;
+
+  /// Aviso de la card del PF en la tab Coach cuando el vínculo está pausado. Sólo afirma lo que la app y las reglas permiten con un vínculo pausado: ver las rutinas asignadas, los archivos compartidos, el plan nutricional y la agenda, y escribirle al PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF pausó el vínculo. Lo que ya te dejó —rutinas, archivos, plan nutricional y agenda— sigue a tu alcance y podés escribirle. Se reanuda cuando tu PF lo reactive.'**
+  String get athleteLinkPausedNote;
+
   /// Título de la pantalla read-only del plan nutricional del alumno.
   ///
   /// In es_AR, this message translates to:
@@ -1400,7 +1412,7 @@ abstract class AppL10n {
   /// **'Acepto consultas'**
   String get trainerAcceptsInquiriesTitle;
 
-  /// Subtítulo del toggle de consultas. Dice NUEVAS a propósito: `senderMayPost` autoriza incondicionalmente todo chat que ya tiene kind:inquiry, así que apagar el switch NO calla a quien ya venía hablando. Decir «sólo te escriben tus alumnos» era una promesa que el sistema no cumple.
+  /// Subtítulo del toggle de consultas. Dice NUEVAS a propósito: el switch (`acceptsInquiries`) sólo se evalúa al CREAR el chat, en `chatCreateOk`. `senderMayPost` no lo mira ni mira `kind` ni el follow: en un chat que ya existe escriben los dos miembros y sólo corta un bloqueo o `closedAt`. Así que apagar el switch NO calla a quien ya venía hablando. Decir «sólo te escriben tus alumnos» era una promesa que el sistema no cumple.
   ///
   /// In es_AR, this message translates to:
   /// **'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.'**
@@ -3073,6 +3085,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'CANCELADAS'**
   String get dashboardStatCanceladas;
+
+  /// PF mobile, Inicio → «Resumen del día»: cuántas sesiones de hoy el PF marcó como ausente (el alumno faltó, #1737). Va entre COMPLETADAS y CANCELADAS. Una columna angosta: tiene que quedar en una línea.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AUSENTES'**
+  String get dashboardStatAusentes;
 
   /// No description provided for @dashboardProximasSesionesSectionLabel.
   ///
@@ -5876,10 +5894,10 @@ abstract class AppL10n {
   /// **'Pausar vínculo'**
   String get coachHubDashboardPauseLinkTitle;
 
-  /// Coach Hub web dashboard — confirmation dialog body for pausing a link. Same copy is used from the alumnos section.
+  /// Coach Hub web dashboard — confirmation dialog body for pausing a link. Same copy is used from the alumnos section. Sólo afirma lo que pausar hace de verdad (#1843): el alumno conserva rutinas, plan nutricional, agenda y chat, y el PF deja de ver sus sesiones (se revoca `session_shares`). NO promete un bloqueo de sesiones: nada lo aplica.
   ///
   /// In es_AR, this message translates to:
-  /// **'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.'**
+  /// **'El alumno conserva sus rutinas, su plan nutricional, la agenda y el chat. Vos dejás de ver sus sesiones hasta que reanudes el vínculo.'**
   String get coachHubDashboardPauseLinkBody;
 
   /// Coach Hub web dashboard — confirmation dialog title before terminating a link.
@@ -5923,6 +5941,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos terminar el vínculo.'**
   String get coachHubDashboardTerminateLinkError;
+
+  /// Línea que se suma al diálogo de terminar un vínculo (Coach Hub y tab Coach del PF) cuando el PF tiene sesiones futuras con ese alumno: terminar el vínculo las cancela (#1792).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{También se cancela 1 sesión agendada con este alumno y se le avisa.} other{También se cancelan {count} sesiones agendadas con este alumno y se le avisa.}}'**
+  String coachHubTerminateLinkAppointmentsWarning(int count);
+
+  /// No description provided for @coachHubTerminateLinkAppointmentsWarningUnknown.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos revisar tus sesiones con este alumno. Las que tengas a futuro también se cancelan y se le avisa.'**
+  String get coachHubTerminateLinkAppointmentsWarningUnknown;
+
+  /// No description provided for @coachHubTerminateLinkAppointmentsError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cancelar las sesiones futuras con este alumno, así que el vínculo sigue activo. Probá de nuevo.'**
+  String get coachHubTerminateLinkAppointmentsError;
 
   /// Coach Hub web dashboard — snackbar when resume() fails.
   ///
@@ -6356,6 +6392,54 @@ abstract class AppL10n {
   /// **'No entrenaste este día.'**
   String get insightsDayEmptyHint;
 
+  /// Encabezado de InsightsScreen (el hub de estadísticas del alumno), junto a la flecha de volver.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'INSIGHTS'**
+  String get insightsScreenTitle;
+
+  /// InsightsScreen de una cuenta que nunca completó un entrenamiento: no hay nada que reportar de entrenos. Debajo sigue el tile de Medidas, que sí es alcanzable (#1696).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Empezá a entrenar para ver tus insights.'**
+  String get insightsEmptyState;
+
+  /// Tooltip y etiqueta de accesibilidad del chevron ‹ de la tarjeta SEMANA de InsightsScreen: pagina a la semana anterior.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana anterior'**
+  String get insightsPreviousWeekTooltip;
+
+  /// Tooltip y etiqueta de accesibilidad del chevron › de la tarjeta SEMANA de InsightsScreen: pagina a la semana siguiente. Deshabilitado en la semana en curso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana siguiente'**
+  String get insightsNextWeekTooltip;
+
+  /// Rango de la semana mostrada en la tarjeta SEMANA de InsightsScreen. {start} y {end} ya vienen formateados con el día y el mes abreviado en mayúsculas (ej. 18 MAY y 24 MAY).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEMANA · {start} – {end}'**
+  String insightsWeekRange(String start, String end);
+
+  /// Encabezado de la tarjeta de músculos trabajados en el día elegido de la tira de la semana de InsightsScreen. Mismo texto que coachDailyHeatmapSectionTitle, que es del detalle de alumno del PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MÚSCULOS DEL DÍA'**
+  String get insightsDayMusclesHeading;
+
+  /// Unidad que va después de la cantidad en cada fila de la tarjeta de músculos del día de InsightsScreen (p. ej. «6 SETS»). Va en mayúsculas porque se dibuja con la tipografía de etiquetas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SETS'**
+  String get insightsDaySetsUnit;
+
+  /// Botón del pie de InsightsScreen: vuelve a la pantalla anterior o a Inicio (_safePopOrHome).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLVER'**
+  String get insightsBackButton;
+
   /// Section header for the shared DailyHeatmapSection (per-day body heat-map + day-strip) in the coach's mobile athlete detail screen (charts-redesign PR2b, AD5).
   ///
   /// In es_AR, this message translates to:
@@ -6374,6 +6458,18 @@ abstract class AppL10n {
   /// **'Esta sesión no tiene sets registrados.'**
   String get sessionDetailNoSets;
 
+  /// Distancia de una serie por DISTANCIA ya hecha (#1701): fila del historial/detalle de sesión y mejor serie del resumen post-entreno. {meters} ya viene formateado con el separador del locale (ej. 40 o 1.500).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{meters} m'**
+  String workoutSetDistanceValue(String meters);
+
+  /// Valor de una serie vieja por tiempo o distancia que se guardó como 0 reps / 0 kg, sin tiempo ni metros (#1701). Un guion en vez de afirmar «0 reps 0 kg», que es falso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'—'**
+  String get workoutSetNoMetric;
+
   /// Snackbar al salir del player porque el reloj cerro el entreno. El reloj escribe en la misma sesion, asi que terminar alla termina aca.
   ///
   /// In es_AR, this message translates to:
@@ -6391,6 +6487,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos finalizar la sesión. Probá de nuevo.'**
   String get sessionFinishError;
+
+  /// Título del estado de error del player cuando no se pudo armar la sesión: retomar una sesión ajena, inexistente o ya cerrada, un timeout de lectura, una rutina borrada o un rechazo del servidor (#1728). No afirma cuál fue la causa, porque la pantalla no la distingue.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir el entrenamiento'**
+  String get sessionLoadErrorTitle;
+
+  /// Cuerpo del estado de error del player. Apunta al botón de abajo (sessionLoadErrorCta).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volvé al inicio y probá de nuevo.'**
+  String get sessionLoadErrorBody;
+
+  /// Botón del estado de error del player: va a Inicio con context.go('/home'). Es la única salida cuando el player es la única ruta del stack (recarga en web, deep link).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volver al inicio'**
+  String get sessionLoadErrorCta;
 
   /// Caption under the disabled TERMINAR SESIÓN button while the athlete has logged zero sets (#1511). Explains why it is disabled and where the other exit is.
   ///
@@ -6871,6 +6985,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Volumen'**
   String get progressionMetricVolume;
+
+  /// [#1715] Label for the longest-timed-set metric (chip, personal record, session PR) of a timed exercise like a plank.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tiempo máximo'**
+  String get progressionMetricLongestDuration;
+
+  /// [#1715] Label for the longest-distance-set metric (chip, personal record, session PR) of a distance exercise like a farmer's carry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Distancia máxima'**
+  String get progressionMetricLongestDistance;
 
   /// Frecuencia stat label showing session count in the last 8 weeks.
   ///
@@ -7418,6 +7544,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Peso y medidas corporales en el tiempo'**
   String get insightsTileMeasurementsSubtitle;
+
+  /// Perfil (alumno) → grupo ENTRENAMIENTO: título de la fila que abre el hub de Insights (/home/insights). La fila de Medidas, justo debajo, reusa insightsTileMeasurementsTitle/Subtitle (#1719).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Insights'**
+  String get profileInsightsTileTitle;
+
+  /// Perfil (alumno) → grupo ENTRENAMIENTO: subtítulo de la fila de Insights.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu semana, tu racha y tus reportes'**
+  String get profileInsightsTileSubtitle;
 
   /// Header title for the dedicated MeasurementsScreen.
   ///
@@ -8198,6 +8336,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No podés escribir en este chat'**
   String get chatBlockedComposerHintA11y;
+
+  /// Aviso persistente que reemplaza al composer cuando el chat está cerrado: el vínculo PF↔alumno del par terminó (Chat.closedAt, #1697). El historial sigue legible y si el par se vuelve a vincular el chat reabre. Texto neutro a propósito: lo ve cualquiera de los dos lados, sin saber quién terminó el vínculo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El vínculo terminó. Ya no se pueden enviar mensajes en este chat.'**
+  String get chatClosedComposerNotice;
 
   /// Pill de la lista de seguidores en la pantalla de seguidores/seguidos.
   ///
@@ -9447,6 +9591,48 @@ abstract class AppL10n {
   /// **'No pudimos bloquear. Probá de nuevo.'**
   String get moderationBlockError;
 
+  /// Desbloquear a alguien que el usuario bloqueo. Label del item del menu de moderacion (reemplaza a Bloquear si ya esta bloqueado), del boton del aviso de bloqueo del chat y de la lista de bloqueados.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Desbloquear'**
+  String get moderationUnblockAction;
+
+  /// Success snackbar after unblocking someone.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Desbloqueaste a {name}.'**
+  String moderationUnblockSuccess(String name);
+
+  /// Error snackbar when unblocking fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos desbloquear. Probá de nuevo.'**
+  String get moderationUnblockError;
+
+  /// Titulo de la pantalla de usuarios bloqueados y de la fila de Privacidad que la abre.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usuarios bloqueados'**
+  String get blockedUsersTitle;
+
+  /// Parrafo sobre la lista. La 1a frase repite moderationBlockConfirmBody. La 2a es cierta porque el trigger removeFollowEdgesOnBlock corre solo al CREAR el bloqueo (ver el comentario del delete en las rules de blocks).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Las personas que bloqueaste no pueden escribirte, seguirte ni reaccionar a tus posts. Desbloquear no restaura los seguimientos: si se seguían, tienen que volver a seguirse.'**
+  String get blockedUsersExplainer;
+
+  /// Estado vacio de la lista de usuarios bloqueados.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No bloqueaste a nadie.'**
+  String get blockedUsersEmpty;
+
+  /// Error de carga de la lista de usuarios bloqueados. Va con coachRetryLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu lista. Probá de nuevo.'**
+  String get blockedUsersLoadError;
+
   /// Error mostrado cuando el filtro de terminos vetados rechaza un texto. NO nombra el termino que lo disparo a proposito: decirlo convierte al filtro en un oraculo para encontrarle el borde.
   ///
   /// In es_AR, this message translates to:
@@ -10458,6 +10644,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VER DETALLE'**
   String get coachHubPdfFailedAction;
+
+  /// PF mobile: el alumno no tiene vínculo vivo (activo o pausado) y se frena crear o asignar una rutina (#1695). Lo usan la ficha, el editor, la importación de PDF y el aviso de «No se asignó nada».
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este alumno no tiene un vínculo vigente con vos, así que no podés asignarle una rutina.'**
+  String get coachAssignNoLink;
+
+  /// PF mobile: no se pudo leer el roster, causa DISTINTA de no tener vínculo (#1695). No afirma que el vínculo terminó.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos verificar tu vínculo con este alumno. Probá de nuevo.'**
+  String get coachAssignLinkUnverified;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

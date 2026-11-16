@@ -21,6 +21,44 @@ double? calculateOneRepMax({required double weightKg, required int reps}) {
 /// Internal aggregation always keeps full double precision.
 double roundToNearestHalfKg(double value) => (value * 2).round() / 2;
 
+/// [#1715] El mayor tiempo (segundos) entre las series de [logs] por TIEMPO, o
+/// `null` si ninguna trae `durationSeconds` positivo (series por reps/peso, o
+/// guardadas antes de #1701, sin dato).
+///
+/// Es lo que el atleta COMPLETÓ: el player guarda la serie por tiempo al
+/// terminar la cuenta regresiva, así que el valor es el prescripto. Un récord
+/// sobre eso es «el hold más largo que terminé», y sube cuando el plan sube.
+int? bestDurationSecondsOf(Iterable<SetLog> logs) {
+  int? best;
+  for (final log in logs) {
+    final seconds = log.durationSeconds;
+    if (seconds == null || seconds <= 0) continue;
+    if (best == null || seconds > best) best = seconds;
+  }
+  return best;
+}
+
+/// [#1715] Los mayores metros entre las series de [logs] por DISTANCIA, o
+/// `null` si ninguna trae `distanceMeters` positivo. Misma regla que
+/// [bestDurationSecondsOf].
+double? bestDistanceMetersOf(Iterable<SetLog> logs) {
+  double? best;
+  for (final log in logs) {
+    final meters = log.distanceMeters;
+    if (meters == null || meters <= 0) continue;
+    if (best == null || meters > best) best = meters;
+  }
+  return best;
+}
+
+/// [#1715] Si [log] aporta a algún gráfico de progresión: carga (#368), tiempo
+/// o distancia. Lo comparten el agregador y `athleteExerciseListProvider`, para
+/// que «tiene datos en el período» no se desvíe de lo que el gráfico dibuja.
+bool isChartableSet(SetLog log) =>
+    log.weightKg > 0 ||
+    (log.durationSeconds ?? 0) > 0 ||
+    (log.distanceMeters ?? 0) > 0;
+
 /// [#377] Whether [session] falls inside [window]'s CURRENT period — the
 /// exact calendar-day (ART) comparison [aggregateExerciseProgression] applies
 /// before building the 4 series. Shared with `athleteExerciseListProvider`'s
@@ -80,11 +118,20 @@ List<PersonalRecord> derivePersonalRecords(
 /// best set as reps-only in that case. [sessionVolume] sums ONLY weighted
 /// sets (same #368 rule as [aggregateExerciseProgression]'s volume series),
 /// so it is 0 for bodyweight-only sessions.
+///
+/// [bestDurationSeconds]/[bestDistanceMeters] (#1716): the best set of a TIMED
+/// or DISTANCE exercise — the longest time / the most meters of the session.
+/// Those sets are logged with weight and reps at 0 (#1702), so
+/// [bestWeightKg]/[bestSetReps] say nothing about them. `null` when no set of
+/// the exercise carries that metric (reps/weight work, or pre-#1702 sets with
+/// no data) — same convention as `SessionExerciseSummary`.
 typedef ExerciseSessionHistoryEntry = ({
   DateTime date,
   int setCount,
   double bestWeightKg,
   int bestSetReps,
+  int? bestDurationSeconds,
+  double? bestDistanceMeters,
   double sessionVolume,
 });
 
@@ -111,6 +158,9 @@ const int kExerciseHistoryMaxEntries = 20;
 ///   set with `bestWeightKg = 0`;
 /// - `setCount` is weight-agnostic (a bodyweight set still counts as a set,
 ///   matching the frecuencia stat's weight-agnostic spirit);
+/// - a timed / distance exercise (#1716) also yields the longest
+///   `durationSeconds` / the most `distanceMeters` of the session, the same
+///   max-of-the-session rule `aggregateSessionHighlights` applies (#1701);
 /// - dates are `startedAt.toLocal()` for display (#380).
 List<ExerciseSessionHistoryEntry> deriveExerciseSessionHistory({
   required String exerciseId,
@@ -145,6 +195,8 @@ List<ExerciseSessionHistoryEntry> deriveExerciseSessionHistory({
       setCount: setCount,
       bestWeightKg: best!.weightKg,
       bestSetReps: best.reps,
+      bestDurationSeconds: bestDurationSecondsOf(exerciseLogs),
+      bestDistanceMeters: bestDistanceMetersOf(exerciseLogs),
       sessionVolume: volume,
     ));
     if (entries.length >= maxEntries) break;
@@ -189,6 +241,11 @@ List<ExerciseSessionHistoryEntry> deriveExerciseSessionHistory({
 ///   points (nor, downstream, "0 kg" personal records). A session whose sets
 ///   are all 0kg is omitted from these series entirely, mirroring how
 ///   all-reps<=0 sessions drop out of the 1RM series.
+///   - [ExerciseProgression.bestDurationSeries] /
+///     [ExerciseProgression.bestDistanceSeries] (#1715): the longest timed set
+///     / the most meters of each session, from the sets that carry
+///     `durationSeconds` / `distanceMeters`. Independent of the weight rules
+///     above: a plank has no weight and still has a series.
 ///   - [ExerciseProgression.personalRecords]: first-achieved-date record per
 ///     series that has data, via [derivePersonalRecords].
 ///   - [ExerciseProgression.frequencySessionCount]: count of sessions with
@@ -241,6 +298,8 @@ ExerciseProgression aggregateExerciseProgression({
   // récord la necesita para mostrarse como «80 kg × 7» (#1512).
   final bestSetVolumeLogs = <SetLog>[];
   final bestSessionVolumePoints = <ProgressionPoint>[];
+  final bestDurationPoints = <ProgressionPoint>[];
+  final bestDistancePoints = <ProgressionPoint>[];
   int frecuencia = 0;
   String? resolvedName;
 
@@ -291,6 +350,19 @@ ExerciseProgression aggregateExerciseProgression({
       );
       bestSessionVolumePoints
           .add(ProgressionPoint(date: localDate, value: sessionVolume));
+    }
+
+    // #1715: tiempo y distancia, con su propia regla (no pasan por el filtro de
+    // peso de arriba: una plancha guarda peso 0 y reps 0).
+    final bestDuration = bestDurationSecondsOf(exerciseLogs);
+    if (bestDuration != null) {
+      bestDurationPoints.add(
+          ProgressionPoint(date: localDate, value: bestDuration.toDouble()));
+    }
+    final bestDistance = bestDistanceMetersOf(exerciseLogs);
+    if (bestDistance != null) {
+      bestDistancePoints
+          .add(ProgressionPoint(date: localDate, value: bestDistance));
     }
 
     // [AD2] 1RM = max Epley estimate across this session's valid sets
@@ -348,6 +420,10 @@ ExerciseProgression aggregateExerciseProgression({
     }),
     ...derivePersonalRecords(bestSessionVolumePoints,
         recordType: ProgressionRecordType.bestSessionVolume),
+    ...derivePersonalRecords(bestDurationPoints,
+        recordType: ProgressionRecordType.longestDuration),
+    ...derivePersonalRecords(bestDistancePoints,
+        recordType: ProgressionRecordType.longestDistance),
   ];
 
   return ExerciseProgression(
@@ -359,5 +435,7 @@ ExerciseProgression aggregateExerciseProgression({
     bestSessionVolumeSeries: bestSessionVolumePoints,
     personalRecords: personalRecords,
     frequencySessionCount: frecuencia,
+    bestDurationSeries: bestDurationPoints,
+    bestDistanceSeries: bestDistancePoints,
   );
 }

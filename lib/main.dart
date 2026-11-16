@@ -60,6 +60,14 @@ Future<void> main() async {
       GoogleFonts.barlow(fontWeight: FontWeight.w700),
     ]);
 
+    if (kUsaEmuladores) {
+      // ANTES de `initializeApp` (#1692). Sólo hace algo en web, y este entry
+      // no es el del web target —ver más abajo—, pero si alguien lo corre ahí
+      // con `USE_EMULATOR` el plugin de Auth restaura la sesión por red y deja
+      // a Auth en PRODUCCIÓN. Ver `limpiarSesionDeAuthParaEmulador`.
+      await limpiarSesionDeAuthParaEmulador();
+    }
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -171,11 +179,7 @@ Future<void> main() async {
     // Android), so no explicit args are needed here.
     await GoogleSignIn.instance.initialize();
 
-    const useEmulator = bool.fromEnvironment(
-      'USE_EMULATOR',
-      defaultValue: false,
-    );
-    if (useEmulator) {
+    if (kUsaEmuladores) {
       // Firestore, Auth, Functions y Storage, en una sola función que comparte
       // con el Coach Hub — ver su dartdoc. Requiere `./scripts/emulator.sh`
       // (fija --project treino-dev; el default de .firebaserc es
@@ -197,8 +201,13 @@ Future<void> main() async {
     // preferencias, que recién se resuelven en esta línea.
     //
     // El default sigue siendo habilitado — ver `analyticsConsentFromPrefs`.
-    await FirebaseAnalytics.instance
-        .setAnalyticsCollectionEnabled(analyticsConsentFromPrefs(prefs));
+    //
+    // Con `USE_EMULATOR` queda apagada: Analytics no tiene emulador y sus
+    // eventos salen al proyecto real, que es producción (#1698). Ver
+    // `analyticsEfectiva`.
+    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(
+      analyticsEfectiva(analyticsConsentFromPrefs(prefs)),
+    );
 
     runApp(
       ProviderScope(
@@ -209,10 +218,34 @@ Future<void> main() async {
         child: const TreinoApp(),
       ),
     );
-  }, (error, stack) {
-    // Cualquier async uncaught dentro del zone cae acá.
-    if (!kIsWeb) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    }
-  });
+  }, manejarErrorNoCapturado);
+}
+
+/// Qué hace el `runZonedGuarded` de [main] con un error async no capturado.
+///
+/// En mobile va a Crashlytics como FATAL. En web se IMPRIME: Crashlytics no
+/// soporta web (`firebase_crashlytics` declara sólo android, ios y macos), y
+/// antes el handler era un `if (!kIsWeb)` sin `else`, o sea que el error se
+/// descartaba sin dejar rastro —ni en la consola del navegador— (QA E2E
+/// 2026-11-06, #1698). `debugPrint` sale por `console.log` y sobrevive al
+/// build de release; `dart:developer` no (en web `log()` es un no-op), por eso
+/// `reportNonFatal` hace lo mismo. Nunca se traga un error en silencio.
+///
+/// [web] y [registrarFatal] existen para probarla sin Firebase ni navegador.
+@visibleForTesting
+void manejarErrorNoCapturado(
+  Object error,
+  StackTrace stack, {
+  bool web = kIsWeb,
+  void Function(Object error, StackTrace stack)? registrarFatal,
+}) {
+  if (web) {
+    debugPrint('[uncaught] $error\n$stack');
+    return;
+  }
+  (registrarFatal ??
+      (e, s) => FirebaseCrashlytics.instance.recordError(e, s, fatal: true))(
+    error,
+    stack,
+  );
 }

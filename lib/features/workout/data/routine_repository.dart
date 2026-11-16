@@ -5,7 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         FieldValue,
         FirebaseException,
         FirebaseFirestore,
+        Query,
         QueryDocumentSnapshot,
+        QuerySnapshot,
         Timestamp;
 
 import '../../../core/analytics/analytics_service.dart';
@@ -518,18 +520,48 @@ class RoutineRepository {
   ///
   /// REQ-COACH-PLANS-001, SCENARIO-432, SCENARIO-433.
   Future<List<Routine>> listAssignedTo(String athleteId) async {
-    final snap = await _collection
-        .where('assignedTo', isEqualTo: athleteId)
-        .where('source', isEqualTo: 'trainer-assigned')
-        .orderBy('createdAt', descending: true)
-        .limit(20)
-        .get();
-    return snap.docs
-        .map(_fromDoc)
-        .whereType<Routine>()
-        .where((r) => r.status != RoutineStatus.archived)
-        .toList();
+    final snap = await _assignedToQuery(athleteId).get();
+    return _notArchived(snap);
   }
+
+  /// Versión EN VIVO de [listAssignedTo]: la misma query, la misma regla de
+  /// las archivadas, pero re-emite cada vez que el PF asigna, edita o archiva
+  /// un plan (o lo hace `cleanupAssignedPlansOnUnlink` al terminar el vínculo).
+  ///
+  /// La app del alumno lee esto desde `assignedRoutinesProvider`. Con el
+  /// `get()` de un solo disparo, lo que el PF hacía después de abrir la app no
+  /// se veía hasta recargar (#1698): el plan nuevo no aparecía, y el archivado
+  /// seguía siendo arrancable.
+  ///
+  /// Comparte [_assignedToQuery] y [_notArchived] con [listAssignedTo] a
+  /// propósito: son dos formas de leer LO MISMO, y si cada una armara su
+  /// query/filtro, la próxima vez que cambie uno (el límite, el índice, el
+  /// criterio de «archivada») el otro quedaría atrás sin que nada lo avise.
+  ///
+  /// Mismos requisitos de índice y de reglas que [listAssignedTo]: un listener
+  /// de query pasa por las mismas reglas que un `get()` de query, así que la
+  /// prueba `uid == assignedTo` del alumno vale igual.
+  Stream<List<Routine>> watchAssignedTo(String athleteId) {
+    if (athleteId.isEmpty) return Stream.value(const []);
+    return _assignedToQuery(athleteId).snapshots().map(_notArchived);
+  }
+
+  /// La query de [listAssignedTo] y [watchAssignedTo]. Ver la doc de la
+  /// primera para el índice y para por qué el filtro de `status` NO va acá.
+  Query<Map<String, Object?>> _assignedToQuery(String athleteId) => _collection
+      .where('assignedTo', isEqualTo: athleteId)
+      .where('source', isEqualTo: 'trainer-assigned')
+      .orderBy('createdAt', descending: true)
+      .limit(20);
+
+  /// El filtro del lado del cliente de [listAssignedTo]: saca las ARCHIVADAS y
+  /// los docs que no se pueden mapear.
+  List<Routine> _notArchived(QuerySnapshot<Map<String, Object?>> snap) =>
+      snap.docs
+          .map(_fromDoc)
+          .whereType<Routine>()
+          .where((r) => r.status != RoutineStatus.archived)
+          .toList();
 
   /// Returns the plans [trainerId] assigned to [athleteId], newest first.
   ///

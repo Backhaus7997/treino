@@ -1483,6 +1483,8 @@ class _ResumenTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final trainerUid = ref.watch(currentUidProvider);
+    final puedeAsignar =
+        ref.watch(alumnoConVinculoVivoProvider(athleteId)).valueOrNull == true;
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
     final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
     final routinesAsync = ref.watch(assignedRoutinesByTrainerProvider(
@@ -1568,7 +1570,11 @@ class _ResumenTab extends ConsumerWidget {
             ? [
                 _SinRutinaNotice(
                   palette: palette,
-                  onAsignar: () => context.push('/routine-editor/$athleteId'),
+                  // Sin vínculo vivo no hay salida a asignar (#1695): en un
+                  // ex-alumno el botón creaba una rutina que él no puede borrar.
+                  onAsignar: puedeAsignar
+                      ? () => context.push('/routine-editor/$athleteId')
+                      : null,
                 ),
                 const SizedBox(width: 10),
                 pesoCard,
@@ -1726,7 +1732,9 @@ class _SinRutinaNotice extends StatelessWidget {
   const _SinRutinaNotice({required this.palette, required this.onAsignar});
 
   final AppPalette palette;
-  final VoidCallback onAsignar;
+
+  /// `null` → no se ofrece asignar (el alumno no tiene vínculo vivo).
+  final VoidCallback? onAsignar;
 
   @override
   Widget build(BuildContext context) {
@@ -1769,14 +1777,16 @@ class _SinRutinaNotice extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: AppSpacing.s12),
-            TreinoButton(
-              label: 'Asignar rutina', // i18n
-              icon: TreinoIcon.plus,
-              variant: TreinoButtonVariant.ghostAccent,
-              size: TreinoButtonSize.sm,
-              onPressed: onAsignar,
-            ),
+            if (onAsignar != null) ...[
+              const SizedBox(width: AppSpacing.s12),
+              TreinoButton(
+                label: 'Asignar rutina', // i18n
+                icon: TreinoIcon.plus,
+                variant: TreinoButtonVariant.ghostAccent,
+                size: TreinoButtonSize.sm,
+                onPressed: onAsignar,
+              ),
+            ],
           ],
         ),
       ),
@@ -2749,6 +2759,8 @@ class _RutinaTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final trainerUid = ref.watch(currentUidProvider);
+    final puedeAsignar =
+        ref.watch(alumnoConVinculoVivoProvider(athleteId)).valueOrNull == true;
     final routinesAsync = ref.watch(assignedRoutinesByTrainerProvider(
       (trainerId: trainerUid ?? '', athleteId: athleteId),
     ));
@@ -2761,14 +2773,16 @@ class _RutinaTab extends ConsumerWidget {
           Row(
             children: [
               Expanded(child: _sectionLabel(palette, 'RUTINA ACTIVA')), // i18n
-              TreinoButton(
-                label: 'Asignar rutina', // i18n: Fase W2
-                icon: TreinoIcon.plus,
-                variant: TreinoButtonVariant.ghostAccent,
-                size: TreinoButtonSize.sm,
-                onPressed: () =>
-                    context.push('/routine-editor/$athleteId'), // i18n
-              ),
+              // Mismo gate que el aviso de «Sin rutina asignada» (#1695).
+              if (puedeAsignar)
+                TreinoButton(
+                  label: 'Asignar rutina', // i18n: Fase W2
+                  icon: TreinoIcon.plus,
+                  variant: TreinoButtonVariant.ghostAccent,
+                  size: TreinoButtonSize.sm,
+                  onPressed: () =>
+                      context.push('/routine-editor/$athleteId'), // i18n
+                ),
             ],
           ),
           const SizedBox(height: 10),
@@ -2897,8 +2911,11 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               oneRepMaxLabel: '1RM', // i18n: Fase W2
               bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
               bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
+              longestDurationLabel: 'Tiempo máximo', // i18n: Fase W2
+              longestDistanceLabel: 'Distancia máxima', // i18n: Fase W2
               volumeUnit: 'kg', // i18n: Fase W2
               weightUnit: 'kg', // i18n: Fase W2
+              distanceUnit: 'm', // i18n: Fase W2
               // #555: el count viene acotado al período activo del selector.
               frequencyLabel: (n) => n == 1
                   ? '1 sesión en este período' // i18n: Fase W2
@@ -2922,8 +2939,11 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               oneRepMaxLabel: '1RM', // i18n: Fase W2
               bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
               bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
+              longestDurationLabel: 'Tiempo máximo', // i18n: Fase W2
+              longestDistanceLabel: 'Distancia máxima', // i18n: Fase W2
               volumeUnit: 'kg', // i18n: Fase W2
               weightUnit: 'kg', // i18n: Fase W2
+              distanceUnit: 'm', // i18n: Fase W2
               emptyText:
                   'Sin datos suficientes para este ejercicio.', // i18n: Fase W2
               localeName: 'es_AR', // i18n: Fase W2
@@ -3216,10 +3236,17 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
                   ),
                   Expanded(
                     flex: 2,
-                    child:
-                        Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
-                            style: c,
-                            textAlign: TextAlign.right),
+                    // #1701: sin carga no hay volumen. Una sesión sólo de series
+                    // por tiempo o por distancia tiene `totalVolumeKg == 0`, y
+                    // «0 kg» afirma un dato que no existe. En una tabla la
+                    // columna no puede faltar en una sola fila: va el mismo
+                    // «—» de la fecha cuando no hay dato.
+                    child: Text(
+                        s.totalVolumeKg > 0
+                            ? '${s.totalVolumeKg.round()} kg' // i18n: Fase W2
+                            : '—',
+                        style: c,
+                        textAlign: TextAlign.right),
                   ),
                   SizedBox(
                     width: 24,

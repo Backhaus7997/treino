@@ -256,4 +256,62 @@ void main() {
       expect(find.byType(TrainerProfileView), findsOneWidget);
     });
   });
+
+  // #1738: el aviso de «Editar perfil de entrenador» manda a «Datos personales»,
+  // y esa fila sólo existía en CUENTA del atleta (`_AthleteProfile`): el PF no
+  // tenía forma de llegar a cambiar su nombre ni su avatar.
+  group('«Datos personales» (#1738)', () {
+    GoRouter buildRouter() => GoRouter(
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (_, __) => const Scaffold(body: TrainerProfileView()),
+            ),
+            GoRoute(
+              path: '/profile/edit-personal',
+              builder: (_, __) => const Scaffold(body: Text('EDITAR PERFIL')),
+            ),
+          ],
+        );
+
+    testWidgets(
+        'el PF ve la fila, con la misma etiqueta que la CUENTA del atleta',
+        (tester) async {
+      await tester.pumpWidget(_harness());
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Datos personales'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Datos personales'), findsOneWidget);
+      final l10n = AppL10n.of(tester.element(find.byType(TrainerProfileView)));
+      expect(l10n.profileCuentaDatosPersonalesTitle, 'Datos personales');
+    });
+
+    testWidgets(
+        'abre /profile/edit-personal con push, y se puede volver al perfil',
+        (tester) async {
+      final router = buildRouter();
+      await tester.pumpWidget(_harness(router: router));
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Datos personales'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Datos personales'));
+      await tester.pumpAndSettle();
+
+      expect(locationActualDe(router), '/profile/edit-personal');
+      expect(find.text('EDITAR PERFIL'), findsOneWidget);
+
+      router.pop();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TrainerProfileView), findsOneWidget);
+    });
+  });
 }

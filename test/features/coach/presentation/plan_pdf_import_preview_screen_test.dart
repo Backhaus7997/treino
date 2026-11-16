@@ -12,6 +12,9 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/moderation/moderation_guard.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinkRepositoryProvider;
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/plan_pdf_import_preview_screen.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
@@ -27,7 +30,9 @@ import 'package:treino/features/workout/data/custom_exercise_repository.dart';
 import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
+import '../../../helpers/trainer_links.dart';
 import '../../coach_hub/presentation/periodized_draft_fixtures.dart';
 
 class _MockCustomRepo extends Mock implements CustomExerciseRepository {}
@@ -173,6 +178,7 @@ void main() {
     PeriodizedImportDraft draft, {
     CustomExerciseQuota quota = (limit: null, count: 0),
     String? owner = kAthleteId,
+    List<Override> extra = const [],
   }) async {
     final router = GoRouter(
       initialLocation: '/coach/athlete/$kAthleteId',
@@ -206,6 +212,7 @@ void main() {
       exercisesProvider.overrideWith((ref) async => const []),
       userRepositoryProvider.overrideWithValue(userRepo),
       cloudFunctionsProvider.overrideWithValue(functions),
+      ...extra,
     ]);
     addTearDown(container.dispose);
     await tester.pumpWidget(UncontrolledProviderScope(
@@ -483,6 +490,29 @@ void main() {
       await tester.tap(find.text('ABRIR EDITOR'));
       await tester.pumpAndSettle();
       expect(find.text('editor:$kAthleteId:nuevo-1'), findsOneWidget);
+    });
+
+    // #1695: el alumno pudo cortar el vínculo con la vista previa abierta, y
+    // las rules no lo frenan. `assign` lo pregunta al servidor antes de escribir.
+    testWidgets('si el vínculo terminó: no escribe y dice por qué',
+        (tester) async {
+      final servidor = await repoConVinculos([
+        linkDe(kAthleteId, status: TrainerLinkStatus.terminated),
+      ]);
+      await pump(tester, _casiResuelto(), extra: [
+        trainerLinkRepositoryProvider.overrideWithValue(servidor),
+      ]);
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(assignButton());
+      await tester.pumpAndSettle();
+
+      verifyNever(() => routineRepo.createAssigned(any()));
+      expect(find.text('FICHA'), findsNothing);
+      final l10n =
+          AppL10n.of(tester.element(find.byType(PlanPdfImportPreviewScreen)));
+      expect(find.text(l10n.coachAssignNoLink), findsOneWidget);
     });
 
     testWidgets('salir con cosas resueltas pregunta; «Salir igual» descarta',

@@ -76,11 +76,19 @@ class _TrainerInquiryCtaState extends ConsumerState<TrainerInquiryCta> {
       // estampa al CREAR. Un chat social preexistente —creado cuando el PF
       // seguía al alumno, y después dejó de seguirlo— llega hasta acá sin
       // `kind`, y desde el cliente no se puede agregar: está pineado inmutable
-      // en las rules. Sin esto, el alumno no le puede escribir NUNCA MÁS a ese
-      // PF, con un cartel que le echa la culpa al follow.
+      // en las rules. Se le pide al servidor que la estampe para que ese chat
+      // quede marcado como consulta, igual que uno nacido de este botón.
       //
-      // Chat de Coach (`linkId != null`) no lleva marca: ya escapa por su
-      // propia rama, y marcarlo dejaría un campo mentiroso.
+      // OJO: hasta el 2026-10-21 la marca era lo que le daba escritura al
+      // alumno (sin ella, «Para escribirle, esta persona tiene que seguirte»).
+      // Desde REQ-FOLLOW-012 ya no: `senderMayPost` no mira `kind` ni `linkId`
+      // ni el follow, y en un chat existente escriben los dos miembros. `kind`
+      // sólo lo lee `chatCreateOk`, al CREAR el chat, así que estampar acá deja
+      // un dato que ninguna rule consulta después. Esta llamada, y la callable
+      // `promoteChatToInquiry`, son candidatas a código muerto (#1722).
+      //
+      // Chat de Coach (`linkId != null`) no lleva marca: ya es un chat de
+      // Coach, y marcarlo dejaría un campo mentiroso.
       if (chat.linkId == null && !chat.isInquiry) {
         try {
           await ref

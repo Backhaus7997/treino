@@ -17,19 +17,33 @@ class DashboardDayCounts {
     required this.pending,
     required this.done,
     required this.cancelled,
+    this.absent = 0,
   });
 
   final int pending;
   final int done;
   final int cancelled;
+
+  /// Sesiones confirmadas que el PF marcó ausentes (el alumno faltó). #1737.
+  final int absent;
 }
 
-/// Classifies today's appointments into pending / done / cancelled for the
-/// dashboard summary.
+/// Classifies today's appointments into pending / done / absent / cancelled
+/// for the dashboard summary.
 ///
 /// A confirmed session counts as `done` only once it has actually ended
 /// (`startsAt + durationMin`); while it has not yet ended — including while it
 /// is in progress — it counts as `pending`.
+///
+/// #1737: una sesión confirmada que el PF marcó ausente
+/// ([AppointmentAttendance.absent]) no es ni `pending` ni `done`: cuenta como
+/// `absent`, termine o no. Ausente no es un [AppointmentStatus] (ver el dartdoc
+/// de [AppointmentAttendance]), así que se mira `attendance` y no `status`; sin
+/// esto el turno ausente se leía como COMPLETADO — "se dio" — y el PF que
+/// acababa de marcar que no se dio veía subir ese número. Se puede marcar
+/// ausente una sesión en curso, y esa tampoco queda pendiente: ya no hay nada
+/// por hacer con ella. Un turno `cancelled` nunca cuenta como ausente, aunque
+/// arrastre un `attendance`.
 ///
 /// QA-HOME-001: [now] and [Appointment.startsAt] are BOTH Argentina wall-clock
 /// — UTC-flagged DateTimes whose calendar fields read as ART. `startsAt` is
@@ -45,20 +59,20 @@ DashboardDayCounts dashboardDayCounts(
   final todayAppts = all.where((a) => _isSameArtDay(a.startsAt, now)).toList();
   DateTime endOf(Appointment a) =>
       a.startsAt.add(Duration(minutes: a.durationMin));
-  final pending = todayAppts
-      .where((a) =>
-          a.status == AppointmentStatus.confirmed && endOf(a).isAfter(now))
-      .length;
-  final done = todayAppts
-      .where((a) =>
-          a.status == AppointmentStatus.confirmed && !endOf(a).isAfter(now))
-      .length;
+  final confirmed =
+      todayAppts.where((a) => a.status == AppointmentStatus.confirmed).toList();
+  bool isAbsent(Appointment a) => a.attendance == AppointmentAttendance.absent;
+  final absent = confirmed.where(isAbsent).length;
+  final attended = confirmed.where((a) => !isAbsent(a)).toList();
+  final pending = attended.where((a) => endOf(a).isAfter(now)).length;
+  final done = attended.where((a) => !endOf(a).isAfter(now)).length;
   final cancelled =
       todayAppts.where((a) => a.status == AppointmentStatus.cancelled).length;
   return DashboardDayCounts(
     pending: pending,
     done: done,
     cancelled: cancelled,
+    absent: absent,
   );
 }
 

@@ -679,6 +679,69 @@ void main() {
     expect(find.text('Estadísticas avanzadas'), findsNothing);
   });
 
+  // #1696: la cuenta nueva sólo veía «Empezá a entrenar…» y no tenía cómo
+  // llegar a Medidas — o sea, no podía cargar su primera medición. Medidas no
+  // depende de haber entrenado, así que sale en el empty state. Los demás
+  // tiles del hub NO: abrirían pantallas vacías.
+  testWidgets(
+      'SCENARIO-EMPTY-MEDIDAS-01: cuenta nueva → el empty state ofrece '
+      'Medidas (y sólo Medidas del hub) y navega a su ruta', (tester) async {
+    final repo = MockSessionRepository();
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => const []);
+
+    final overrides = <Override>[
+      currentUidProvider.overrideWithValue('u1'),
+      sessionRepositoryProvider.overrideWithValue(repo),
+      exercisesProvider.overrideWith((ref) async => const []),
+    ];
+
+    final router = GoRouter(
+      initialLocation: '/home/insights',
+      routes: [
+        GoRoute(
+          path: '/home/insights',
+          builder: (_, __) => const InsightsScreen(),
+        ),
+        GoRoute(
+          path: '/home/insights/measurements',
+          builder: (_, __) => const Scaffold(
+            body: Text('measurements-route'),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: overrides,
+        child: MaterialApp.router(
+          theme: AppTheme.dark(),
+          routerConfig: router,
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Sigue siendo el empty state…
+    expect(
+        find.text('Empezá a entrenar para ver tus insights.'), findsOneWidget);
+    expect(find.text('Estadísticas avanzadas'), findsNothing);
+    // …con Medidas a la vista y ningún otro tile del hub.
+    expect(find.text('Medidas'), findsOneWidget);
+    expect(find.text('Peso y medidas corporales en el tiempo'), findsOneWidget);
+    expect(find.text('Distribución muscular'), findsNothing);
+    expect(find.text('Ejercicios frecuentes'), findsNothing);
+    expect(find.text('Volumen por grupo'), findsNothing);
+
+    await tester.tap(find.text('Medidas'));
+    await tester.pumpAndSettle();
+    expect(find.text('measurements-route'), findsOneWidget);
+  });
+
   testWidgets(
       'SCENARIO-HUB-TILES-02: tapping each tile pushes its dedicated route',
       (tester) async {
@@ -867,6 +930,132 @@ void main() {
     await tester.tap(find.text('Cómo me sentí'));
     await tester.pumpAndSettle();
     expect(find.text('wellbeing-route'), findsOneWidget);
+  });
+
+  // #1722: el encabezado, el empty state, los tooltips del paginador, el rango
+  // de la semana y el título de la tarjeta de músculos del día estaban
+  // hardcodeados en español. Con el locale en inglés se ve que ahora salen del
+  // ARB (en producción `resolveLocale` sirve siempre es-AR, así que el español
+  // queda igual).
+  group('#1722 — los textos del hub salen de l10n', () {
+    Widget wrapEn(List<Override> overrides) => ProviderScope(
+          overrides: overrides,
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('en'),
+            home: const Scaffold(body: InsightsScreen()),
+          ),
+        );
+
+    testWidgets('cuenta nueva: encabezado y empty state', (tester) async {
+      final repo = MockSessionRepository();
+      when(() => repo.listByUid('u1')).thenAnswer((_) async => const []);
+
+      await tester.pumpWidget(wrapEn([
+        currentUidProvider.overrideWithValue('u1'),
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async => const []),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.text('INSIGHTS'), findsOneWidget);
+      expect(find.text('Start training to see your insights.'), findsOneWidget);
+      expect(
+          find.text('Empezá a entrenar para ver tus insights.'), findsNothing);
+    });
+
+    testWidgets(
+        'con sesiones: tooltips del paginador, rango de la semana y título '
+        'de músculos del día', (tester) async {
+      final repo = MockSessionRepository();
+      final now = argentinaNow();
+      final todayOnly = DateTime(now.year, now.month, now.day);
+      when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+            makeSession(
+              id: 's1',
+              startedAt: todayOnly.add(const Duration(hours: 9)),
+              status: SessionStatus.finished,
+              wasFullyCompleted: true,
+              routineId: 'r1',
+            ),
+          ]);
+      when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1')).thenAnswer(
+          (_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
+
+      await tester.pumpWidget(wrapEn([
+        currentUidProvider.overrideWithValue('u1'),
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async => [
+              const Exercise(
+                id: 'e-chest',
+                name: 'Press',
+                muscleGroup: 'chest',
+                category: 'compound',
+              ),
+            ]),
+        routineByIdProvider('r1').overrideWith((ref) async => null),
+        visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Previous week'), findsOneWidget);
+      expect(find.byTooltip('Next week'), findsOneWidget);
+      expect(find.byTooltip('Semana anterior'), findsNothing);
+      expect(find.textContaining('WEEK · '), findsOneWidget);
+      expect(find.textContaining('SEMANA · '), findsNothing);
+      expect(find.text('MUSCLES OF THE DAY'), findsOneWidget);
+      expect(find.text('MÚSCULOS DEL DÍA'), findsNothing);
+      // #1823: el botón del pie y la unidad de las filas también salen del ARB.
+      // «SETS» se escribe igual en los dos idiomas: acá solo se fija que sigue.
+      expect(find.text('BACK'), findsOneWidget);
+      expect(find.text('VOLVER'), findsNothing);
+      expect(find.text('SETS'), findsWidgets);
+    });
+
+    testWidgets('en es-AR el rango y los tooltips siguen en español',
+        (tester) async {
+      final repo = MockSessionRepository();
+      final now = argentinaNow();
+      final todayOnly = DateTime(now.year, now.month, now.day);
+      when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+            makeSession(
+              id: 's1',
+              startedAt: todayOnly.add(const Duration(hours: 9)),
+              status: SessionStatus.finished,
+              wasFullyCompleted: true,
+              routineId: 'r1',
+            ),
+          ]);
+      when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1')).thenAnswer(
+          (_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
+
+      await tester.pumpWidget(_wrap(const InsightsScreen(), [
+        currentUidProvider.overrideWithValue('u1'),
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async => [
+              const Exercise(
+                id: 'e-chest',
+                name: 'Press',
+                muscleGroup: 'chest',
+                category: 'compound',
+              ),
+            ]),
+        routineByIdProvider('r1').overrideWith((ref) async => null),
+        visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.text('INSIGHTS'), findsOneWidget);
+      expect(find.byTooltip('Semana anterior'), findsOneWidget);
+      expect(find.byTooltip('Semana siguiente'), findsOneWidget);
+      expect(find.textContaining('SEMANA · '), findsOneWidget);
+      expect(find.text('MÚSCULOS DEL DÍA'), findsOneWidget);
+      expect(find.text('VOLVER'), findsOneWidget);
+      expect(find.text('BACK'), findsNothing);
+      expect(find.text('SETS'), findsWidgets);
+    });
   });
 }
 

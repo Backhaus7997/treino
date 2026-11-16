@@ -579,7 +579,9 @@ class UserRepository {
   ///   - `userPublicProfiles/{uid}` — written when partial contains any of
   ///     `displayName`, `avatarUrl`, `gymId`. REQ-UPP-011, REQ-UPP-012.
   ///   - `trainerPublicProfiles/{uid}` — written when partial contains any
-  ///     trainer-specific field (see [_trainerPublicFields]).
+  ///     trainer-specific field (see [_trainerPublicFields]). Sin campo de PF,
+  ///     un `displayName` / `avatarUrl` se espeja sólo si el usuario es PF y su
+  ///     tarjeta ya existe (ver [_trainerIdentityOnlySubset], #1336 / #1694).
   ///     REQ-COACH-DISC-DUAL-001.
   ///
   /// All three writes are in a single batch.commit() — no partial state.
@@ -797,8 +799,9 @@ class UserRepository {
     return filaPref[canal] != false;
   }
 
-  /// #1336 — espejo del nombre cuando el partial lleva `displayName` pero
-  /// ningún campo de PF (Coach Hub, Ajustes → Cuenta).
+  /// #1336 / #1694 — espejo de la IDENTIDAD (nombre y foto) cuando el partial
+  /// lleva `displayName` y/o `avatarUrl` pero ningún campo de PF (Coach Hub,
+  /// Ajustes → Cuenta; la pantalla «Datos personales» del mobile).
   ///
   /// [_trainerPublicSubsetFromPartial] se apaga sin campo de PF a propósito
   /// (regresión #58: el alta de un alumno mandaba `displayName` y la rule
@@ -808,33 +811,48 @@ class UserRepository {
   /// entra, así que #58 sigue cerrado.
   ///
   /// SÓLO ACTUALIZA: si `trainerPublicProfiles/{uid}` no existe no lo crea. Un
-  /// partial de nombre solo no es una tarjeta completa, y `listAll()` no filtra
-  /// por completitud: crearla acá metería una tarjeta pelada al descubrimiento
-  /// (el paso `cuenta` del onboarding corre antes que `pf`, que es quien la
-  /// crea). Tampoco espeja un nombre vacío: anularía `displayNameLowercase` y
-  /// la tarjeta saldría del `orderBy`.
+  /// partial de identidad solo no es una tarjeta completa, y `listAll()` no
+  /// filtra por completitud: crearla acá metería una tarjeta pelada al
+  /// descubrimiento (el paso `cuenta` del onboarding corre antes que `pf`, que
+  /// es quien la crea). Tampoco espeja un nombre vacío: anularía
+  /// `displayNameLowercase` y la tarjeta saldría del `orderBy`.
   ///
-  /// Cuesta dos lecturas, sólo cuando el partial trae `displayName` y no hay
+  /// El `avatarUrl` SÍ se espeja en `null`: «Quitar foto» es un valor legítimo,
+  /// y sin espejarlo Discovery seguiría mostrando una imagen que ya se borró de
+  /// Storage. Hasta #1694 este helper sólo miraba `displayName`: cambiar la
+  /// foto actualizaba `users/` y `userPublicProfiles/` pero dejaba la tarjeta
+  /// de Discovery con la foto vieja.
+  ///
+  /// Cuesta dos lecturas, sólo cuando el partial trae algo espejable y no hay
   /// otro disparador.
-  Future<Map<String, Object?>?> _trainerNameOnlySubset(
+  Future<Map<String, Object?>?> _trainerIdentityOnlySubset(
     String uid,
     Map<String, Object?> partial,
   ) async {
-    if (!partial.containsKey('displayName')) return null;
+    final trimmed = partial.containsKey('displayName')
+        ? (partial['displayName'] as String?)?.trim()
+        : null;
+    // Null = no hay nombre espejable (ausente, null o en blanco).
+    final name = trimmed != null && trimmed.isNotEmpty ? trimmed : null;
+    final mirrorAvatar = partial.containsKey('avatarUrl');
+    if (name == null && !mirrorAvatar) return null;
+
     final snap = await _users.doc(uid).get();
     if (snap.data()?['role'] != UserRole.trainer.name) return null;
-    final name = (partial['displayName'] as String?)?.trim();
-    if (name == null || name.isEmpty) return null;
     final card = await _trainerPublicProfiles.doc(uid).get();
     if (!card.exists) return null;
     return {
       'uid': uid,
-      'displayName': partial['displayName'],
-      'displayNameLowercase': name.toLowerCase(),
+      if (name != null) ...{
+        'displayName': partial['displayName'],
+        'displayNameLowercase': name.toLowerCase(),
+      },
+      if (mirrorAvatar) 'avatarUrl': partial['avatarUrl'],
     };
   }
 
-  /// Completa el subset de PF con el nombre de la cuenta cuando no lo trae.
+  /// Completa el subset de PF con el nombre y la foto de la cuenta cuando no
+  /// los trae.
   ///
   /// El alta (ProfileSetup) manda `displayName` SIN campos de PF, así que el
   /// espejo no se dispara; después "Editar perfil de PF" guarda bio, tarifa y
@@ -842,26 +860,43 @@ class UserRepository {
   /// `displayNameLowercase`: en el directorio sale con "?" y `listAll()`
   /// (`orderBy('displayNameLowercase')`) la excluye. Nada la rellenaba.
   ///
-  /// Un `displayName` explícito en el partial gana (no se pisa). Si la cuenta
-  /// no tiene nombre, no se agrega nada: nunca se escribe un nombre vacío, que
-  /// anularía `displayNameLowercase`. El nombre de `users/` ya viene filtrado
+  /// Con la foto pasaba lo mismo (#1717): el alta del mobile —o un alumno
+  /// promovido a PF— deja `users/{uid}.avatarUrl` cargado ANTES de que exista
+  /// la tarjeta, y el guardado que la crea no la manda. Discovery mostraba la
+  /// card sin foto hasta que el PF la volviera a subir. Se completa igual que
+  /// el nombre, y de paso una tarjeta que ya existía sin foto se cura sola en
+  /// el siguiente guardado de PF.
+  ///
+  /// Un `displayName` / `avatarUrl` explícito en el partial gana (no se pisa).
+  /// Si la cuenta no tiene nombre, no se agrega nada: nunca se escribe un
+  /// nombre vacío, que anularía `displayNameLowercase`. Con la foto igual: una
+  /// cuenta sin foto (o con una en blanco) no agrega `avatarUrl`, así que acá
+  /// nunca se espeja un `null`; «Quitar foto» ya lo espeja
+  /// [_trainerIdentityOnlySubset]. El nombre de `users/` ya viene filtrado
   /// por el guard del cliente y por la cuarentena del servidor
   /// (`quarantineDisplayName` lo reemplaza por `usuario_xxxxxx`), así que
   /// copiarlo no re-publica un nombre vetado. Una lectura extra, sólo en
-  /// guardados de PF sin nombre; los de alumnos devuelven null antes y no
-  /// llegan acá.
-  Future<Map<String, Object?>> _conNombreDeLaCuenta(
+  /// guardados de PF a los que les falta el nombre o la foto; los de alumnos
+  /// devuelven null antes y no llegan acá.
+  Future<Map<String, Object?>> _conIdentidadDeLaCuenta(
     String uid,
     Map<String, Object?> subset,
   ) async {
-    if (subset.containsKey('displayName')) return subset;
-    final snap = await _users.doc(uid).get();
-    final name = (snap.data()?['displayName'] as String?)?.trim();
-    if (name == null || name.isEmpty) return subset;
+    final faltaNombre = !subset.containsKey('displayName');
+    final faltaFoto = !subset.containsKey('avatarUrl');
+    if (!faltaNombre && !faltaFoto) return subset;
+
+    final data = (await _users.doc(uid).get()).data();
+    final name = faltaNombre ? (data?['displayName'] as String?)?.trim() : null;
+    final avatarUrl =
+        faltaFoto ? (data?['avatarUrl'] as String?)?.trim() : null;
     return {
       ...subset,
-      'displayName': name,
-      'displayNameLowercase': name.toLowerCase(),
+      if (name != null && name.isNotEmpty) ...{
+        'displayName': name,
+        'displayNameLowercase': name.toLowerCase(),
+      },
+      if (avatarUrl != null && avatarUrl.isNotEmpty) 'avatarUrl': avatarUrl,
     };
   }
 
@@ -946,8 +981,8 @@ class UserRepository {
       hasLocationConsent: hasLocationConsent,
     );
     final trainerPublicSubset = trainerSubsetDelPartial != null
-        ? await _conNombreDeLaCuenta(uid, trainerSubsetDelPartial)
-        : await _trainerNameOnlySubset(uid, efectivo);
+        ? await _conIdentidadDeLaCuenta(uid, trainerSubsetDelPartial)
+        : await _trainerIdentityOnlySubset(uid, efectivo);
 
     if (publicSubset == null && trainerPublicSubset == null) {
       // No public-relevant fields — single write to users only.

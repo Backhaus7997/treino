@@ -1,29 +1,46 @@
 /**
  * promoteChatToInquiry — estampa `kind: 'inquiry'` en un chat que YA existe.
  *
- * ## El bug que arregla
+ * ## ESTADO ACTUAL (desde 2026-10-21, REQ-FOLLOW-012)
+ *
+ * Lo que sigue explica POR QUÉ se escribió esta callable, y ese motivo ya no
+ * existe. `senderMayPost` dejó de mirar `kind`, `linkId` y el follow: en un
+ * chat que ya existe escriben los dos miembros y sólo corta un bloqueo o
+ * `closedAt` (ver el bloque de `chats` en `firestore.rules`). `kind` ya no
+ * habilita escribir; sólo lo lee `chatCreateOk`, al CREAR el chat.
+ *
+ * Estampar `kind: 'inquiry'` en un chat existente es hoy un dato que ninguna
+ * rule ni función consulta después. La callable sigue desplegada y la llama
+ * `TrainerInquiryCta`, pero es candidata a código muerto (#1722): quitarla
+ * implica borrar la llamada del cliente, el servicio, esta función y su
+ * entrada en el enforcement de App Check, y el borrado de la función en
+ * producción lo hace un humano.
+ *
+ * ## El bug que arreglaba
  *
  * `ChatRepository.getOrCreate` sale temprano si el doc ya existe, y la marca
  * `'kind': 'inquiry'` sólo se estampa al CREAR. Y `firestore.rules` tiene
  * `kind` pineado como inmutable en el `update` (ver el bloque de `chats`,
  * "⚠ `kind` PINEADO").
  *
- * Resultado: si entre un alumno y un PF ya existía un chat social —creado
- * cuando el PF lo seguía, y después dejó de seguirlo—, tocar CONSULTAR no
- * estampa nada, la marca no se puede agregar NUNCA MÁS desde el cliente, y el
- * alumno queda sin poder escribirle a ese PF para siempre. El cartel que ve
- * dice "esta persona tiene que seguirte", que ni siquiera es el motivo.
+ * Resultado, hasta el 2026-10-21: si entre un alumno y un PF ya existía un
+ * chat social —creado cuando el PF lo seguía, y después dejó de seguirlo—,
+ * tocar CONSULTAR no estampaba nada, la marca no se podía agregar NUNCA MÁS
+ * desde el cliente, y el alumno quedaba sin poder escribirle a ese PF para
+ * siempre. El cartel que veía decía "esta persona tiene que seguirte", que ni
+ * siquiera era el motivo.
  *
  * ## Por qué una callable y no relajar la regla
  *
- * El pin de `kind` no es incidental: su comentario en `firestore.rules`
- * documenta el agujero que tapa —convertir un chat social en consulta con un
+ * El pin de `kind` no era incidental: su comentario en `firestore.rules`
+ * documenta el agujero que tapaba —convertir un chat social en consulta con un
  * update de una línea, saltándose el gate de follow y auto-otorgándose
- * escritura permanente que sobrevive al unfollow—. Relajarlo para la
- * transición `ausente -> 'inquiry'` lo reabre parcialmente.
+ * escritura permanente que sobrevivía al unfollow—. Relajarlo para la
+ * transición `ausente -> 'inquiry'` lo reabría parcialmente. (Hoy la marca ya
+ * no da escritura, pero el pin sigue en las rules y no se tocó.)
  *
- * La otra alternativa —darle a `senderMayPost` una cuarta rama que evalúe los
- * hechos en vivo— tiene una asimetría direccional que la rompe: cuando el que
+ * La otra alternativa —darle a `senderMayPost` una cuarta rama que evaluara los
+ * hechos en vivo— tenía una asimetría direccional que la rompía: cuando el que
  * escribe es el PF, `other` es el ALUMNO, que no es trainer, así que el PF
  * perdería la respuesta. Y responder es la mitad de la feature.
  *
@@ -111,9 +128,9 @@ export async function runPromoteChatToInquiry(
 
     const linkId = chat.get("linkId");
     if (typeof linkId === "string" && linkId.length > 0) {
-      // Chat de Coach: ya escapa por `'linkId' in chat`. Marcarlo sería el
-      // campo mentiroso. Y si el alumno abre la consulta con el PF que YA es
-      // su entrenador, lo que quiere es su chat de Coach de siempre.
+      // Chat de Coach: ya es un chat de Coach. Marcarlo sería el campo
+      // mentiroso. Y si el alumno abre la consulta con el PF que YA es su
+      // entrenador, lo que quiere es su chat de Coach de siempre.
       return { status: "noop" };
     }
 

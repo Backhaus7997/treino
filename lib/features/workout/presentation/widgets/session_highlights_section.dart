@@ -12,6 +12,8 @@ import '../../application/exercise_progression_aggregator.dart'
 import '../../application/session_highlights.dart';
 import '../../application/session_recognition.dart';
 import '../../domain/exercise_progression.dart';
+import 'best_set_label.dart';
+import 'mmss.dart';
 
 // NOTA l10n: los ARB los está tocando otra rama en vuelo, así que los strings
 // NUEVOS de este archivo van como literales es-AR con TODO(l10n) — mismo
@@ -202,6 +204,10 @@ class _SessionRecordRow extends StatelessWidget {
       ProgressionRecordType.bestSetVolume =>
         l10n.progressionMetricBestSetVolume,
       ProgressionRecordType.bestSessionVolume => l10n.progressionMetricVolume,
+      ProgressionRecordType.longestDuration =>
+        l10n.progressionMetricLongestDuration,
+      ProgressionRecordType.longestDistance =>
+        l10n.progressionMetricLongestDistance,
     };
     // #1512: la mejor serie se muestra COMO SERIE («80 kg × 7»), no como el
     // producto «560 kg·reps», que era jerga. El resto de los récords son un
@@ -212,11 +218,20 @@ class _SessionRecordRow extends StatelessWidget {
     final previousSet = record.previousSet;
     final showsSet =
         record.recordType == ProgressionRecordType.bestSetVolume && set != null;
-    String value(double v) => _formatRecordValue(v,
-        isOneRepMax: isOneRepMax, localeName: l10n.localeName);
+    // #1715: el tiempo se lee «01:15» (sin unidad) y la distancia en metros.
+    final isDuration =
+        record.recordType == ProgressionRecordType.longestDuration;
+    String value(double v) => isDuration
+        ? formatMMSS(v.round())
+        : _formatRecordValue(v,
+            isOneRepMax: isOneRepMax, localeName: l10n.localeName);
 
     // Con la serie, la unidad va DENTRO del texto («kg × 7»): no hay sufijo.
-    final unit = showsSet ? '' : 'kg';
+    final unit = showsSet || isDuration
+        ? ''
+        : record.recordType == ProgressionRecordType.longestDistance
+            ? 'm'
+            : 'kg';
     final newValue = showsSet ? serie(set) : value(record.value);
     final previous = !showsSet
         ? value(record.previousBest)
@@ -403,18 +418,33 @@ class _SessionExerciseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     // Mejor set: "80 kg × 5", o "12 reps" para bodyweight (#368: peso 0).
     // TODO(l10n): "sets"/"reps" literales — mismo pendiente que tenían las
     // barras de distribución que este cambio reemplazó.
-    final bestSet = exercise.bestWeightKg > 0
-        ? '${_formatRecordValue(exercise.bestWeightKg, isOneRepMax: false, localeName: AppL10n.of(context).localeName)} kg '
-            '× ${exercise.bestSetReps}'
-        // #1513: «12 reps» a secas, al lado de filas con kg, se leía como un
-        // peso que faltaba. Dice que es peso corporal (y no «0 kg», que se lee
-        // como un error de carga).
-        : '${exercise.bestSetReps} reps · peso corporal';
-    final stats = '${exercise.setCount} sets · $bestSet';
+    //
+    // #1701: un ejercicio por TIEMPO o por DISTANCIA guarda peso 0 y reps 0, y
+    // «0 reps · peso corporal» es falso: su mejor serie es el tiempo o los
+    // metros. La regla (peso → tiempo → metros → reps de peso corporal → nada)
+    // vive en [bestSetLabel], compartida con el HISTORIAL del detalle de
+    // ejercicio (#1716). Una serie vieja por tiempo/distancia, sin métrica ni
+    // reps, no tiene mejor serie que mostrar: queda sólo la cantidad de sets,
+    // en vez de un «0 reps».
+    final String? bestSet = bestSetLabel(
+      l10n: l10n,
+      weightKg: exercise.bestWeightKg,
+      reps: exercise.bestSetReps,
+      durationSeconds: exercise.bestDurationSeconds,
+      distanceMeters: exercise.bestDistanceMeters,
+      // #1513: «12 reps» a secas, al lado de filas con kg, se leía como un peso
+      // que faltaba. Dice que es peso corporal (y no «0 kg», que se lee como un
+      // error de carga).
+      bodyweightSuffix: ' · peso corporal',
+    );
+    final stats = bestSet == null
+        ? '${exercise.setCount} sets'
+        : '${exercise.setCount} sets · $bestSet';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

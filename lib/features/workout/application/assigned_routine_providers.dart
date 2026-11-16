@@ -6,20 +6,33 @@ import '../domain/routine.dart';
 import 'routine_providers.dart' show routineRepositoryProvider;
 
 /// Returns all plans assigned to the given athlete uid by a trainer,
-/// ordered newest first.
+/// ordered newest first — EN VIVO.
+///
+/// Es un stream y no un `Future` de un solo disparo (#1698): lo que el PF hace
+/// con los planes del alumno —asignar uno, editarlo, archivarlo, o el archivado
+/// masivo de `cleanupAssignedPlansOnUnlink` al terminar el vínculo— tiene que
+/// llegar a su app sin recargar. Con el `FutureProvider` anterior el plan nuevo
+/// no aparecía y el archivado seguía siendo arrancable hasta el próximo
+/// arranque en frío. Mismo patrón que `userCreatedRoutinesProvider`, su
+/// hermano del lado de las rutinas propias.
+///
+/// Los consumidores que hacen `await ref.watch(...future)` (Home, la lista
+/// unificada) se recomponen solos en cada emisión: el `.future` de un
+/// `StreamProvider` avisa cuando llega un dato nuevo.
 ///
 /// Returns an empty list immediately when [athleteId] is empty — avoids a
 /// Firestore round-trip for unauthenticated or unresolved uid states.
 ///
-/// `autoDispose` ensures the provider is cleaned up when no widget is
-/// listening. `family` lets each athleteId maintain its own cached future.
+/// `autoDispose` ensures the provider is cleaned up (and the Firestore
+/// listener cancelled) when no widget is listening. `family` lets each
+/// athleteId maintain its own cached stream.
 ///
 /// REQ-COACH-PLANS-003, REQ-COACH-PLANS-004, SCENARIO-436, SCENARIO-437.
 final assignedRoutinesProvider =
-    FutureProvider.autoDispose.family<List<Routine>, String>(
-  (ref, athleteId) async {
-    if (athleteId.isEmpty) return const [];
-    return ref.watch(routineRepositoryProvider).listAssignedTo(athleteId);
+    StreamProvider.autoDispose.family<List<Routine>, String>(
+  (ref, athleteId) {
+    if (athleteId.isEmpty) return Stream.value(const []);
+    return ref.watch(routineRepositoryProvider).watchAssignedTo(athleteId);
   },
 );
 

@@ -1,3 +1,4 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,8 +8,12 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_segmented_pill.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/coach/application/agenda_providers.dart'
+    show appointmentRepositoryProvider;
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
+import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/trainer_coach_view.dart';
@@ -17,13 +22,21 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 
 class _MockLinkRepo extends Mock implements TrainerLinkRepository {}
 
-Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
+class _MockTurnos extends Mock implements AppointmentRepository {}
+
+Widget _wrap(
+  Widget child, {
+  List<Override> overrides = const [],
+  // es-AR es el locale de la app; por default queda el del test (inglés).
+  Locale? locale,
+}) =>
     ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
+        locale: locale,
         home: Scaffold(body: child),
       ),
     );
@@ -73,7 +86,17 @@ UserPublicProfile _pub(String uid, String name) => UserPublicProfile(
       displayNameLowercase: name.toLowerCase(),
     );
 
-List<Override> _stubLinks(List<TrainerLink> links) => [
+/// Los turnos del PF en un Firestore fake (por default, vacío): «Terminar
+/// vínculo» cuenta y cancela los turnos futuros del alumno (#1792).
+Override _stubTurnos([FakeFirebaseFirestore? db]) =>
+    appointmentRepositoryProvider.overrideWithValue(
+      AppointmentRepository(firestore: db ?? FakeFirebaseFirestore()),
+    );
+
+List<Override> _stubLinks(List<TrainerLink> links,
+        {FakeFirebaseFirestore? turnosDb}) =>
+    [
+      _stubTurnos(turnosDb),
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links)),
       for (final l in links)
         userPublicProfileProvider(l.athleteId).overrideWith(
@@ -280,6 +303,171 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('unread-dot-a1')), findsNothing);
+    });
+  });
+
+  // ── Turnos futuros al terminar el vínculo (#1792) ─────────────────────────
+  group('TrainerCoachView — TERMINAR VÍNCULO y los turnos futuros', () {
+    final futuro = DateTime.utc(2099, 1, 1, 10);
+
+    Future<void> seedTurno(
+      FakeFirebaseFirestore db,
+      String id,
+      DateTime at, {
+      String athlete = 'a1',
+    }) =>
+        db.collection('appointments').doc(id).set(Appointment(
+              id: id,
+              trainerId: 'trainer-1',
+              athleteId: athlete,
+              athleteDisplayName: 'Atleta',
+              startsAt: at,
+              durationMin: 60,
+              status: AppointmentStatus.confirmed,
+            ).toJson());
+
+    Future<String> statusOf(FakeFirebaseFirestore db, String id) async =>
+        (await db.collection('appointments').doc(id).get()).data()!['status']
+            as String;
+
+    Future<void> abrirDialogo(
+      WidgetTester tester, {
+      required FakeFirebaseFirestore db,
+      TrainerLinkRepository? repo,
+    }) async {
+      await tester.pumpWidget(_wrap(
+        const TrainerCoachView(),
+        locale: const Locale('es', 'AR'),
+        overrides: [
+          ..._stubLinks(
+            [_link(id: 'l1', status: TrainerLinkStatus.active)],
+            turnosDb: db,
+          ),
+          if (repo != null)
+            trainerLinkRepositoryProvider.overrideWithValue(repo),
+        ],
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ALUMNOS'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('TERMINAR VÍNCULO'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('el diálogo avisa cuántos turnos se cancelan', (tester) async {
+      final db = FakeFirebaseFirestore();
+      await seedTurno(db, 't1', futuro);
+      await seedTurno(db, 't2', futuro.add(const Duration(days: 1)));
+      await seedTurno(db, 'viejo', DateTime.utc(2020, 1, 1, 10));
+      await seedTurno(db, 'ajeno', futuro, athlete: 'otro');
+
+      await abrirDialogo(tester, db: db);
+
+      expect(
+        find.textContaining(
+          'También se cancelan 2 sesiones agendadas con este alumno',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('al confirmar cancela los turnos futuros Y termina el vínculo',
+        (tester) async {
+      final db = FakeFirebaseFirestore();
+      await seedTurno(db, 't1', futuro);
+      await seedTurno(db, 'ajeno', futuro, athlete: 'otro');
+      final repo = _MockLinkRepo();
+      when(() => repo.terminate(any(), reason: any(named: 'reason')))
+          .thenAnswer((_) async {});
+
+      await abrirDialogo(tester, db: db, repo: repo);
+      await tester.tap(find.text('Terminar'));
+      await tester.pumpAndSettle();
+
+      expect(await statusOf(db, 't1'), 'cancelled');
+      expect(await statusOf(db, 'ajeno'), 'confirmed');
+      verify(() => repo.terminate('l1', reason: 'trainer-terminated'))
+          .called(1);
+    });
+
+    testWidgets(
+        'si no se pueden cancelar los turnos, el vínculo NO se termina y el '
+        'toast lo dice', (tester) async {
+      final turnos = _MockTurnos();
+      when(() => turnos.listFutureConfirmedForPair(
+            trainerId: any(named: 'trainerId'),
+            athleteId: any(named: 'athleteId'),
+          )).thenThrow(Exception('sin red'));
+      when(() => turnos.cancelFutureForPair(
+            trainerId: any(named: 'trainerId'),
+            athleteId: any(named: 'athleteId'),
+            actorUid: any(named: 'actorUid'),
+            reason: any(named: 'reason'),
+          )).thenThrow(Exception('sin red'));
+      final repo = _MockLinkRepo();
+      await tester.pumpWidget(_wrap(
+        const TrainerCoachView(),
+        locale: const Locale('es', 'AR'),
+        overrides: [
+          ..._stubLinks([_link(id: 'l1', status: TrainerLinkStatus.active)]),
+          appointmentRepositoryProvider.overrideWithValue(turnos),
+          trainerLinkRepositoryProvider.overrideWithValue(repo),
+        ],
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ALUMNOS'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('TERMINAR VÍNCULO'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('No pudimos revisar'), findsOneWidget);
+
+      await tester.tap(find.text('Terminar'));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repo.terminate(any(), reason: any(named: 'reason')));
+      expect(find.textContaining('el vínculo sigue activo'), findsOneWidget);
+    });
+  });
+
+  // ── PAUSAR VÍNCULO (#1843) ────────────────────────────────────────────────
+  //
+  // El diálogo decía «Va a quedar en read-only hasta que reanudes», y el alumno
+  // pausado no queda en read-only: sigue viendo y usando lo suyo, y nada le
+  // bloquea registrar sesiones. Lo que sí cambia es que el PF deja de ver sus
+  // sesiones (se revoca `session_shares`).
+  group('TrainerCoachView — PAUSAR VÍNCULO dice lo que pausar hace', () {
+    testWidgets('el diálogo no promete un bloqueo que no existe',
+        (tester) async {
+      final repo = _MockLinkRepo();
+      when(() => repo.pause(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_wrap(
+        const TrainerCoachView(),
+        locale: const Locale('es', 'AR'),
+        overrides: [
+          ..._stubLinks([_link(id: 'l1', status: TrainerLinkStatus.active)]),
+          trainerLinkRepositoryProvider.overrideWithValue(repo),
+        ],
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ALUMNOS'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('PAUSAR VÍNCULO'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          'Conserva sus rutinas, su plan nutricional, la agenda y el chat, y '
+          'vos dejás de ver sus sesiones hasta que reanudes.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('read-only'), findsNothing);
+
+      await tester.tap(find.text('Pausar'));
+      await tester.pumpAndSettle();
+      verify(() => repo.pause('l1')).called(1);
     });
   });
 

@@ -16,9 +16,11 @@ import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../../core/widgets/treino_toast.dart';
 import '../../../../../chat/application/chat_media_send_controller.dart';
 import '../../../../../chat/application/chat_providers.dart';
+import '../../../../../chat/domain/chat.dart';
 import '../../../../../chat/domain/media_type.dart';
 import '../../../../../chat/domain/message.dart';
 import '../../../../../profile/application/user_public_profile_providers.dart';
+import '../../../../../profile/domain/user_public_profile.dart';
 import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import 'avatar_color.dart';
@@ -293,6 +295,13 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
     final currentUid = ref.watch(currentUidProvider);
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
     final mediaSend = ref.watch(chatMediaSendControllerProvider(widget.chatId));
+    // Chat CERRADO (`Chat.closedAt`): el vínculo del par terminó y las rules
+    // rechazan cualquier mensaje nuevo. Sin el doc todavía se asume abierto:
+    // un falso cerrado le tapa el composer a quien sí puede escribir.
+    final isClosed = ref.watch(
+      chatByIdProvider(widget.chatId)
+          .select((chat) => chat.valueOrNull?.isClosed ?? false),
+    );
 
     return Container(
       color: palette.bg,
@@ -361,17 +370,32 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
               color: palette.accent,
               backgroundColor: palette.bgCard,
             ),
-          _Composer(
-            controller: _composerCtrl,
-            sending: _sending || mediaSend.uploading,
-            onSend: _send,
-            onAttach: _openAttachMenu,
-            palette: palette,
-          ),
+          // Cerrado el aviso REEMPLAZA al composer: no hay nada que el PF
+          // pueda hacer para destrabarlo, sólo un vínculo nuevo reabre el chat.
+          // El historial de arriba sigue intacto.
+          if (isClosed)
+            _ClosedNotice(palette: palette)
+          else
+            _Composer(
+              controller: _composerCtrl,
+              sending: _sending || mediaSend.uploading,
+              onSend: _send,
+              onAttach: _openAttachMenu,
+              palette: palette,
+            ),
         ],
       ),
     );
   }
+}
+
+/// El otro miembro de [c] (el primero que no soy yo), con fallback al primero
+/// para no romper el render si el chat quedara con un solo miembro. Misma
+/// regla que la lista (`_otherUidOf`).
+String? _peerOf(Chat c, String? selfUid) {
+  final others = c.members.where((m) => m != selfUid).toList();
+  if (others.isNotEmpty) return others.first;
+  return c.members.isNotEmpty ? c.members.first : null;
 }
 
 /// Header del pane derecho — avatar + displayName del otro user.
@@ -398,6 +422,9 @@ class _Header extends ConsumerWidget {
     // global, que no sabe el peer de antemano) se preserva la derivación
     // original desde el chat.
     String? otherUid = peerUid;
+    // El interlocutor todavía no se pudo resolver PERO puede resolverse: el
+    // header muestra «…» en vez de «Usuario eliminado» mientras tanto.
+    var peerPending = false;
     if (otherUid == null) {
       final chatsAsync = ref.watch(chatsForCurrentUserProvider);
       // `valueOrNull` preserva la lista previa durante reloads/errores
@@ -405,17 +432,32 @@ class _Header extends ConsumerWidget {
       // de chat (mismo bug que la lista).
       for (final c in (chatsAsync.valueOrNull ?? const [])) {
         if (c.chatId != chatId) continue;
-        final others = c.members.where((m) => m != uid).toList();
-        otherUid = others.isNotEmpty
-            ? others.first
-            : (c.members.isNotEmpty ? c.members.first : null);
+        otherUid = _peerOf(c, uid);
         break;
+      }
+      if (otherUid == null) {
+        // Un chat recién creado (abierto desde la ficha del alumno, sin
+        // mensajes todavía) NO está en `chatsForCurrentUserProvider`: esa
+        // query ordena por `lastMessageAt` y Firestore deja afuera los docs
+        // que no tienen el campo. Antes caía en `data(null)` y el header
+        // decía «Usuario eliminado» hasta el primer mensaje. El doc del chat
+        // sí existe: se lee directo (el mismo provider que el pane ya
+        // escucha para el aviso de chat cerrado, sin listener nuevo).
+        final chatAsync = ref.watch(chatByIdProvider(chatId));
+        final chat = chatAsync.valueOrNull;
+        if (chat != null) {
+          otherUid = _peerOf(chat, uid);
+        } else {
+          peerPending = chatAsync.isLoading;
+        }
       }
     }
 
     final pubAsync = otherUid != null
         ? ref.watch(userPublicProfileProvider(otherUid))
-        : const AsyncValue.data(null);
+        : peerPending
+            ? const AsyncValue<UserPublicProfile?>.loading()
+            : const AsyncValue<UserPublicProfile?>.data(null);
 
     // Nombre a mostrar mientras el perfil vivo está loading/ausente. Con
     // `peerNameInitial` (ya resuelto por el caller, p.ej. el header del
@@ -594,6 +636,42 @@ class _MessagesList extends StatelessWidget {
         '📷 Foto', // never reached in V3 (image renders inline)
       null => '📎 Adjunto', // i18n: Fase W2 — defensive
     };
+  }
+}
+
+/// Aviso persistente en lugar del composer cuando el chat está cerrado
+/// (`Chat.isClosed`). Sólo texto, sin controles: el copy vive en el ARB
+/// (`chatClosedComposerNotice`) para que sea el mismo que ve la app móvil.
+class _ClosedNotice extends StatelessWidget {
+  const _ClosedNotice({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('chat_closed_notice'),
+      color: palette.bgCard,
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(TreinoIcon.infoCircle, size: 18, color: palette.textMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              AppL10n.of(context).chatClosedComposerNotice,
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
+                color: palette.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

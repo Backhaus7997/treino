@@ -59,7 +59,8 @@ ProviderContainer _container({
 }) {
   final c = ProviderContainer(
     overrides: [
-      assignedRoutinesProvider('u1').overrideWith((ref) async => assigned),
+      assignedRoutinesProvider('u1')
+          .overrideWith((ref) => Stream.value(assigned)),
       userCreatedRoutinesProvider('u1')
           .overrideWith((ref) => Stream.value(own)),
       userProfileProvider.overrideWith(
@@ -243,6 +244,50 @@ void main() {
       final entries = await c.read(unifiedRoutinesProvider('u1').future);
 
       expect(entries.map((e) => e.routine.id), ['p1', 'r1']);
+    });
+  });
+
+  // #1698: la lista unificada se arma sobre `assignedRoutinesProvider`, que es un
+  // stream. Un plan que el PF asigna o archiva con la app abierta tiene que
+  // llegar a RUTINAS sin recargar.
+  group('unifiedRoutinesProvider — EN VIVO con el PF', () {
+    test('un plan asignado DESPUÉS aparece fijado arriba; archivado, sale',
+        () async {
+      final asignadas = StreamController<List<Routine>>();
+      addTearDown(asignadas.close);
+      final c = ProviderContainer(
+        overrides: [
+          assignedRoutinesProvider('u1')
+              .overrideWith((ref) => asignadas.stream),
+          userCreatedRoutinesProvider('u1')
+              .overrideWith((ref) => Stream.value([_own('r1')])),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_profile(activeRoutineId: 'r1')),
+          ),
+          userRepositoryProvider.overrideWithValue(userRepo),
+        ],
+      );
+      addTearDown(c.dispose);
+      await _warmProfile(c);
+      final sub = c.listen(unifiedRoutinesProvider('u1'), (_, __) {});
+      addTearDown(sub.close);
+      List<String> ids() => c
+          .read(unifiedRoutinesProvider('u1'))
+          .requireValue
+          .map((e) => e.routine.id)
+          .toList();
+
+      asignadas.add(const []);
+      await pumpEventQueue();
+      expect(ids(), ['r1']);
+
+      asignadas.add([_coach('p1')]);
+      await pumpEventQueue();
+      expect(ids(), ['p1', 'r1']);
+
+      asignadas.add(const []);
+      await pumpEventQueue();
+      expect(ids(), ['r1']);
     });
   });
 }

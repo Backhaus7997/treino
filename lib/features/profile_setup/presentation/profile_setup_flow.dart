@@ -126,6 +126,26 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     ref.read(profileSetupNotifierProvider.notifier).goBack();
   }
 
+  /// Atrás del SISTEMA (botón o gesto de Android): el mismo `VOLVER` del footer
+  /// y, en el primer paso, la misma salida que la X.
+  ///
+  /// Sin esto el alta es la raíz del stack (el router la abre con `go`) y atrás
+  /// cerraba la app: el borrador, que vive sólo en memoria, se perdía sin un
+  /// aviso (#1698, Android 2/2).
+  ///
+  /// En el paso 0 no hay a dónde volver, y salir es «Cancelar cuenta»: se reusa
+  /// [_onCancel] —el diálogo que ya existe— en vez de inventar otra salida. Un
+  /// segundo atrás con el diálogo abierto lo cierra (la ruta del diálogo está
+  /// arriba de ésta), así que nada se borra sin un «Cancelar cuenta» tocado a
+  /// propósito. Si ya hay una baja en curso, [_onCancel] no hace nada.
+  void _onSystemBack() {
+    if (ref.read(profileSetupNotifierProvider).currentStep == 0) {
+      _onCancel();
+    } else {
+      _onBack();
+    }
+  }
+
   /// Hard-cancel the onboarding from step 0. Shows a confirmation dialog, and
   /// if confirmed, deletes the Firestore profile + Firebase Auth user and
   /// navigates to /welcome. On failure shows a SnackBar and keeps the user
@@ -211,87 +231,95 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     // dejó. El resultado no se usa: watchearlo es lo que lo mantiene vivo.
     ref.watch(perfilAseguradoProvider);
 
-    return Scaffold(
-      backgroundColor: palette.bg,
-      body: MediaQuery(
-        // Clamp OS text scaling: huge accessibility settings would otherwise
-        // grow the fixed header into the PageView body and overflow (audit F4).
-        data: MediaQuery.of(context).copyWith(
-          textScaler: MediaQuery.textScalerOf(context).clamp(
-            minScaleFactor: 1.0,
-            maxScaleFactor: 1.3,
-          ),
-        ),
-        child: AppBackground(
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Column(
-                children: [
-                  // Cancel-onboarding affordance — only visible on step 0.
-                  // Tapping triggers a confirmation dialog; on confirm, the
-                  // Firebase Auth user and Firestore profile are deleted and
-                  // the user lands back on /welcome (REQ: hard cancel).
-                  if (state.currentStep == 0) ...[
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        key: const Key('profile_setup_cancel_button'),
-                        padding: EdgeInsets.zero,
-                        icon: Icon(
-                          TreinoIcon.close,
-                          color: palette.textPrimary,
+    return PopScope(
+        // El back del sistema se maneja acá: ver [_onSystemBack]. `canPop: false`
+        // también le avisa a Android 14+ (back predictivo) que la app lo atiende.
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _onSystemBack();
+        },
+        child: Scaffold(
+          backgroundColor: palette.bg,
+          body: MediaQuery(
+            // Clamp OS text scaling: huge accessibility settings would otherwise
+            // grow the fixed header into the PageView body and overflow (audit F4).
+            data: MediaQuery.of(context).copyWith(
+              textScaler: MediaQuery.textScalerOf(context).clamp(
+                minScaleFactor: 1.0,
+                maxScaleFactor: 1.3,
+              ),
+            ),
+            child: AppBackground(
+              child: SafeArea(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  child: Column(
+                    children: [
+                      // Cancel-onboarding affordance — only visible on step 0.
+                      // Tapping triggers a confirmation dialog; on confirm, the
+                      // Firebase Auth user and Firestore profile are deleted and
+                      // the user lands back on /welcome (REQ: hard cancel).
+                      if (state.currentStep == 0) ...[
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            key: const Key('profile_setup_cancel_button'),
+                            padding: EdgeInsets.zero,
+                            icon: Icon(
+                              TreinoIcon.close,
+                              color: palette.textPrimary,
+                            ),
+                            onPressed: _cancelando ? null : _onCancel,
+                            tooltip: 'Cancelar creación de cuenta',
+                          ),
                         ),
-                        onPressed: _cancelando ? null : _onCancel,
-                        tooltip: 'Cancelar creación de cuenta',
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-                  ProfileSetupHeader(
-                    currentStep: state.currentStep,
-                    title: _titles[state.currentStep],
-                  ),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: PageView(
-                      controller: _pageController,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: const [
-                        Step1UsernameAvatar(),
-                        Step2BornAt(),
-                        Step3Gym(),
-                        Step4ExperienceGender(),
-                        Step5WeightHeight(),
+                        const SizedBox(height: 4),
                       ],
-                    ),
+                      ProfileSetupHeader(
+                        currentStep: state.currentStep,
+                        title: _titles[state.currentStep],
+                      ),
+                      const SizedBox(height: 20),
+                      Expanded(
+                        child: PageView(
+                          controller: _pageController,
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: const [
+                            Step1UsernameAvatar(),
+                            Step2BornAt(),
+                            Step3Gym(),
+                            Step4ExperienceGender(),
+                            Step5WeightHeight(),
+                          ],
+                        ),
+                      ),
+                      // Terms checkbox — solo en el último step y solo sin
+                      // consentimiento registrado (email ya aceptó en Register).
+                      // QA-AUTH-001 (#434).
+                      if (state.isLastStep && needsTermsConsent) ...[
+                        const SizedBox(height: 12),
+                        TermsCheckbox(
+                          value: state.termsAccepted,
+                          onChanged: ref
+                              .read(profileSetupNotifierProvider.notifier)
+                              .updateTermsAccepted,
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      ProfileSetupFooter(
+                        onBack: state.currentStep == 0 ? null : _onBack,
+                        onPrimary:
+                            state.canGoNext && !_cancelando ? _onPrimary : null,
+                        primaryLabel: state.isLastStep ? 'EMPEZAR' : null,
+                        primaryLoading: state.isSubmitting,
+                      ),
+                    ],
                   ),
-                  // Terms checkbox — solo en el último step y solo sin
-                  // consentimiento registrado (email ya aceptó en Register).
-                  // QA-AUTH-001 (#434).
-                  if (state.isLastStep && needsTermsConsent) ...[
-                    const SizedBox(height: 12),
-                    TermsCheckbox(
-                      value: state.termsAccepted,
-                      onChanged: ref
-                          .read(profileSetupNotifierProvider.notifier)
-                          .updateTermsAccepted,
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  ProfileSetupFooter(
-                    onBack: state.currentStep == 0 ? null : _onBack,
-                    onPrimary:
-                        state.canGoNext && !_cancelando ? _onPrimary : null,
-                    primaryLabel: state.isLastStep ? 'EMPEZAR' : null,
-                    primaryLoading: state.isSubmitting,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }

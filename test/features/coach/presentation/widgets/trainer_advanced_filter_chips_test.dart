@@ -75,12 +75,12 @@ void main() {
         const TrainerAdvancedFilterChips(),
         overrides: [
           _withFakeLocation(),
-          selectedPriceFilterProvider.overrideWith((_) => PriceFilter.k5to10k),
+          selectedPriceFilterProvider.overrideWith((_) => PriceFilter.mid),
         ],
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('\$5-10k'), findsOneWidget);
+      expect(find.text('\$40-100k'), findsOneWidget);
       expect(find.text('Precio'), findsNothing);
     });
 
@@ -117,12 +117,12 @@ void main() {
       await tester.pumpWidget(_wrap(
         const TrainerAdvancedFilterChips(),
         overrides: [
-          selectedPriceFilterProvider.overrideWith((_) => PriceFilter.under5k),
+          selectedPriceFilterProvider.overrideWith((_) => PriceFilter.low),
         ],
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('< \$5k'), findsOneWidget);
+      expect(find.text('< \$40k'), findsOneWidget);
     });
   });
 }

@@ -33,10 +33,17 @@
   <title>TREINO Coach Hub</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- image_cropper web (croppie) — required by AvatarCropper.cropToSquare()
-       on Flutter Web. Pinned to v2.6.5 (same version image_cropper_for_web ships). -->
-  <link rel="stylesheet" href="https://unpkg.com/croppie@2.6.5/croppie.css"/>
-  <script src="https://unpkg.com/croppie@2.6.5/croppie.min.js"></script>
+  <!-- image_cropper web (cropperjs) — required by AvatarCropper.cropToSquare()
+       on Flutter Web. image_cropper_for_web >= 5.0.0 (hoy 7.0.0, vía
+       image_cropper 12.x) habla con cropperjs 1.x (`@JS("Cropper")`); las
+       versiones 4.x y anteriores usaban croppie. Con croppie cargado el global
+       `Cropper` no existe y el recorte falla con «cropper has not been
+       initialized» (#1694). Pineado a 1.6.2, la versión que documenta el README
+       del plugin — NO subir a 2.x: es otra API (web components) y el plugin no
+       la soporta. Va por unpkg y no por cdnjs (como dice el README) porque
+       unpkg ya está en el script-src/style-src del CSP de firebase.json. -->
+  <link rel="stylesheet" href="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.css"/>
+  <script src="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.js"></script>
 </head>
 <body>
   <!--

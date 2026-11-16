@@ -14,6 +14,8 @@ import '../../core/widgets/treino_destructive_menu_item.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../core/widgets/treino_toast.dart';
 import '../coach/application/template_quota_provider.dart';
+import '../coach/application/trainer_link_providers.dart'
+    show trainerLinkRepositoryProvider;
 import '../coach/presentation/template_limit_gate.dart';
 import '../coach/presentation/widgets/athlete_picker_sheet.dart';
 import '../profile/application/user_public_profile_providers.dart';
@@ -618,16 +620,33 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
   }
 
   Future<void> _onAssign(BuildContext context) async {
+    final l10n = AppL10n.of(context);
     final athleteId = await showAthletePickerSheet(context);
     if (athleteId == null || !mounted) return;
     setState(() => _assigning = true);
     // Capturado antes del await: `ref` después de un dispose tira.
     final analytics = ref.read(analyticsServiceProvider);
+    final routines = ref.read(routineRepositoryProvider);
+    final links = ref.read(trainerLinkRepositoryProvider);
+    final trainerId = ref.read(currentUidProvider) ?? '';
     try {
-      await ref.read(routineRepositoryProvider).assignTemplateToAthlete(
-            template: widget.template,
-            athleteId: athleteId,
-          );
+      // Última barrera (#1695): la hoja pudo quedar abierta mientras el alumno
+      // cortaba el vínculo, y las rules validan el rol, no el vínculo. Si no
+      // se puede preguntar, cae al aviso de error de abajo y tampoco escribe.
+      final vigente = await links.tieneVinculoVivo(
+        trainerId: trainerId,
+        athleteId: athleteId,
+      );
+      if (!vigente) {
+        if (!context.mounted) return;
+        showTreinoToast(context, l10n.coachAssignNoLink,
+            type: TreinoToastType.error);
+        return;
+      }
+      await routines.assignTemplateToAthlete(
+        template: widget.template,
+        athleteId: athleteId,
+      );
       // La copia asignada nace con la forma de la plantilla.
       analytics.logRoutineCreated(
         source: RoutineCreationSource.trainerAssigned,

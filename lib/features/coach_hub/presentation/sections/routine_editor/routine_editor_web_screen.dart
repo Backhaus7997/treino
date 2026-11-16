@@ -17,6 +17,7 @@ import '../../../../workout/application/custom_exercise_providers.dart';
 import '../../../../workout/application/exercise_filter.dart';
 import '../../../../workout/application/exercise_providers.dart';
 import '../../../../workout/domain/custom_exercise.dart';
+import '../../../../workout/presentation/widgets/bounded_number_formatter.dart';
 import '../../../../workout/presentation/widgets/superset_block.dart';
 import '../../../../workout/presentation/widgets/quick_entry_panel.dart';
 import '../../../../workout/presentation/widgets/quick_entry_parser.dart';
@@ -35,6 +36,8 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../../core/widgets/treino_select.dart';
 import '../../../../coach/application/blocked_athletes_providers.dart';
+import '../../../../coach/application/trainer_link_providers.dart'
+    show alumnoConVinculoVivoProvider, trainerLinkRepositoryProvider;
 import '../../../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../../../../coach/presentation/template_limit_gate.dart';
 import '../facturacion_planes/blocked_students_screen.dart'
@@ -56,11 +59,14 @@ import '../../../../workout/domain/routine_slot.dart';
 import '../../../../workout/domain/routine_source.dart';
 import '../../../../workout/domain/routine_visibility.dart';
 import '../../../../workout/domain/set_enums.dart';
+import '../../../../workout/domain/set_limits.dart';
 import '../../../../workout/domain/set_spec.dart';
 import '../../shell/responsive.dart' as rsp;
 import '../../widgets/create_custom_exercise_dialog.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import '../../widgets/exercise_picker_dialog.dart';
+import '../../../infrastructure/before_unload_guard.dart';
+import 'routine_editor_exit_guard.dart';
 import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 import 'package:treino/core/widgets/treino_toast.dart';
 
@@ -318,6 +324,27 @@ class _RoutineEditorWebScreenState
   bool _submitting = false;
   bool _publishing = false;
   bool _isDirty = false;
+
+  /// Cuenta cada edición. Un guardado se anota la que tenía al armar el
+  /// documento: si al volver el `await` sigue igual, el formulario ES lo
+  /// guardado; si subió, el PF siguió tipeando mientras se escribía y eso
+  /// todavía no está en ningún lado.
+  int _ediciones = 0;
+
+  /// El PF ya contestó «Descartar» y la salida está en marcha. La ruta
+  /// pregunta de nuevo en su `onExit`; sin esta marca el diálogo salía dos
+  /// veces seguidas.
+  bool _salidaConfirmada = false;
+
+  /// Hay un diálogo de descartar abierto. Un segundo intento de salir mientras
+  /// tanto (Atrás del navegador con el diálogo en pantalla) no apila otro.
+  bool _preguntandoSalida = false;
+
+  late final RoutineEditorExitGuard _exitGuard;
+
+  /// El aviso del navegador para recargar o cerrar la pestaña. Se prende con la
+  /// primera edición y se apaga al guardar o al irse de la pantalla.
+  late final BeforeUnloadGuard _beforeUnload;
   String? _errorMessage;
 
   /// True cuando [_errorMessage] describe una DENEGACIÓN de permiso y no un
@@ -364,6 +391,19 @@ class _RoutineEditorWebScreenState
   /// The routine being edited (its identity fields are preserved on save).
   Routine? _loadedRoutine;
 
+  /// La rutina que ESTA pantalla creó, si ya creó una (#1733).
+  ///
+  /// El primer guardado de un editor nuevo hace un `create`; si el PF se queda
+  /// en la pantalla y guarda otra vez, ese segundo guardado tiene que
+  /// ACTUALIZAR el mismo documento. Sin esto vuelve a la rama de creación y
+  /// deja dos rutinas iguales. Se anota apenas vuelve el `create`, antes de que
+  /// cualquier otra cosa pueda fallar.
+  Routine? _creada;
+
+  /// Hay un documento detrás de este formulario: se cargó uno (modo edición) o
+  /// esta pantalla lo acaba de crear.
+  bool get _yaExiste => _isEditing || _creada != null;
+
   /// True while the existing routine is being fetched (edit mode only).
   bool _loading = false;
 
@@ -374,6 +414,9 @@ class _RoutineEditorWebScreenState
   @override
   void initState() {
     super.initState();
+    _exitGuard = ref.read(routineEditorExitGuardProvider)
+      ..registrar(this, _confirmarSalida);
+    _beforeUnload = ref.read(beforeUnloadGuardProvider);
     if (_isEditing) {
       _loading = true;
       _load();
@@ -542,6 +585,12 @@ class _RoutineEditorWebScreenState
   /// desmontado y `ScaffoldMessenger.of` explota.
   ScaffoldMessengerState? _messenger;
 
+  /// `true` cuando esta pantalla dejó un aviso PARA que se lea al salir
+  /// (hoy: dónde quedó la copia, [_avisarCopiaGuardada]). `dispose` no lo
+  /// limpia: se muestra justo antes de cerrar y es lo único que le dice al PF
+  /// qué pasó, en la pantalla de atrás.
+  bool _avisoDeSalida = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -554,7 +603,16 @@ class _RoutineEditorWebScreenState
     // en el `ScaffoldMessenger` de la app y no en la ruta, así que sin esto
     // «sale de la Semana 3 · Deshacer» te seguía hasta Chat — y su Deshacer
     // apuntaba a un editor que ya no existe.
-    _messenger?.clearSnackBars();
+    //
+    // Salvo el que se dejó A PROPÓSITO para la pantalla de atrás: el aviso de
+    // «Se guardó la copia» se muestra antes de salir y este `dispose` corre
+    // cuando la ruta ya se fue, así que lo borraba a los pocos cientos de ms,
+    // con el PF todavía leyéndolo. Al ser el último aviso mostrado, reemplazó
+    // al que hubiera (`showTreinoToast` cierra el visible): no queda ninguno
+    // del editor atrás.
+    if (!_avisoDeSalida) _messenger?.clearSnackBars();
+    _exitGuard.soltar(this);
+    _beforeUnload.disarm();
     _nameCtrl.dispose();
     _splitCtrl.dispose();
     _summaryCtrl.dispose();
@@ -799,8 +857,12 @@ class _RoutineEditorWebScreenState
   // The publication control depends on dirty state, so the first edit must
   // rebuild even when it came from a plain TextField.onChanged.
   void _markDirty() {
+    _ediciones++;
     if (_isDirty) return;
     setState(() => _isDirty = true);
+    // Recargar o cerrar la pestaña no pasa por el router: sólo el navegador
+    // puede preguntar, y sólo si se lo pedimos ANTES.
+    _beforeUnload.arm();
   }
 
   Future<void> _onTogglePublished() async {
@@ -1917,6 +1979,10 @@ class _RoutineEditorWebScreenState
         return 'El día "${day.name}" necesita al menos un ejercicio.'; // i18n
       }
       for (final slot in day.slots) {
+        if (_descansoFueraDeTope(slot)) {
+          final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
+          return '$name tiene un descanso de más de $kMaxRestSeconds s.'; // i18n
+        }
         // Presence-mask backstop (Fase 4c): with the toggle's canonicalization
         // rules this should be unreachable, but a non-empty mask that names no
         // valid week would create an invisible ghost slot — refuse it.
@@ -1943,6 +2009,9 @@ class _RoutineEditorWebScreenState
             // as valid (mirrors mobile's isSetValid). One source of truth for
             // both this submit check and the live markers below.
             if (_isSetValid(slot, set)) continue;
+            if (!_enRango(set)) {
+              return '$name tiene un valor fuera de rango$wk.'; // i18n
+            }
             if (slot.exerciseMode == ExerciseMode.duration) {
               return '$name tiene una serie sin duración$wk.'; // i18n
             } else if (slot.exerciseMode == ExerciseMode.distance) {
@@ -1967,6 +2036,9 @@ class _RoutineEditorWebScreenState
   /// A single set's countable target is complete. Shared by the submit check
   /// [_firstValidationError] and every live marker so they can't diverge.
   bool _isSetValid(_EditorSlot slot, _EditorSet set) {
+    // Primero, y también para «al fallo»: un valor fuera de tope no puede
+    // pasar por ningún camino (mismo orden que `isSetValid` del teléfono).
+    if (!_enRango(set)) return false;
     if (set.type == SetType.failure) return true;
     if (slot.exerciseMode == ExerciseMode.duration) {
       return set.durationSeconds != null && set.durationSeconds! > 0;
@@ -1980,6 +2052,21 @@ class _RoutineEditorWebScreenState
     }
     return set.reps != null && set.reps! > 0;
   }
+
+  /// Ningún valor de la serie pasa del tope de dominio (`set_limits.dart`).
+  /// Los campos no dejan TIPEAR uno, pero un documento guardado antes de los
+  /// topes sí puede traerlo: no se re-escribe hasta que el PF lo corrija.
+  bool _enRango(_EditorSet s) =>
+      (s.reps ?? 0) <= kMaxReps &&
+      (s.repsMin ?? 0) <= kMaxReps &&
+      (s.repsMax ?? 0) <= kMaxReps &&
+      (s.weightKg ?? 0) <= kMaxWeightKg &&
+      (s.durationSeconds ?? 0) <= kMaxDurationSeconds &&
+      (s.distanceMeters ?? 0) <= kMaxDistanceMeters;
+
+  /// El descanso del ejercicio pasa del tope (es del ejercicio, no de la semana).
+  bool _descansoFueraDeTope(_EditorSlot slot) =>
+      slot.exercise != null && slot.restSeconds > kMaxRestSeconds;
 
   /// The slot has an incomplete set in week [w] — but only for weeks it is
   /// actually scheduled in (absent weeks never run, so they can't be "wrong").
@@ -1998,7 +2085,7 @@ class _RoutineEditorWebScreenState
 
   bool _slotHasError(_EditorSlot slot) {
     if (slot.exercise == null) return false; // empty slots block at day level
-    if (_slotIsGhost(slot)) return true;
+    if (_slotIsGhost(slot) || _descansoFueraDeTope(slot)) return true;
     for (var w = 0; w < slot.weeklySets.length; w++) {
       if (_slotHasErrorInWeek(slot, w)) return true;
     }
@@ -2010,9 +2097,15 @@ class _RoutineEditorWebScreenState
   String? _slotErrorText(_EditorSlot slot) {
     if (slot.exercise == null) return null;
     if (_slotIsGhost(slot)) return 'No está en ninguna semana.'; // i18n
+    if (_descansoFueraDeTope(slot)) {
+      return 'El descanso pasa el máximo ($kMaxRestSeconds s).'; // i18n
+    }
     for (var w = 0; w < slot.weeklySets.length; w++) {
       if (!_slotHasErrorInWeek(slot, w)) continue;
       final wk = _numWeeks > 1 ? ' (Semana ${w + 1})' : ''; // i18n
+      if (slot.weeklySets[w].any((s) => !_enRango(s))) {
+        return 'Hay un valor fuera de rango$wk.'; // i18n
+      }
       if (slot.exerciseMode == ExerciseMode.duration) {
         return 'Falta la duración de una serie$wk.'; // i18n
       }
@@ -2240,6 +2333,7 @@ class _RoutineEditorWebScreenState
       _errorIsDenial = false;
     });
 
+    final edicionesAlGuardar = _ediciones;
     final days = _days.map((d) {
       // supersetGroup ids are derived per day from the linkedToNext flags, over
       // the exercise-bearing slots only (the ones that become RoutineDay.slots).
@@ -2256,6 +2350,7 @@ class _RoutineEditorWebScreenState
     }).toList();
 
     final repo = ref.read(routineRepositoryProvider);
+    final linkRepo = ref.read(trainerLinkRepositoryProvider);
     // Captured before the write's async gap: the post-save cache invalidation
     // must land even if this screen is disposed mid-save, and a WidgetRef
     // touched after dispose throws. See [invalidateRoutineById].
@@ -2317,13 +2412,17 @@ class _RoutineEditorWebScreenState
         // O sea: el aviso, que es cosmético, se llevaría puesto el refresco,
         // que no lo es.
         copiaGuardada = copia.name;
-      } else if (_isEditing) {
+      } else if (_yaExiste) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
         // createdAt, …). updateTemplate/updateAssigned each write only
         // name/split/level/days/numWeeks/summary — `days` is rebuilt from a
         // form that models 100% of RoutineSlot's schema, so nothing is lost on
         // re-save (Fase 4c).
-        final draft = _loadedRoutine!.copyWith(
+        //
+        // `_creada` cuando el documento lo creó esta misma pantalla: el
+        // segundo guardado de un editor nuevo actualiza ese id (#1733).
+        final base = _loadedRoutine ?? _creada!;
+        final draft = base.copyWith(
           name: _nameCtrl.text.trim(),
           split: _splitCtrl.text.trim(),
           level: _level,
@@ -2333,7 +2432,7 @@ class _RoutineEditorWebScreenState
           // Sólo la plantilla los edita. En un plan asignado se conservan los
           // del doc cargado —`_goals` se hidrató de ahí y el selector no se
           // muestra—, y `updateAssigned` ni siquiera los manda.
-          goals: widget.isTemplate ? _goalsOrdered : _loadedRoutine!.goals,
+          goals: widget.isTemplate ? _goalsOrdered : base.goals,
         );
         if (widget.isTemplate) {
           await repo.updateTemplate(uid: trainerUid, draft: draft);
@@ -2361,13 +2460,33 @@ class _RoutineEditorWebScreenState
           assignedBy: trainerUid,
           visibility: RoutineVisibility.private,
         );
-        await repo.createTemplate(template);
+        _creada = await repo.createTemplate(template);
         analytics.logRoutineCreated(
           source: analyticsSource,
           daysCount: days.length,
           weeksCount: _numWeeks,
         );
       } else {
+        // Última barrera antes de crear el plan (#1695). El gate de arriba mira
+        // el stream del roster y el vínculo pudo cortarse con el editor abierto
+        // —el alumno lo termina desde su teléfono— y las rules no lo van a
+        // frenar: validan el rol, no el vínculo. Esto sí lo pregunta al
+        // servidor, a un paso de escribir.
+        final vigente = await linkRepo.tieneVinculoVivo(
+          trainerId: trainerUid,
+          athleteId: widget.athleteId!,
+        );
+        if (!vigente) {
+          if (mounted) {
+            setState(() {
+              _submitting = false;
+              _errorMessage = 'No se asignó nada: este alumno ya no tiene un '
+                  'vínculo vigente con vos.'; // i18n
+              _errorIsDenial = false;
+            });
+          }
+          return;
+        }
         final routine = Routine(
           id: '',
           name: _nameCtrl.text.trim(),
@@ -2385,13 +2504,27 @@ class _RoutineEditorWebScreenState
           // assignTemplateToAthlete.
           visibility: RoutineVisibility.private,
         );
-        await repo.createAssigned(routine);
+        _creada = await repo.createAssigned(routine);
         analytics.logRoutineCreated(
           source: analyticsSource,
           daysCount: days.length,
           weeksCount: _numWeeks,
         );
       }
+      // El documento YA está escrito: el guardado deja de estar en vuelo, y el
+      // formulario es lo guardado —salvo lo que el PF haya tipeado mientras se
+      // escribía—, o sea que no queda trabajo que perder al salir. Va antes de
+      // todo lo que sigue, que es cosmético y puede fallar sin cambiar esto, y
+      // es lo que deja volver a apretar Guardar si la pantalla sigue.
+      if (mounted) {
+        final limpio = _ediciones == edicionesAlGuardar;
+        setState(() {
+          _submitting = false;
+          if (limpio) _isDirty = false;
+        });
+        if (limpio) _beforeUnload.disarm();
+      }
+
       // La grilla de la sección Rutinas. `routinesAuthoredByProvider` es un
       // `FutureProvider.autoDispose` que esa pantalla WATCHEA, y el editor
       // llega por `context.push`: la ruta de abajo sigue montada, así que el
@@ -2425,7 +2558,6 @@ class _RoutineEditorWebScreenState
       if (copiaGuardada != null && mounted) {
         _avisarCopiaGuardada(copiaGuardada);
       }
-      if (mounted) context.pop();
     } catch (error) {
       if (!mounted) return;
       if (isPermissionDenied(error)) {
@@ -2459,7 +2591,14 @@ class _RoutineEditorWebScreenState
         }
         _errorIsDenial = false;
       });
+      return;
     }
+
+    // FUERA del `try`, a propósito (#1733). Salir toca el router, y el router
+    // puede negarse; si esa excepción cayera en el `catch` de arriba, el PF
+    // leería «No pudimos guardar» sobre una rutina que sí se guardó, y el
+    // reintento la duplicaría.
+    if (mounted) _salir();
   }
 
   /// El servidor rechazó la escritura por permisos.
@@ -2513,7 +2652,7 @@ class _RoutineEditorWebScreenState
             collection: 'routines',
             // Una copia es un CREATE aunque `_isEditing` sea true: se
             // escribe un documento nuevo y el original ni se toca.
-            operation: (_isEditing && modo != _ModoDeGuardado.copia)
+            operation: (_yaExiste && modo != _ModoDeGuardado.copia)
                 ? 'update'
                 : 'create',
             surface: 'routine_editor_web',
@@ -2632,6 +2771,7 @@ class _RoutineEditorWebScreenState
   /// sobrevive al `pop` y se lee en la pantalla de atrás — que es justo donde
   /// el PF va a buscar la copia.
   void _avisarCopiaGuardada(String nombre) {
+    _avisoDeSalida = true;
     showTreinoToast(
       context,
       'Se guardó «$nombre» en tus plantillas. La original quedó como '
@@ -2642,11 +2782,50 @@ class _RoutineEditorWebScreenState
 
   // ── Discard guard ────────────────────────────────────────────────────────
 
-  Future<void> _onBackTap() async {
-    if (!_isDirty) {
+  /// A dónde cae el editor cuando no hay pantalla de atrás: abierto por un link
+  /// directo, un F5 o una pestaña nueva. La lista de la que el editor es el
+  /// detalle: las rutinas del alumno, o la sección Rutinas para una plantilla.
+  String get _rutaDeRespaldo =>
+      widget.isTemplate ? '/rutinas' : '/rutinas/${widget.athleteId}';
+
+  /// Sale del editor.
+  ///
+  /// `pop()` a secas asume que SIEMPRE se llegó empujando, y no es cierto: con
+  /// el editor como única ruta `GoRouterDelegate.pop` tira `GoError('There is
+  /// nothing to pop')` —en release también, no es un `assert`—. Eso hacía que
+  /// «Volver» no hiciera nada y que Guardar mostrara un error sobre una
+  /// rutina ya guardada (#1733). Mismo criterio que `athlete_routines_screen`.
+  void _salir() {
+    if (context.canPop()) {
       context.pop();
-      return;
+    } else {
+      context.go(_rutaDeRespaldo);
     }
+  }
+
+  /// ¿Puede irse el PF? Sin cambios, sí. Con cambios, lo decide él.
+  ///
+  /// Es lo que contestan TODAS las salidas: la flecha, el back del sistema
+  /// ([PopScope]) y la ruta (`onExit`, que ve el sidebar y Atrás del
+  /// navegador, ver [RoutineEditorExitGuard]). Un diálogo, un solo lugar.
+  Future<bool> _confirmarSalida() async {
+    if (!_isDirty || _salidaConfirmada) return true;
+    if (_preguntandoSalida || !mounted) return false;
+    _preguntandoSalida = true;
+    final descartar = await _preguntarDescartar();
+    _preguntandoSalida = false;
+    // La salida que sigue vuelve a pasar por `onExit`: sin la marca preguntaría
+    // otra vez.
+    if (descartar) _salidaConfirmada = true;
+    return descartar;
+  }
+
+  Future<void> _onBackTap() async {
+    if (!await _confirmarSalida() || !mounted) return;
+    _salir();
+  }
+
+  Future<bool> _preguntarDescartar() async {
     final palette = AppPalette.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2681,7 +2860,7 @@ class _RoutineEditorWebScreenState
         ],
       ),
     );
-    if (confirmed == true && mounted) context.pop();
+    return confirmed == true;
   }
 
   // ── Build ────────────────────────────────────────────────────────────────
@@ -2709,6 +2888,28 @@ class _RoutineEditorWebScreenState
     // `.distinct()` del provider es lo que evita que las reescrituras del
     // barrido (que corren con los mismos valores) reconstruyan este árbol.
     if (!widget.isTemplate) ref.watch(blockedAthletesProvider);
+
+    // CREAR un plan para un alumno exige vínculo VIVO con él (activo o pausado,
+    // #1695). La ruta
+    // `/routine-editor/:athleteId` la escribe cualquiera, así que el gate vive
+    // acá y no en quien navega: un uid sin vínculo, de un ex-alumno o que ni
+    // existe cae en el mismo estado fatal que «no encontramos la rutina», con
+    // su «Volver» — no en un formulario que termina en una rutina huérfana.
+    //
+    // EDITAR no pasa por acá: un plan que ya existe es del PF aunque el vínculo
+    // haya terminado, y sacarlo (archivarlo) es justamente cómo se limpia.
+    final vinculo = (!widget.isTemplate && !_isEditing)
+        ? ref.watch(alumnoConVinculoVivoProvider(widget.athleteId!))
+        : const AsyncData(true);
+    final cargando = _loading || vinculo.isLoading;
+    final fatal = _fatalMessage ??
+        (vinculo.hasError
+            ? 'No pudimos verificar tu vínculo con $athleteName. '
+                'Probá de nuevo.' // i18n
+            : vinculo.valueOrNull == false
+                ? '$athleteName no tiene un vínculo vigente con vos, así que no '
+                    'podés asignarle una rutina.' // i18n
+                : null);
 
     final arbol = PopScope(
       canPop: !_isDirty,
@@ -2762,14 +2963,13 @@ class _RoutineEditorWebScreenState
           // ── Body: loading spinner / blocked notice / the form ───────────
           Expanded(
             child: TreinoStateSwitcher(
-              childKey: ValueKey(_loading
-                  ? 'loading'
-                  : (_fatalMessage != null ? 'fatal' : 'form')),
-              child: _loading
+              childKey: ValueKey(
+                  cargando ? 'loading' : (fatal != null ? 'fatal' : 'form')),
+              child: cargando
                   ? const Center(child: CircularProgressIndicator())
-                  : _fatalMessage != null
+                  : fatal != null
                       ? _FatalMessage(
-                          message: _fatalMessage!,
+                          message: fatal,
                           palette: palette,
                           onBack: _onBackTap,
                         )
@@ -3334,7 +3534,7 @@ class _RoutineEditorWebScreenState
             ),
           ),
           // ── Footer (hidden while loading or when blocked) ───────────────
-          if (!_loading && _fatalMessage == null)
+          if (!cargando && fatal == null)
             Container(
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
               decoration: BoxDecoration(
@@ -4476,12 +4676,27 @@ class _SlotCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  // 88 y no 60: el tema le pone 18 px de padding a cada lado y con
+                  // 60 quedaban 16 px de texto, que no alcanzan para «180» —se
+                  // veía «80»—. Con 88 entran los 3 dígitos del tope con holgura.
                   SizedBox(
-                    width: 60,
+                    width: 88,
                     child: TextFormField(
+                      key: const Key('routine_editor_rest_field'),
                       initialValue: slot.restSeconds.toString(),
                       keyboardType: TextInputType.number,
                       onChanged: onRestChanged,
+                      inputFormatters: [
+                        BoundedNumberFormatter(
+                          max: kMaxRestSeconds.toDouble(),
+                          decimal: false,
+                          onOverMax: () => _avisarTope(
+                            context,
+                            kMaxRestSeconds.toDouble(),
+                            'seg',
+                          ),
+                        ),
+                      ],
                       style: GoogleFonts.barlow(
                         color: palette.textPrimary,
                         fontSize: 13,
@@ -4740,6 +4955,10 @@ class _SetRow extends StatelessWidget {
             // Duration exercises (planks, cardio) have no weight — just seconds.
             Expanded(
               child: _numberField(
+                context,
+                fieldKey: const Key('routine_editor_duration_field'),
+                max: kMaxDurationSeconds.toDouble(),
+                unidad: 'seg',
                 initial: set.durationSeconds?.toString() ?? '',
                 hint: 'seg', // i18n
                 onChanged: onDurationChanged,
@@ -4750,6 +4969,10 @@ class _SetRow extends StatelessWidget {
             // Distancia (sled, carry, sprint): sólo metros, sin peso.
             Expanded(
               child: _numberField(
+                context,
+                fieldKey: const Key('routine_editor_distance_field'),
+                max: kMaxDistanceMeters,
+                unidad: 'm',
                 initial: formatWeightKg(set.distanceMeters),
                 hint: 'm', // i18n
                 decimal: true,
@@ -4761,6 +4984,10 @@ class _SetRow extends StatelessWidget {
             if (isRange) ...[
               Expanded(
                 child: _numberField(
+                  context,
+                  fieldKey: const Key('routine_editor_reps_min_field'),
+                  max: kMaxReps.toDouble(),
+                  unidad: 'reps',
                   initial: set.repsMin?.toString() ?? '',
                   hint: 'mín', // i18n
                   onChanged: onRepsMinChanged,
@@ -4770,6 +4997,10 @@ class _SetRow extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _numberField(
+                  context,
+                  fieldKey: const Key('routine_editor_reps_max_field'),
+                  max: kMaxReps.toDouble(),
+                  unidad: 'reps',
                   initial: set.repsMax?.toString() ?? '',
                   hint: 'máx', // i18n
                   onChanged: onRepsMaxChanged,
@@ -4779,6 +5010,10 @@ class _SetRow extends StatelessWidget {
             ] else
               Expanded(
                 child: _numberField(
+                  context,
+                  fieldKey: const Key('routine_editor_reps_field'),
+                  max: kMaxReps.toDouble(),
+                  unidad: 'reps',
                   initial: set.reps?.toString() ?? '',
                   hint: 'reps', // i18n
                   onChanged: onRepsChanged,
@@ -4788,6 +5023,10 @@ class _SetRow extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: _numberField(
+                context,
+                fieldKey: const Key('routine_editor_weight_field'),
+                max: kMaxWeightKg,
+                unidad: 'kg',
                 initial: set.weightKg?.toString() ?? '',
                 hint: 'kg', // i18n
                 decimal: true,
@@ -4807,10 +5046,14 @@ class _SetRow extends StatelessWidget {
     );
   }
 
-  Widget _numberField({
+  Widget _numberField(
+    BuildContext context, {
+    required Key fieldKey,
     required String initial,
     required String hint,
     required ValueChanged<String> onChanged,
+    required double max,
+    required String unidad,
     bool decimal = false,
     bool invalid = false,
   }) {
@@ -4818,11 +5061,22 @@ class _SetRow extends StatelessWidget {
       borderSide: BorderSide(color: palette.danger),
     );
     return TextFormField(
+      key: fieldKey,
       initialValue: initial,
       keyboardType: decimal
           ? const TextInputType.numberWithOptions(decimal: true)
           : TextInputType.number,
       onChanged: onChanged,
+      // El mismo formatter que el editor del teléfono: sin negativos, sin
+      // letras ni `Infinity`, y la tecla que pasaría del tope se rechaza con
+      // aviso.
+      inputFormatters: [
+        BoundedNumberFormatter(
+          max: max,
+          decimal: decimal,
+          onOverMax: () => _avisarTope(context, max, unidad),
+        ),
+      ],
       style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 13),
       decoration: InputDecoration(
         isDense: true,
@@ -4834,6 +5088,12 @@ class _SetRow extends StatelessWidget {
     );
   }
 }
+
+/// La tecla se rechazó por el tope: lo dice, en vez de dejar un campo que
+/// «no responde». Mismo aviso que el editor del teléfono (`inputMaxReached`),
+/// con el copy acá porque este archivo no usa `AppL10n` (constraint C-6).
+void _avisarTope(BuildContext context, double max, String unidad) =>
+    showTreinoToast(context, 'Máximo ${max.toInt()} $unidad'); // i18n
 
 // ── Rep-mode chip (Reps fijas / Rango) ───────────────────────────────────────
 

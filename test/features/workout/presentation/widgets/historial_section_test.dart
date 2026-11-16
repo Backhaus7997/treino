@@ -233,6 +233,86 @@ void main() {
       expect(find.textContaining('45'), findsOneWidget);
     });
 
+    // ── #1701: sesión sin carga (series por tiempo / distancia) ─────────────
+    //
+    // La tarjeta tiene dos layouts —Row y, con texto grande, Wrap debajo del
+    // título—, y el volumen es opcional en los dos.
+
+    /// Distancia horizontal entre el borde derecho del bloque expandido (título
+    /// + fecha) y el borde izquierdo de [metric]: lo que separa a las métricas
+    /// del título en el layout Row.
+    double gapBeforeMetric(WidgetTester tester, Finder metric) {
+      final expanded = find
+          .ancestor(of: find.text('Push A'), matching: find.byType(Expanded))
+          .first;
+      return tester.getTopLeft(metric).dx - tester.getTopRight(expanded).dx;
+    }
+
+    testWidgets('#1701: sin volumen (0 kg) la tarjeta muestra sólo la duración',
+        (tester) async {
+      await _pumpHistorialSection(
+        tester,
+        sessions: [_makeSession(totalVolumeKg: 0, durationMin: 18)],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('kg'), findsNothing);
+      expect(find.text('18 min'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      // Un solo separador de 8px antes de la duración: sin el volumen no queda
+      // el del volumen colgando.
+      expect(gapBeforeMetric(tester, find.text('18 min')), 8);
+    });
+
+    testWidgets(
+        '#1701: con volumen, la tarjeta muestra volumen y duración, cada uno '
+        'a 8px del anterior', (tester) async {
+      await _pumpHistorialSection(
+        tester,
+        sessions: [_makeSession(totalVolumeKg: 1200, durationMin: 18)],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('1.200 kg'), findsOneWidget);
+      expect(find.text('18 min'), findsOneWidget);
+      expect(gapBeforeMetric(tester, find.text('1.200 kg')), 8);
+      expect(
+        tester.getTopLeft(find.text('18 min')).dx -
+            tester.getTopRight(find.text('1.200 kg')).dx,
+        8,
+      );
+    });
+
+    testWidgets(
+        '#1701: layout apilado (texto grande) sin volumen: sólo la duración, '
+        'sin desbordar', (tester) async {
+      await _pumpHistorialSection(
+        tester,
+        sessions: [_makeSession(totalVolumeKg: 0, durationMin: 18)],
+        textScaler: const TextScaler.linear(3.2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('kg'), findsNothing);
+      expect(find.text('18 min'), findsOneWidget);
+    });
+
+    testWidgets(
+        '#1701: layout apilado (texto grande) con volumen: muestra volumen y '
+        'duración', (tester) async {
+      await _pumpHistorialSection(
+        tester,
+        sessions: [_makeSession(totalVolumeKg: 1200, durationMin: 18)],
+        textScaler: const TextScaler.linear(3.2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('1.200 kg'), findsOneWidget);
+      expect(find.text('18 min'), findsOneWidget);
+    });
+
     // SCENARIO-360: abandoned sessions (wasFullyCompleted=false) are filtered out
     testWidgets(
         'SCENARIO-360: abandoned sessions (wasFullyCompleted=false) are filtered out',

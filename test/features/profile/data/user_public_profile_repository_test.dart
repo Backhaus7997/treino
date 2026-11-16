@@ -1,5 +1,12 @@
+// Los dobles de Firestore de #1698 implementan `CollectionReference` y
+// `DocumentReference` (selladas) para simular el permission-denied de las
+// reglas, que fake_cloud_firestore no evalúa.
+// ignore_for_file: subtype_of_sealed_class
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
@@ -544,4 +551,186 @@ void main() {
       expect(perfil.toJson().containsKey('hiddenFromDiscovery'), isFalse);
     });
   });
+
+  // [#1698] `firestore.rules` acota la `rachaSemanas` que el dueño puede
+  // escribir (lo guardado + una semana por semana ART desde el sello). El
+  // cliente recorta su valor al mismo techo para que, cuando el cálculo en vivo
+  // lo supera (objetivo semanal que baja, sesiones del reloj sin `finish`), la
+  // racha converja en vez de rebotar y decaer a 0 en el board.
+  group('#1698: updateCounters recorta la racha al techo de las reglas', () {
+    // Viernes 2026-07-24 12:00 ART. Su lunes es el 2026-07-20.
+    final ahora = DateTime.utc(2026, 7, 24, 15);
+    DateTime artNoon(int y, int m, int d) => DateTime.utc(y, m, d, 15);
+
+    late UserPublicProfileRepository repoConReloj;
+
+    setUp(() {
+      repoConReloj =
+          UserPublicProfileRepository(firestore: firestore, now: () => ahora);
+    });
+
+    Future<void> sembrar({int? racha, DateTime? sello}) {
+      return firestore.collection('userPublicProfiles').doc('u1').set({
+        'uid': 'u1',
+        'displayName': 'Ana',
+        if (racha != null) 'rachaSemanas': racha,
+        if (sello != null) 'rachaSemanasUpdatedAt': Timestamp.fromDate(sello),
+      });
+    }
+
+    Future<Map<String, Object?>> leer() async =>
+        (await firestore.collection('userPublicProfiles').doc('u1').get())
+            .data()!;
+
+    test('racha que continúa (+1 sobre la semana pasada): se escribe tal cual',
+        () async {
+      await sembrar(racha: 3, sello: artNoon(2026, 7, 15));
+
+      await repoConReloj
+          .updateCounters('u1', {'workoutsCount': 20, 'rachaSemanas': 4});
+
+      final doc = await leer();
+      expect(doc['rachaSemanas'], 4);
+      expect(doc['workoutsCount'], 20);
+      expect(doc['rachaSemanasUpdatedAt'], isA<Timestamp>());
+    });
+
+    test(
+        'un valor por encima del techo se recorta, y el resto de los '
+        'contadores igual se escriben', () async {
+      await sembrar(racha: 3, sello: artNoon(2026, 7, 15));
+
+      await repoConReloj
+          .updateCounters('u1', {'workoutsCount': 20, 'rachaSemanas': 9});
+
+      final doc = await leer();
+      expect(doc['rachaSemanas'], 4,
+          reason: 'lo guardado (3) + 1 semana desde el sello');
+      expect(doc['workoutsCount'], 20);
+    });
+
+    test('otra sesión la misma semana: el techo es lo guardado', () async {
+      await sembrar(racha: 3, sello: artNoon(2026, 7, 22));
+
+      await repoConReloj.updateCounters('u1', {'rachaSemanas': 5});
+
+      expect((await leer())['rachaSemanas'], 3);
+    });
+
+    test('escrituras perdidas: suma una semana por semana transcurrida',
+        () async {
+      await sembrar(racha: 5, sello: artNoon(2026, 7, 1));
+
+      await repoConReloj.updateCounters('u1', {'rachaSemanas': 8});
+
+      expect((await leer())['rachaSemanas'], 8);
+    });
+
+    test('racha cortada: bajar no se recorta', () async {
+      await sembrar(racha: 7, sello: artNoon(2026, 6, 20));
+
+      await repoConReloj.updateCounters('u1', {'rachaSemanas': 1});
+
+      expect((await leer())['rachaSemanas'], 1);
+    });
+
+    test(
+        'doc sin racha ni sello (sembrado en 0, o recién creado): primera '
+        'racha de 1', () async {
+      await sembrar();
+
+      await repoConReloj.updateCounters('u1', {'rachaSemanas': 6});
+
+      expect((await leer())['rachaSemanas'], 1);
+    });
+
+    test('sin `rachaSemanas` en el payload no hay lectura ni sello', () async {
+      await sembrar(racha: 3, sello: artNoon(2026, 7, 15));
+
+      await repoConReloj.updateCounters('u1', {'workoutsCount': 21});
+
+      final doc = await leer();
+      expect(doc['workoutsCount'], 21);
+      expect(doc['rachaSemanas'], 3);
+      expect(
+        (doc['rachaSemanasUpdatedAt'] as Timestamp).toDate().toUtc(),
+        artNoon(2026, 7, 15),
+        reason: 'el sello no se toca si la racha no se escribe',
+      );
+    });
+  });
+
+  group('#1698: si las reglas rechazan la racha, workoutsCount sigue', () {
+    late _MockFirestore mockFirestore;
+    late _MockCollection mockCol;
+    late _MockDoc mockDoc;
+    late List<Map<String, Object?>> writes;
+
+    setUpAll(() => registerFallbackValue(SetOptions(merge: true)));
+
+    setUp(() {
+      mockFirestore = _MockFirestore();
+      mockCol = _MockCollection();
+      mockDoc = _MockDoc();
+      writes = [];
+      when(() => mockFirestore.collection('userPublicProfiles'))
+          .thenReturn(mockCol);
+      when(() => mockCol.doc('u1')).thenReturn(mockDoc);
+      // Sin lectura posible (sin red ni caché) no hay techo que aplicar: el
+      // cliente manda lo que calculó y deciden las reglas.
+      when(() => mockDoc.get()).thenThrow(
+        FirebaseException(plugin: 'cloud_firestore', code: 'unavailable'),
+      );
+      when(() => mockDoc.set(any(), any())).thenAnswer((inv) async {
+        final data = inv.positionalArguments.first as Map<String, Object?>;
+        // Lo que hacen las reglas con una racha por encima del techo.
+        if (data.containsKey('rachaSemanas')) {
+          throw FirebaseException(
+            plugin: 'cloud_firestore',
+            code: 'permission-denied',
+          );
+        }
+        writes.add(data);
+      });
+    });
+
+    test('permission-denied en la racha: se reescribe SIN ella', () async {
+      final repo = UserPublicProfileRepository(firestore: mockFirestore);
+
+      await repo.updateCounters('u1', {'workoutsCount': 20, 'rachaSemanas': 9});
+
+      expect(writes, [
+        {'workoutsCount': 20},
+      ]);
+    });
+
+    test('permission-denied y nada más que la racha: no hay segundo write',
+        () async {
+      final repo = UserPublicProfileRepository(firestore: mockFirestore);
+
+      await repo.updateCounters('u1', {'rachaSemanas': 9});
+
+      expect(writes, isEmpty);
+    });
+
+    test('un error que NO es permission-denied sigue propagándose', () async {
+      when(() => mockDoc.set(any(), any())).thenThrow(
+        FirebaseException(plugin: 'cloud_firestore', code: 'unavailable'),
+      );
+      final repo = UserPublicProfileRepository(firestore: mockFirestore);
+
+      expect(
+        () => repo.updateCounters('u1', {'rachaSemanas': 2}),
+        throwsA(isA<FirebaseException>()),
+      );
+    });
+  });
 }
+
+class _MockFirestore extends Mock implements FirebaseFirestore {}
+
+class _MockCollection extends Mock
+    implements CollectionReference<Map<String, Object?>> {}
+
+class _MockDoc extends Mock
+    implements DocumentReference<Map<String, Object?>> {}

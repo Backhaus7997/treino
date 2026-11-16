@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_page.dart';
 
+import 'routine_editor_exit_guard.dart';
 import 'routine_editor_web_screen.dart';
 
 /// Rutas contextuales del editor de rutinas web.
@@ -15,9 +16,14 @@ import 'routine_editor_web_screen.dart';
 ///   (cualquiera: el editor hidrata y reescribe todo el modelo sin pérdida).
 /// - `/template-editor` → crear una plantilla reutilizable (sin alumno).
 /// - `/template-editor/:templateId` → editar una plantilla existente.
+///
+/// Las cuatro llevan `onExit: routineEditorOnExit`: es lo que pregunta antes de
+/// perder el trabajo cuando se sale por el sidebar o por Atrás del navegador,
+/// que reemplazan la pila sin pasar por el `PopScope` de la pantalla.
 final List<RouteBase> routineEditorRoutes = [
   GoRoute(
     path: '/routine-editor/:athleteId',
+    onExit: routineEditorOnExit,
     pageBuilder: (_, state) => coachHubPageAnimated(
       RoutineEditorWebScreen(
         athleteId: state.pathParameters['athleteId']!,
@@ -26,6 +32,7 @@ final List<RouteBase> routineEditorRoutes = [
   ),
   GoRoute(
     path: '/routine-editor/:athleteId/:routineId',
+    onExit: routineEditorOnExit,
     pageBuilder: (_, state) => coachHubPageAnimated(
       RoutineEditorWebScreen(
         athleteId: state.pathParameters['athleteId']!,
@@ -35,11 +42,13 @@ final List<RouteBase> routineEditorRoutes = [
   ),
   GoRoute(
     path: '/template-editor',
+    onExit: routineEditorOnExit,
     pageBuilder: (_, __) =>
         coachHubPageAnimated(const RoutineEditorWebScreen.template()),
   ),
   GoRoute(
     path: '/template-editor/:templateId',
+    onExit: routineEditorOnExit,
     pageBuilder: (_, state) => coachHubPageAnimated(
       RoutineEditorWebScreen.template(
         routineId: state.pathParameters['templateId'],

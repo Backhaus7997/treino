@@ -24,9 +24,11 @@ import '../application/session_providers.dart' show currentUidProvider;
 import '../domain/exercise.dart';
 import '../domain/exercise_progression.dart';
 import '../domain/muscle_group.dart';
+import 'widgets/best_set_label.dart';
 import 'widgets/exercise_progression_chart.dart';
 import 'widgets/exercise_progression_section.dart'
     show ChartPeriodLabels, ChartPeriodSelector;
+import 'widgets/mmss.dart';
 import 'widgets/exercise_video_player.dart';
 import 'widgets/personal_records_list.dart';
 import 'widgets/stat_tile.dart';
@@ -333,6 +335,7 @@ class _PersonalStatsBlockState extends ConsumerState<_PersonalStatsBlock> {
     // Loading/error → null → the tiles keep their "—" placeholder (the card
     // must never crash nor block the rest of the screen).
     final progression = progressionAsync.valueOrNull;
+    final headline = _headlineStat(progression, l10n);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,17 +365,14 @@ class _PersonalStatsBlockState extends ConsumerState<_PersonalStatsBlock> {
         const SizedBox(height: 12),
         _StatsCard(
           tiles: [
-            StatTile(
-                label: '1RM',
-                value: _oneRepMaxValue(
-                    progression, AppL10n.of(context).localeName)),
+            StatTile(label: headline.label, value: headline.value),
             StatTile(
               label: 'SESIONES',
               value: progression == null
                   ? null
                   : '${progression.frequencySessionCount}',
             ),
-            StatTile(label: 'PROGRESO', value: _progressValue(progression)),
+            StatTile(label: 'PROGRESO', value: _progressValue(headline.series)),
           ],
         ),
         const SizedBox(height: 12),
@@ -404,13 +404,51 @@ String? _oneRepMaxValue(ExerciseProgression? progression, String localeName) {
   return '${_formatStatValue(roundToNearestHalfKg(best), localeName)} kg';
 }
 
-/// PROGRESO tile criterion: % delta first→last session over the period's 1RM
-/// series — the estimated-strength metric, deliberately the same series the
-/// 1RM tile reads so the card stays internally coherent (session volume is
-/// confounded by set count; heaviest weight moves in coarse plate jumps).
-/// Needs ≥2 points inside the period; otherwise "—".
-String? _progressValue(ExerciseProgression? progression) {
-  final series = progression?.oneRepMaxSeries;
+/// The card's first tile and the series PROGRESO reads. For a lifted exercise
+/// that is the 1RM. A timed or distance exercise carries no weight (#1702), so
+/// it has no 1RM and the tile would only ever say «—» (#1715): its best mark
+/// of the period takes the slot — same «no weight» rule the chart uses to drop
+/// the weight chips — and PROGRESO follows that same series.
+({String label, String? value, List<ProgressionPoint>? series}) _headlineStat(
+  ExerciseProgression? progression,
+  AppL10n l10n,
+) {
+  final timed = progression?.bestDurationSeries ?? const <ProgressionPoint>[];
+  final distance =
+      progression?.bestDistanceSeries ?? const <ProgressionPoint>[];
+  double best(List<ProgressionPoint> s) =>
+      s.map((p) => p.value).reduce((a, b) => a > b ? a : b);
+  if (progression != null && progression.heaviestWeightSeries.isEmpty) {
+    if (timed.isNotEmpty) {
+      return (
+        label: l10n.progressionMetricLongestDuration,
+        value: formatMMSS(best(timed).round()),
+        series: timed,
+      );
+    }
+    if (distance.isNotEmpty) {
+      return (
+        label: l10n.progressionMetricLongestDistance,
+        value: l10n.workoutSetDistanceValue(
+            _formatStatValue(best(distance), l10n.localeName)),
+        series: distance,
+      );
+    }
+  }
+  return (
+    label: '1RM',
+    value: _oneRepMaxValue(progression, l10n.localeName),
+    series: progression?.oneRepMaxSeries,
+  );
+}
+
+/// PROGRESO tile criterion: % delta first→last session over the period's
+/// headline series — the 1RM, the estimated-strength metric, for a lifted
+/// exercise (deliberately the same series the 1RM tile reads so the card stays
+/// internally coherent: session volume is confounded by set count; heaviest
+/// weight moves in coarse plate jumps), or the time / distance of a timed /
+/// distance one (#1715). Needs ≥2 points inside the period; otherwise "—".
+String? _progressValue(List<ProgressionPoint>? series) {
   if (series == null || series.length < 2) return null;
   final first = series.first.value;
   if (first <= 0) return null;
@@ -457,8 +495,11 @@ class _ProgressionChartBlock extends StatelessWidget {
               oneRepMaxLabel: l10n.progressionMetricOneRepMax,
               bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
               bestSessionVolumeLabel: l10n.progressionMetricVolume,
+              longestDurationLabel: l10n.progressionMetricLongestDuration,
+              longestDistanceLabel: l10n.progressionMetricLongestDistance,
               volumeUnit: 'kg',
               weightUnit: 'kg',
+              distanceUnit: 'm',
               frequencyLabel: (n) => l10n.progressionFrequencyPeriod(n),
               singlePointHint: l10n.progressionSinglePointHint,
               emptyHint: l10n.progressionEmptyExercise,
@@ -477,8 +518,11 @@ class _ProgressionChartBlock extends StatelessWidget {
                 oneRepMaxLabel: l10n.progressionMetricOneRepMax,
                 bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
                 bestSessionVolumeLabel: l10n.progressionMetricVolume,
+                longestDurationLabel: l10n.progressionMetricLongestDuration,
+                longestDistanceLabel: l10n.progressionMetricLongestDistance,
                 volumeUnit: 'kg',
                 weightUnit: 'kg',
+                distanceUnit: 'm',
                 emptyText: l10n.progressionEmptyExercise,
                 localeName: l10n.localeName,
               ),
@@ -571,10 +615,17 @@ class _HistoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     // #368: bodyweight-only session → best set is reps-only, no volume line.
-    final isBodyweight = entry.bestWeightKg <= 0;
-    final bestSet = isBodyweight
-        ? '${entry.bestSetReps} reps'
-        : '${_formatStatValue(entry.bestWeightKg, AppL10n.of(context).localeName)} kg × ${entry.bestSetReps}';
+    // #1716: a timed / distance exercise shows its time or meters, and an old
+    // set with no metric and no reps has no best set to show — `null` hides
+    // the line instead of rendering «0 reps». Same rule as the post-workout
+    // summary ([bestSetLabel]).
+    final bestSet = bestSetLabel(
+      l10n: AppL10n.of(context),
+      weightKg: entry.bestWeightKg,
+      reps: entry.bestSetReps,
+      durationSeconds: entry.bestDurationSeconds,
+      distanceMeters: entry.bestDistanceMeters,
+    );
 
     return Row(
       children: [
@@ -604,14 +655,15 @@ class _HistoryRow extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              bestSet,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                color: palette.accent,
+            if (bestSet != null)
+              Text(
+                bestSet,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  color: palette.accent,
+                ),
               ),
-            ),
             if (entry.sessionVolume > 0) ...[
               const SizedBox(height: 2),
               Text(

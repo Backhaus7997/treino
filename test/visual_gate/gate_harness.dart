@@ -217,8 +217,8 @@ Future<ProviderContainer> pumpGate(
     measurementsForAthleteProvider.overrideWith(
       (ref, athleteId) => Stream.value(gateMeasurements(athleteId)),
     ),
-    assignedRoutinesProvider.overrideWith((ref, athleteId) async {
-      return const <Routine>[];
+    assignedRoutinesProvider.overrideWith((ref, athleteId) {
+      return Stream.value(const <Routine>[]);
     }),
     // Los DOS providers, a propósito. El listado del PF se mudó a
     // `assignedRoutinesByTrainerProvider` (el `list` del entrenador necesita

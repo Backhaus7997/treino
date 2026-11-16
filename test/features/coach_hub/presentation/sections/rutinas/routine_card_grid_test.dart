@@ -1,16 +1,33 @@
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinkRepositoryProvider, trainerLinksStreamProvider;
+import 'package:treino/features/coach/application/template_quota_provider.dart';
+import 'package:treino/features/coach/data/trainer_link_repository.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/routine_card_grid.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/workout/application/routine_providers.dart'
+    show routineRepositoryProvider;
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
+import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
+import 'package:treino/l10n/app_l10n.dart';
+
+import '../../../../../helpers/fake_analytics_service.dart';
+import '../../../../../helpers/trainer_links.dart';
 
 const _athlete = 'athlete-1';
 
@@ -603,7 +620,246 @@ void _menuDeRutinasTests() {
       expect(find.byKey(const Key('publicar_nombre_field')), findsOneWidget);
     });
   });
+
+  // #1784: el server rebota el create/restore de una plantilla con
+  // `permission-denied` (regla `templateQuotaOk`). El aviso del tope necesita
+  // un número concreto; sin él `mostrarAvisoTopeDePlantillasPorRebote`
+  // devuelve `false` y no muestra nada — y los dos call sites de la grilla
+  // ignoraban ese `false`, así que el PF no veía NADA.
+  group('RoutineCard — el rebote del tope de plantillas no es silencioso', () {
+    setUpAll(() => registerFallbackValue(_routine(id: 'fallback')));
+
+    final denegado = FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'permission-denied',
+    );
+
+    Future<void> pumpConCuota(
+      WidgetTester tester,
+      Routine rutina,
+      RoutineRepository repo,
+      AsyncValue<TemplateQuota> cuota,
+    ) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          routineRepositoryProvider.overrideWithValue(repo),
+          templateQuotaProvider.overrideWithValue(cuota),
+          analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: RoutineCardGrid(routines: [rutina]),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> publicarComoPlantilla(WidgetTester tester) async {
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Publicar como plantilla'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Publicar'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'publicar como plantilla: el server rebota y NO hay tope conocido → '
+        'toast de error, no silencio', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createTemplate(any())).thenThrow(denegado);
+
+      await pumpConCuota(
+        tester,
+        _routine(id: 'r1', assignedTo: _athlete),
+        repo,
+        // El gate falla abierto mientras la cuota carga: pasa, y el server
+        // rebota.
+        const AsyncValue.loading(),
+      );
+      await publicarComoPlantilla(tester);
+
+      verify(() => repo.createTemplate(any())).called(1);
+      expect(
+          find.textContaining('tope de plantillas de tu plan'), findsOneWidget);
+      // Y no el genérico «probá de nuevo»: reintentar no sirve contra un tope.
+      expect(find.text('No se pudo. Probá de nuevo.'), findsNothing);
+    });
+
+    testWidgets(
+        'publicar como plantilla: el server rebota y SÍ hay tope conocido '
+        '(carrera) → el aviso del tope, no el toast', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createTemplate(any())).thenThrow(denegado);
+
+      await pumpConCuota(
+        tester,
+        _routine(id: 'r1', assignedTo: _athlete),
+        repo,
+        // 2 de 3: el gate local deja pasar (le queda un lugar), pero el
+        // server ya contaba 3.
+        const AsyncValue.data((limit: 3, count: 2)),
+      );
+      await publicarComoPlantilla(tester);
+
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(
+          find.textContaining('tope de plantillas de tu plan'), findsNothing);
+    });
+
+    testWidgets(
+        'recuperar una plantilla archivada: el server rebota y NO hay tope '
+        'conocido → toast de error, no silencio', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.unarchive(any())).thenThrow(denegado);
+
+      await pumpConCuota(
+        tester,
+        _routine(
+          id: 'r1',
+          source: RoutineSource.trainerTemplate,
+          status: RoutineStatus.archived,
+        ),
+        repo,
+        const AsyncValue.loading(),
+      );
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Recuperar'));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.unarchive('r1')).called(1);
+      expect(
+          find.textContaining('tope de plantillas de tu plan'), findsOneWidget);
+    });
+  });
+
+  // #1695: asignar una plantilla CREA un plan para el alumno elegido, y las
+  // rules no miran el vínculo. El diálogo sólo lista a los vivos (activo o
+  // pausado), pero pudo quedar abierto mientras el alumno cortaba: el servidor
+  // tiene la última palabra, y se le pregunta justo antes de escribir.
+  group('RoutineCard — asignar una plantilla exige vínculo VIVO', () {
+    setUpAll(() => registerFallbackValue(_routine(id: 'fallback')));
+
+    /// Abre el menú de una plantilla, elige «Asignar a un alumno» y toca a
+    /// Sofía. El roster EN MEMORIA dice que está activa; [servidor] es lo que
+    /// contesta la verificación previa.
+    Future<_MockRoutineRepository> asignarASofia(
+      WidgetTester tester,
+      TrainerLinkRepository servidor,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.assignTemplateToAthlete(
+            template: any(named: 'template'),
+            athleteId: any(named: 'athleteId'),
+          )).thenAnswer((i) async => i.namedArguments[#template] as Routine);
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          trainerLinksStreamProvider
+              .overrideWith((ref) => Stream.value([linkDe(_athlete)])),
+          userPublicProfilesBatchProvider.overrideWith(
+            (ref, key) async => {
+              _athlete: const UserPublicProfile(
+                uid: _athlete,
+                displayName: 'Sofía',
+              ),
+            },
+          ),
+          routineRepositoryProvider.overrideWithValue(repo),
+          trainerLinkRepositoryProvider.overrideWithValue(servidor),
+          analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: Scaffold(
+            body: RoutineCardGrid(
+              routines: [
+                _routine(id: 'r1', source: RoutineSource.trainerTemplate),
+              ],
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Asignar a un alumno'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sofía'));
+      await tester.pumpAndSettle();
+      return repo;
+    }
+
+    for (final status in [TrainerLinkStatus.active, TrainerLinkStatus.paused]) {
+      testWidgets('vínculo ${status.name} en el servidor: asigna la copia',
+          (tester) async {
+        final repo = await asignarASofia(
+          tester,
+          await repoConVinculos([linkDe(_athlete, status: status)]),
+        );
+
+        verify(() => repo.assignTemplateToAthlete(
+              template: any(named: 'template'),
+              athleteId: _athlete,
+            )).called(1);
+        expect(find.textContaining('Se le asignó una copia'), findsOneWidget);
+      });
+    }
+
+    testWidgets('el servidor lo tiene TERMINADO: no escribe y lo dice',
+        (tester) async {
+      final repo = await asignarASofia(
+        tester,
+        await repoConVinculos([
+          linkDe(_athlete, status: TrainerLinkStatus.terminated),
+        ]),
+      );
+
+      verifyNever(() => repo.assignTemplateToAthlete(
+            template: any(named: 'template'),
+            athleteId: any(named: 'athleteId'),
+          ));
+      expect(
+        find.textContaining('ese alumno ya no tiene un vínculo vigente'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'si no se puede PREGUNTAR, tampoco escribe y no afirma que cortó',
+        (tester) async {
+      final servidor = _MockTrainerLinkRepository();
+      when(() => servidor.tieneVinculoVivo(
+            trainerId: any(named: 'trainerId'),
+            athleteId: any(named: 'athleteId'),
+          )).thenThrow(Exception('sin red'));
+
+      final repo = await asignarASofia(tester, servidor);
+
+      verifyNever(() => repo.assignTemplateToAthlete(
+            template: any(named: 'template'),
+            athleteId: any(named: 'athleteId'),
+          ));
+      expect(find.textContaining('No pudimos verificar tu vínculo'),
+          findsOneWidget);
+      expect(find.textContaining('ya no tiene un vínculo'), findsNothing);
+    });
+  });
 }
+
+class _MockRoutineRepository extends Mock implements RoutineRepository {}
+
+class _MockTrainerLinkRepository extends Mock
+    implements TrainerLinkRepository {}
 
 Future<void> _pumpSoloGrilla(
   WidgetTester tester,

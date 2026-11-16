@@ -21,6 +21,8 @@ _$ChatImpl _$$ChatImplFromJson(Map<String, dynamic> json) => _$ChatImpl(
               json['lastRead'], const TimestampMapConverter().fromJson),
       linkId: json['linkId'] as String?,
       kind: json['kind'] as String?,
+      closedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
+          json['closedAt'], const TimestampConverter().fromJson),
       archivedAt:
           _$JsonConverterFromJson<Map<String, Object?>, Map<String, DateTime>>(
               json['archivedAt'], const TimestampMapConverter().fromJson),
@@ -43,6 +45,8 @@ Map<String, dynamic> _$$ChatImplToJson(_$ChatImpl instance) =>
               instance.lastRead, const TimestampMapConverter().toJson),
       'linkId': instance.linkId,
       'kind': instance.kind,
+      'closedAt': _$JsonConverterToJson<Timestamp, DateTime>(
+          instance.closedAt, const TimestampConverter().toJson),
       'archivedAt':
           _$JsonConverterToJson<Map<String, Object?>, Map<String, DateTime>>(
               instance.archivedAt, const TimestampMapConverter().toJson),

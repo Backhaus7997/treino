@@ -98,7 +98,8 @@ ProviderContainer _container({
       userProfileProvider.overrideWith(
         (ref) => Stream.value(_perfil(activeRoutineId: activeRoutineId)),
       ),
-      assignedRoutinesProvider(_uid).overrideWith((ref) async => assigned),
+      assignedRoutinesProvider(_uid)
+          .overrideWith((ref) => Stream.value(assigned)),
       userCreatedRoutinesProvider(_uid)
           .overrideWith((ref) => Stream.value(selfCreated)),
       sessionsByUidProvider(_uid)

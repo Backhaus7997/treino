@@ -9,7 +9,8 @@
  *   - Guards: after missing → skip; el write ESCRIBIÓ `reason` =
  *     'athlete-account-deleted', o sea es el cascade de baja de cuenta (ver
  *     `isAthleteAccountDeletedWrite`) → skip; idem para
- *     'trainer-account-deleted' (#1333, `isTrainerAccountDeletedWrite`);
+ *     'trainer-account-deleted' (#1333, `isTrainerAccountDeletedWrite`); idem
+ *     para 'link-terminated' (#1833);
  *     before?.status === after.status → skip (no-op write).
  *   - Branches:
  *       create + requested → notify trainer, deepLink "/coach?tab=agenda"
@@ -27,6 +28,7 @@ import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import { ATHLETE_ACCOUNT_DELETED_REASON } from "../cascade/appointments";
 import { TRAINER_ACCOUNT_DELETED_REASON } from "../cascade/trainer-data";
+import { LINK_TERMINATED_REASON } from "../cancel-appointments-on-unlink";
 import { enqueueMail } from "../mail/enqueue-mail";
 import {
   formatDateAR,
@@ -238,6 +240,13 @@ export async function notifyOnAppointmentHandler(
     logger.info(
       `notifyOnAppointment: skipping cascade reason=${TRAINER_ACCOUNT_DELETED_REASON}`,
     );
+    return;
+  }
+
+  // Guard: `cancelAppointmentsOnUnlink` canceló los turnos de un vínculo terminado (#1833); los dos
+  // lados ya reciben UN aviso por el vínculo. Misma señal (`reason`) y misma mirada (la ESCRITURA).
+  if (after.reason === LINK_TERMINATED_REASON && before?.reason !== LINK_TERMINATED_REASON) {
+    logger.info(`notifyOnAppointment: skipping cascade reason=${LINK_TERMINATED_REASON}`);
     return;
   }
 

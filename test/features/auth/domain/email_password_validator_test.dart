@@ -52,6 +52,40 @@ void main() {
         equals('El email no es válido'),
       );
     });
+
+    // El autocompletado del teclado deja un espacio al final; los espacios de
+    // los bordes no son parte de la dirección (#1698).
+    test('acepta espacios al principio o al final (se recortan antes)', () {
+      expect(EmailPasswordValidator.validateEmail(' a@b.com'), isNull);
+      expect(EmailPasswordValidator.validateEmail('a@b.com '), isNull);
+      expect(EmailPasswordValidator.validateEmail('  a@b.com  '), isNull);
+      expect(EmailPasswordValidator.validateEmail('\ta@b.com\n'), isNull);
+    });
+
+    test('returns error for whitespace-only value', () {
+      expect(
+        EmailPasswordValidator.validateEmail('   '),
+        equals('El email no es válido'),
+      );
+    });
+
+    test('sigue rechazando espacios de ADENTRO', () {
+      expect(
+        EmailPasswordValidator.validateEmail('a b@c.com'),
+        equals('El email no es válido'),
+      );
+      expect(
+        EmailPasswordValidator.validateEmail(' a@b .com '),
+        equals('El email no es válido'),
+      );
+    });
+
+    test('recortar no vuelve válido un formato inválido', () {
+      expect(
+        EmailPasswordValidator.validateEmail(' noatsign '),
+        equals('El email no es válido'),
+      );
+    });
   });
 
   group('EmailPasswordValidator.validatePassword', () {

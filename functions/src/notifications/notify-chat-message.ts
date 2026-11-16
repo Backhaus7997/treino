@@ -76,6 +76,12 @@ export async function notifyOnChatMessageHandler(
     return;
   }
 
+  // Chat cerrado (#1697): este mensaje se coló antes de `syncChatOnTrainerLink`. Sin push.
+  if (chatSnap.data()?.closedAt != null) {
+    logger.info("notifyOnChatMessage: chat cerrado, sin push", { chatId });
+    return;
+  }
+
   const members: string[] = (chatSnap.data()?.members as string[] | undefined) ?? [];
   const recipients = members.filter((m) => m !== senderId);
 

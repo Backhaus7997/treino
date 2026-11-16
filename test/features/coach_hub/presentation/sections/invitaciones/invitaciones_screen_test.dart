@@ -606,6 +606,60 @@ void main() {
       expect(find.text('Solicitud rechazada.'), findsOneWidget);
     });
 
+    // #1751 — el `_busy` vive en el State del tile; sin key por id, al salir la
+    // fila procesada su State pasaba a la fila de abajo y ésta quedaba en
+    // «Procesando…» sin que nadie la tocara.
+    for (final accion in ['accept', 'decline']) {
+      testWidgets(
+          '$accion de la primera fila: la siguiente NO hereda «Procesando…» '
+          'cuando la procesada sale de la lista', (tester) async {
+        final svc = _MockPromotionService();
+        when(() => svc.accept(any())).thenAnswer((_) async {});
+        final repo = _MockRepo();
+        when(() => repo.decline(any())).thenAnswer((_) async {});
+        final controller = StreamController<List<TrainerLink>>();
+        addTearDown(controller.close);
+
+        final now = DateTime.now();
+        // La lista va requestedAt DESC: l1 (más nueva) arriba, l2 abajo.
+        final l1 =
+            _link('a1', TrainerLinkStatus.pending, id: 'l1', requestedAt: now);
+        final l2 = _link('a2', TrainerLinkStatus.pending,
+            id: 'l2', requestedAt: now.subtract(const Duration(hours: 1)));
+
+        await _pump(
+          tester,
+          linksStream: controller.stream,
+          profiles: [_prof('a1', 'Ana García'), _prof('a2', 'Beto Pérez')],
+          promotionService: svc,
+          repo: repo,
+          settle: false,
+        );
+        controller.add([l1, l2]);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(Key('${accion}_l1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('dialog_primary_button')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
+
+        // La fila procesada queda en spinner (todavía está en la lista)...
+        expect(find.byKey(const Key('solicitud_busy_l1')), findsOneWidget);
+        expect(find.byKey(const Key('solicitud_busy_l2')), findsNothing);
+
+        // ...hasta que el stream en vivo la saca.
+        controller.add([l2]);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.byKey(const Key('solicitud_busy_l2')), findsNothing);
+        expect(find.byKey(const Key('accept_l2')), findsOneWidget);
+        expect(find.byKey(const Key('decline_l2')), findsOneWidget);
+      });
+    }
+
     testWidgets('cancelar el diálogo NO llama a la callable', (tester) async {
       final svc = _MockPromotionService();
       when(() => svc.accept(any())).thenAnswer((_) async {});

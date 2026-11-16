@@ -158,6 +158,29 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // #1698: un espacio al borde (el teclado lo deja al autocompletar) daba «El
+  // email no es válido» porque se validaba antes del trim.
+  // ---------------------------------------------------------------------------
+  testWidgets('email con espacios al borde: valida y manda el valor recortado',
+      (tester) async {
+    String? emailEnviado;
+    final notifier = _TestAuthNotifier(
+      onReset: (email) async => emailEnviado = email,
+    );
+
+    await tester.pumpWidget(_buildApp(notifier: notifier));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField), ' user@example.com ');
+    await tester.pump();
+    await tester.tap(find.byType(AuthPillButton));
+    await tester.pumpAndSettle();
+
+    expect(find.text('El email no es válido'), findsNothing);
+    expect(emailEnviado, 'user@example.com');
+  });
+
+  // ---------------------------------------------------------------------------
   // REQ-AUTH-026: spinner during loading (local _isLoading state)
   // ---------------------------------------------------------------------------
   testWidgets('spinner shown while submit is in progress', (tester) async {

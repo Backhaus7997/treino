@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/moderation/moderation_guard.dart';
 import '../../coach/application/custom_exercise_quota_provider.dart';
+import '../../coach/application/trainer_link_providers.dart'
+    show trainerLinkRepositoryProvider;
 import '../../profile/domain/experience_level.dart';
 import '../../workout/application/custom_exercise_providers.dart';
 import '../../workout/application/routine_providers.dart';
@@ -38,6 +40,13 @@ final class PlanAssignBlockedUnresolved extends PlanAssignOutcome {
 /// No se intentó: no hay alumnos elegidos.
 final class PlanAssignNoAthletes extends PlanAssignOutcome {
   const PlanAssignNoAthletes();
+}
+
+/// No se escribió nada: [athleteIds] ya no tienen un vínculo vivo con el PF
+/// (#1695). Reintentar sin sacarlos no sirve, así que la UI los descarta.
+final class PlanAssignSinVinculo extends PlanAssignOutcome {
+  const PlanAssignSinVinculo(this.athleteIds);
+  final List<String> athleteIds;
 }
 
 /// La moderación vetó el texto del plan. Es el MISMO plan para todos los
@@ -369,6 +378,21 @@ class PlanImportPreviewController {
       );
     }
     if (athleteIds.isEmpty) return const PlanAssignNoAthletes();
+
+    // Última barrera antes de escribir (#1695): las rules validan el rol y no
+    // el vínculo, y el alumno pudo cortarlo con la vista previa abierta. UNA
+    // lectura al servidor; si alguno ya no es del PF no se le escribe a NADIE
+    // («Probá de nuevo» sería consejo falso), y si no se puede preguntar, tampoco.
+    final Set<String> vivos;
+    try {
+      vivos = await _ref
+          .read(trainerLinkRepositoryProvider)
+          .alumnosConVinculoVivo(trainerUid);
+    } catch (_) {
+      return const PlanAssignAllFailed();
+    }
+    final sinVinculo = athleteIds.where((id) => !vivos.contains(id)).toList();
+    if (sinVinculo.isNotEmpty) return PlanAssignSinVinculo(sinVinculo);
 
     final repo = _ref.read(routineRepositoryProvider);
     final analytics = _ref.read(analyticsServiceProvider);

@@ -118,7 +118,8 @@ void main() {
     }) =>
         [
           authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
-          assignedRoutinesProvider(_uid).overrideWith((_) async => assigned),
+          assignedRoutinesProvider(_uid)
+              .overrideWith((_) => Stream.value(assigned)),
           userCreatedRoutinesProvider(_uid)
               .overrideWith((_) => Stream.value(own)),
           userProfileProvider.overrideWith(
@@ -289,7 +290,8 @@ void main() {
       await tester.pumpWidget(_buildScreen(
         overrides: [
           authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
-          assignedRoutinesProvider(_uid).overrideWith((_) => completer.future),
+          assignedRoutinesProvider(_uid)
+              .overrideWith((_) => completer.future.asStream()),
           userCreatedRoutinesProvider(_uid)
               .overrideWith((_) => Stream<List<Routine>>.value(const [])),
           userProfileProvider.overrideWith((_) => Stream.value(_profile())),

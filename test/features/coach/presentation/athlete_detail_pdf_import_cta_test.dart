@@ -8,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
 import 'package:treino/features/coach/presentation/athlete_detail_screen.dart';
 import 'package:treino/features/coach_hub/application/plan_pdf_import_providers.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -16,6 +18,8 @@ import 'package:treino/features/workout/application/assigned_routine_providers.d
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+
+import '../../../helpers/trainer_links.dart';
 
 Future<void> _pump(WidgetTester tester, PdfImportGate gate) async {
   final router = GoRouter(
@@ -38,6 +42,8 @@ Future<void> _pump(WidgetTester tester, PdfImportGate gate) async {
     overrides: [
       nutritionPlanProvider.overrideWith((ref, key) => Stream.value(null)),
       currentUidProvider.overrideWithValue('trainer-1'),
+      trainerLinksStreamProvider
+          .overrideWith((ref) => Stream.value([linkDe('athlete-1')])),
       userPublicProfileProvider('athlete-1').overrideWith(
         (ref) => Stream.value(const UserPublicProfile(
             uid: 'athlete-1', displayName: 'Martín García')),

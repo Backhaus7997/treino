@@ -87,8 +87,11 @@ class ExerciseProgressionScreen extends ConsumerWidget {
                     oneRepMaxLabel: l10n.progressionMetricOneRepMax,
                     bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
                     bestSessionVolumeLabel: l10n.progressionMetricVolume,
+                    longestDurationLabel: l10n.progressionMetricLongestDuration,
+                    longestDistanceLabel: l10n.progressionMetricLongestDistance,
                     volumeUnit: 'kg',
                     weightUnit: 'kg',
+                    distanceUnit: 'm',
                     // #555: el count viene acotado al período activo del
                     // selector — el label habla de esa misma ventana, no de
                     // "las últimas 8 semanas".
@@ -110,8 +113,11 @@ class ExerciseProgressionScreen extends ConsumerWidget {
                     oneRepMaxLabel: l10n.progressionMetricOneRepMax,
                     bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
                     bestSessionVolumeLabel: l10n.progressionMetricVolume,
+                    longestDurationLabel: l10n.progressionMetricLongestDuration,
+                    longestDistanceLabel: l10n.progressionMetricLongestDistance,
                     volumeUnit: 'kg',
                     weightUnit: 'kg',
+                    distanceUnit: 'm',
                     emptyText: l10n.progressionEmptyExercise,
                     localeName: l10n.localeName,
                   ),

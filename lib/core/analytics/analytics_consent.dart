@@ -1,7 +1,9 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../firebase/emuladores.dart' show kUsaEmuladores;
 import '../persistence/shared_prefs_provider.dart';
 
 /// Clave de la preferencia. El prefijo `privacy.` la agrupa con lo que venga
@@ -21,13 +23,40 @@ const String kAnalyticsConsentKey = 'privacy.analytics_enabled';
 bool analyticsConsentFromPrefs(SharedPreferences prefs) =>
     prefs.getBool(kAnalyticsConsentKey) ?? true;
 
+/// Lo que de verdad se le pide a Firebase Analytics: el [consentimiento], salvo
+/// con `USE_EMULATOR`, donde la colección queda apagada (#1698).
+///
+/// Analytics no tiene emulador. Con los demás servicios redirigidos
+/// ([conectarEmuladores]), seguía mandando eventos al proyecto real —que es
+/// PRODUCCIÓN, `treino-dev`—: la QA E2E del 2026-11-06 midió 1068 requests en
+/// una pasada, y cada corrida de dev o QA ensuciaba los datos reales.
+///
+/// Es una expresión sobre una `const` (el default de [emulador]) y NO una
+/// llamada con un `false` literal: en un build normal se pliega
+/// a [consentimiento] y no deja nada, como el `if (kUsaEmuladores)` de los
+/// entry points (#1709); y el guard de `analytics_consent_scan_test` prohíbe los
+/// literales, porque la analítica tiene que seguir derivando del consentimiento
+/// del usuario. Sólo APAGA: nunca prende algo que el usuario revocó.
+///
+/// La usan los dos entry points y [_aplicarEnFirebase], así que el interruptor
+/// de Privacidad tampoco puede volver a prenderla en modo emulador. Lo que
+/// MUESTRA el interruptor sigue siendo la preferencia guardada
+/// ([analyticsConsentFromPrefs]), no esto.
+///
+/// [emulador] existe para que un test lo fuerce; nadie más lo pasa.
+bool analyticsEfectiva(
+  bool consentimiento, {
+  @visibleForTesting bool emulador = kUsaEmuladores,
+}) =>
+    consentimiento && !emulador;
+
 /// Cómo se le avisa a Firebase. Es un typedef y no una llamada directa para
 /// que los tests puedan observarlo: `FirebaseAnalytics.instance` necesita a
 /// Firebase inicializado, y un widget test no lo tiene.
 typedef AnalyticsToggle = Future<void> Function(bool enabled);
 
-Future<void> _aplicarEnFirebase(bool enabled) =>
-    FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(enabled);
+Future<void> _aplicarEnFirebase(bool enabled) => FirebaseAnalytics.instance
+    .setAnalyticsCollectionEnabled(analyticsEfectiva(enabled));
 
 /// El aplicador real. Los tests lo sobreescriben.
 final analyticsToggleProvider =
