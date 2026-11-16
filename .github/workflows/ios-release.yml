@@ -11,6 +11,15 @@
 # que falten; no hace falta exportar un .p12 desde una Mac. La key tiene que
 # tener rol Admin: con uno menor Apple no deja crear certificados.
 #
+# Cada corrida crea un certificado «Apple Development: Created via API» para
+# firmar el archive (el runner arranca vacío). No molestan, pero se acumulan:
+# revocar los viejos cada tanto en developer.apple.com → Certificates.
+#
+# Si el archive falla con «PLA Update available», no es el pipeline: Apple
+# actualizó el Program License Agreement y el Account Holder tiene que
+# aceptarlo en developer.apple.com. Hasta entonces bloquea certificados y
+# perfiles para todo el equipo, la API key incluida.
+#
 # EL RELOJ va adentro: el target de watchOS está en «Embed Watch Content» y
 # toma `FLUTTER_BUILD_NAME`/`FLUTTER_BUILD_NUMBER`, así que sale con la misma
 # versión que la app del teléfono.
@@ -27,9 +36,6 @@ name: iOS release (TestFlight)
 
 on:
   workflow_dispatch:
-  push:
-    # TEMPORAL: para iterar el pipeline desde su rama. Se saca antes de mergear.
-    branches: [ci/ios-release]
 
 permissions:
   contents: read
