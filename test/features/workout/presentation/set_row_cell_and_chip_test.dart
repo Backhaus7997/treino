@@ -275,6 +275,68 @@ void main() {
       expect(find.text('Máximo $kMaxReps reps'), findsOneWidget);
     });
 
+    // #1846: el campo decimal topaba SIEMPRE en el peso (500), y la distancia lo
+    // heredaba: una carrera de 5 km no se podía prescribir desde el teléfono.
+    group('tope de un campo decimal', () {
+      Future<TextEditingController> montar(
+        WidgetTester tester, {
+        double? max,
+        String? unit,
+      }) async {
+        const palette = AppPalette.mintMagenta;
+        final ctrl = TextEditingController();
+        addTearDown(ctrl.dispose);
+        await tester.pumpWidget(_host(
+          palette,
+          SizedBox(
+            width: 120,
+            child: SetCellField(
+              controller: ctrl,
+              palette: palette,
+              decimal: true,
+              max: max,
+              unit: unit,
+              onDecimalChanged: (_) {},
+            ),
+          ),
+        ));
+        return ctrl;
+      }
+
+      testWidgets('sin tope propio es un peso: 500 kg, y el aviso dice kg',
+          (tester) async {
+        final ctrl = await montar(tester);
+
+        await tester.enterText(find.byType(TextField), '500');
+        await tester.pump();
+        expect(ctrl.text, '500');
+
+        await tester.enterText(find.byType(TextField), '501');
+        await tester.pump();
+        expect(ctrl.text, '500');
+        expect(find.text('Máximo 500 kg'), findsOneWidget);
+      });
+
+      testWidgets('con el tope de la distancia: llega a 100000 m y avisa en m',
+          (tester) async {
+        final ctrl = await montar(tester, max: kMaxDistanceMeters, unit: 'm');
+
+        // Lo que antes se rechazaba (> 500) entra.
+        await tester.enterText(find.byType(TextField), '2000');
+        await tester.pump();
+        expect(ctrl.text, '2000');
+
+        await tester.enterText(find.byType(TextField), '100000');
+        await tester.pump();
+        expect(ctrl.text, '100000');
+
+        await tester.enterText(find.byType(TextField), '100001');
+        await tester.pump();
+        expect(ctrl.text, '100000');
+        expect(find.text('Máximo 100000 m'), findsOneWidget);
+      });
+    });
+
     testWidgets('decimal parsea coma y punto', (tester) async {
       const palette = AppPalette.mintMagenta;
       final ctrl = TextEditingController();
