@@ -1,0 +1,159 @@
+# Build de iOS (con la app del reloj embebida) y subida a App Store Connect.
+#
+# Existe porque el equipo releasea desde Windows: firmar y subir un build de
+# iOS exige macOS + Xcode, y este job pone ambos. Se dispara A MANO
+# (Actions → «iOS release (TestFlight)» → Run workflow) sobre `main`, después
+# del release develop → main, igual que el build de Android.
+#
+# FIRMA: automática, la que ya usa el proyecto (`CODE_SIGN_STYLE = Automatic`,
+# team J66AQRRM96). Con la API key de App Store Connect y
+# `-allowProvisioningUpdates`, Xcode pide a Apple los certificados y perfiles
+# que falten; no hace falta exportar un .p12 desde una Mac. La key tiene que
+# tener rol Admin: con uno menor Apple no deja crear certificados.
+#
+# EL RELOJ va adentro: el target de watchOS está en «Embed Watch Content» y
+# toma `FLUTTER_BUILD_NAME`/`FLUTTER_BUILD_NUMBER`, así que sale con la misma
+# versión que la app del teléfono.
+#
+# Secretos (Settings → Secrets → Actions):
+#   ASC_ISSUER_ID, ASC_KEY_ID, ASC_KEY_P8_BASE64  → API key de App Store Connect
+#   PLACES_CLIENT_KEY, CARTO_API_KEY              → los mismos --dart-define que
+#     el AAB de Android (#1371, #1381). Sin Places la búsqueda de gimnasios sale
+#     caída en producción.
+#
+# Sólo `workflow_dispatch`: este job sube un build a Apple con secretos de
+# release, y no tiene que correr en PRs (y menos en los de forks).
+name: iOS release (TestFlight)
+
+on:
+  workflow_dispatch:
+  push:
+    # TEMPORAL: para iterar el pipeline desde su rama. Se saca antes de mergear.
+    branches: [ci/ios-release]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
+
+jobs:
+  ios:
+    name: Build y subida a App Store Connect
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      TEAM_ID: J66AQRRM96
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Mismo criterio que `watch-typecheck` en ci.yml: el target del reloj
+      # exige watchOS 26.2 y el Xcode por defecto de la imagen cambia sin aviso.
+      - name: Elegir un Xcode con el SDK de watchOS >= 26.2
+        run: |
+          set -euo pipefail
+          ls -d /Applications/Xcode*.app
+          XCODE="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -v -i beta | sort -V | tail -n 1 || true)"
+          if [[ -z "${XCODE}" ]]; then
+            echo "::error::La imagen no trae ningún Xcode 26.x."
+            exit 1
+          fi
+          export DEVELOPER_DIR="${XCODE}/Contents/Developer"
+          SDK="$(xcrun --sdk watchos --show-sdk-version 2>/dev/null || true)"
+          MINIMO="26.2"
+          if [[ -z "${SDK}" || "$(printf '%s\n%s\n' "${MINIMO}" "${SDK}" | sort -V | head -n 1)" != "${MINIMO}" ]]; then
+            echo "::error::${XCODE} trae el SDK de watchOS '${SDK}', y hace falta ${MINIMO} o más."
+            exit 1
+          fi
+          echo "Elegido: ${XCODE} — watchOS SDK ${SDK}, iOS SDK $(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "DEVELOPER_DIR=${DEVELOPER_DIR}" >> "${GITHUB_ENV}"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # El mismo que el resto del CI (ci.yml).
+          flutter-version: '3.41.9'
+          channel: stable
+          cache: true
+
+      # La key y los defines se escriben en $RUNNER_TEMP, nunca en el repo, y
+      # sin pasar por `echo` para que no queden en el log.
+      - name: Credenciales de release
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          PLACES_CLIENT_KEY: ${{ secrets.PLACES_CLIENT_KEY }}
+          CARTO_API_KEY: ${{ secrets.CARTO_API_KEY }}
+        run: |
+          set -euo pipefail
+          for v in ASC_KEY_ID ASC_KEY_P8_BASE64 PLACES_CLIENT_KEY CARTO_API_KEY; do
+            if [[ -z "${!v:-}" ]]; then echo "::error::Falta el secreto ${v}."; exit 1; fi
+          done
+          KEY_PATH="${RUNNER_TEMP}/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "${ASC_KEY_P8_BASE64}" | base64 --decode > "${KEY_PATH}"
+          node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({PLACES_CLIENT_KEY: process.env.PLACES_CLIENT_KEY, CARTO_API_KEY: process.env.CARTO_API_KEY}))' "${RUNNER_TEMP}/release-defines.json"
+          echo "ASC_KEY_PATH=${KEY_PATH}" >> "${GITHUB_ENV}"
+
+      - name: Dependencias
+        run: flutter pub get
+
+      # Compila Dart y deja `ios/Flutter/Generated.xcconfig` con la versión del
+      # pubspec y los defines; el archive de abajo los reusa.
+      - name: Build de Flutter (sin firmar)
+        run: flutter build ios --release --no-codesign --dart-define-from-file="${RUNNER_TEMP}/release-defines.json"
+
+      - name: Archive firmado
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "${RUNNER_TEMP}/Runner.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "${ASC_KEY_PATH}" \
+            -authenticationKeyID "${ASC_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_ISSUER_ID}" \
+            DEVELOPMENT_TEAM="${TEAM_ID}" \
+            CODE_SIGN_STYLE=Automatic
+
+      # `destination: upload` hace que el export suba directo a App Store
+      # Connect; de ahí pasa a TestFlight cuando Apple termina de procesarlo.
+      - name: Export y subida a App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          cat > "${RUNNER_TEMP}/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "${RUNNER_TEMP}/Runner.xcarchive" \
+            -exportOptionsPlist "${RUNNER_TEMP}/ExportOptions.plist" \
+            -exportPath "${RUNNER_TEMP}/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "${ASC_KEY_PATH}" \
+            -authenticationKeyID "${ASC_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_ISSUER_ID}"
+
+      - name: Borrar credenciales
+        if: always()
+        run: rm -f "${RUNNER_TEMP}"/AuthKey_*.p8 "${RUNNER_TEMP}/release-defines.json"
